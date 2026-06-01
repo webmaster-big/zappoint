@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/attractions/AttractionPurchases.tsx
 
 export interface AttractionPurchasesPurchase {
   id: string;

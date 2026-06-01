@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -54,16 +52,9 @@ export interface AvailableSlotsRequest {
 }
 
 const timeSlotService = {
-  /**
-   * Get available time slots for a package and date via SSE (auto-finds available rooms)
-   * Returns an EventSource for real-time updates
-   */
   getAvailableSlotsSSE(params: AvailableSlotsRequest): EventSource {
-    // Get JWT token from localStorage
     const token = getStoredUser()?.token;
     
-    // Build URL with auth token as query parameter (EventSource doesn't support custom headers)
-    // New endpoint automatically finds available rooms for each time slot
     let url = `${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.date}`;
     
     if (token) {
@@ -73,10 +64,6 @@ const timeSlotService = {
     return new EventSource(url);
   },
 
-  /**
-   * Get available time slots for a package and date (one-time fetch, auto-finds available rooms)
-   * Use this for initial load or when SSE is not needed
-   */
   async getAvailableSlots(params: AvailableSlotsRequest): Promise<AvailableSlotsResponse> {
     const response = await api.get(
       `/package-time-slots/available-slots/${params.package_id}/${params.date}`

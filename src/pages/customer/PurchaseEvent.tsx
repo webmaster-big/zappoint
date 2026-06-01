@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -34,8 +34,9 @@ import { feeSupportService } from '../../services/FeeSupportService';
 import { specialPricingService } from '../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../types/SpecialPricing.types';
 import type { Event, EventAddOn } from '../../types/event.types';
+import { useMembershipBenefits } from '../../hooks/useMembershipBenefits';
+import type { MembershipBenefitQuoteItem } from '../../types/Membership.types';
 
-// Country codes (ISO 3166-1 alpha-2) with display names
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
   { code: 'CA', name: 'Canada' },
@@ -80,7 +81,6 @@ const countries: { code: string; name: string }[] = [
   { code: 'PE', name: 'Peru' },
 ];
 
-// Helper function to parse payment errors into user-friendly messages
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -123,24 +123,20 @@ const PurchaseEvent = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Date & time
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Purchase
   const [quantity, setQuantity] = useState(1);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
 
-  // Customer info
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
 
-  // Payment card details
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -152,19 +148,17 @@ const PurchaseEvent = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
 
-  // Signature & Terms
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
 
-  // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Dedup guard
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
-  // Fire `form_started` engagement exactly once per offer-page mount.
+  const pageViewFiredRef = useRef(false);
+
   const formStartedRef = useRef(false);
   const handleFormStarted = () => {
     if (formStartedRef.current) return;
@@ -178,7 +172,6 @@ const PurchaseEvent = () => {
     });
   };
 
-  // Billing address
   const [billingAddress, setBillingAddress] = useState('');
   const [billingAddress2, setBillingAddress2] = useState('');
   const [billingCity, setBillingCity] = useState('');
@@ -186,32 +179,25 @@ const PurchaseEvent = () => {
   const [billingZip, setBillingZip] = useState('');
   const [billingCountry, setBillingCountry] = useState('US');
 
-  // Multi-step form
   const [currentStep, setCurrentStep] = useState(1);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
 
-  // Account modal + mobile summary
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
 
-  // Customer search
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
-  // Country search
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
 
-  // SMS consent
   const [smsConsent, setSmsConsent] = useState(false);
 
-  // Fee breakdown & special pricing
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
-  // Check if customer is logged in
   const customerData = (() => {
     try {
       const data = localStorage.getItem('zapzone_customer');
@@ -221,7 +207,6 @@ const PurchaseEvent = () => {
     }
   })();
 
-  // Show account modal for non-logged-in users
   useEffect(() => {
     const data = localStorage.getItem('zapzone_customer');
     if (!data) {
@@ -239,14 +224,12 @@ const PurchaseEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
-  // Pre-fill customer info if logged in
   useEffect(() => {
     if (customerData) {
       setGuestName(customerData.name || `${customerData.first_name || ''} ${customerData.last_name || ''}`.trim() || '');
       setGuestEmail(customerData.email || '');
       setGuestPhone(customerData.phone || '');
       if (customerData.id) setSelectedCustomerId(customerData.id);
-      // Billing
       if (customerData.address) setBillingAddress(customerData.address);
       if (customerData.address2) setBillingAddress2(customerData.address2);
       if (customerData.city) setBillingCity(customerData.city);
@@ -261,7 +244,6 @@ const PurchaseEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced customer search by email
   useEffect(() => {
     const searchCustomer = async () => {
       const email = guestEmail.trim();
@@ -296,7 +278,6 @@ const PurchaseEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guestEmail]);
 
-  // Initialize Authorize.Net
   useEffect(() => {
     const initializeAuthorizeNet = async () => {
       if (!event) return;
@@ -314,13 +295,11 @@ const PurchaseEvent = () => {
           await loadAcceptJS(environment as 'sandbox' | 'production');
         }
       } catch {
-        // Payment system initialization failed - will show error when user tries to pay
       }
     };
     initializeAuthorizeNet();
   }, [event]);
 
-  // Fetch fee breakdown when event or quantity/add-ons change
   useEffect(() => {
     if (!event) {
       setFeeBreakdown(null);
@@ -349,7 +328,6 @@ const PurchaseEvent = () => {
     return () => clearTimeout(timeoutId);
   }, [event, quantity, selectedAddOns]);
 
-  // Fetch special pricing breakdown for event
   useEffect(() => {
     if (!event) {
       setSpecialPricingBreakdown(null);
@@ -392,7 +370,6 @@ const PurchaseEvent = () => {
         return;
       }
 
-      // Filter out past/inactive events
       const eventData = res.data;
       if (!eventData.is_active) {
         setError('This event is no longer available');
@@ -407,6 +384,15 @@ const PurchaseEvent = () => {
       }
 
       setEvent(res.data);
+
+      if (!pageViewFiredRef.current) {
+        pageViewFiredRef.current = true;
+        void trackPageView({
+          page_type: 'event_buy',
+          entity_type: 'event',
+          entity_id: res.data.id,
+        });
+      }
 
       const dateRes = await eventService.getAvailableDates(parseInt(eventId!));
       setAvailableDates(dateRes.dates || []);
@@ -434,7 +420,6 @@ const PurchaseEvent = () => {
     }
   };
 
-  // Price
   const eventPrice = event ? parseFloat(event.price) : 0;
   const ticketSubtotal = eventPrice * quantity;
   const addOnTotal = event?.add_ons
@@ -446,7 +431,26 @@ const PurchaseEvent = () => {
   const baseTotal = ticketSubtotal + addOnTotal;
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
   const totalAfterSpecialPricing = Math.max(0, baseTotal - specialPricingDiscount);
-  const totalAmount = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
+  const totalBeforeMembership = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
+
+  const benefitItems = useMemo<MembershipBenefitQuoteItem[]>(() => {
+    if (!event) return [];
+    const list: MembershipBenefitQuoteItem[] = [
+      { type: 'event', id: event.id, unit_price: eventPrice, quantity },
+    ];
+    if (event.add_ons) {
+      Object.entries(selectedAddOns).forEach(([idStr, qty]) => {
+        const id = parseInt(idStr);
+        const addon = event.add_ons!.find((a) => a.id === id);
+        if (addon && qty > 0) list.push({ type: 'addon', id, unit_price: parseFloat(addon.price), quantity: qty });
+      });
+    }
+    return list;
+  }, [event, eventPrice, quantity, selectedAddOns]);
+
+  const membershipBenefits = useMembershipBenefits(customerData?.id ?? null, event?.location_id ?? null, benefitItems, { self: true });
+  const membershipDiscount = membershipBenefits.discount;
+  const totalAmount = Math.max(0, totalBeforeMembership - membershipDiscount);
 
   const formatTime = (t: string) => {
     const [h, m] = t.split(':');
@@ -482,7 +486,6 @@ const PurchaseEvent = () => {
       return;
     }
 
-    // Dedup guard
     const now = Date.now();
     if (isSubmittingRef.current) return;
     if (purchaseComplete) return;
@@ -491,7 +494,6 @@ const PurchaseEvent = () => {
       return;
     }
 
-    // localStorage-based dedup to survive page reloads
     const dedupFingerprint = `${eventId}-${guestEmail}-${quantity}-${totalAmount.toFixed(2)}`;
     const lastPurchaseKey = localStorage.getItem('_lastEventPurchaseKey');
     const lastPurchaseTime = Number(localStorage.getItem('_lastEventPurchaseTime') || '0');
@@ -500,7 +502,6 @@ const PurchaseEvent = () => {
       return;
     }
 
-    // Validate signature and terms
     const stErrors: Record<string, string> = {};
     if (!signatureImage) {
       stErrors.signature = 'Please provide your signature before proceeding.';
@@ -515,7 +516,6 @@ const PurchaseEvent = () => {
     }
     setSignatureTermsErrors({});
 
-    // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
       setPaymentError('Please fill in all card details');
       isSubmittingRef.current = false;
@@ -554,7 +554,6 @@ const PurchaseEvent = () => {
         };
       });
 
-      // Card data
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -562,7 +561,6 @@ const PurchaseEvent = () => {
         cardCode: cardCVV,
       };
 
-      // Customer billing data
       const [firstName, ...rest] = guestName.trim().split(' ');
       const customerBillingData = {
         first_name: firstName || guestName,
@@ -577,7 +575,6 @@ const PurchaseEvent = () => {
         country: billingCountry,
       };
 
-      // Step 1: Create event purchase FIRST (no charge yet)
       let response;
       try {
         setNextTrackingId();
@@ -595,6 +592,7 @@ const PurchaseEvent = () => {
           total_amount: totalAmount,
           amount_paid: 0,
           discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
+          membership_id: membershipBenefits.membershipId ?? undefined,
           payment_method: 'authorize.net',
           payment_status: 'pending',
           special_requests: specialRequests || undefined,
@@ -610,7 +608,6 @@ const PurchaseEvent = () => {
 
       const createdPurchase = response.data || response;
 
-      // Step 2: Charge payment WITH payable_id
       const paymentData = {
         location_id: event!.location_id,
         amount: totalAmount,
@@ -658,7 +655,6 @@ const PurchaseEvent = () => {
 
       setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
-      // Store dedup fingerprint to prevent duplicate submissions
       localStorage.setItem('_lastEventPurchaseKey', dedupFingerprint);
       localStorage.setItem('_lastEventPurchaseTime', Date.now().toString());
 
@@ -694,7 +690,6 @@ const PurchaseEvent = () => {
     );
   }
 
-  // Ordered add-ons
   const orderedAddOns: EventAddOn[] = event
     ? (event.add_ons_order && event.add_ons
         ? event.add_ons_order.map(id => event.add_ons!.find(a => a.id === id)).filter(Boolean) as EventAddOn[]
@@ -704,7 +699,6 @@ const PurchaseEvent = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40">
 
-      {/* Account Modal */}
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
           <div className="bg-white max-w-sm w-full p-6 rounded-2xl shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -743,11 +737,9 @@ const PurchaseEvent = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
 
-          {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
 
-              {/* Progress Steps */}
               <div className="bg-gradient-to-r from-gray-50 to-white">
                 <div className="px-4 md:px-6 py-4 md:py-5">
                   <div className="flex items-center justify-between mb-2">
@@ -775,7 +767,6 @@ const PurchaseEvent = () => {
                 </div>
               </div>
 
-              {/* ── STEP 1: Date / Time / Quantity / Add-ons ── */}
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
@@ -783,7 +774,6 @@ const PurchaseEvent = () => {
                     <p className="text-xs md:text-sm text-gray-600">Choose your date, time, and quantity</p>
                   </div>
 
-                  {/* Date selection (date_range events) */}
                   {event.date_type === 'date_range' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -802,7 +792,6 @@ const PurchaseEvent = () => {
                     </div>
                   )}
 
-                  {/* Time slots */}
                   {selectedDate && (
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -836,7 +825,6 @@ const PurchaseEvent = () => {
                     </div>
                   )}
 
-                  {/* Quantity */}
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-center mb-4">
                       <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 text-blue-600" />
@@ -867,7 +855,6 @@ const PurchaseEvent = () => {
                     </div>
                   </div>
 
-                  {/* Add-ons */}
                   {orderedAddOns.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
@@ -938,7 +925,6 @@ const PurchaseEvent = () => {
                 </div>
               )}
 
-              {/* ── STEP 2: Customer Info + Billing ── */}
               {currentStep === 2 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6" onFocusCapture={handleFormStarted}>
                   <div>
@@ -947,7 +933,6 @@ const PurchaseEvent = () => {
                   </div>
 
                   <div className="space-y-4">
-                    {/* Email with customer search */}
                     <div className="relative">
                       <label className="block text-sm font-medium text-gray-900 mb-2">
                         Email Address <span className="text-red-500">*</span>
@@ -991,7 +976,6 @@ const PurchaseEvent = () => {
                       )}
                     </div>
 
-                    {/* Name */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-900 mb-2">First Name <span className="text-red-500">*</span></label>
@@ -1017,7 +1001,6 @@ const PurchaseEvent = () => {
                       </div>
                     </div>
 
-                    {/* Phone + SMS */}
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2">Phone Number</label>
                       <input
@@ -1035,7 +1018,6 @@ const PurchaseEvent = () => {
                       </label>
                     </div>
 
-                    {/* Special requests */}
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2">Special Requests <span className="text-gray-400 text-xs">(Optional)</span></label>
                       <textarea
@@ -1048,7 +1030,6 @@ const PurchaseEvent = () => {
                     </div>
                   </div>
 
-                  {/* Billing Information */}
                   <div className="mt-6 pt-6 border-t border-gray-100">
                     <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
                     <div className="space-y-4">
@@ -1152,7 +1133,6 @@ const PurchaseEvent = () => {
                 </div>
               )}
 
-              {/* ── STEP 3: Payment ── */}
               {currentStep === 3 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1176,7 +1156,6 @@ const PurchaseEvent = () => {
                     </div>
                   </div>
 
-                  {/* Card Form */}
                   <div className="space-y-4">
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Card Number</label>
@@ -1252,7 +1231,6 @@ const PurchaseEvent = () => {
                     </div>
                   </div>
 
-                  {/* Signature & Terms */}
                   <div className="space-y-4 mt-6 pt-6 border-t border-gray-100">
                     <h3 className="text-lg font-semibold">Signature & Agreement</h3>
                     <SignatureCapture
@@ -1306,7 +1284,6 @@ const PurchaseEvent = () => {
                 </div>
               )}
 
-              {/* ── STEP 4: Confirmation ── */}
               {currentStep === 4 && purchaseComplete && (
                 <div className="p-4 md:p-6">
                   <div className="text-center mb-6">
@@ -1366,7 +1343,6 @@ const PurchaseEvent = () => {
             </div>
           </div>
 
-          {/* Right Column - Event Summary (hidden on mobile, shown on lg+) */}
           <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden lg:sticky lg:top-8">
               {event.image && (
@@ -1391,7 +1367,6 @@ const PurchaseEvent = () => {
                   {event.description && <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">{event.description}</p>}
                 </div>
 
-                {/* Event details */}
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   <div className="flex items-start gap-2">
                     <div className="p-2 bg-blue-50 rounded-xl"><Clock className="h-4 w-4 text-blue-600" /></div>
@@ -1409,7 +1384,6 @@ const PurchaseEvent = () => {
                   )}
                 </div>
 
-                {/* Features list */}
                 {event.features && event.features.length > 0 && (
                   <div className="mb-5">
                     <div className="flex items-center gap-2 mb-2">
@@ -1427,7 +1401,6 @@ const PurchaseEvent = () => {
                   </div>
                 )}
 
-                {/* Order Summary */}
                 <div className="pt-4 border-t border-gray-100">
                   <h3 className="font-bold text-gray-900 mb-3 text-sm md:text-base">Order Summary</h3>
                   <div className="space-y-2">
@@ -1467,6 +1440,12 @@ const PurchaseEvent = () => {
                       </div>
                     )}
                   </div>
+                  {membershipDiscount > 0 && (
+                    <div className="mt-3 flex justify-between text-emerald-600 text-sm">
+                      <span>Member Savings{membershipBenefits.planName ? ` (${membershipBenefits.planName})` : ''}</span>
+                      <span>-${membershipDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Total</span>
@@ -1475,7 +1454,6 @@ const PurchaseEvent = () => {
                   </div>
                 </div>
 
-                {/* Trust badges */}
                 <div className="mt-5 bg-gray-50 rounded-xl p-3">
                   <div className="flex items-center justify-around text-xs text-gray-500">
                     <div className="text-center"><Shield className="h-4 w-4 mx-auto mb-1" /><span>Secure</span></div>
@@ -1489,7 +1467,6 @@ const PurchaseEvent = () => {
         </div>
       </div>
 
-      {/* Mobile Floating Summary Button */}
       <button
         onClick={() => setShowMobileSummary(true)}
         className="fixed top-4 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
@@ -1499,7 +1476,6 @@ const PurchaseEvent = () => {
         <span className="text-sm font-medium">${totalAmount.toFixed(2)}</span>
       </button>
 
-      {/* Mobile Order Summary Sidebar */}
       {showMobileSummary && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50 animate-mobile-summary-fade-in" onClick={() => setShowMobileSummary(false)} />

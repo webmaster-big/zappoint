@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/users/ManageAccounts.tsx
 
 export interface ManageAccountsAccount {
   id: string;

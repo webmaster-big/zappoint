@@ -9,8 +9,6 @@ interface PriceBreakdownProps {
   compact?: boolean;
 }
 
-// Displays a full price breakdown including all applicable fees.
-// Works for both packages and attractions.
 const PriceBreakdownDisplay: React.FC<PriceBreakdownProps> = ({ breakdown, className = '', compact = false }) => {
   const { themeColor } = useThemeColor();
 
@@ -36,13 +34,11 @@ const PriceBreakdownDisplay: React.FC<PriceBreakdownProps> = ({ breakdown, class
 
   return (
     <div className={`rounded-xl bg-gray-50 p-3 space-y-2 ${className}`}>
-      {/* Base Price */}
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-700">Base Price</span>
         <span className="font-medium text-gray-900">${breakdown.displayed_base_price.toFixed(2)}</span>
       </div>
 
-      {/* Fee Items */}
       {breakdown.fees.map((fee) => (
         <div key={fee.fee_support_id} className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-1.5 text-gray-600">
@@ -61,7 +57,6 @@ const PriceBreakdownDisplay: React.FC<PriceBreakdownProps> = ({ breakdown, class
         </div>
       ))}
 
-      {/* Divider */}
       <div className="pt-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-gray-900">Total</span>

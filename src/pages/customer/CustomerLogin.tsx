@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import type { LoginFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
@@ -42,6 +42,9 @@ const GoogleIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 
 const CustomerLogin = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get('next') || searchParams.get('redirect') || '/';
+  const safeNextPath = nextPath.startsWith('/') ? nextPath : '/';
   const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,7 +109,7 @@ const CustomerLogin = () => {
           token: response.token, role: response.role,
         }));
         await animateProgress(100, 400);
-        setTimeout(() => navigate('/'), 200);
+        setTimeout(() => navigate(safeNextPath), 200);
       } else { setError('Login failed. Please try again.'); }
     } catch (err: unknown) {
       console.error('Login error:', err);
@@ -120,9 +123,7 @@ const CustomerLogin = () => {
 
   return (
     <div className="h-dvh flex flex-col lg:flex-row overflow-hidden">
-      {/* Left — Form */}
       <div className="flex-1 flex flex-col min-h-0 bg-white lg:max-w-[480px] xl:max-w-[520px]">
-        {/* Mobile header */}
         <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-100">
           <Link to="/" className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,7 +190,7 @@ const CustomerLogin = () => {
 
             <p className="mt-4 text-center text-sm text-gray-500">
               Don't have an account?{' '}
-              <Link to="/customer/register" className="font-semibold text-blue-600 hover:text-blue-700 transition">Create an account</Link>
+              <Link to={safeNextPath !== '/' ? `/customer/register?next=${encodeURIComponent(safeNextPath)}` : '/customer/register'} className="font-semibold text-blue-600 hover:text-blue-700 transition">Create an account</Link>
             </p>
           </div>
         </div>
@@ -199,38 +200,30 @@ const CustomerLogin = () => {
         </p>
       </div>
 
-      {/* Right — Carousel */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden items-center justify-center bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800">
-        {/* Subtle dot grid */}
         <div className="absolute inset-0" style={{ opacity: 0.04, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
         <div className="relative z-10 w-full max-w-lg px-14">
-          {/* Section label */}
           <div className="flex items-center gap-3 mb-12">
             <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.15), transparent)' }} />
             <span style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>What you can do</span>
             <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.15), transparent)' }} />
           </div>
 
-          {/* Carousel content */}
           <div className="relative" style={{ minHeight: '320px' }}>
             {carouselSlides.map((slide, i) => (
               <div key={i} className={`absolute inset-0 flex flex-col transition-all duration-700 ease-out ${
                 i === carouselIndex ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
               }`}>
-                {/* Step number */}
                 <div className="flex items-center gap-3 mb-7">
                   <span style={{ fontSize: '40px', fontWeight: 800, color: 'rgba(255,255,255,0.12)', lineHeight: 1, letterSpacing: '-0.02em' }}>{slide.step}</span>
                   <div style={{ width: '28px', height: '2px', background: 'rgba(255,255,255,0.25)', borderRadius: '1px' }} />
                 </div>
 
-                {/* Title — using div instead of h2 to avoid global CSS !important heading override */}
                 <div style={{ fontSize: '28px', fontWeight: 700, color: '#ffffff', marginBottom: '14px', lineHeight: 1.2 }}>{slide.title}</div>
 
-                {/* Description */}
                 <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '15px', lineHeight: 1.7, marginBottom: '24px', maxWidth: '420px' }}>{slide.description}</p>
 
-                {/* Feature list */}
                 <div className="flex flex-col gap-2.5">
                   {slide.features.map((feat, fi) => (
                     <div key={fi} className="flex items-center gap-3">
@@ -243,7 +236,6 @@ const CustomerLogin = () => {
             ))}
           </div>
 
-          {/* Carousel indicators */}
           <div className="flex items-center gap-2 mt-6">
             {carouselSlides.map((_, i) => (
               <button key={i} onClick={() => setCarouselIndex(i)}
@@ -264,7 +256,6 @@ const CustomerLogin = () => {
         </div>
       </div>
 
-      {/* Google Coming Soon Popup */}
       {showGooglePopup && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowGooglePopup(false)}>
           <div className="bg-white rounded-2xl max-w-xs w-full shadow-2xl" onClick={e => e.stopPropagation()}>

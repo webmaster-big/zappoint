@@ -1,8 +1,4 @@
-// Types for: Payment processing with Authorize.Net
 
-/**
- * Payment type constants matching backend Payment model
- */
 export const PAYMENT_TYPE = {
   BOOKING: 'booking',
   ATTRACTION_PURCHASE: 'attraction_purchase',
@@ -35,29 +31,19 @@ export interface PaymentChargeRequest {
     zip?: string;
     country?: string;
   };
-  // Signature & Terms fields
   signature_image?: string; // base64 data URI of customer signature
   terms_accepted?: boolean; // Whether customer accepted Terms & Conditions
-  // Payable linking fields — charge endpoint links payment to entity automatically
   payable_id?: number; // ID of booking or attraction purchase
   payable_type?: PaymentPayableType; // 'booking' | 'attraction_purchase'
-  // Email & QR fields — charge endpoint sends confirmation email on success
   send_email?: boolean; // Whether to send confirmation email after successful charge
   qr_code?: string; // base64 data URI of QR code to include in email
 }
 
-/**
- * Request to link a payment to a booking or attraction purchase
- * Used after charge-then-link flow: charge first, create entity, then link
- */
 export interface LinkPayableRequest {
   payable_id: number;
   payable_type: PaymentPayableType;
 }
 
-/**
- * Response from linking a payment to a payable entity
- */
 export interface LinkPayableResponse {
   success: boolean;
   message: string;
@@ -78,7 +64,6 @@ export interface PaymentChargeResponse {
   payment?: Payment;
 }
 
-// Booking details returned from API
 export interface PaymentBooking {
   id: number;
   reference_number?: string;
@@ -99,7 +84,6 @@ export interface PaymentBooking {
   created_at?: string;
 }
 
-// Attraction purchase details returned from API
 export interface PaymentAttractionPurchase {
   id: number;
   transaction_id?: string;
@@ -118,7 +102,6 @@ export interface PaymentAttractionPurchase {
   created_at?: string;
 }
 
-// Event purchase details returned from API
 export interface PaymentEventPurchase {
   id: number;
   reference_number?: string;
@@ -144,10 +127,8 @@ export type PaymentMethod = 'card' | 'cash' | 'authorize.net' | 'in-store';
 
 export interface Payment {
   id: number;
-  // Polymorphic relationship fields
   payable_id?: number;
   payable_type?: PaymentPayableType;
-  // Backward compatibility
   booking_id?: number;
   customer_id?: number;
   location_id: number;
@@ -163,7 +144,6 @@ export interface Payment {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
-  // Relationships
   booking?: PaymentBooking | null;
   attractionPurchase?: PaymentAttractionPurchase | null;
   attraction_purchase?: PaymentAttractionPurchase | null;
@@ -180,19 +160,15 @@ export interface Payment {
     id: number;
     name: string;
   } | null;
-  // Computed payable details (when loaded)
   payable?: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
-  // Signature & Terms
   signature_image?: string | null;
   terms_accepted?: boolean | null;
   card_last_four?: string | null;
 }
 
 export interface CreatePaymentRequest {
-  // New polymorphic fields (preferred)
   payable_id?: number;
   payable_type?: PaymentPayableType;
-  // Backward compatibility (will be converted to payable_id/payable_type on backend)
   booking_id?: number;
   attraction_purchase_id?: number;
   customer_id?: number | null;
@@ -203,14 +179,10 @@ export interface CreatePaymentRequest {
   notes?: string;
   payment_id?: string;
   location_id?: number;
-  // Signature & Terms fields
   signature_image?: string; // base64 data URI of customer signature
   terms_accepted?: boolean; // Whether customer accepted Terms & Conditions
 }
 
-/**
- * Filters for fetching payments
- */
 export interface PaymentFilters {
   payable_id?: number;
   payable_type?: PaymentPayableType;
@@ -227,18 +199,12 @@ export interface PaymentFilters {
   page?: number;
 }
 
-/**
- * Refund request payload
- */
 export interface RefundRequest {
   amount?: number;
   notes?: string;
   cancel?: boolean;
 }
 
-/**
- * Refund response from the API
- */
 export interface RefundResponse {
   success: boolean;
   message: string;
@@ -255,9 +221,6 @@ export interface RefundResponse {
   payable: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
 }
 
-/**
- * Void response from the API
- */
 export interface VoidResponse {
   success: boolean;
   message: string;
@@ -270,28 +233,18 @@ export interface VoidResponse {
   payable: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
 }
 
-/**
- * Error data returned when a refund exceeds available balance
- */
 export interface RefundErrorData {
   original_amount: number;
   total_already_refunded: number;
   max_refundable: number;
 }
 
-/**
- * Manual refund request payload (for non-Authorize.Net payments: in-store, cash, card)
- * Notes field is REQUIRED for manual refunds to document offline processing
- */
 export interface ManualRefundRequest {
   amount?: number;
   notes: string;
   cancel?: boolean;
 }
 
-/**
- * Manual refund response from the API
- */
 export interface ManualRefundResponse {
   success: boolean;
   message: string;
@@ -306,9 +259,6 @@ export interface ManualRefundResponse {
   payable_cancelled: boolean;
 }
 
-/**
- * Paginated payments response
- */
 export interface PaginatedPaymentsResponse {
   success: boolean;
   data: {
@@ -328,7 +278,6 @@ export interface PaymentApiResponse<T = any> {
   data?: T;
 }
 
-// Accept.js types for Authorize.Net frontend integration
 export interface AcceptJSAuthData {
   clientKey: string;
   apiLoginID: string;
@@ -357,7 +306,6 @@ export interface AcceptJSResponse {
   };
 }
 
-// Window extension for Accept.js library
 declare global {
   interface Window {
     Accept?: {

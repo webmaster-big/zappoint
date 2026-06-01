@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/attractions/CreateAttractions.tsx
 
 export interface AttractionAvailabilitySchedule {
   days: string[];

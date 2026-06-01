@@ -49,7 +49,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
 
-  // Available day names (lowercase) from availability slots
   const availableDayNames = useMemo(() => {
     const days = new Set<string>();
     availability.forEach(slot => {
@@ -65,7 +64,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
     return `${y}-${m}-${d}`;
   };
 
-  // Check if a date is selectable
   const isDateSelectable = useMemo(() => {
     return (date: Date): boolean => {
       if (date < today) return false;
@@ -77,7 +75,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
     };
   }, [today, availableDayNames, dayOffDates]);
 
-  // Build calendar grid
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
     const lastDay = new Date(viewYear, viewMonth + 1, 0);
@@ -133,7 +130,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
 
   const canGoPrev = viewYear > today.getFullYear() || (viewYear === today.getFullYear() && viewMonth > today.getMonth());
 
-  // Highlighted available day columns (0-6 index)
   const availableDayIndices = useMemo(() => {
     const indices = new Set<number>();
     availableDayNames.forEach(name => {
@@ -147,10 +143,8 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
     return [...availableDayNames].map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ');
   }, [availableDayNames]);
 
-  // Calendar section
   const calendarSection = (
     <div className={compact ? 'p-2.5' : 'p-3'}>
-      {/* Month navigation */}
       <div className="flex items-center justify-between mb-2.5">
         <button
           type="button"
@@ -170,7 +164,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         </button>
       </div>
 
-      {/* Day headers — highlight available days */}
       <div className="grid grid-cols-7 gap-0.5 mb-1">
         {DAY_NAMES.map((name, idx) => (
           <div
@@ -186,7 +179,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         ))}
       </div>
 
-      {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-0.5">
         {calendarDays.map((day, idx) => {
           if (!day.date) {
@@ -195,7 +187,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
 
           const dateNum = day.date.getDate();
 
-          // Unavailable / past / day-off dates
           if (!day.selectable) {
             return (
               <div
@@ -212,7 +203,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
             );
           }
 
-          // Available selectable dates — highlighted with subtle bg and dot
           return (
             <button
               key={idx}
@@ -229,7 +219,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
               title={day.isToday ? 'Today' : undefined}
             >
               {dateNum}
-              {/* Available indicator dot */}
               {!day.isSelected && (
                 <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${day.isToday ? `bg-${themeColor}-600` : `bg-${themeColor}-400`}`} />
               )}
@@ -238,7 +227,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         })}
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 pt-2 border-t border-gray-100">
         <div className="flex items-center gap-1">
           <div className={`w-2 h-2 rounded-sm bg-${themeColor}-50 ring-1 ring-${themeColor}-200`} />
@@ -260,7 +248,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
     </div>
   );
 
-  // Time slot section
   const timeSection = (
     <div className={compact ? 'p-2.5' : 'p-3'}>
       <label className="block text-xs font-semibold text-gray-700 mb-2">
@@ -301,7 +288,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className={`px-4 py-2.5 bg-${themeColor}-50 border-b border-${themeColor}-100`}>
         <div className="flex items-center gap-2">
           <Clock className={`h-4 w-4 text-${themeColor}-600`} />
@@ -315,19 +301,15 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         )}
       </div>
 
-      {/* Mobile: stacked | Desktop: side-by-side */}
       <div className={`flex flex-col ${compact ? '' : 'md:flex-row'}`}>
-        {/* Calendar side */}
         <div className={`${compact ? 'w-full' : 'w-full md:w-[55%]'} ${compact ? '' : 'md:border-r'} border-gray-100`}>
           {calendarSection}
         </div>
-        {/* Time side */}
         <div className={`${compact ? 'w-full border-t' : 'w-full md:w-[45%] border-t md:border-t-0'} border-gray-100`}>
           {timeSection}
         </div>
       </div>
 
-      {/* Confirmation */}
       {scheduledDate && scheduledTime && (
         <div className="px-3 pb-3">
           <div className="p-2.5 bg-green-50 rounded-lg border border-green-200 flex items-center gap-2">

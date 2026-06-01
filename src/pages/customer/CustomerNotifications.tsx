@@ -71,7 +71,6 @@ const CustomerNotifications = () => {
       const res = await customerNotificationService.getUnreadCount();
       if (res.success) setUnreadCount(res.data.unread_count);
     } catch {
-      // silent
     }
   }, []);
 
@@ -211,7 +210,6 @@ const CustomerNotifications = () => {
       `}</style>
 
       <div className="min-h-screen bg-gray-50/80">
-        {/* Hero */}
         <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 slide-up">
@@ -236,10 +234,8 @@ const CustomerNotifications = () => {
         </section>
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Controls */}
           <div className="bg-white border border-gray-100 rounded-xl p-4 mb-5 slide-up">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              {/* Filter Tabs */}
               <div className="flex gap-1.5">
                 {(['all', 'unread', 'read'] as FilterTab[]).map(tab => (
                   <button
@@ -256,7 +252,6 @@ const CustomerNotifications = () => {
                 ))}
               </div>
 
-              {/* Type Filter */}
               <select
                 value={typeFilter}
                 onChange={(e) => { setTypeFilter(e.target.value as CustomerNotificationType | 'all'); setCurrentPage(1); }}
@@ -273,7 +268,6 @@ const CustomerNotifications = () => {
               </select>
             </div>
 
-            {/* Bulk Actions */}
             {selectedIds.length > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
                 <span className="text-xs text-gray-500">{selectedIds.length} selected</span>
@@ -294,7 +288,6 @@ const CustomerNotifications = () => {
               </div>
             )}
 
-            {/* Quick Actions */}
             <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
               <button onClick={selectAll} className="text-xs text-blue-700 hover:text-blue-800 font-semibold">
                 {selectedIds.length === notifications.length && notifications.length > 0 ? 'Deselect All' : 'Select All'}
@@ -311,7 +304,6 @@ const CustomerNotifications = () => {
             </div>
           </div>
 
-          {/* Loading Skeleton */}
           {loading && (
             <div className="space-y-2.5">
               {[...Array(4)].map((_, i) => (
@@ -330,7 +322,6 @@ const CustomerNotifications = () => {
             </div>
           )}
 
-          {/* Error */}
           {!loading && error && (
             <div className="bg-red-50 border border-red-100 rounded-lg p-5 text-center">
               <p className="text-sm text-red-700 mb-3">{error}</p>
@@ -343,7 +334,6 @@ const CustomerNotifications = () => {
             </div>
           )}
 
-          {/* Notifications List */}
           {!loading && !error && (
             <div className="space-y-2">
               {notifications.length === 0 ? (
@@ -365,7 +355,6 @@ const CustomerNotifications = () => {
                   >
                     <div className="p-3.5">
                       <div className="flex items-start gap-3">
-                        {/* Checkbox */}
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(notification.id)}
@@ -373,12 +362,10 @@ const CustomerNotifications = () => {
                           className="mt-1 rounded text-blue-600"
                         />
 
-                        {/* Icon */}
                         <div className={`p-2 rounded-lg shrink-0 ${getColor(notification.type)}`}>
                           {getIcon(notification.type)}
                         </div>
 
-                        {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
@@ -392,7 +379,6 @@ const CustomerNotifications = () => {
                                 {notification.message}
                               </p>
 
-                              {/* Extra data */}
                               {notification.data && Object.keys(notification.data).length > 0 && (() => {
                                 const d = notification.data as Record<string, string | number | undefined>;
                                 return (
@@ -404,7 +390,6 @@ const CustomerNotifications = () => {
                                 );
                               })()}
 
-                              {/* Priority */}
                               {notification.priority && notification.priority !== 'normal' && (
                                 <div className="mt-1.5">
                                   <span className={`text-xs px-2 py-0.5 font-semibold rounded-full ${
@@ -418,7 +403,6 @@ const CustomerNotifications = () => {
                               )}
                             </div>
 
-                            {/* Time & Actions */}
                             <div className="flex flex-col items-end gap-1.5 shrink-0">
                               <span className="text-xs text-gray-400 font-medium">{formatDate(notification.created_at)}</span>
                               <div className="flex gap-0.5">
@@ -460,7 +444,6 @@ const CustomerNotifications = () => {
             </div>
           )}
 
-          {/* Pagination */}
           {!loading && !error && totalItems > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 bg-white border border-gray-100 rounded-xl px-4 py-3">
               <div className="flex items-center gap-3 text-xs text-gray-500">

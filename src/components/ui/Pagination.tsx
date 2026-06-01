@@ -6,27 +6,15 @@ interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  /** Total number of items (used for "Showing X to Y of Z" text) */
   totalItems?: number;
-  /** Items per page (used for "Showing X to Y of Z" text) */
   itemsPerPage?: number;
-  /** Label for the items, e.g. "results", "activities", "payments" */
   itemLabel?: string;
-  /** Override the starting index (1-based) for "Showing X to Y" display when items come from server pagination */
   showingFrom?: number;
-  /** Override the ending index for "Showing X to Y" display when items come from server pagination */
   showingTo?: number;
-  /** Use compact layout (no "Showing" text, icon-only nav) — used for customer pages */
   compact?: boolean;
-  /** Additional className for the container */
   className?: string;
 }
 
-/**
- * Generates an array of page numbers and ellipsis markers to display.
- * Shows: first page, last page, current page, and 1 page on each side of current.
- * Ellipsis ("...") is inserted where pages are skipped.
- */
 function getPageNumbers(currentPage: number, totalPages: number): (number | '...')[] {
   if (totalPages <= 5) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -36,25 +24,20 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | '...
   const rangeStart = Math.max(2, currentPage - 1);
   const rangeEnd = Math.min(totalPages - 1, currentPage + 1);
 
-  // Always show first page
   pages.push(1);
 
-  // Ellipsis after first page if needed
   if (rangeStart > 2) {
     pages.push('...');
   }
 
-  // Pages around current
   for (let i = rangeStart; i <= rangeEnd; i++) {
     pages.push(i);
   }
 
-  // Ellipsis before last page if needed
   if (rangeEnd < totalPages - 1) {
     pages.push('...');
   }
 
-  // Always show last page
   pages.push(totalPages);
 
   return pages;
@@ -76,7 +59,6 @@ const Pagination: React.FC<PaginationProps> = ({
 
   const pages = getPageNumbers(currentPage, totalPages);
 
-  // Calculate "Showing X to Y of Z" values
   const from = showingFrom ?? (itemsPerPage ? (currentPage - 1) * itemsPerPage + 1 : undefined);
   const to = showingTo ?? (itemsPerPage && totalItems ? Math.min(currentPage * itemsPerPage, totalItems) : undefined);
 

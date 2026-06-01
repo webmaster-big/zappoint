@@ -54,7 +54,6 @@ const PurchaseDetails = () => {
     }
   };
 
-  // Get auth token from localStorage
   const getAuthToken = () => {
     const userData = localStorage.getItem('zapzone_user');
     if (userData) {
@@ -95,7 +94,6 @@ const PurchaseDetails = () => {
       console.log('🔐 Loading purchase details - Auth Token:', authToken ? 'Present' : 'Missing');
       const response = await attractionPurchaseService.getPurchase(Number(id));
       setPurchase(response.data);
-      // Generate QR code
       if (response.data?.id) {
         try {
           const qrCode = await generatePurchaseQRCode(response.data.id);
@@ -160,7 +158,6 @@ const PurchaseDetails = () => {
         }
       `}</style>
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <StandardButton
@@ -188,13 +185,10 @@ const PurchaseDetails = () => {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Purchase Information */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchase Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <User className={`h-5 w-5 text-${fullColor}`} />
@@ -215,7 +209,6 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
-              {/* Purchase Date */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <Calendar className={`h-5 w-5 text-${fullColor}`} />
@@ -226,7 +219,6 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
-              {/* Status */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
@@ -241,11 +233,9 @@ const PurchaseDetails = () => {
             </div>
           </div>
 
-          {/* Attraction Details */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Attraction Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Attraction */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <MapPin className={`h-5 w-5 text-${fullColor}`} />
@@ -259,7 +249,6 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
-              {/* Quantity */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <Ticket className={`h-5 w-5 text-${fullColor}`} />
@@ -270,7 +259,6 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
-              {/* Scheduled Date & Time */}
               {purchase.scheduled_date && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
@@ -288,7 +276,6 @@ const PurchaseDetails = () => {
                 </div>
               )}
 
-              {/* Duration */}
               {purchase.attraction?.duration && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
@@ -305,7 +292,6 @@ const PurchaseDetails = () => {
             </div>
           </div>
 
-          {/* Purchased Add-ons */}
           {purchase.add_ons && purchase.add_ons.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchased Add-ons</h2>
@@ -332,11 +318,9 @@ const PurchaseDetails = () => {
             </div>
           )}
 
-          {/* Payment Information */}
           <div className="p-6 border-b border-gray-100 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Total Amount */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
@@ -349,7 +333,6 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
-              {/* Payment Method */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <CreditCard className={`h-5 w-5 text-${fullColor}`} />
@@ -362,7 +345,6 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
-              {/* Transaction ID */}
               {purchase.transaction_id && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
@@ -404,7 +386,6 @@ const PurchaseDetails = () => {
             </div>
           </div>
 
-          {/* Notes */}
           {purchase.notes && (
             <div className="p-6 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
@@ -414,7 +395,6 @@ const PurchaseDetails = () => {
         </div>
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast
@@ -425,7 +405,6 @@ const PurchaseDetails = () => {
         </div>
       )}
 
-      {/* QR Code Modal */}
       {showQRModal && qrCodeData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowQRModal(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>

@@ -28,13 +28,11 @@ const GiftCard: React.FC = () => {
     max_usage: "1",
   });
   const [editIndex, setEditIndex] = useState<number | null>(null);
-  // Use string values for editForm fields for form compatibility
   const [editForm, setEditForm] = useState<null | Partial<Record<string, string>>>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Toast state
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const showToast = (message: string, type?: "success" | "error" | "info") => {
     setToast({ message, type });
@@ -46,7 +44,6 @@ const GiftCard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Get admin's location_id for scoping gift cards
   const adminLocationId = getStoredUser()?.location_id;
 
   const loadGiftCards = async () => {
@@ -83,15 +80,12 @@ const GiftCard: React.FC = () => {
     }
   };
 
-  // Note: Status updates for expired cards should be handled by the backend
-  // This useEffect is removed to avoid localStorage dependency
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Helper to generate a unique code
   function generateGiftCardCode(): string {
     return (
       'GC-' +
@@ -272,7 +266,6 @@ const GiftCard: React.FC = () => {
   const filteredGiftCards = giftCards.filter(card => {
     if (card.deleted) return false;
     
-    // Search filter
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       if (!card.code.toLowerCase().includes(search) && 
@@ -281,7 +274,6 @@ const GiftCard: React.FC = () => {
       }
     }
     
-    // Status filter
     if (filterStatus !== "all" && card.status !== filterStatus) {
       return false;
     }
@@ -289,7 +281,6 @@ const GiftCard: React.FC = () => {
     return true;
   });
 
-  // Clear filters function
   const clearFilters = () => {
     setFilterStatus("all");
     setSearchTerm("");
@@ -297,7 +288,6 @@ const GiftCard: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Page Header with Action Buttons */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gift Cards</h1>
@@ -313,12 +303,9 @@ const GiftCard: React.FC = () => {
         </StandardButton>
       </div>
 
-      {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
 
-        {/* Search and Filter Section */}
         <div className="mb-6">
-          {/* Search Row */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-lg">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -352,7 +339,6 @@ const GiftCard: React.FC = () => {
             </div>
           </div>
 
-          {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -382,13 +368,11 @@ const GiftCard: React.FC = () => {
             </div>
           )}
 
-          {/* Results count */}
           <div className="text-sm text-gray-500 mt-3">
             Showing {filteredGiftCards.length} gift card{filteredGiftCards.length !== 1 ? 's' : ''}
           </div>
         </div>
 
-        {/* Gift Cards Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -519,7 +503,6 @@ const GiftCard: React.FC = () => {
         )}
       </div>
 
-      {/* Create Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
@@ -621,7 +604,6 @@ const GiftCard: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
       {editIndex !== null && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
@@ -746,7 +728,6 @@ const GiftCard: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50">
           <Toast 

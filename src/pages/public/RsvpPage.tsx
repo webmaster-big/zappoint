@@ -1,11 +1,9 @@
-// src/pages/public/RsvpPage.tsx
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { RsvpPageData, RsvpSubmitRequest } from '../../types/invitation.types';
 import invitationService from '../../services/invitationService';
 
-// ── Confetti ─────────────────────────────────────────────────────────
 const ConfettiCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -171,7 +169,6 @@ const RsvpPage = () => {
     return `${hour % 12 || 12}:${m} ${ampm}`;
   };
 
-  // ── Loading ──
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -183,7 +180,6 @@ const RsvpPage = () => {
     );
   }
 
-  // ── Error ──
   if (error && !pageData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -204,7 +200,6 @@ const RsvpPage = () => {
 
   const { invitation, party, location, company } = pageData;
 
-  // ── Already Responded / Success ──
   if (submitted) {
     const isAttending = confirmationData?.rsvp_status === 'attending' || invitation.rsvp_status === 'attending';
 
@@ -272,13 +267,11 @@ const RsvpPage = () => {
     );
   }
 
-  // ── RSVP Form ──
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       {showConfetti && <ConfettiCanvas />}
 
       <div className="max-w-lg mx-auto space-y-5">
-        {/* Party Header Card */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white p-7 text-center">
             <p className="text-blue-200/80 text-xs font-semibold uppercase tracking-wider mb-2">You're Invited!</p>
@@ -328,7 +321,6 @@ const RsvpPage = () => {
           </div>
         </div>
 
-        {/* RSVP Form Card */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-bold text-gray-900">RSVP</h2>
@@ -340,7 +332,6 @@ const RsvpPage = () => {
               <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-xs text-red-700">{error}</div>
             )}
 
-            {/* RSVP Status */}
             <div>
               <label className={labelClass}>Will you attend? *</label>
               <div className="flex gap-2.5 mt-1">
@@ -367,7 +358,6 @@ const RsvpPage = () => {
               </div>
             </div>
 
-            {/* Full Name */}
             <div>
               <label className={labelClass}>Full Name *</label>
               <input
@@ -380,7 +370,6 @@ const RsvpPage = () => {
               {formErrors.fullName && <p className="text-[11px] text-red-600 mt-1">{formErrors.fullName}</p>}
             </div>
 
-            {/* Email */}
             <div>
               <label className={labelClass}>Email *</label>
               <input
@@ -393,7 +382,6 @@ const RsvpPage = () => {
               {formErrors.email && <p className="text-[11px] text-red-600 mt-1">{formErrors.email}</p>}
             </div>
 
-            {/* Phone */}
             <div>
               <label className={labelClass}>Phone <span className="text-gray-400 font-normal">(optional)</span></label>
               <input
@@ -405,7 +393,6 @@ const RsvpPage = () => {
               />
             </div>
 
-            {/* Guest Count */}
             {rsvpStatus === 'attending' && (
               <div>
                 <label className={labelClass}>Number of guests (including yourself) *</label>
@@ -421,7 +408,6 @@ const RsvpPage = () => {
               </div>
             )}
 
-            {/* Notes */}
             <div>
               <label className={labelClass}>Dietary restrictions or special needs <span className="text-gray-400 font-normal">(optional)</span></label>
               <textarea
@@ -433,7 +419,6 @@ const RsvpPage = () => {
               />
             </div>
 
-            {/* Marketing Opt-In */}
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-3.5">
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <input
@@ -452,7 +437,6 @@ const RsvpPage = () => {
               </label>
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={submitting}
@@ -468,7 +452,6 @@ const RsvpPage = () => {
           </form>
         </div>
 
-        {/* Footer */}
         <div className="text-center text-[10px] text-gray-400 pb-2">
           Powered by {company.name || 'Zap Zone'}
         </div>

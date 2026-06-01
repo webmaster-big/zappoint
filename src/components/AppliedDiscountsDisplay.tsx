@@ -1,4 +1,3 @@
-// Reusable component for displaying applied discounts on bookings/purchases
 
 import type { AppliedDiscount } from '../utils/discounts';
 

@@ -30,7 +30,6 @@ const LocationManagerProfile = () => {
   const [locationId, setLocationId] = useState<number | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Profile data state
   const [profileData, setProfileData] = useState<LocationManagerProfileData>({
     personal: {
       firstName: '',
@@ -62,12 +61,10 @@ const LocationManagerProfile = () => {
 
   const [editedData, setEditedData] = useState(profileData);
 
-  // Fetch user and location data on mount
   useEffect(() => {
     fetchProfileData();
   }, []);
 
-  // Update profile picture when localStorage changes
   useEffect(() => {
     const user = getStoredUser();
     if (user?.profile_path && user.profile_path !== profileData.personal.avatar) {
@@ -107,7 +104,6 @@ const LocationManagerProfile = () => {
       setUserId(user.id);
       setLocationId(user.location_id);
 
-      // Fetch location data
       const locationResponse = await fetch(`${API_BASE_URL}/locations/${user.location_id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -182,7 +178,6 @@ const LocationManagerProfile = () => {
         throw new Error('Missing authentication or user data');
       }
       
-      // Update user data
       const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
         method: 'PATCH',
         headers: {
@@ -207,9 +202,7 @@ const LocationManagerProfile = () => {
         throw new Error('Failed to update personal information');
       }
       
-      // const userData = await userResponse.json();
       
-      // Update location data
       const locationResponse = await fetch(`${API_BASE_URL}/locations/${locationId}`, {
         method: 'PATCH',
         headers: {
@@ -233,7 +226,6 @@ const LocationManagerProfile = () => {
         throw new Error('Failed to update location information');
       }
       
-      // Update localStorage with new user data
       setStoredUser({
         ...getStoredUser(),
         first_name: editedData.personal.firstName,
@@ -312,7 +304,6 @@ const LocationManagerProfile = () => {
         const data = await response.json();
         const newProfilePath = data.data.profile_path;
         
-        // Update localStorage first
         const currentUser = getStoredUser();
         if (currentUser) {
           setStoredUser({
@@ -321,10 +312,8 @@ const LocationManagerProfile = () => {
           }, true);
         }
         
-        // Dispatch custom event to notify other components
         window.dispatchEvent(new Event('zapzone_profile_updated'));
         
-        // Then update component state
         setProfileData(prev => ({
           ...prev,
           personal: {
@@ -364,7 +353,6 @@ const LocationManagerProfile = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto">
-        {/* Success Message */}
         {successMessage && (
           <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
             <CheckCircle size={20} />
@@ -372,7 +360,6 @@ const LocationManagerProfile = () => {
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
             <AlertCircle size={20} />
@@ -383,7 +370,6 @@ const LocationManagerProfile = () => {
           </div>
         )}
 
-        {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
@@ -483,7 +469,6 @@ const LocationManagerProfile = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
           <div className="flex overflow-x-auto">
             {tabs.map((tab) => {
@@ -508,9 +493,7 @@ const LocationManagerProfile = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          {/* Personal Information Tab */}
           {activeTab === 'personal' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -641,7 +624,6 @@ const LocationManagerProfile = () => {
             </div>
           )}
 
-          {/* Location Details Tab */}
           {activeTab === 'location' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">

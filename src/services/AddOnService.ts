@@ -9,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -23,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface PackageSpecificPrice {
   package_id: number;
   price: number;
@@ -95,33 +93,21 @@ export interface PaginatedResponse<T> {
 }
 
 class AddOnService {
-  /**
-   * Get all addons with optional filters
-   */
   async getAddOns(filters?: AddOnFilters): Promise<PaginatedResponse<AddOn>> {
     const response = await api.get('/addons', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get a specific add-on by ID
-   */
   async getAddOn(id: number): Promise<ApiResponse<AddOn>> {
     const response = await api.get(`/addons/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new add-on
-   */
   async createAddOn(data: CreateAddOnData): Promise<ApiResponse<AddOn>> {
     const response = await api.post('/addons', data);
     return response.data;
   }
 
-  /**
-   * Create a new add-on with image (using FormData)
-   */
   async createAddOnWithImage(formData: FormData): Promise<ApiResponse<AddOn>> {
     const token = getStoredUser()?.token;
     const response = await api.post('/addons', formData, {
@@ -133,20 +119,13 @@ class AddOnService {
     return response.data;
   }
 
-  /**
-   * Update an existing add-on
-   */
   async updateAddOn(id: number, data: UpdateAddOnData): Promise<ApiResponse<AddOn>> {
     const response = await api.put(`/addons/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Update an existing add-on with image (using FormData)
-   */
   async updateAddOnWithImage(id: number, formData: FormData): Promise<ApiResponse<AddOn>> {
     const token = getStoredUser()?.token;
-    // Laravel doesn't support PUT with FormData, so we use POST with _method override
     formData.append('_method', 'PUT');
     const response = await api.post(`/addons/${id}`, formData, {
       headers: {
@@ -157,25 +136,16 @@ class AddOnService {
     return response.data;
   }
 
-  /**
-   * Delete an add-on
-   */
   async deleteAddOn(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/addons/${id}`);
     return response.data;
   }
 
-  /**
-   * Bulk delete add-ons
-   */
   async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
     const response = await api.post('/addons/bulk-delete', { ids });
     return response.data;
   }
 
-  /**
-   * Bulk import add-ons
-   */
   async bulkImport(addOns: Array<{
     location_id?: number;
     name: string;
@@ -191,6 +161,5 @@ class AddOnService {
   }
 }
 
-// Export a singleton instance
 export const addOnService = new AddOnService();
 export default addOnService;

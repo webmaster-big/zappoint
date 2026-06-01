@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/Settings.tsx
 
 export interface SettingsLocation {
   id: number;
@@ -62,7 +61,6 @@ export interface SettingsApiResponse<T = any> {
   data: T;
 }
 
-// Public key response from getPublicKey endpoint
 export interface SettingsAuthorizeNetPublicKey {
   api_login_id: string;
   client_key: string; // Public Client Key for Accept.js authentication

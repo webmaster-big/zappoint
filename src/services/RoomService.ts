@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface Room {
   id: number;
   location_id: number;
@@ -38,7 +35,6 @@ export interface Room {
   updated_at: string;
 }
 
-// Break time type
 export interface BreakTime {
   days: string[];
   start_time: string;
@@ -90,57 +86,36 @@ export interface PaginatedResponse<T> {
 }
 
 class RoomService {
-  /**
-   * Get all rooms with optional filters
-   */
   async getRooms(filters?: RoomFilters): Promise<PaginatedResponse<Room>> {
     const response = await api.get('/rooms', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get a specific room by ID
-   */
   async getRoom(id: number): Promise<ApiResponse<Room>> {
     const response = await api.get(`/rooms/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new room
-   */
   async createRoom(data: CreateRoomData): Promise<ApiResponse<Room>> {
     const response = await api.post('/rooms', data);
     return response.data;
   }
 
-  /**
-   * Update an existing room
-   */
   async updateRoom(id: number, data: UpdateRoomData): Promise<ApiResponse<Room>> {
     const response = await api.put(`/rooms/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a room
-   */
   async deleteRoom(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/rooms/${id}`);
     return response.data;
   }
 
-  /**
-   * Bulk delete rooms
-   */
   async bulkDeleteRooms(ids: number[]): Promise<ApiResponse<{ deleted_count: number }>> {
     const response = await api.post('/rooms/bulk-delete', { ids });
     return response.data;
   }
 
-  /**
-   * Update booking interval for all rooms in an area group
-   */
   async updateBookingIntervalByAreaGroup(areaGroup: string, bookingInterval: number): Promise<ApiResponse<{ updated_count: number }>> {
     const response = await api.patch(`/rooms/area-group/${encodeURIComponent(areaGroup)}/update-booking-interval`, {
       booking_interval: bookingInterval
@@ -149,6 +124,5 @@ class RoomService {
   }
 }
 
-// Export a singleton instance
 export const roomService = new RoomService();
 export default roomService;

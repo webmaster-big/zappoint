@@ -43,7 +43,6 @@ const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
   const [picking, setPicking] = useState<'start' | 'end'>(startDate && !endDate ? 'end' : 'start');
   const [hoveredDate, setHoveredDate] = useState<string>('');
 
-  // Close popover on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
@@ -102,7 +101,6 @@ const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
   for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-  // Trigger button label
   const hasRange = startDate && endDate;
   const hasPartial = startDate && !endDate;
   const triggerLabel = hasRange
@@ -113,7 +111,6 @@ const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
 
   return (
     <div className="relative" ref={popoverRef}>
-      {/* Trigger Button */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -134,10 +131,8 @@ const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
         )}
       </button>
 
-      {/* Popover Calendar */}
       {open && (
         <div className="absolute z-50 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 p-3 w-[260px] right-0">
-          {/* Month navigation */}
           <div className="flex items-center justify-between mb-2">
             <button type="button" onClick={prevMonth} className="p-1 rounded hover:bg-gray-100 transition">
               <ChevronLeft size={14} className="text-gray-600" />
@@ -150,19 +145,16 @@ const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
             </button>
           </div>
 
-          {/* Picking hint */}
           <p className="text-[10px] text-center text-gray-400 mb-1.5">
             {picking === 'start' ? 'Select start date' : 'Select end date'}
           </p>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 mb-0.5">
             {DAY_HEADERS.map(d => (
               <div key={d} className="text-center text-[10px] font-medium text-gray-400 py-0.5">{d}</div>
             ))}
           </div>
 
-          {/* Days grid */}
           <div className="grid grid-cols-7 gap-px">
             {cells.map((day, i) => {
               if (day === null) return <div key={`e-${i}`} />;
@@ -193,7 +185,6 @@ const DateRangeCalendar: React.FC<DateRangeCalendarProps> = ({
             })}
           </div>
 
-          {/* Footer: range summary */}
           {(startDate || endDate) && (
             <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
               <span className="text-[10px] text-gray-500">

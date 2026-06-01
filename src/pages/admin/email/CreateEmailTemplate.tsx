@@ -1,4 +1,3 @@
-// src/pages/admin/email/CreateEmailTemplate.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -60,7 +59,6 @@ const CreateEmailTemplate: React.FC = () => {
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
   const [formData, setFormData] = useState<CreateEmailTemplateData>({
     name: '',
     subject: '',
@@ -79,12 +77,10 @@ const CreateEmailTemplate: React.FC = () => {
   const [showImageSizeModal, setShowImageSizeModal] = useState(false);
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   
-  // Link modal state
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
 
-  // Variables panel state
   const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     default: true,
@@ -93,7 +89,6 @@ const CreateEmailTemplate: React.FC = () => {
   });
   const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
 
-  // Categories
   const categories = [
     { value: '', label: 'Select Category' },
     { value: 'onboarding', label: 'Onboarding' },
@@ -105,11 +100,9 @@ const CreateEmailTemplate: React.FC = () => {
     { value: 'other', label: 'Other' }
   ];
 
-  // Fetch locations and variables on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch locations for company admin
         if (isCompanyAdmin) {
           const locResponse = await locationService.getLocations();
           if (locResponse.success && locResponse.data) {
@@ -117,10 +110,8 @@ const CreateEmailTemplate: React.FC = () => {
           }
         }
 
-        // Fetch available variables
         const varResponse = await emailCampaignService.getTemplateVariables();
         if (varResponse.success && varResponse.data) {
-          // Convert flat key-value object to array of { name, sampleValue }
           const parseVariables = (obj: Record<string, string> | undefined): VariableItem[] => {
             if (!obj || typeof obj !== 'object') return [];
             return Object.entries(obj).map(([name, sampleValue]) => ({
@@ -143,7 +134,6 @@ const CreateEmailTemplate: React.FC = () => {
     fetchData();
   }, [isCompanyAdmin]);
 
-  // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -152,7 +142,6 @@ const CreateEmailTemplate: React.FC = () => {
     }));
   };
 
-  // Handle body content change
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({
@@ -162,7 +151,6 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  // Insert variable at cursor position
   const insertVariable = (variable: string) => {
     const variableText = `{{ ${variable} }}`;
     
@@ -184,7 +172,6 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  // Copy variable to clipboard
   const copyVariable = (variable: string) => {
     const variableText = `{{ ${variable} }}`;
     navigator.clipboard.writeText(variableText);
@@ -192,22 +179,18 @@ const CreateEmailTemplate: React.FC = () => {
     setTimeout(() => setCopiedVariable(null), 2000);
   };
 
-  // Toggle variable group - only one open at a time
   const toggleGroup = (groupName: string) => {
     setExpandedGroups(prev => {
       const isCurrentlyOpen = prev[groupName];
-      // Close all groups, then toggle the clicked one
       const allClosed = Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {} as Record<string, boolean>);
       return { ...allClosed, [groupName]: !isCurrentlyOpen };
     });
   };
 
-  // Format group name
   const formatGroupName = (name: string) => {
     return name.charAt(0).toUpperCase() + name.slice(1) + ' Variables';
   };
 
-  // Preview template
   const handlePreview = async () => {
     if (!formData.subject || !formData.body) {
       setToast({ message: 'Please enter subject and body to preview', type: 'error' });
@@ -233,9 +216,7 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  // Save template
   const handleSave = async (status: EmailTemplateStatus = 'draft') => {
-    // Validation
     if (!formData.name.trim()) {
       setToast({ message: 'Please enter a template name', type: 'error' });
       return;
@@ -270,26 +251,21 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  // Basic text formatting - focus editor first then execute command
   const formatText = (command: string, value?: string) => {
-    // Focus the editor first
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
     }
     
-    // Small delay to ensure focus is established
     setTimeout(() => {
       document.execCommand(command, false, value);
       handleBodyChange();
     }, 0);
   };
 
-  // Handle image file selection - show size modal
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       setToast({ message: 'Please select a valid image file (PNG, JPG, GIF, WebP)', type: 'error' });
@@ -297,19 +273,16 @@ const CreateEmailTemplate: React.FC = () => {
       return;
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setToast({ message: 'Image must be less than 5MB', type: 'error' });
       if (imageInputRef.current) imageInputRef.current.value = '';
       return;
     }
 
-    // Store file and show size picker modal
     setPendingImageFile(file);
     setShowImageSizeModal(true);
   };
 
-  // Upload and insert image with selected size
   const handleImageUpload = async (maxWidth: string) => {
     if (!pendingImageFile) return;
 
@@ -320,7 +293,6 @@ const CreateEmailTemplate: React.FC = () => {
       const response = await emailCampaignService.uploadImage(pendingImageFile);
       
       if (response.success) {
-        // Insert image at cursor position with chosen size
         if (bodyEditorRef.current) {
           bodyEditorRef.current.focus();
           const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
@@ -335,24 +307,20 @@ const CreateEmailTemplate: React.FC = () => {
     } finally {
       setUploadingImage(false);
       setPendingImageFile(null);
-      // Reset input
       if (imageInputRef.current) {
         imageInputRef.current.value = '';
       }
     }
   };
 
-  // Handle toolbar button click - use onMouseDown to prevent blur
   const handleToolbarClick = (e: React.MouseEvent, command: string, value?: string) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Execute command directly - onMouseDown prevents blur
     document.execCommand(command, false, value);
     handleBodyChange();
   };
 
-  // Insert link with text
   const insertLink = () => {
     if (!linkUrl.trim()) {
       setToast({ message: 'Please enter a URL', type: 'error' });
@@ -374,7 +342,6 @@ const CreateEmailTemplate: React.FC = () => {
     setLinkText('');
   };
 
-  // Apply text color
   const applyTextColor = (color: string) => {
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
@@ -383,7 +350,6 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  // Apply highlight/background color
   const applyHighlight = (color: string) => {
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
@@ -394,7 +360,6 @@ const CreateEmailTemplate: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -446,9 +411,7 @@ const CreateEmailTemplate: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Basic Info */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Template Information</h2>
               
@@ -504,7 +467,6 @@ const CreateEmailTemplate: React.FC = () => {
               )}
             </div>
 
-            {/* Email Content */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Content</h2>
               
@@ -528,9 +490,7 @@ const CreateEmailTemplate: React.FC = () => {
                   Email Body <span className="text-red-500">*</span>
                 </label>
                 
-                {/* Simplified Toolbar */}
                 <div className="flex flex-wrap items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
-                  {/* Undo/Redo */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'undo')}
@@ -549,7 +509,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Normal Text */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'formatBlock', 'p')}
@@ -561,7 +520,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Font Style */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'bold')}
@@ -596,7 +554,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Text Color Buttons */}
                   <div className="flex items-center gap-0.5">
                     <button
                       type="button"
@@ -625,7 +582,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </div>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Highlight */}
                   <button
                     type="button"
                     onMouseDown={(e) => { e.preventDefault(); applyHighlight('#fef08a'); }}
@@ -636,7 +592,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Headings */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'formatBlock', 'h1')}
@@ -663,7 +618,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Alignment */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'justifyLeft')}
@@ -690,7 +644,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Lists */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'insertUnorderedList')}
@@ -709,7 +662,6 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                   <div className="w-px h-5 bg-gray-300 mx-1" />
                   
-                  {/* Link */}
                   <button
                     type="button"
                     onClick={() => setShowLinkModal(true)}
@@ -719,7 +671,6 @@ const CreateEmailTemplate: React.FC = () => {
                     <LinkIcon className="w-4 h-4" />
                   </button>
                   
-                  {/* Image Upload */}
                   <button
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
@@ -737,7 +688,6 @@ const CreateEmailTemplate: React.FC = () => {
                     className="hidden"
                   />
                   
-                  {/* Clear Formatting */}
                   <button
                     type="button"
                     onMouseDown={(e) => handleToolbarClick(e, 'removeFormat')}
@@ -748,9 +698,7 @@ const CreateEmailTemplate: React.FC = () => {
                   </button>
                 </div>
                 
-                {/* Content Editable Editor */}
                 <div className="relative">
-                  {/* Placeholder - shown when editor is empty */}
                   {!formData.body && (
                     <div 
                       className="absolute top-3 left-4 text-gray-400 pointer-events-none select-none z-0"
@@ -780,7 +728,6 @@ const CreateEmailTemplate: React.FC = () => {
                     className="w-full min-h-[400px] overflow-y-auto px-4 py-3 border border-gray-300 rounded-b-lg focus:outline-none bg-white transition-all resize-y relative z-10"
                     style={{ whiteSpace: 'pre-wrap' }}
                     onKeyDown={(e) => {
-                      // Handle keyboard shortcuts
                       if (e.ctrlKey || e.metaKey) {
                         if (e.key === 'b') { e.preventDefault(); formatText('bold'); }
                         if (e.key === 'i') { e.preventDefault(); formatText('italic'); }
@@ -797,7 +744,6 @@ const CreateEmailTemplate: React.FC = () => {
             </div>
           </div>
 
-          {/* Variables Panel */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
@@ -878,7 +824,6 @@ const CreateEmailTemplate: React.FC = () => {
         </div>
       </div>
 
-      {/* Preview Modal */}
       {showPreview && previewData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -916,7 +861,6 @@ const CreateEmailTemplate: React.FC = () => {
         </div>
       )}
 
-      {/* Image Size Picker Modal */}
       {showImageSizeModal && pendingImageFile && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -930,7 +874,6 @@ const CreateEmailTemplate: React.FC = () => {
               </div>
             </div>
             
-            {/* Image Preview */}
             <div className="mb-4 p-4 bg-gray-50 rounded-lg flex justify-center">
               <img 
                 src={URL.createObjectURL(pendingImageFile)} 
@@ -991,7 +934,6 @@ const CreateEmailTemplate: React.FC = () => {
         </div>
       )}
 
-      {/* Link Modal */}
       {showLinkModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -1059,7 +1001,6 @@ const CreateEmailTemplate: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}

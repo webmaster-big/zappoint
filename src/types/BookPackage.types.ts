@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/bookings/BookPackage.tsx
 
 export interface BookPackageAttraction { 
   id: number;

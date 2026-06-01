@@ -72,25 +72,20 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
     setSuccess(false);
 
     try {
-      // Map userType to backend role
       const role = userType === 'manager' ? 'location_manager' : 'attendant';
 
-      // Get optional user data for company_id and location_id
       const userData = localStorage.getItem('zapzone_user');
       const user = userData ? JSON.parse(userData) : null;
 
-      // Prepare request body
       const requestBody: Record<string, string> = {
         email: email,
         role: role,
       };
 
-      // Add company_id if available
       if (user?.company_id) {
         requestBody.company_id = String(user.company_id);
       }
 
-      // Add location_id (required for attendant and manager roles)
       if (user?.location_id) {
         requestBody.location_id = String(user.location_id);
       }
@@ -109,16 +104,13 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
         throw new Error(data.message || 'Failed to create invitation');
       }
 
-      // Set the generated link from backend
       setGeneratedLink(data.data.link);
       setSuccess(true);
 
-      // Call the parent callback
       if (onSendInvitation) {
         onSendInvitation(email, userType);
       }
 
-      // Show success message
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
@@ -144,7 +136,6 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Send Account Invitation</h3>
           <StandardButton
@@ -156,9 +147,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
           />
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-4">
-          {/* Success Message */}
           {success && (
             <div className="p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex items-start gap-2">
               <CheckCircle className="w-5 h-5 text-${themeColor}-500 flex-shrink-0 mt-0.5" />
@@ -169,7 +158,6 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700">{error}</p>
@@ -205,7 +193,6 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
             />
           </div>
 
-          {/* Show generated link after successful creation */}
           {generatedLink && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -233,7 +220,6 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex gap-3 p-6 border-t border-gray-200">
           <StandardButton
             variant="secondary"
@@ -282,13 +268,11 @@ const ManageAttendants = () => {
   const [viewTarget, setViewTarget] = useState<ManageAttendantsAttendant | null>(null);
   const [editTarget, setEditTarget] = useState<ManageAttendantsAttendant | null>(null);
 
-  // Status colors
   const statusColors = {
     active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800'
   };
 
-  // Department colors
   const departmentColors: Record<string, string> = {
     'Guest Services': `bg-${themeColor}-100 text-${fullColor}`,
     'Entertainment': `bg-${themeColor}-100 text-${fullColor}`,
@@ -298,8 +282,6 @@ const ManageAttendants = () => {
     'Administration': `bg-${themeColor}-100 text-${fullColor}`
   };
 
-  // Calculate metrics data
-  // Calculate new attendants in the last 30 days
   const newAttendantsCount = attendants.filter(a => {
     const created = new Date(a.createdAt);
     const now = new Date();
@@ -338,11 +320,9 @@ const ManageAttendants = () => {
     }
   ];
 
-  // Apply filters callback
   const applyFilters = useCallback(() => {
     let result = [...attendants];
 
-    // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(attendant =>
@@ -354,12 +334,10 @@ const ManageAttendants = () => {
       );
     }
 
-    // Apply status filter
     if (filters.status !== 'all') {
       result = result.filter(attendant => attendant.status === filters.status);
     }
 
-    // Apply department filter
     if (filters.department !== 'all') {
       result = result.filter(attendant => attendant.department === filters.department);
     }
@@ -368,13 +346,11 @@ const ManageAttendants = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [attendants, filters]);
 
-  // Load attendants from backend API
   useEffect(() => {
     loadAttendants();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply filters when attendants or filters change
   useEffect(() => {
     applyFilters();
   }, [applyFilters]);
@@ -390,7 +366,6 @@ const ManageAttendants = () => {
         return;
       }
 
-      // Build query parameters
       const params = new URLSearchParams();
       if (filters.status !== 'all') params.append('status', filters.status);
       if (filters.department !== 'all') params.append('department', filters.department);
@@ -411,7 +386,6 @@ const ManageAttendants = () => {
         throw new Error(data.message || 'Failed to load attendants');
       }
 
-      // Transform backend users to frontend attendant format
       const transformedAttendants: ManageAttendantsAttendant[] = data.data.users.map((user: Record<string, unknown>) => ({
         id: String(user.id),
         firstName: String(user.first_name || ''),
@@ -494,7 +468,6 @@ const ManageAttendants = () => {
         throw new Error(data.message || 'Failed to update status');
       }
 
-      // Update local state
       const updatedAttendants = attendants.map(attendant =>
         attendant.id === id ? { ...attendant, status: newStatus } : attendant
       );
@@ -533,7 +506,6 @@ const ManageAttendants = () => {
         throw new Error(data.message || 'Failed to delete attendant');
       }
 
-      // Update local state
       const updatedAttendants = attendants.filter(attendant => attendant.id !== id);
       setAttendants(updatedAttendants);
     } catch (error) {
@@ -550,17 +522,14 @@ const ManageAttendants = () => {
     }
 
     try {
-      // Convert string IDs to numbers for the API
       const ids = selectedAttendants.map(id => parseInt(id));
       
-      // Use the bulk delete API endpoint
       const response = await userService.bulkDelete(ids);
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to delete attendants');
       }
 
-      // Update local state
       const updatedAttendants = attendants.filter(attendant => !selectedAttendants.includes(attendant.id));
       setAttendants(updatedAttendants);
       setSelectedAttendants([]);
@@ -584,7 +553,6 @@ const ManageAttendants = () => {
         return;
       }
 
-      // Update status for all selected attendants
       await Promise.all(selectedAttendants.map(id => 
         fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
           method: 'PATCH',
@@ -595,7 +563,6 @@ const ManageAttendants = () => {
         })
       ));
 
-      // Update local state
       const updatedAttendants = attendants.map(attendant =>
         selectedAttendants.includes(attendant.id) ? { ...attendant, status: newStatus } : attendant
       );
@@ -607,25 +574,19 @@ const ManageAttendants = () => {
     }
   };
 
-  // Send invitation to create account
   const handleSendInvitation = () => {
-    // The actual API call is handled in the modal
-    // Reload attendants to get updated data from backend
     loadAttendants();
   };
 
-  // Open invitation modal for specific attendant
   const handleInviteAttendant = () => {
     setShowInvitationModal(true);
   };
 
-  // Get unique departments
   const getUniqueDepartments = () => {
     const departments = attendants.map(attendant => attendant.department);
     return [...new Set(departments)];
   };
 
-  // Calculate experience in months
   const getExperience = (hireDate: string) => {
     const hire = new Date(hireDate);
     const today = new Date();
@@ -633,13 +594,7 @@ const ManageAttendants = () => {
     return Math.max(0, months);
   };
 
-  // // Check if invitation is expired
-  // const isInvitationExpired = (expiryDate?: string) => {
-  //   if (!expiryDate) return true;
-  //   return new Date(expiryDate) < new Date();
-  // };
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentAttendants = filteredAttendants.slice(indexOfFirstItem, indexOfLastItem);
@@ -657,7 +612,6 @@ const ManageAttendants = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Manage Attendants</h1>
@@ -680,17 +634,9 @@ const ManageAttendants = () => {
           >
             Create Staff Account
           </StandardButton>
-          {/* <Link
-            to="/manager/attendants/create"
-            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            New Attendant
-          </Link> */}
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -714,7 +660,6 @@ const ManageAttendants = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -749,7 +694,6 @@ const ManageAttendants = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -792,7 +736,6 @@ const ManageAttendants = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {selectedAttendants.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -819,7 +762,6 @@ const ManageAttendants = () => {
         </div>
       )}
 
-      {/* Attendants Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -837,7 +779,6 @@ const ManageAttendants = () => {
                 <th scope="col" className="px-6 py-4 font-medium">Contact</th>
                 <th scope="col" className="px-6 py-4 font-medium">Position</th>
                 <th scope="col" className="px-6 py-4 font-medium">Department</th>
-                {/* Account Status column removed */}
                 <th scope="col" className="px-6 py-4 font-medium">Experience</th>
                 <th scope="col" className="px-6 py-4 font-medium">Status</th>
                 <th scope="col" className="px-6 py-4 font-medium">Actions</th>
@@ -891,7 +832,6 @@ const ManageAttendants = () => {
                         {attendant.department}
                       </span>
                     </td>
-                    {/* Account Status cell removed */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getExperience(attendant.hireDate)} months
                     </td>
@@ -938,7 +878,6 @@ const ManageAttendants = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-6 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -951,28 +890,24 @@ const ManageAttendants = () => {
         </div>
       </div>
 
-      {/* Invitation Modal */}
       <InvitationModal
         isOpen={showInvitationModal}
         onClose={() => setShowInvitationModal(false)}
         onSendInvitation={handleSendInvitation}
       />
 
-      {/* Create Staff Account (direct provisioning) */}
       <CreateStaffAccountModal
         isOpen={showCreateStaffModal}
         onClose={() => setShowCreateStaffModal(false)}
         onCreated={() => loadAttendants()}
       />
 
-      {/* View Profile Modal */}
       <AttendantViewModal
         isOpen={viewTarget !== null}
         onClose={() => setViewTarget(null)}
         attendant={viewTarget}
       />
 
-      {/* Edit Staff Modal */}
       <AttendantEditModal
         isOpen={editTarget !== null}
         onClose={() => setEditTarget(null)}

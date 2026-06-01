@@ -66,7 +66,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
       setError('');
       setSuccess(false);
       
-      // Fetch locations when modal opens
       fetchLocations();
     }
   }, [isOpen, defaultEmail, defaultUserType]);
@@ -77,7 +76,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
       console.log('Location API Response:', response);
 
       if (response.success) {
-        // API returns data as array directly, not data.locations
         const locationsList = Array.isArray(response.data) ? response.data : [];
         console.log('Locations list:', locationsList);
         setLocations(locationsList);
@@ -93,7 +91,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
       return;
     }
 
-    // Validate location selection for attendant
     if (userType === 'attendant' && !selectedLocationId) {
       setError('Please select a location for the attendant');
       return;
@@ -104,30 +101,23 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
     setSuccess(false);
 
     try {
-      // Map userType to backend role
       const role = userType === 'manager' ? 'location_manager' : userType === 'company_admin' ? 'company_admin' : 'attendant';
 
-      // Get optional user data for company_id and location_id
       const userData = localStorage.getItem('zapzone_user');
       const user = userData ? JSON.parse(userData) : null;
 
-      // Prepare request body
       const requestBody: Record<string, string> = {
         email: email,
         role: role,
       };
 
-      // Add company_id if available
       if (user?.company_id) {
         requestBody.company_id = String(user.company_id);
       }
 
-      // Add location_id based on user type
       if (role === 'attendant' && selectedLocationId) {
-        // For attendant, use the selected location
         requestBody.location_id = selectedLocationId;
       } else if (role === 'location_manager' && user?.location_id) {
-        // For manager, use current user's location
         requestBody.location_id = String(user.location_id);
       }
 
@@ -146,16 +136,13 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
         throw new Error(data.message || 'Failed to create invitation');
       }
 
-      // Set the generated link from backend
       setGeneratedLink(data.data.link);
       setSuccess(true);
 
-      // Call the parent callback
       if (onSendInvitation) {
         onSendInvitation(email, userType);
       }
 
-      // Show success message
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
@@ -181,7 +168,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Send Account Invitation</h3>
           <StandardButton
@@ -193,9 +179,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
           />
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-4">
-          {/* Success Message */}
           {success && (
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
               <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
@@ -206,7 +190,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700">{error}</p>
@@ -232,7 +215,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
             </select>
           </div>
 
-          {/* Location Selector - Only for Attendant */}
           {userType === 'attendant' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -268,7 +250,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
             />
           </div>
 
-          {/* Show generated link after successful creation */}
           {generatedLink && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -296,7 +277,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex gap-3 p-6 border-t border-gray-200">
           <StandardButton
             onClick={onClose}
@@ -351,27 +331,21 @@ const ManageAccounts = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
-  // Locations
   const locations = [
     'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 
     'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti', 'Escape Room Zone'
   ];
 
-  // Status colors
   const statusColors = {
     active: 'bg-green-100 text-green-800',
     inactive: 'bg-gray-100 text-gray-800'
   };
 
-  // User type badge color
   const userTypeBadgeColor = `bg-${themeColor}-100 text-${fullColor}`;
 
-  // Department badge color
   const departmentBadgeColor = `bg-${themeColor}-100 text-${fullColor}`;
   const foodBeverageBadgeColor = 'bg-yellow-100 text-yellow-800';
 
-  // Calculate metrics data
-  // Calculate new accounts in the last 30 days
   const newAccountsCount = accounts.filter(a => {
     const created = new Date(a.createdAt);
     const now = new Date();
@@ -410,13 +384,11 @@ const ManageAccounts = () => {
     }
   ];
 
-  // Load accounts from backend API
   useEffect(() => {
     loadAccounts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply filters when accounts or filters change
   useEffect(() => {
     applyFilters();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -433,7 +405,6 @@ const ManageAccounts = () => {
         return;
       }
 
-      // Build query parameters
       const params = new URLSearchParams();
       if (filters.status !== 'all') params.append('status', filters.status);
       if (filters.userType !== 'all') {
@@ -461,7 +432,6 @@ const ManageAccounts = () => {
         throw new Error(data.message || 'Failed to load accounts');
       }
 
-      // Transform backend users to frontend account format
       const transformedAccounts: ManageAccountsAccount[] = data.data.users.map((user: Record<string, unknown>) => ({
         id: String(user.id),
         firstName: String(user.first_name || ''),
@@ -495,7 +465,6 @@ const ManageAccounts = () => {
   const applyFilters = () => {
     let result = [...accounts];
 
-    // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(account =>
@@ -508,22 +477,18 @@ const ManageAccounts = () => {
       );
     }
 
-    // Apply status filter
     if (filters.status !== 'all') {
       result = result.filter(account => account.status === filters.status);
     }
 
-    // Apply department filter
     if (filters.department !== 'all') {
       result = result.filter(account => account.department === filters.department);
     }
 
-    // Apply user type filter
     if (filters.userType !== 'all') {
       result = result.filter(account => account.userType === filters.userType);
     }
 
-    // Apply location filter
     if (filters.location !== 'all') {
       result = result.filter(account => account.location === filters.location);
     }
@@ -589,7 +554,6 @@ const ManageAccounts = () => {
         throw new Error(data.message || 'Failed to update status');
       }
 
-      // Update local state
       const updatedAccounts = accounts.map(account =>
         account.id === id ? { ...account, status: newStatus } : account
       );
@@ -628,7 +592,6 @@ const ManageAccounts = () => {
         throw new Error(data.message || 'Failed to delete account');
       }
 
-      // Update local state
       const updatedAccounts = accounts.filter(account => account.id !== id);
       setAccounts(updatedAccounts);
     } catch (error) {
@@ -645,17 +608,14 @@ const ManageAccounts = () => {
     }
 
     try {
-      // Convert string IDs to numbers for the API
       const ids = selectedAccounts.map(id => parseInt(id));
       
-      // Use the bulk delete API endpoint
       const response = await userService.bulkDelete(ids);
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to delete accounts');
       }
 
-      // Update local state
       const updatedAccounts = accounts.filter(account => !selectedAccounts.includes(account.id));
       setAccounts(updatedAccounts);
       setSelectedAccounts([]);
@@ -679,7 +639,6 @@ const ManageAccounts = () => {
         return;
       }
 
-      // Update status for all selected accounts
       await Promise.all(selectedAccounts.map(id => 
         fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
           method: 'PATCH',
@@ -690,7 +649,6 @@ const ManageAccounts = () => {
         })
       ));
 
-      // Update local state
       const updatedAccounts = accounts.map(account =>
         selectedAccounts.includes(account.id) ? { ...account, status: newStatus } : account
       );
@@ -702,25 +660,19 @@ const ManageAccounts = () => {
     }
   };
 
-  // Send invitation to create account
   const handleSendInvitation = () => {
-    // The actual API call is handled in the modal
-    // Reload accounts to get updated data from backend
     loadAccounts();
   };
 
-  // Open invitation modal for new invitation
   const handleInviteAccount = () => {
     setShowInvitationModal(true);
   };
 
-  // Get unique values for filters
   const getUniqueDepartments = () => {
     const departments = accounts.map(account => account.department);
     return [...new Set(departments)];
   };
 
-  // Format last login date
   const formatLastLogin = (lastLogin?: string) => {
     if (!lastLogin) return 'Never';
     const date = new Date(lastLogin);
@@ -737,7 +689,6 @@ const ManageAccounts = () => {
 
   console.log('Filtered Accounts:', filteredAccounts);
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentAccounts = filteredAccounts.slice(indexOfFirstItem, indexOfLastItem);
@@ -755,7 +706,6 @@ const ManageAccounts = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Manage Accounts</h1>
@@ -791,7 +741,6 @@ const ManageAccounts = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -815,7 +764,6 @@ const ManageAccounts = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -850,7 +798,6 @@ const ManageAccounts = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -918,7 +865,6 @@ const ManageAccounts = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {selectedAccounts.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -945,7 +891,6 @@ const ManageAccounts = () => {
         </div>
       )}
 
-      {/* Accounts Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -963,7 +908,6 @@ const ManageAccounts = () => {
                 <th scope="col" className="px-6 py-4 font-medium">Contact</th>
                 <th scope="col" className="px-6 py-4 font-medium">Type & Location</th>
                 <th scope="col" className="px-6 py-4 font-medium">Department</th>
-                {/* Account Status column removed */}
                 <th scope="col" className="px-6 py-4 font-medium">Last Login</th>
                 <th scope="col" className="px-6 py-4 font-medium">Status</th>
                 <th scope="col" className="px-6 py-4 font-medium">Actions</th>
@@ -1025,7 +969,6 @@ const ManageAccounts = () => {
                         {account.department}
                       </span>
                     </td>
-                    {/* Account Status cell removed */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatLastLogin(account.lastLogin)}
                     </td>
@@ -1087,7 +1030,6 @@ const ManageAccounts = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-6 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -1100,7 +1042,6 @@ const ManageAccounts = () => {
         </div>
       </div>
 
-      {/* Invitation Modal */}
       <InvitationModal
         isOpen={showInvitationModal}
         onClose={() => setShowInvitationModal(false)}
@@ -1109,34 +1050,29 @@ const ManageAccounts = () => {
         defaultUserType='attendant'
       />
 
-      {/* Create Staff Account (direct provisioning) */}
       <CreateStaffAccountModal
         isOpen={showCreateStaffModal}
         onClose={() => setShowCreateStaffModal(false)}
         onCreated={() => loadAccounts()}
       />
 
-      {/* Create Location (company_admin only) */}
       <CreateLocationModal
         isOpen={showCreateLocationModal}
         onClose={() => setShowCreateLocationModal(false)}
       />
 
-      {/* Resend / rotate credentials */}
       <ResendCredentialsModal
         isOpen={resendTarget !== null}
         onClose={() => setResendTarget(null)}
         user={resendTarget}
       />
 
-      {/* View Profile Modal */}
       <AccountViewModal
         isOpen={viewTarget !== null}
         onClose={() => setViewTarget(null)}
         account={viewTarget}
       />
 
-      {/* Edit Account Modal */}
       <AccountEditModal
         isOpen={editTarget !== null}
         onClose={() => setEditTarget(null)}

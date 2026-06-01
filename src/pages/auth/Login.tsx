@@ -12,7 +12,6 @@ export default function Login() {
   const [showLoader, setShowLoader] = useState(false);
   const [loginProgress, setLoginProgress] = useState(0);
 
-  // Helper function to smoothly animate progress from current to target
   const animateProgress = (targetProgress: number, duration: number = 500) => {
     return new Promise<void>((resolve) => {
       setLoginProgress(prev => {
@@ -24,7 +23,6 @@ export default function Login() {
           const elapsed = Date.now() - startTime;
           const progress = Math.min(elapsed / duration, 1);
           
-          // Use easeOutCubic for more natural deceleration
           const easeProgress = 1 - Math.pow(1 - progress, 3);
           const currentProgress = startProgress + (diff * easeProgress);
           
@@ -52,7 +50,6 @@ export default function Login() {
     setLoginProgress(0);
 
     try {
-      // Animate to 20%
       await animateProgress(20, 400);
       
       const response = await fetch(`${API_BASE_URL}/login`, {
@@ -84,7 +81,6 @@ export default function Login() {
       await animateProgress(65, 600);
       const { user, role, token } = data;
 
-      // Update last login timestamp
       try {
         await fetch(`${API_BASE_URL}/users/${user.id}/update-last-login`, {
           method: 'PATCH',
@@ -97,7 +93,6 @@ export default function Login() {
         console.error('Failed to update last login:', error);
       }
 
-      // Determine redirect path based on role
       const redirectPaths: Record<string, string> = {
         'company_admin': '/company/dashboard',
         'location_manager': '/manager/dashboard',
@@ -106,18 +101,12 @@ export default function Login() {
       const redirect = redirectPaths[role] || '/attendant/dashboard';
 
       await animateProgress(85, 600);
-      // Purge any tenant-scoped Cache Storage entries left behind by a
-      // previous user on this device BEFORE we install the new identity.
-      // This closes a cross-tenant data leak where the new user's first
-      // paint could otherwise be served from the previous user's cache.
       try {
         const { purgeAllZapzoneCaches } = await import('../../utils/cacheGuard');
         await purgeAllZapzoneCaches();
       } catch {
-        /* ignore \u2014 cache purge is best-effort */
       }
 
-      // Store user data
       localStorage.setItem('zapzone_user', JSON.stringify({
         id: user.id,
         name: `${user.first_name} ${user.last_name}`,
@@ -151,7 +140,6 @@ export default function Login() {
 
   return (
     <>
-      {/* Loader Overlay */}
       {showLoader && <LoadingSpinner fullScreen showProgress={true} progress={loginProgress} message="Signing in..." />}
 
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
@@ -164,7 +152,6 @@ export default function Login() {
           <h1 className="text-center text-2xl sm:text-3xl font-bold text-zinc-900 mb-2 tracking-tight">Sign in to your account</h1>
           <p className="text-center text-zinc-500 text-sm">Enter your email and password to continue</p>
         </div>
-        {/* Error Message */}
         {errorMessage && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />

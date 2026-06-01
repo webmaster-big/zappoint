@@ -28,21 +28,17 @@ import type {
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 
-// Helper function to get ordinal suffix (1st, 2nd, 3rd, etc.)
 const getOrdinal = (n: number): string => {
     const s = ['th', 'st', 'nd', 'rd'];
     const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
-// Helper function to sort rooms numerically (extracts numbers from room names)
 const sortRoomsNumerically = (roomNames: string[]): string[] => {
     return [...roomNames].sort((a, b) => {
-        // Extract numbers from room names (e.g., "Room 1" -> 1, "Space 10" -> 10)
         const numA = parseInt(a.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.replace(/\D/g, '')) || 0;
         if (numA !== numB) return numA - numB;
-        // If no numbers or same numbers, sort alphabetically
         return a.localeCompare(b);
     });
 };
@@ -55,7 +51,6 @@ const EditPackage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     
-    // State for fetched data from backend
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]);
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
     const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
@@ -63,7 +58,6 @@ const EditPackage: React.FC = () => {
     const [promos, setPromos] = useState<CreatePackagePromo[]>([]);
     const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]);
 
-    // Form state
     const [form, setForm] = useState({
         name: "",
         description: "",
@@ -105,10 +99,8 @@ const EditPackage: React.FC = () => {
         displayOrder: "0",
     });
 
-    // Image preview state
     const [imagePreview, setImagePreview] = useState<string>("");
 
-    // Fetch options data and then load package data
     useEffect(() => {
         const initializeData = async () => {
             if (!id) {
@@ -118,17 +110,14 @@ const EditPackage: React.FC = () => {
             }
 
             try {
-                // Check caches first before making API calls
                 const cachedRooms = await roomCacheService.getCachedRooms();
                 const cachedAddOns = await addOnCacheService.getCachedAddOns();
                 const cachedAttractions = await attractionCacheService.getCachedAttractions();
                 
-                // Trigger background sync for stale caches (updates for next visit)
                 if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground();
                 if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground();
                 if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground();
                 
-                // Only fetch from API if cache is empty
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
                     ? Promise.resolve({ data: { rooms: cachedRooms } })
                     : roomService.getRooms();
@@ -141,7 +130,6 @@ const EditPackage: React.FC = () => {
                     ? Promise.resolve({ data: { attractions: cachedAttractions } })
                     : attractionService.getAttractions();
                 
-                // Step 1: Fetch all reference data first
                 const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
                     attractionsPromise,
                     addOnsPromise,
@@ -151,7 +139,6 @@ const EditPackage: React.FC = () => {
                     categoryService.getCategories()
                 ]);
 
-                // Transform data to match component types (include id)
                 const attractionsData = attractionsRes.data?.attractions?.map(attr => ({
                     id: attr.id,
                     name: attr.name,
@@ -159,7 +146,6 @@ const EditPackage: React.FC = () => {
                     unit: attr.unit || ''
                 })) || [];
 
-                // Cache attractions if we fetched from API (not from cache)
                 if (!cachedAttractions || cachedAttractions.length === 0) {
                     const attractionsList = attractionsRes.data?.attractions || [];
                     if (attractionsList.length > 0) {
@@ -173,7 +159,6 @@ const EditPackage: React.FC = () => {
                     price: addon.price || 0
                 })) || [];
                 
-                // Cache add-ons if we fetched from API (not from cache)
                 if (!cachedAddOns || cachedAddOns.length === 0) {
                     const addOnsList = addOnsRes.data?.add_ons || [];
                     if (addOnsList.length > 0) {
@@ -181,7 +166,6 @@ const EditPackage: React.FC = () => {
                     }
                 }
 
-                // Rooms data - use the result from cache or API
                 let roomsData: CreatePackageRoom[] = [];
                 const roomsList = roomsRes.data?.rooms || [];
                 roomsData = roomsList.map((room: any) => ({
@@ -190,7 +174,6 @@ const EditPackage: React.FC = () => {
                     area_group: room.area_group || undefined
                 }));
                 
-                // Cache rooms if we fetched from API (not from cache)
                 if (!cachedRooms || cachedRooms.length === 0) {
                     if (roomsList.length > 0) {
                         await roomCacheService.cacheRooms(roomsList);
@@ -217,7 +200,6 @@ const EditPackage: React.FC = () => {
 
                 const categoriesData = categoriesRes.data || [];
 
-                // Set reference data state
                 setAttractions(attractionsData);
                 setAddOns(addOnsData);
                 setRooms(roomsData);
@@ -226,7 +208,6 @@ const EditPackage: React.FC = () => {
                 setCategories(categoriesData);
                 setCategories(categoriesData);
 
-                // Step 2: Now fetch the package data
                 console.log('Fetching package with ID:', id);
                 const response = await packageService.getPackage(parseInt(id));
                 console.log('Package API response:', response);
@@ -236,7 +217,6 @@ const EditPackage: React.FC = () => {
                 
                 console.log("Loaded package data:", pkg);
                 
-                // Check if response was successful but data is empty
                 if (!pkg || !pkg.id) {
                     console.error('Package data is empty or missing ID');
                     setNotFound(true);
@@ -244,7 +224,6 @@ const EditPackage: React.FC = () => {
                     return;
                 }
 
-                // Extract names/codes from relationship objects (backend uses snake_case)
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const attractionNames = pkg.attractions?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -253,7 +232,6 @@ const EditPackage: React.FC = () => {
                 const giftCardCodes = pkg.gift_cards?.map((g: any) => typeof g === 'string' ? g : (g.code || '')) || [];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const addOnNames = pkg.add_ons?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
-                // Use add_ons_order if available for preserved drag-and-drop order, otherwise fall back to add_ons
                 const orderedAddOnNames = (pkg.add_ons_order && pkg.add_ons_order.length > 0) 
                     ? pkg.add_ons_order.filter((name: string) => addOnNames.includes(name))
                     : addOnNames;
@@ -269,7 +247,6 @@ const EditPackage: React.FC = () => {
                     roomNames
                 });
 
-                // Convert arrays to strings if needed
                 const availableDays = Array.isArray(pkg.available_days) 
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     ? pkg.available_days.map((d: any) => String(d)) 
@@ -283,16 +260,12 @@ const EditPackage: React.FC = () => {
                     ? pkg.available_month_days.map((d: any) => String(d)) 
                     : [];
 
-                // Format time values from HH:MM:SS to HH:MM for HTML time input
                 const formatTime = (time: string) => {
                     if (!time) return "09:00";
-                    // If time is already in HH:MM format, return as is
                     if (time.length === 5) return time;
-                    // If time is in HH:MM:SS format, extract HH:MM
                     return time.substring(0, 5);
                 };
 
-                // Parse duration for "hours and minutes" unit
                 let durationHours = "";
                 let durationMinutes = "";
                 if (pkg.duration_unit === "hours and minutes" && pkg.duration) {
@@ -327,7 +300,6 @@ const EditPackage: React.FC = () => {
                     timeSlotStart: formatTime(pkg.time_slot_start || "09:00"),
                     timeSlotEnd: formatTime(pkg.time_slot_end || "17:00"),
                     timeSlotInterval: String(pkg.time_slot_interval || "30"),
-                    // Format time fields in availability schedules to ensure HH:MM format
                     availability_schedules: (pkg.availability_schedules || []).map((schedule: AvailabilitySchedule) => ({
                         ...schedule,
                         time_slot_start: formatTime(schedule.time_slot_start || "09:00"),
@@ -355,15 +327,12 @@ const EditPackage: React.FC = () => {
             } catch (error: unknown) {
                 console.error("Error loading data:", error);
                 
-                // Type guard for axios errors
                 const axiosError = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
                 
-                // Check if it's a 404 (package not found) vs other errors
                 if (axiosError.response?.status === 404) {
                     showToast("Package not found", "error");
                     setNotFound(true);
                 } else {
-                    // For other errors, show the error but don't mark as not found
                     const errorMsg = axiosError.response?.data?.message || axiosError.message || "Failed to load package data";
                     showToast(errorMsg, "error");
                     console.error("Error details:", {
@@ -371,7 +340,6 @@ const EditPackage: React.FC = () => {
                         message: errorMsg,
                         error: error
                     });
-                    // Don't set notFound for general errors - user might want to retry
                 }
                 setLoading(false);
             }
@@ -380,7 +348,6 @@ const EditPackage: React.FC = () => {
         initializeData();
     }, [id]);
 
-    // Handle image upload
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -393,7 +360,6 @@ const EditPackage: React.FC = () => {
         }
     };
 
-    // Handle invitation file upload
     const handleInvitationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -405,7 +371,6 @@ const EditPackage: React.FC = () => {
         }
     };
 
-    // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
     const showToast = (message: string, type?: "success" | "error" | "info") => {
         setToast({ message, type });
@@ -417,7 +382,6 @@ const EditPackage: React.FC = () => {
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Handle feature input change
     const handleFeatureChange = (index: number, value: string) => {
         setForm((prev) => {
             const newFeatures = [...prev.features];
@@ -426,7 +390,6 @@ const EditPackage: React.FC = () => {
         });
     };
 
-    // Add new feature input
     const handleAddFeature = () => {
         setForm((prev) => ({
             ...prev,
@@ -434,7 +397,6 @@ const EditPackage: React.FC = () => {
         }));
     };
 
-    // Remove feature input
     const handleRemoveFeature = (index: number) => {
         setForm((prev) => ({
             ...prev,
@@ -442,10 +404,8 @@ const EditPackage: React.FC = () => {
         }));
     };
 
-    // Drag and drop state for features
     const [draggedFeatureIndex, setDraggedFeatureIndex] = useState<number | null>(null);
     
-    // Drag and drop handlers for features
     const handleFeatureDragStart = (index: number) => {
         setDraggedFeatureIndex(index);
     };
@@ -468,10 +428,8 @@ const EditPackage: React.FC = () => {
         setDraggedFeatureIndex(null);
     };
 
-    // Drag and drop state for add-ons
     const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
     
-    // Drag and drop handlers for add-ons
     const handleAddOnDragStart = (index: number) => {
         setDraggedAddOnIndex(index);
     };
@@ -494,7 +452,6 @@ const EditPackage: React.FC = () => {
         setDraggedAddOnIndex(null);
     };
 
-    // Multi-select for promos and gift cards
     const handleMultiSelectCheckbox = (name: 'promos' | 'giftCards', value: string) => {
         setForm((prev) => {
             const arr = prev[name] as string[];
@@ -517,7 +474,6 @@ const EditPackage: React.FC = () => {
         });
     };
 
-    // Availability Schedule Management
     const addNewSchedule = () => {
         const newSchedule: AvailabilitySchedule = {
             availability_type: 'weekly',
@@ -541,7 +497,6 @@ const EditPackage: React.FC = () => {
         }));
     };
 
-    // Update a specific schedule
     const updateSchedule = (index: number, updates: Partial<AvailabilitySchedule>) => {
         setForm(prev => ({
             ...prev,
@@ -551,7 +506,6 @@ const EditPackage: React.FC = () => {
         }));
     };
 
-    // Select all days for weekly schedule
     const selectAllWeekDays = (index: number) => {
         const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const schedule = form.availability_schedules[index];
@@ -560,7 +514,6 @@ const EditPackage: React.FC = () => {
         updateSchedule(index, { day_configuration: allSelected ? [] : allDays });
     };
 
-    // Add option with API calls instead of localStorage
     const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
         if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
         
@@ -661,7 +614,6 @@ const EditPackage: React.FC = () => {
         }
     };
 
-    // On submit, update the package via API
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
@@ -670,7 +622,6 @@ const EditPackage: React.FC = () => {
             return;
         }
 
-        // Validation
         if (!form.name.trim()) {
             showToast("Package name is required", "error");
             return;
@@ -686,7 +637,6 @@ const EditPackage: React.FC = () => {
         const pricePerAdditional = parseFloat(form.pricePerAdditional || '0');
         const maxParticipants = parseInt(form.maxParticipants || '0');
 
-        // Calculate duration based on unit type
         let duration: number;
         if (form.durationUnit === 'hours and minutes') {
             const hours = parseInt(form.durationHours) || 0;
@@ -695,7 +645,6 @@ const EditPackage: React.FC = () => {
                 showToast("Please enter a valid duration (hours and/or minutes)", "error");
                 return;
             }
-            // Convert to decimal hours: e.g., 1 hour 45 min = 1.75
             duration = hours + (minutes / 60);
         } else {
             duration = parseFloat(form.duration || '0');
@@ -728,7 +677,6 @@ const EditPackage: React.FC = () => {
 
         setSubmitting(true);
         try {
-            // Get IDs for relationships from the options arrays (matching CreatePackage pattern)
             const attraction_ids = form.attractions
                 .map(name => attractions.find(a => a.name === name)?.id)
                 .filter(Boolean) as number[];
@@ -749,7 +697,6 @@ const EditPackage: React.FC = () => {
                 .map(code => giftCards.find(g => g.code === code)?.id)
                 .filter(Boolean) as number[];
 
-            // Prepare data matching CreatePackage structure
             const updateData = {
                 name: form.name,
                 description: form.description,
@@ -777,7 +724,6 @@ const EditPackage: React.FC = () => {
                 room_ids,
                 promo_ids,
                 gift_card_ids,
-                // Store add-ons order for display (uses add-on names)
                 add_ons_order: form.addOns,
                 is_active: form.isActive,
                 display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
@@ -788,7 +734,6 @@ const EditPackage: React.FC = () => {
             const response = await packageService.updatePackage(parseInt(id), updateData);
             console.log("Update response:", response);
             
-            // Update availability schedules separately
             if (form.availability_schedules.length > 0) {
                 try {
                     await packageService.updateAvailabilitySchedules(parseInt(id), {
@@ -802,25 +747,21 @@ const EditPackage: React.FC = () => {
                 }
             }
             
-            // Update in cache - wrap in try-catch to prevent white screen
             try {
                 if (response?.success && response?.data) {
                     await packageCacheService.updatePackageInCache(response.data);
                 }
             } catch (cacheError) {
                 console.error('Error updating cache:', cacheError);
-                // Don't fail the whole operation if cache update fails
             }
             
             showToast("Package updated successfully!", "success");
             setSubmitting(false);
             
-            // Navigate back after a short delay
             navigate("/packages");
         } catch (error: unknown) {
             console.error("Error updating package:", error);
             
-            // Better error messaging
             let errorMessage = "Error updating package. Please try again.";
             if (error && typeof error === 'object' && 'response' in error) {
                 const axiosError = error as { response?: { data?: { message?: string } } };
@@ -832,13 +773,11 @@ const EditPackage: React.FC = () => {
         }
     };
 
-    // Format availability for display
     const formatAvailability = () => {
         if (form.availability_schedules.length === 0) return "No schedules configured";
         return `${form.availability_schedules.length} schedule(s) configured`;
     };
 
-    // Format duration for display
     const formatDuration = () => {
         if (form.durationUnit === 'hours and minutes') {
             const hours = parseInt(form.durationHours) || 0;
@@ -852,7 +791,6 @@ const EditPackage: React.FC = () => {
         return formatDurationDisplay(parseFloat(form.duration), form.durationUnit);
     };
 
-    // Loading state
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -861,7 +799,6 @@ const EditPackage: React.FC = () => {
         );
     }
 
-    // Not found state
     if (notFound) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -893,7 +830,6 @@ const EditPackage: React.FC = () => {
 
     return (
         <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
-            {/* Form Section */}
             <div className="flex-1 mx-auto">
                 <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
                     <div className="flex items-center gap-3 mb-6">
@@ -910,7 +846,6 @@ const EditPackage: React.FC = () => {
                     </div>
                     
                     <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
-                        {/* Image Upload */}
                         <div>
                             <label className="block font-semibold mb-2 text-base text-neutral-800">Package Image</label>
                             <input
@@ -919,9 +854,9 @@ const EditPackage: React.FC = () => {
                                 onChange={handleImageChange}
                                 className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                             />
-                            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                <p className="text-xs text-blue-800 font-medium">Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
-                                <p className="text-xs text-blue-600 mt-1">Images will be cropped to fit the display area. Center your subject for best results.</p>
+                            <div className={`mt-2 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-md`}>
+                                <p className={`text-xs text-${themeColor}-800 font-medium`}>Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
+                                <p className={`text-xs text-${fullColor} mt-1`}>Images will be cropped to fit the display area. Center your subject for best results.</p>
                             </div>
                             <p className="text-xs text-gray-500 mt-1">Max file size: 20MB. Use optimized images for faster loading.</p>
                             {imagePreview && (
@@ -934,7 +869,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Details Section */}
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                                 <Info className={`w-5 h-5 text-${themeColor}-600`} /> Details
@@ -1039,7 +973,6 @@ const EditPackage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Package Type */}
                                 <div>
                                     <label className="block font-semibold mb-2 text-base text-neutral-800">Package Type</label>
                                     <select
@@ -1089,7 +1022,6 @@ const EditPackage: React.FC = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Additional Pricing Section */}
                                 {form.maxParticipants && (
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
@@ -1211,7 +1143,6 @@ const EditPackage: React.FC = () => {
                             </div>
                         </div>
                         
-                        {/* Availability Section */}
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                                 <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Availability Schedules
@@ -1254,7 +1185,6 @@ const EditPackage: React.FC = () => {
                                                 </StandardButton>
 
                                                 <div className="space-y-4">
-                                                    {/* Schedule Type */}
                                                     <div>
                                                         <label className="block font-semibold mb-2 text-sm text-neutral-800">
                                                             Schedule Type
@@ -1278,7 +1208,6 @@ const EditPackage: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Day Configuration for Weekly */}
                                                     {schedule.availability_type === 'weekly' && (
                                                         <div>
                                                             <div className="flex items-center justify-between mb-2">
@@ -1321,7 +1250,6 @@ const EditPackage: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                    {/* Day Configuration for Monthly */}
                                                     {schedule.availability_type === 'monthly' && (
                                                         <div>
                                                             <label className="block font-semibold mb-2 text-sm text-neutral-800">
@@ -1357,7 +1285,6 @@ const EditPackage: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                    {/* Time Slot Configuration */}
                                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                         <div>
                                                             <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
@@ -1391,13 +1318,11 @@ const EditPackage: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Preview generated time slots */}
                                                     {((form.durationUnit === 'hours and minutes' && (form.durationHours || form.durationMinutes)) || (form.durationUnit !== 'hours and minutes' && form.duration)) && schedule.time_slot_start && schedule.time_slot_end && (
                                                         <div className="mt-3 pt-3 border-t border-gray-200">
                                                             <p className="text-xs font-medium text-gray-600 mb-2">Generated Time Slots:</p>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {(() => {
-                                                                    // Calculate duration in minutes based on unit
                                                                     let slotDuration: number;
                                                                     if (form.durationUnit === 'hours and minutes') {
                                                                         const hours = parseInt(form.durationHours) || 0;
@@ -1459,7 +1384,6 @@ const EditPackage: React.FC = () => {
                         
                         <div className="border-b border-gray-100 my-2" />
                         
-                        {/* Attractions Section */}
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
@@ -1509,7 +1433,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
                         
-                        {/* Rooms Section */}
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
@@ -1531,7 +1454,6 @@ const EditPackage: React.FC = () => {
                                     </StandardButton>
                                 )}
                             </div>
-                            {/* Group rooms by area_group */}
                             {(() => {
                                 const groupedRooms = rooms.reduce((acc, room) => {
                                     const group = room.area_group || 'Ungrouped';
@@ -1599,7 +1521,6 @@ const EditPackage: React.FC = () => {
                             </div>
                         </div>
                         
-                        {/* Add-ons Section */}
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
@@ -1663,7 +1584,6 @@ const EditPackage: React.FC = () => {
                                 </StandardButton>
                             </div>
                             
-                            {/* Selected Add-ons - Draggable Order */}
                             {form.addOns.length > 0 && (
                                 <div className="mt-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1702,7 +1622,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
                         
-                        {/* Promos Section */}
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
@@ -1754,7 +1673,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
                         
-                        {/* Gift Cards Section */}
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
@@ -1806,7 +1724,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
                         
-                        {/* Pricing Section */}
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                                 <Info className={`w-5 h-5 text-${themeColor}-600`} /> Pricing
@@ -1826,7 +1743,6 @@ const EditPackage: React.FC = () => {
                             />
                         </div>
                         
-                        {/* Partial Payment Section */}
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group`}>
                                 <Info className={`w-5 h-5 text-${themeColor}-600`} /> Partial Payment Options
@@ -1868,7 +1784,6 @@ const EditPackage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Guest of Honor Toggle */}
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                                 <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Guest of Honor
@@ -1885,7 +1800,6 @@ const EditPackage: React.FC = () => {
                             <p className="text-xs text-gray-500 mt-2">When enabled, customers can specify the name, age, and gender of the guest of honor during booking.</p>
                         </div>
 
-                        {/* Customer Notes */}
                         <div>
                             <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                                 <FileText className={`w-5 h-5 text-${themeColor}-600`} /> Customer Notes
@@ -1901,12 +1815,10 @@ const EditPackage: React.FC = () => {
                             <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
                         </div>
 
-                        {/* Booking Window */}
                         <div>
                             <label className="block font-semibold mb-3 text-base text-neutral-800">Booking Window</label>
                             <p className="text-sm text-gray-500 mb-3">How far in advance customers can book this package</p>
                             
-                            {/* Quick presets row */}
                             <div className="flex flex-wrap gap-1.5 mb-3">
                                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => {
                                     const days = month * 30;
@@ -1928,7 +1840,6 @@ const EditPackage: React.FC = () => {
                                 })}
                             </div>
                             
-                            {/* Custom and No Limit options */}
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
                                     <input
@@ -1970,7 +1881,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Advance Booking Time */}
                         <div>
                             <label className="block font-semibold mb-3 text-base text-neutral-800">
                                 Advance Booking Time
@@ -1978,7 +1888,6 @@ const EditPackage: React.FC = () => {
                             </label>
                             <p className="text-sm text-gray-500 mb-3">Set how far in advance customers must book. For example, setting 48 hours means if a customer visits on Monday at 2:00 PM, the earliest available time slot would be Wednesday at 2:00 PM. This only affects customer-facing bookings — staff can still book freely.</p>
                             
-                            {/* Quick select buttons */}
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {[
                                     { hours: 1, label: '1 h' },
@@ -2022,7 +1931,6 @@ const EditPackage: React.FC = () => {
                                 })}
                             </div>
                             
-                            {/* Custom hours input */}
                             <div className="flex items-center gap-2">
                                 <input
                                     type="number"
@@ -2058,11 +1966,9 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Invitation */}
                         <div>
                             <label className="block font-semibold mb-3 text-base text-neutral-800">Invitation Template</label>
                             
-                            {/* Tab Navigation */}
                             <div className="flex border-b border-gray-200 mb-4">
                                 <button
                                     type="button"
@@ -2088,7 +1994,6 @@ const EditPackage: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* Tab Content */}
                             {form.invitationType === 'link' ? (
                                 <div>
                                     <input
@@ -2121,7 +2026,6 @@ const EditPackage: React.FC = () => {
                             <p className="text-xs text-gray-500 mt-3">Optional: Customers can access this invitation template after booking.</p>
                         </div>
 
-                        {/* Display Order */}
                         <div className="bg-white rounded-xl border border-gray-200 p-5">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Display Order</label>
                             <input
@@ -2129,7 +2033,7 @@ const EditPackage: React.FC = () => {
                                 min={0}
                                 value={form.displayOrder}
                                 onChange={(e) => setForm(f => ({ ...f, displayOrder: e.target.value }))}
-                                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-600 focus:border-transparent`}
                                 placeholder="0"
                             />
                             <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the store page.</p>
@@ -2158,7 +2062,6 @@ const EditPackage: React.FC = () => {
                 </div>
             </div>
             
-            {/* Live Preview Section */}
             <div className="w-full md:w-[420px] md:max-w-sm h-fit">
                 <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
                     <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>
@@ -2169,7 +2072,6 @@ const EditPackage: React.FC = () => {
                         </div>
                         <div className="text-xs text-gray-500 mb-2">{form.category || "Category"}</div>
                         
-                        {/* Duration in Preview */}
                         <div className="mb-2 flex items-center gap-2">
                             <Clock className="w-4 h-4 text-gray-500" />
                             <span className="font-semibold">Duration:</span> 
@@ -2178,7 +2080,6 @@ const EditPackage: React.FC = () => {
                             </span>
                         </div>
                         
-                        {/* Availability in Preview */}
                         <div className="mb-2 flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-gray-500" />
                             <span className="font-semibold">Available:</span> 
@@ -2187,7 +2088,6 @@ const EditPackage: React.FC = () => {
                             </span>
                         </div>
                         
-                        {/* Time Slots in Preview - show from availability schedules */}
                         <div className="mb-2 flex items-start gap-2">
                             <Clock className="w-4 h-4 text-gray-500 mt-0.5" />
                             <div className="flex-1">
@@ -2255,7 +2155,6 @@ const EditPackage: React.FC = () => {
                 </div>
             </div>
     
-            {/* Toast notification (top right) */}
             {toast && (
                 <div className="fixed top-6 right-6 z-50 animate-fade-in-up">
                     <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

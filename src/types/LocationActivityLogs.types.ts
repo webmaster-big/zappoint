@@ -1,6 +1,4 @@
-// Types for: src/pages/admin/LocationActivityLogs.tsx
 
-// Base interfaces for common patterns
 export interface UserReference {
   user_id: number;
   name: string | null;
@@ -12,7 +10,6 @@ export interface LoginLogoutInfo {
   user_agent: string;
 }
 
-// Booking-related metadata
 export interface BookingCreatedMetadata {
   reference_number: string;
   customer_name: string;
@@ -78,7 +75,6 @@ export interface BookingStatusChangedMetadata {
   amount_paid: number;
 }
 
-// Payment-related metadata
 export interface PaymentRecordedMetadata {
   transaction_id: string;
   recorded_by: string;
@@ -144,7 +140,6 @@ export interface PaymentRefundedMetadata {
   };
 }
 
-// User-related metadata
 export interface UserLoginMetadata {
   login_at: string;
   user_details: {
@@ -191,7 +186,6 @@ export interface UserDeletedMetadata {
   };
 }
 
-// Attraction purchase metadata
 export interface AttractionPurchaseCreatedMetadata {
   created_by: UserReference;
   created_at: string;
@@ -213,7 +207,6 @@ export interface AttractionPurchaseCreatedMetadata {
   };
 }
 
-// Gift card metadata
 export interface GiftCardRedeemedMetadata {
   redeemed_by: UserReference;
   redeemed_at: string;
@@ -229,7 +222,6 @@ export interface GiftCardRedeemedMetadata {
   };
 }
 
-// Day off metadata
 export interface DayOffCreatedMetadata {
   created_by: UserReference;
   created_at: string;
@@ -249,14 +241,12 @@ export interface DayOffCreatedMetadata {
   };
 }
 
-// Generic delete metadata
 export interface GenericDeletedMetadata {
   deleted_by: UserReference;
   deleted_at: string;
   [key: string]: unknown;
 }
 
-// Bulk operations metadata
 export interface BulkDeleteMetadata {
   deleted_by: UserReference;
   deleted_at: string;
@@ -264,7 +254,6 @@ export interface BulkDeleteMetadata {
   [key: string]: unknown;
 }
 
-// Union type for all metadata variants
 export type ActivityLogMetadata =
   | UserLoginMetadata
   | UserLogoutMetadata

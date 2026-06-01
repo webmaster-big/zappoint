@@ -1,4 +1,3 @@
-// src/pages/admin/email/EmailCampaigns.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -33,7 +32,6 @@ const EmailCampaigns: React.FC = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
-  // State
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [statistics, setStatistics] = useState<EmailCampaignStatistics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +53,6 @@ const EmailCampaigns: React.FC = () => {
   const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Status configuration
   const statusConfig: Record<EmailCampaignStatus, { color: string; icon: React.ElementType; label: string }> = {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     sending: { color: 'bg-blue-100 text-blue-800', icon: Send, label: 'Sending' },
@@ -64,7 +61,6 @@ const EmailCampaigns: React.FC = () => {
     cancelled: { color: 'bg-gray-100 text-gray-600', icon: Ban, label: 'Cancelled' }
   };
 
-  // Fetch locations for company admin
   useEffect(() => {
     const fetchLocations = async () => {
       if (isCompanyAdmin) {
@@ -81,7 +77,6 @@ const EmailCampaigns: React.FC = () => {
     fetchLocations();
   }, [isCompanyAdmin]);
 
-  // Fetch campaigns
   const fetchCampaigns = useCallback(async () => {
     try {
       setLoading(true);
@@ -116,7 +111,6 @@ const EmailCampaigns: React.FC = () => {
     }
   }, [currentPage, itemsPerPage, filters, selectedLocation]);
 
-  // Fetch statistics
   const fetchStatistics = useCallback(async () => {
     try {
       const params: { location_id?: number } = {};
@@ -137,7 +131,6 @@ const EmailCampaigns: React.FC = () => {
     fetchStatistics();
   }, [fetchCampaigns, fetchStatistics]);
 
-  // Handle delete campaign
   const handleDelete = async (id: number) => {
     try {
       const response = await emailCampaignService.deleteCampaign(id);
@@ -154,7 +147,6 @@ const EmailCampaigns: React.FC = () => {
     }
   };
 
-  // Handle cancel campaign
   const handleCancel = async (id: number) => {
     try {
       const response = await emailCampaignService.cancelCampaign(id);
@@ -171,7 +163,6 @@ const EmailCampaigns: React.FC = () => {
     }
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -184,7 +175,6 @@ const EmailCampaigns: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Email Campaigns</h1>
@@ -212,7 +202,6 @@ const EmailCampaigns: React.FC = () => {
         </div>
       </div>
 
-      {/* Statistics Cards - Dashboard Style */}
       {statistics && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
@@ -269,7 +258,6 @@ const EmailCampaigns: React.FC = () => {
         </div>
       )}
 
-      {/* Filters Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -307,11 +295,9 @@ const EmailCampaigns: React.FC = () => {
           </div>
         </div>
         
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className={`grid grid-cols-1 ${isCompanyAdmin && locations.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-3`}>
-              {/* Location Filter (Company Admin only) */}
               {isCompanyAdmin && locations.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
@@ -333,7 +319,6 @@ const EmailCampaigns: React.FC = () => {
                 </div>
               )}
 
-              {/* Status Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                 <select
@@ -370,7 +355,6 @@ const EmailCampaigns: React.FC = () => {
         )}
       </div>
 
-      {/* Campaigns Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
@@ -398,7 +382,6 @@ const EmailCampaigns: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -494,7 +477,6 @@ const EmailCampaigns: React.FC = () => {
               </table>
             </div>
 
-            {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-gray-100">
               {campaigns.map((campaign) => {
                 const StatusIcon = statusConfig[campaign.status]?.icon || Clock;
@@ -546,7 +528,6 @@ const EmailCampaigns: React.FC = () => {
               })}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <Pagination
@@ -563,7 +544,6 @@ const EmailCampaigns: React.FC = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -591,7 +571,6 @@ const EmailCampaigns: React.FC = () => {
         </div>
       )}
 
-      {/* Cancel Confirmation Modal */}
       {cancelConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -619,7 +598,6 @@ const EmailCampaigns: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}

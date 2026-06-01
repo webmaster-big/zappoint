@@ -9,7 +9,6 @@ interface CreateLocationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreated?: (location: Location) => void;
-  /** Raise z-index when stacked over another modal (e.g. CreateStaffAccountModal). */
   elevated?: boolean;
 }
 
@@ -24,12 +23,6 @@ const initialForm: CreateLocationData = {
   is_active: true,
 };
 
-/**
- * Create Location modal (company_admin only).
- *
- * Backend endpoint: POST /api/locations (Section 3 of the integration guide).
- * `company_id` is forced from the bearer token — we never send it.
- */
 const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: CreateLocationModalProps) => {
   const { themeColor } = useThemeColor();
   const [form, setForm] = useState<CreateLocationData>(initialForm);
@@ -61,7 +54,6 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
 
     setSubmitting(true);
     try {
-      // Drop empty optional strings to keep the payload clean.
       const payload: CreateLocationData = { name: form.name.trim() };
       if (form.address?.trim()) payload.address = form.address.trim();
       if (form.city?.trim()) payload.city = form.city.trim();

@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/profile/CompanyAdminProfile.tsx
 
 export interface CompanyAdminProfilePersonal {
   firstName: string;

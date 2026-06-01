@@ -1,4 +1,3 @@
-// Types for: src/pages/customer/CustomerGiftCards.tsx
 
 export interface CustomerGiftCardsCard {
   id: string;

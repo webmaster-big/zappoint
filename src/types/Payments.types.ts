@@ -1,10 +1,6 @@
-// Types for: src/pages/admin/payments/Payments.tsx
 
 import type { PaymentPayableType, PaymentBooking, PaymentAttractionPurchase } from './Payment.types';
 
-/**
- * Payment record with additional display-friendly fields
- */
 export interface PaymentsPagePayment {
   id: number;
   payable_id?: number;
@@ -23,28 +19,21 @@ export interface PaymentsPagePayment {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
-  // Relationships
   booking?: PaymentBooking | null;
   attractionPurchase?: PaymentAttractionPurchase | null;
-  // Display-friendly computed fields
   customerName?: string;
   customerEmail?: string;
   locationName?: string;
   payableReference?: string;
   payableDescription?: string;
-  // Additional booking/purchase details for display
   bookingDate?: string;
   bookingTime?: string;
   participants?: number;
   guestName?: string;
-  // Signature & Terms
   signature_image?: string | null;
   terms_accepted?: boolean | null;
 }
 
-/**
- * Filter options for the payments page
- */
 export interface PaymentsFilterOptions {
   status: 'all' | 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
   method: 'all' | 'card' | 'cash' | 'authorize.net' | 'in-store';
@@ -55,9 +44,6 @@ export interface PaymentsFilterOptions {
   endDate: string;
 }
 
-/**
- * Metrics displayed on the payments page
- */
 export interface PaymentsMetrics {
   totalPayments: number;
   totalRevenue: number;

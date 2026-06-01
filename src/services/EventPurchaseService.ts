@@ -37,19 +37,16 @@ class EventPurchaseService {
   private _lastCreateKey = '';
   private _lastCreateTime = 0;
 
-  /** List all event purchases (admin) */
   async getPurchases(filters?: EventPurchaseFilters): Promise<ApiResponse<EventPurchase[]>> {
     const response = await api.get('/event-purchases', { params: filters });
     return response.data;
   }
 
-  /** Get a single purchase */
   async getPurchase(id: number): Promise<ApiResponse<EventPurchase>> {
     const response = await api.get(`/event-purchases/${id}`);
     return response.data;
   }
 
-  /** Create a new event purchase (with dedup guard) */
   async createPurchase(data: CreateEventPurchaseData): Promise<ApiResponse<EventPurchase>> {
     const dedupKey = `${data.event_id}-${data.guest_email || data.customer_id || ''}-${data.quantity}-${data.purchase_date}-${data.purchase_time}`;
     const now = Date.now();
@@ -72,63 +69,52 @@ class EventPurchaseService {
     }
   }
 
-  /** Update a purchase */
   async updatePurchase(id: number, data: UpdateEventPurchaseData): Promise<ApiResponse<EventPurchase>> {
     const response = await api.put(`/event-purchases/${id}`, data);
     return response.data;
   }
 
-  /** Delete a purchase (soft delete) */
   async deletePurchase(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/event-purchases/${id}`);
     return response.data;
   }
 
-  /** Force delete a pending purchase (permanent removal) */
   async forceDeletePurchase(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/event-purchases/${id}/force-delete`);
     return response.data;
   }
 
-  /** Cancel a purchase */
   async cancelPurchase(id: number): Promise<ApiResponse<EventPurchase>> {
     const response = await api.patch(`/event-purchases/${id}/cancel`);
     return response.data;
   }
 
-  /** Update purchase status */
   async updateStatus(id: number, status: string): Promise<ApiResponse<EventPurchase>> {
     const response = await api.patch(`/event-purchases/${id}/status`, { status });
     return response.data;
   }
 
-  /** Get customer's event purchases (public) */
   async getCustomerPurchases(customerId: number, filters?: Record<string, unknown>): Promise<ApiResponse<EventPurchase[]>> {
     const response = await api.get('/event-purchases/customer', { params: { customer_id: customerId, ...filters } });
     return response.data;
   }
 
-  /** Get customer's event purchases by email (public, no auth required) */
   async getCustomerPurchasesByEmail(email: string, filters?: Record<string, unknown>): Promise<{ success: boolean; data: { purchases: EventPurchase[]; pagination: { current_page: number; last_page: number; per_page: number; total: number } } }> {
     const response = await api.get('/event-purchases/customer', { params: { guest_email: email, ...filters } });
     return response.data;
   }
 
-  // ========== SOFT DELETE METHODS ==========
 
-  /** Get all soft-deleted (trashed) purchases */
   async getTrashedPurchases(filters?: Record<string, unknown>): Promise<{ success: boolean; data: EventPurchase[]; meta?: { current_page: number; last_page: number; per_page: number; total: number } }> {
     const response = await api.get('/event-purchases/trashed', { params: filters });
     return response.data;
   }
 
-  /** Restore a soft-deleted purchase */
   async restorePurchase(id: number): Promise<{ success: boolean; data: EventPurchase; message?: string }> {
     const response = await api.post(`/event-purchases/${id}/restore`);
     return response.data;
   }
 
-  /** Bulk restore soft-deleted purchases */
   async bulkRestore(ids: number[]): Promise<{ success: boolean; data: { restored_count: number }; message?: string }> {
     const response = await api.post('/event-purchases/bulk-restore', { ids });
     return response.data;

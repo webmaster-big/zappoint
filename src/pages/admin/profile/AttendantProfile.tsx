@@ -31,7 +31,6 @@ const AttendantProfile = () => {
   const [locationId, setLocationId] = useState<number | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Profile data state
   const [profileData, setProfileData] = useState<AttendantProfileData>({
     personal: {
       firstName: '',
@@ -63,12 +62,10 @@ const AttendantProfile = () => {
 
   const [editedData, setEditedData] = useState(profileData);
 
-  // Fetch user and location data on mount
   useEffect(() => {
     fetchProfileData();
   }, []);
 
-  // Update profile picture when localStorage changes
   useEffect(() => {
     const user = getStoredUser();
     if (user?.profile_path && user.profile_path !== profileData.personal.avatar) {
@@ -108,7 +105,6 @@ const AttendantProfile = () => {
       setUserId(user.id);
       setLocationId(user.location_id);
 
-      // Fetch location data
       const locationResponse = await fetch(`${API_BASE_URL}/locations/${user.location_id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -183,7 +179,6 @@ const AttendantProfile = () => {
         throw new Error('Missing authentication or user data');
       }
       
-      // Update user data
       const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
         method: 'PATCH',
         headers: {
@@ -208,7 +203,6 @@ const AttendantProfile = () => {
         throw new Error('Failed to update personal information');
       }
       
-      // Update localStorage with new user data
       setStoredUser({
         ...getStoredUser(),
         first_name: editedData.personal.firstName,
@@ -245,18 +239,6 @@ const AttendantProfile = () => {
     }));
   };
 
-  // const handleAddressChange = (field: string, value: string) => {
-  //   setEditedData(prev => ({
-  //     ...prev,
-  //     location: {
-  //       ...prev.location,
-  //       address: {
-  //         ...prev.location.address,
-  //         [field]: value
-  //       }
-  //     }
-  //   }));
-  // };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -287,7 +269,6 @@ const AttendantProfile = () => {
         const data = await response.json();
         const newProfilePath = data.data.profile_path;
         
-        // Update localStorage first
         const currentUser = getStoredUser();
         if (currentUser) {
           setStoredUser({
@@ -296,10 +277,8 @@ const AttendantProfile = () => {
           }, true);
         }
         
-        // Dispatch custom event to notify other components
         window.dispatchEvent(new Event('zapzone_profile_updated'));
         
-        // Then update component state
         setProfileData(prev => ({
           ...prev,
           personal: {
@@ -339,7 +318,6 @@ const AttendantProfile = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto">
-        {/* Success Message */}
         {successMessage && (
           <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
             <CheckCircle size={20} />
@@ -347,7 +325,6 @@ const AttendantProfile = () => {
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
             <AlertCircle size={20} />
@@ -358,7 +335,6 @@ const AttendantProfile = () => {
           </div>
         )}
 
-        {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
@@ -464,7 +440,6 @@ const AttendantProfile = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
           <div className="flex overflow-x-auto">
             {tabs.map((tab) => {
@@ -489,9 +464,7 @@ const AttendantProfile = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          {/* Personal Information Tab */}
           {activeTab === 'personal' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -622,7 +595,6 @@ const AttendantProfile = () => {
             </div>
           )}
 
-          {/* Location Details Tab */}
           {activeTab === 'location' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
@@ -641,7 +613,6 @@ const AttendantProfile = () => {
 
               <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                 <div className="space-y-6">
-                  {/* Location Name */}
                   <div>
                     <h3 className="text-base font-semibold text-gray-900 mb-1">{profileData.location.name}</h3>
                     <p className="text-sm text-gray-500">Assigned Location</p>
@@ -649,7 +620,6 @@ const AttendantProfile = () => {
 
                   <div className="border-t border-gray-300 pt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Email */}
                       <div className="flex items-start space-x-3">
                         <Mail size={18} className={`text-${themeColor}-600 mt-0.5`} />
                         <div>
@@ -658,7 +628,6 @@ const AttendantProfile = () => {
                         </div>
                       </div>
 
-                      {/* Phone */}
                       <div className="flex items-start space-x-3">
                         <Phone size={18} className={`text-${themeColor}-600 mt-0.5`} />
                         <div>
@@ -667,7 +636,6 @@ const AttendantProfile = () => {
                         </div>
                       </div>
 
-                      {/* Address */}
                       <div className="flex items-start space-x-3 md:col-span-2">
                         <MapPin size={18} className={`text-${themeColor}-600 mt-0.5`} />
                         <div>
@@ -679,7 +647,6 @@ const AttendantProfile = () => {
                         </div>
                       </div>
 
-                      {/* Timezone */}
                       <div className="flex items-start space-x-3">
                         <svg className={`w-[18px] h-[18px] text-${themeColor}-600 mt-0.5`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

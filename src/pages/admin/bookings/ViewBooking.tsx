@@ -65,7 +65,6 @@ const ViewBooking: React.FC = () => {
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
 
-  // Load booking data - try cache first, then API
   useEffect(() => {
     const loadBooking = async () => {
       if (!id && !referenceNumber) {
@@ -77,7 +76,6 @@ const ViewBooking: React.FC = () => {
       try {
         let bookingData: Booking | null = null;
         
-        // Try to get from cache first by ID
         if (id) {
           const cached = await bookingCacheService.getBookingFromCache(Number(id));
           if (cached) {
@@ -85,16 +83,13 @@ const ViewBooking: React.FC = () => {
           }
         }
         
-        // If not in cache, fetch from API
         if (!bookingData) {
-          // Prefer reference number lookup if available
           if (referenceNumber) {
             const response = await bookingService.getBookings({ reference_number: referenceNumber });
             if (response.success && response.data && response.data.bookings.length > 0) {
               bookingData = response.data.bookings[0];
             }
           } else if (id) {
-            // Fallback to ID lookup
             const response = await bookingService.getBookingById(Number(id));
             if (response.success && response.data) {
               bookingData = response.data;
@@ -104,7 +99,6 @@ const ViewBooking: React.FC = () => {
 
         if (bookingData) {
           setBooking(bookingData);
-          // Generate QR code
           if (bookingData.reference_number) {
             const qrCode = await QRCode.toDataURL(bookingData.reference_number, {
               width: 300,
@@ -198,7 +192,6 @@ const ViewBooking: React.FC = () => {
         }
       `}</style>
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <StandardButton
@@ -233,7 +226,6 @@ const ViewBooking: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Alerts */}
         {booking.status === 'cancelled' && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -254,13 +246,10 @@ const ViewBooking: React.FC = () => {
           </div>
         )}
 
-        {/* Main Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Booking Information */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Booking Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <User className={`h-5 w-5 text-${fullColor}`} />
@@ -273,7 +262,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              {/* Package */}
               {booking.package ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -287,7 +275,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               ) : null}
 
-              {/* Date & Time */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <Calendar className={`h-5 w-5 text-${fullColor}`} />
@@ -306,7 +293,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              {/* Duration */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <Clock className={`h-5 w-5 text-${fullColor}`} />
@@ -317,7 +303,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              {/* Participants */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <Users className={`h-5 w-5 text-${fullColor}`} />
@@ -328,7 +313,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              {/* Location */}
               {(booking.location && typeof booking.location === 'object') ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -346,7 +330,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               ) : null}
 
-              {/* Room */}
               {(booking.room && typeof booking.room === 'object') ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -359,7 +342,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               ) : null}
 
-              {/* Status */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
@@ -372,7 +354,6 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              {/* Guest of Honor Section - Only show if data exists */}
               {(booking as any).guest_of_honor_name && (
                 <>
                   <div className="col-span-2">
@@ -418,7 +399,6 @@ const ViewBooking: React.FC = () => {
             </div>
           </div>
 
-          {/* Payment Information */}
           <div className="p-6 border-b border-gray-100 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -466,14 +446,12 @@ const ViewBooking: React.FC = () => {
                 </div>
               )}
 
-              {/* Applied Fees */}
               {booking.applied_fees && booking.applied_fees.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedFeesDisplay appliedFees={booking.applied_fees} />
                 </div>
               )}
 
-              {/* Applied Discounts */}
               {(booking as any).applied_discounts && (booking as any).applied_discounts.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedDiscountsDisplay appliedDiscounts={(booking as any).applied_discounts} />
@@ -533,7 +511,6 @@ const ViewBooking: React.FC = () => {
               </div>
             </div>
 
-            {/* Payment History */}
             {(booking as any).payments && (booking as any).payments.length > 0 && (
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
@@ -570,7 +547,6 @@ const ViewBooking: React.FC = () => {
             )}
           </div>
 
-          {/* Attractions & Add-ons */}
           {((booking.attractions && booking.attractions.length > 0) || ((booking as any).add_ons && (booking as any).add_ons.length > 0)) && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Services</h2>
@@ -614,7 +590,6 @@ const ViewBooking: React.FC = () => {
                       {(booking as any).add_ons.map((addon: any, index: number) => {
                         let unitPrice = 0;
                         
-                        // For force add-ons, check price_each_packages for the package-specific price
                         if (addon.is_force_add_on && addon.price_each_packages && Array.isArray(addon.price_each_packages) && booking.package_id) {
                           const packagePrice = addon.price_each_packages.find((p: any) => p.package_id === booking.package_id);
                           if (packagePrice) {
@@ -622,7 +597,6 @@ const ViewBooking: React.FC = () => {
                           }
                         }
                         
-                        // Fallback to pivot price_at_booking or addon price
                         if (unitPrice === 0) {
                           unitPrice = Number(addon.pivot?.price_at_booking ?? addon.pivot?.price ?? addon.price ?? 0) || 0;
                         }
@@ -663,7 +637,6 @@ const ViewBooking: React.FC = () => {
             </div>
           )}
 
-          {/* Notes & Special Requests */}
           {(booking.notes || booking.special_requests) && (
             <div className="p-6">
               {booking.special_requests && (
@@ -681,7 +654,6 @@ const ViewBooking: React.FC = () => {
             </div>
           )}
 
-          {/* Internal Staff Notes */}
           {booking.internal_notes && (
             <div className="p-6 bg-amber-50/50 border-t border-amber-100">
               <div className="flex items-center gap-2 mb-2">
@@ -693,7 +665,6 @@ const ViewBooking: React.FC = () => {
             </div>
           )}
 
-          {/* Timestamps */}
           <div className="p-6 bg-gray-100 border-t border-gray-200">
             <div className="flex items-center gap-6 text-sm text-gray-500">
               <div className="flex items-center gap-2">
@@ -704,7 +675,6 @@ const ViewBooking: React.FC = () => {
           </div>
         </div>
 
-        {/* QR Code Modal */}
         {showQRModal && qrCodeData && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowQRModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>

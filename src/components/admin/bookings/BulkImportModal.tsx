@@ -48,12 +48,10 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setState('upload');
       setFile(null);
-      // Auto-set location for non-company-admin users
       setLocationId(!isCompanyAdmin && userLocationId ? userLocationId : '');
       setSkipDuplicates(true);
       setResult(null);
@@ -110,7 +108,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
     if (files && files.length > 0) {
       handleFileSelect(files[0]);
     }
-    // Reset input so same file can be re-selected
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -166,7 +163,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
         className="bg-white rounded-xl shadow-lg w-full max-w-lg relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
           <h2 className="text-xl font-semibold text-gray-900">Bulk Import Bookings</h2>
           {state !== 'importing' && (
@@ -180,14 +176,12 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
           )}
         </div>
 
-        {/* Upload State */}
         {state === 'upload' && (
           <div className="p-6">
             <p className="text-gray-600 text-sm mb-5">
               Import bookings from a Bookly CSV or Excel file.
             </p>
 
-            {/* Location select — only shown for company admins */}
             {isCompanyAdmin ? (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
@@ -211,7 +205,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
             )}
 
-            {/* Dropzone */}
             {!file ? (
               <div
                 onDragOver={handleDragOver}
@@ -256,7 +249,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
             )}
 
-            {/* Skip duplicates checkbox */}
             <label className="flex items-center gap-2 mt-4 cursor-pointer">
               <input
                 type="checkbox"
@@ -267,14 +259,12 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               <span className="text-sm text-gray-700">Skip duplicate Bookly IDs (recommended)</span>
             </label>
 
-            {/* Error message */}
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
               <StandardButton variant="secondary" size="md" onClick={handleDone}>
                 Cancel
@@ -292,7 +282,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
         )}
 
-        {/* Importing State */}
         {state === 'importing' && (
           <div className="p-6 text-center">
             <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
@@ -316,7 +305,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
         )}
 
-        {/* Results State */}
         {state === 'results' && result && (
           <div className="p-6">
             <div className="flex items-center gap-2 mb-5">
@@ -324,7 +312,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               <h3 className="text-lg font-semibold text-gray-900">Import Complete</h3>
             </div>
 
-            {/* Stats grid */}
             <div className="grid grid-cols-4 gap-3 mb-5">
               <div className="bg-gray-50 rounded-lg p-3 text-center border border-gray-100">
                 <p className="text-xl font-bold text-gray-900">{result.total_rows}</p>
@@ -350,7 +337,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
             </div>
 
-            {/* Error list */}
             {result.errors.length > 0 && (
               <div className="mb-5">
                 <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
@@ -367,7 +353,6 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
             )}
 
-            {/* Done button */}
             <div className="flex justify-end pt-4 border-t border-gray-100">
               <StandardButton variant="primary" size="md" onClick={handleDone}>
                 Done — View Bookings

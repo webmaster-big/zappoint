@@ -33,7 +33,6 @@ const CompanyAdminProfile = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  // Profile data state
   const [profileData, setProfileData] = useState<CompanyAdminProfileData>({
     personal: {
       firstName: '',
@@ -71,12 +70,10 @@ const CompanyAdminProfile = () => {
 
   const [editedData, setEditedData] = useState(profileData);
 
-  // Fetch user and company data on mount
   useEffect(() => {
     fetchProfileData();
   }, []);
 
-  // Update profile picture when localStorage changes
   useEffect(() => {
     const user = getStoredUser();
     if (user?.profile_path && user.profile_path !== profileData.personal.avatar) {
@@ -113,10 +110,8 @@ const CompanyAdminProfile = () => {
         return;
       }
 
-      // Check if we have complete user data in localStorage
       const hasCompleteUserData = user.first_name && user.last_name && user.email;
       
-      // Check if we have company data cached in a separate localStorage key
       const cachedCompanyData = localStorage.getItem(`company_${user.company_id}`);
       const cachedBusinessMetrics = localStorage.getItem(`business_metrics_${user.company_id}`);
       
@@ -124,21 +119,17 @@ const CompanyAdminProfile = () => {
       let totalLocations = 0;
       let totalEmployees = 0;
       
-      // If we have complete cached data, use it; otherwise fetch from API
       if (hasCompleteUserData && cachedCompanyData && cachedBusinessMetrics) {
-        // Use cached data
         company = JSON.parse(cachedCompanyData);
         const metrics = JSON.parse(cachedBusinessMetrics);
         totalLocations = metrics.totalLocations;
         
-        // Recalculate total employees from cached company users (excluding company_admin)
         if (company.users && Array.isArray(company.users)) {
           totalEmployees = company.users.filter((u: any) => u.role !== 'company_admin').length;
         } else {
           totalEmployees = metrics.totalEmployees;
         }
       } else {
-        // Fetch company data from API
         const companyResponse = await fetch(`${API_BASE_URL}/companies/${user.company_id}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -153,14 +144,11 @@ const CompanyAdminProfile = () => {
         const companyData = await companyResponse.json();
         company = companyData.data;
         
-        // Cache company data
         localStorage.setItem(`company_${user.company_id}`, JSON.stringify(company));
         
-        // Calculate total locations from company data if available
         if (company.locations && Array.isArray(company.locations)) {
           totalLocations = company.locations.length;
         } else {
-          // Fallback: Fetch locations count for this company
           const locationsResponse = await fetch(`${API_BASE_URL}/locations`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -175,11 +163,9 @@ const CompanyAdminProfile = () => {
           }
         }
         
-        // Calculate total employees from company data if available (excluding company_admin)
         if (company.users && Array.isArray(company.users)) {
           totalEmployees = company.users.filter((u: any) => u.role !== 'company_admin').length;
         } else {
-          // Fallback: Fetch employees count for this company (excluding company_admin role)
           const usersResponse = await fetch(`${API_BASE_URL}/users`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -196,7 +182,6 @@ const CompanyAdminProfile = () => {
           }
         }
         
-        // Cache business metrics
         localStorage.setItem(`business_metrics_${user.company_id}`, JSON.stringify({
           totalLocations,
           totalEmployees
@@ -238,10 +223,8 @@ const CompanyAdminProfile = () => {
         }
       };
 
-      // Store company logo in localStorage for sidebar access
       if (company.logo_path) {
         localStorage.setItem('company_logo_path', company.logo_path);
-        // Dispatch event so AdminSidebar can update
         window.dispatchEvent(new CustomEvent('zapzone_company_logo_updated', {
           detail: { logoPath: company.logo_path }
         }));
@@ -285,7 +268,6 @@ const CompanyAdminProfile = () => {
 
 
 
-      // Update user data (personal information)
       const userPayload = {
         first_name: editedData.personal.firstName,
         last_name: editedData.personal.lastName,
@@ -310,7 +292,6 @@ const CompanyAdminProfile = () => {
         throw new Error(errorData.message || 'Failed to update user data');
       }
 
-      // Update company data
       const companyPayload = {
         company_name: editedData.company.name,
         email: editedData.company.email,
@@ -347,7 +328,6 @@ const CompanyAdminProfile = () => {
       setIsEditing(false);
       setSuccessMessage('Profile updated successfully!');
       
-      // Update stored user data in localStorage
       const storedUser = getStoredUser();
       if (storedUser) {
         storedUser.first_name = editedData.personal.firstName;
@@ -360,7 +340,6 @@ const CompanyAdminProfile = () => {
         setStoredUser(storedUser);
       }
       
-      // Update cached company data
       if (companyId) {
         const companyCache = {
           company_name: editedData.company.name,
@@ -382,7 +361,6 @@ const CompanyAdminProfile = () => {
         localStorage.setItem(`company_${companyId}`, JSON.stringify(companyCache));
       }
       
-      // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update profile');
@@ -401,27 +379,16 @@ const CompanyAdminProfile = () => {
     }));
   };
 
-  // const handleBusinessChange = (field: string, value: string | number) => {
-  //   setEditedData(prev => ({
-  //     ...prev,
-  //     business: {
-  //       ...prev.business,
-  //       [field]: value
-  //     }
-  //   }));
-  // };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('Image size should be less than 5MB');
       return;
@@ -438,7 +405,6 @@ const CompanyAdminProfile = () => {
         throw new Error('Not authenticated');
       }
 
-      // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(file);
       
@@ -468,7 +434,6 @@ const CompanyAdminProfile = () => {
 
           console.log('New profile path from API:', newProfilePath);
 
-          // Update stored user data first
           const storedUser = getStoredUser();
           if (storedUser) {
             storedUser.profile_path = newProfilePath;
@@ -476,10 +441,8 @@ const CompanyAdminProfile = () => {
             console.log('Updated localStorage with new profile_path:', newProfilePath);
           }
 
-          // Dispatch custom event to notify other components
           window.dispatchEvent(new Event('zapzone_profile_updated'));
 
-          // Then update component state
           setProfileData(prev => ({
             ...prev,
             personal: {
@@ -524,14 +487,12 @@ const CompanyAdminProfile = () => {
 
     console.log('File selected:', file.name, file.type, file.size);
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file');
       console.error('Invalid file type:', file.type);
       return;
     }
 
-    // Validate file size (max 20MB for logo)
     if (file.size > 20 * 1024 * 1024) {
       setError('Logo size should be less than 20MB');
       console.error('File too large:', file.size);
@@ -551,7 +512,6 @@ const CompanyAdminProfile = () => {
         throw new Error('Not authenticated');
       }
 
-      // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(file);
       
@@ -586,7 +546,6 @@ const CompanyAdminProfile = () => {
 
           console.log('New logo path from API:', newLogoPath);
 
-          // Update cached company data
           const cachedCompany = localStorage.getItem(`company_${companyId}`);
           if (cachedCompany) {
             const companyData = JSON.parse(cachedCompany);
@@ -594,15 +553,12 @@ const CompanyAdminProfile = () => {
             localStorage.setItem(`company_${companyId}`, JSON.stringify(companyData));
           }
 
-          // Store company logo in a separate key for easy access by sidebar/layout
           localStorage.setItem('company_logo_path', newLogoPath || '');
 
-          // Dispatch custom event to notify sidebar and other components
           window.dispatchEvent(new CustomEvent('zapzone_company_logo_updated', {
             detail: { logoPath: newLogoPath }
           }));
 
-          // Update component state
           setProfileData(prev => ({
             ...prev,
             company: {
@@ -647,14 +603,12 @@ const CompanyAdminProfile = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto">
-        {/* Loading State */}
         {isFetching && (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
             <AlertCircle className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" />
@@ -665,7 +619,6 @@ const CompanyAdminProfile = () => {
           </div>
         )}
 
-        {/* Success Message */}
         {successMessage && (
           <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
             <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
@@ -678,7 +631,6 @@ const CompanyAdminProfile = () => {
 
         {!isFetching && (
           <>
-        {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
@@ -778,7 +730,6 @@ const CompanyAdminProfile = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
           <div className="flex overflow-x-auto">
             {tabs.map((tab) => {
@@ -803,9 +754,7 @@ const CompanyAdminProfile = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          {/* Personal Information Tab */}
           {activeTab === 'personal' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -900,7 +849,6 @@ const CompanyAdminProfile = () => {
             </div>
           )}
 
-          {/* Company Details Tab */}
           {activeTab === 'company' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -920,7 +868,6 @@ const CompanyAdminProfile = () => {
                   />
                 </div>
 
-                {/* Company Logo Upload */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
                   <div className="flex items-center space-x-4">
@@ -1150,7 +1097,6 @@ const CompanyAdminProfile = () => {
             </div>
           )}
 
-          {/* Business Overview Tab */}
           {activeTab === 'business' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">

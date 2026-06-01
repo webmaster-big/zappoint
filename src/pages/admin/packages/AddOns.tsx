@@ -44,24 +44,20 @@ const ManageAddons = () => {
 
   console.log("Form Data:", formData);
   
-  // Advanced filters toggle state
   const [showFilters, setShowFilters] = useState(false);
   
-  // Location filtering for company_admin
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [modalLocationId, setModalLocationId] = useState<number | null>(null);
   
-  // Toast state
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const showToast = (message: string, type?: "success" | "error" | "info") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Fetch locations for company_admin
   useEffect(() => {
     const fetchLocations = async () => {
       if (isCompanyAdmin) {
@@ -71,7 +67,6 @@ const ManageAddons = () => {
           if (response.success && response.data) {
             const locationsArray = Array.isArray(response.data) ? response.data : [];
             setLocations(locationsArray);
-            // Set first location as default if available
             if (locationsArray.length > 0 && selectedLocationId === null) {
               setSelectedLocationId(locationsArray[0].id);
             }
@@ -85,7 +80,6 @@ const ManageAddons = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load packages when modal opens (for force add-on feature)
   useEffect(() => {
     const loadPackages = async () => {
       if (!showModal) return;
@@ -93,28 +87,23 @@ const ManageAddons = () => {
       try {
         setLoadingPackages(true);
         
-        // Determine location to fetch packages for
         const locationId = isCompanyAdmin ? modalLocationId : currentUser?.location_id;
         
-        // Build filter params
         const params: { user_id?: number; location_id?: number } = { user_id: getStoredUser()?.id };
         if (locationId) {
           params.location_id = locationId;
         }
         
-        // Try cache first
         const cachedPackages = await packageCacheService.getPackages(params);
         
         if (cachedPackages && cachedPackages.length > 0) {
           console.log('[AddOns] Loaded packages from cache:', cachedPackages.length);
           setPackages(cachedPackages);
         } else {
-          // Fetch from API and cache the result
           console.log('[AddOns] Fetching packages from API...');
           const response = await packageService.getPackages(params);
           if (response.data?.packages) {
             setPackages(response.data.packages);
-            // Cache the packages for future use
             await packageCacheService.cachePackages(response.data.packages);
             console.log('[AddOns] Cached', response.data.packages.length, 'packages');
           }
@@ -130,13 +119,11 @@ const ManageAddons = () => {
     loadPackages();
   }, [showModal, modalLocationId, isCompanyAdmin, currentUser?.location_id]);
 
-  // Load addons from backend
   useEffect(() => {
     loadAddons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocationId]);
 
-  // Listen for cache updates from background sync
   useEffect(() => {
     const unsubscribe = addOnCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -179,7 +166,6 @@ const ManageAddons = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocationId]);
 
-  // Filter addons based on search - separate effects to avoid resetting page on addon updates
   useEffect(() => {
     if (searchTerm) {
       const filtered = addons.filter(addon =>
@@ -192,7 +178,6 @@ const ManageAddons = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addons]);
   
-  // Only reset page when search term changes
   useEffect(() => {
     if (searchTerm) {
       const filtered = addons.filter(addon =>
@@ -210,17 +195,14 @@ const ManageAddons = () => {
     try {
       setLoading(true);
       
-      // Build filter params
       const params: { user_id?: number; location_id?: number } = {
         user_id: getStoredUser()?.id,
       };
       
-      // For company_admin, only add location_id if a specific location is selected
       if (isCompanyAdmin && selectedLocationId) {
         params.location_id = selectedLocationId;
       }
       
-      // Check if cache has data first for instant loading
       const hasCachedData = await addOnCacheService.hasCachedData();
       
       if (hasCachedData) {
@@ -255,20 +237,17 @@ const ManageAddons = () => {
           console.log('[AddOns] Loaded from cache:', formattedAddons.length, 'add-ons');
           setAddons(formattedAddons);
           setLoading(false);
-          // Trigger background sync for freshness
           addOnCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
       }
       
-      // No cache or cache is empty - fetch from API
       console.log('[AddOns] Fetching from API...');
       const response = await addOnService.getAddOns(params);
       console.log('Add-ons response:', response);
       
       if (response.data && response.data.add_ons) {
         const formattedAddons: AddOnsAddon[] = response.data.add_ons.map(addon => {
-          // Normalize image to a full URL when possible. If backend returns a full URL, keep it.
           let imageFull = '';
           if (addon.image) {
             const imgStr = String(addon.image);
@@ -294,7 +273,6 @@ const ManageAddons = () => {
         });
         setAddons(formattedAddons);
         
-        // Cache the raw add-ons for next time
         await addOnCacheService.cacheAddOns(response.data.add_ons);
         console.log('[AddOns] Cached', response.data.add_ons.length, 'add-ons');
       }
@@ -317,7 +295,6 @@ const ManageAddons = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Convert to base64 and store in formData
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({
@@ -332,20 +309,17 @@ const ManageAddons = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate: Either global price OR force add-on with package prices required
     if (!formData.name) {
       showToast('Please enter an add-on name', 'error');
       return;
     }
     
     if (formData.is_force_add_on) {
-      // For force add-ons, need at least one package with pricing
       if (formData.price_each_packages.length === 0) {
         showToast('Please select at least one package for force add-on', 'error');
         return;
       }
     } else {
-      // For regular add-ons, require global price
       if (!formData.price) {
         showToast('Please enter a price', 'error');
         return;
@@ -357,7 +331,6 @@ const ManageAddons = () => {
       const price = formData.price ? parseFloat(formData.price) : null;
 
       if (editingAddon) {
-        // Update existing add-on
         const updatePayload: UpdateAddOnData = {
           name: formData.name,
           price: price,
@@ -369,7 +342,6 @@ const ManageAddons = () => {
           price_each_packages: formData.is_force_add_on ? formData.price_each_packages : null,
         };
         
-        // Add image only if it's a new base64 image (not the existing URL)
         if (formData.image && formData.image.startsWith('data:image')) {
           updatePayload.image = formData.image;
         }
@@ -383,7 +355,6 @@ const ManageAddons = () => {
         const result = await addOnService.updateAddOn(parseInt(editingAddon.id), updatePayload);
         console.log('Update result:', result);
         
-        // Update addon in state without full reload
         if (result.data) {
           setAddons(prev => prev.map(addon => 
             addon.id === editingAddon.id 
@@ -402,7 +373,6 @@ const ManageAddons = () => {
               : addon
           ));
           
-          // Update in cache
           try {
             await addOnCacheService.updateAddOnInCache(result.data);
           } catch (cacheError) {
@@ -412,12 +382,9 @@ const ManageAddons = () => {
         
         showToast('Add-on updated successfully!', 'success');
       } else {
-        // Create new add-on
-        // Determine location_id based on role
         let locationId: number;
         
         if (isCompanyAdmin) {
-          // For company_admin, use modal location or require selection
           if (!modalLocationId) {
             showToast('Please select a location first', 'error');
             setActionLoading(false);
@@ -425,7 +392,6 @@ const ManageAddons = () => {
           }
           locationId = modalLocationId;
         } else {
-          // For location_manager/attendant, use their assigned location
           locationId = currentUser?.location_id || 1;
         }
 
@@ -441,7 +407,6 @@ const ManageAddons = () => {
           price_each_packages: formData.is_force_add_on ? formData.price_each_packages : null,
         };
         
-        // Add image if provided
         if (formData.image && formData.image.startsWith('data:image')) {
           createPayload.image = formData.image;
         }
@@ -454,7 +419,6 @@ const ManageAddons = () => {
         const result = await addOnService.createAddOn(createPayload);
         console.log('Create result:', result);
         
-        // Add new addon to state without full reload
         if (result.data) {
           const newAddon: AddOnsAddon = {
             id: result.data.id.toString(),
@@ -470,7 +434,6 @@ const ManageAddons = () => {
           };
           setAddons(prev => [...prev, newAddon]);
           
-          // Add to cache
           try {
             await addOnCacheService.addAddOnToCache(result.data);
           } catch (cacheError) {
@@ -498,11 +461,9 @@ const ManageAddons = () => {
 
   const handleEdit = (addon: AddOnsAddon) => {
     setEditingAddon(addon);
-    // Set modal location ID for company admin
     if (isCompanyAdmin && addon.location?.id) {
       setModalLocationId(addon.location.id);
     }
-    // Remove ASSET_URL prefix if present for proper display in modal
     const imageUrl = addon.image?.startsWith(ASSET_URL) 
       ? addon.image 
       : addon.image;
@@ -525,10 +486,8 @@ const ManageAddons = () => {
         setActionLoading(true);
         await addOnService.deleteAddOn(parseInt(id));
         
-        // Remove addon from state without full reload
         setAddons(prev => prev.filter(addon => addon.id !== id));
         
-        // Remove from cache
         try {
           await addOnCacheService.removeAddOnFromCache(parseInt(id));
         } catch (cacheError) {
@@ -565,7 +524,6 @@ const ManageAddons = () => {
     resetForm();
   };
 
-  // Export functionality
   const handleOpenExportModal = () => {
     setSelectedForExport(addons.map(addon => addon.id || ''));
     setShowExportModal(true);
@@ -600,7 +558,6 @@ const ManageAddons = () => {
     setShowExportModal(false);
   };
 
-  // Import functionality
   const handleImport = () => {
     try {
       const parsedData = JSON.parse(importData);
@@ -610,7 +567,6 @@ const ManageAddons = () => {
         return;
       }
 
-      // Validate the structure
       const isValid = parsedData.every(addon => 
         typeof addon === 'object' && addon.name && addon.price
       );
@@ -620,14 +576,12 @@ const ManageAddons = () => {
         return;
       }
 
-      // Generate new IDs for imported add-ons to avoid conflicts
       const importedAddons = parsedData.map(addon => ({
         ...addon,
         id: addon.id || `addon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         price: typeof addon.price === 'number' ? addon.price : parseFloat(addon.price)
       }));
 
-      // Merge with existing add-ons
       const updatedAddons = [...addons, ...importedAddons];
       setAddons(updatedAddons);
       localStorage.setItem('zapzone_addons', JSON.stringify(updatedAddons));
@@ -653,7 +607,6 @@ const ManageAddons = () => {
     }
   };
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentAddons = filteredAddons.slice(indexOfFirstItem, indexOfLastItem);
@@ -675,7 +628,6 @@ const ManageAddons = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Page Header with Action Buttons */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Add-ons</h1>
@@ -710,12 +662,9 @@ const ManageAddons = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
 
-        {/* Search and Filter Section */}
         <div className="mb-6">
-          {/* Search Row */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-lg">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -749,11 +698,9 @@ const ManageAddons = () => {
             </div>
           </div>
 
-          {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                {/* Location Filter for Company Admin */}
                 {isCompanyAdmin && locations.length > 0 && (
                   <div>
                     <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
@@ -793,13 +740,11 @@ const ManageAddons = () => {
             </div>
           )}
           
-          {/* Results count */}
           <div className="text-sm text-gray-500 mt-3">
             Showing {filteredAddons.length} add-on{filteredAddons.length !== 1 ? 's' : ''}
           </div>
         </div>
 
-        {/* Add-ons Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -863,13 +808,11 @@ const ManageAddons = () => {
                       </span>
                     )}
                   </div>
-                  {/* Location */}
                   {addon.location && (
                     <div className="text-xs text-gray-500 mb-2">
                       {addon.location.name}
                     </div>
                   )}
-                  {/* Quick Stats */}
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
                     {addon.min_quantity && addon.min_quantity > 1 && (
                       <span>Min: {addon.min_quantity}</span>
@@ -912,7 +855,6 @@ const ManageAddons = () => {
           </div>
         )}
 
-        {/* Pagination */}
         <div className="pt-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -925,7 +867,6 @@ const ManageAddons = () => {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -934,7 +875,6 @@ const ManageAddons = () => {
               </h2>
               
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Location Selector */}
                 {isCompanyAdmin && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -961,9 +901,7 @@ const ManageAddons = () => {
                   </div>
                 )}
 
-                {/* Two Column Layout: Image + Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Image Upload */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Add-on Image
@@ -1000,9 +938,7 @@ const ManageAddons = () => {
                     </div>
                   </div>
 
-                  {/* Name, Price, Quantity */}
                   <div className="space-y-4">
-                    {/* Name Input */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Add-on Name <span className="text-red-500">*</span>
@@ -1018,7 +954,6 @@ const ManageAddons = () => {
                       />
                     </div>
 
-                    {/* Price Input */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Default Price {!formData.is_force_add_on && <span className="text-red-500">*</span>}
@@ -1047,7 +982,6 @@ const ManageAddons = () => {
                       )}
                     </div>
 
-                    {/* Quantity Limits */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1079,7 +1013,6 @@ const ManageAddons = () => {
                       </div>
                     </div>
 
-                    {/* Description */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Description
@@ -1099,7 +1032,6 @@ const ManageAddons = () => {
                   </div>
                 </div>
 
-                {/* Force Add-On Toggle */}
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1130,7 +1062,6 @@ const ManageAddons = () => {
                     </button>
                   </div>
                   
-                  {/* Package-Specific Pricing */}
                   {formData.is_force_add_on && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1259,7 +1190,6 @@ const ManageAddons = () => {
                   )}
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex gap-3 pt-2">
                   <StandardButton
                     onClick={handleModalClose}
@@ -1285,7 +1215,6 @@ const ManageAddons = () => {
           </div>
         )}
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowExportModal(false)}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -1383,7 +1312,6 @@ const ManageAddons = () => {
           </div>
         )}
 
-      {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => { setShowImportModal(false); setImportData(''); }}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -1479,7 +1407,6 @@ const ManageAddons = () => {
           </div>
         )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
           <Toast 

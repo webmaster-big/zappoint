@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff, Sparkles, Check } from 'lucide-react';
 import type { RegisterFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
+import { membershipCache } from '../../services/MembershipCacheService';
+import type { MembershipPlan } from '../../types/Membership.types';
+import { formatMembershipPrice } from '../../utils/membershipFormat';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' }, { code: 'CA', name: 'Canada' }, { code: 'GB', name: 'United Kingdom' },
@@ -82,6 +85,9 @@ const GoogleIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 
 const CustomerRegister = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get('next') || searchParams.get('redirect') || '';
+  const safeNextPath = nextPath.startsWith('/') ? nextPath : '';
   const [formData, setFormData] = useState<RegisterFormData>({
     firstName: '', lastName: '', email: '', phone: '',
     password: '', confirmPassword: '',
@@ -97,6 +103,12 @@ const CustomerRegister = () => {
   const [activeTab, setActiveTab] = useState<'account' | 'billing'>('account');
   const [showGooglePopup, setShowGooglePopup] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+
+  useEffect(() => {
+    membershipCache.getPublicPlans().then(setPlans).catch(() => setPlans([]));
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -163,7 +175,13 @@ const CustomerRegister = () => {
           state: formData.state, zip: formData.zip, country: formData.country,
           createdAt: new Date().toISOString(),
         }));
-        navigate('/');
+        if (safeNextPath) {
+          navigate(safeNextPath);
+        } else if (selectedPlanId) {
+          navigate(`/customer/membership/purchase?plan=${selectedPlanId}`);
+        } else {
+          navigate('/');
+        }
       } else { setError(response.message || 'Registration failed. Please try again.'); }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -173,9 +191,7 @@ const CustomerRegister = () => {
 
   return (
     <div className="h-dvh flex flex-col lg:flex-row overflow-hidden">
-      {/* Left — Form */}
       <div className="flex-1 flex flex-col min-h-0 bg-white lg:max-w-[520px] xl:max-w-[560px]">
-        {/* Mobile header */}
         <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-100">
           <Link to="/" className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +227,6 @@ const CustomerRegister = () => {
             {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-lg mb-3">{error}</div>}
 
             <form className="space-y-3" onSubmit={handleSubmit}>
-              {/* Tabs */}
               <div className="flex border-b border-gray-200">
                 <button type="button" onClick={() => setActiveTab('account')}
                   className={`flex-1 pb-2 text-sm font-semibold transition ${
@@ -241,7 +256,6 @@ const CustomerRegister = () => {
                 </button>
               </div>
 
-              {/* Account Tab */}
               {activeTab === 'account' && (
                 <div className="space-y-2.5">
                   <div className="grid grid-cols-2 gap-2.5">
@@ -300,7 +314,6 @@ const CustomerRegister = () => {
                 </div>
               )}
 
-              {/* Billing Tab */}
               {activeTab === 'billing' && (
                 <div className="space-y-2.5">
                   <p className="text-[11px] text-gray-400">Billing information is optional.</p>
@@ -341,6 +354,52 @@ const CustomerRegister = () => {
                     </div>
                   </div>
 
+                  {plans.length > 0 && (
+                    <div className="border border-blue-100 bg-gradient-to-br from-blue-50/60 to-white rounded-xl p-3 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        <h3 className="text-xs font-semibold text-gray-900">Add a Membership <span className="text-gray-400 font-normal">(Optional)</span></h3>
+                      </div>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Save on every visit. Pick a plan now and we'll take you to checkout after your account is created.
+                      </p>
+                      <div className="grid gap-1.5 max-h-44 overflow-y-auto">
+                        {plans.map((p) => {
+                          const selected = selectedPlanId === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setSelectedPlanId(selected ? null : p.id)}
+                              className={`relative text-left rounded-lg border px-3 py-2 transition ${selected ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 bg-white hover:border-blue-300'}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className={`text-sm font-semibold truncate ${selected ? 'text-blue-700' : 'text-gray-900'}`}>{p.name}</p>
+                                  {p.description && <p className="text-[11px] text-gray-500 truncate">{p.description}</p>}
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className={`text-sm font-bold ${selected ? 'text-blue-700' : 'text-gray-900'}`}>{formatMembershipPrice(p.price)}</p>
+                                  <p className="text-[10px] text-gray-400 capitalize">{p.billing_interval?.replace('_', ' ')}</p>
+                                </div>
+                              </div>
+                              {selected && (
+                                <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                                  <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {selectedPlanId && (
+                        <button type="button" onClick={() => setSelectedPlanId(null)} className="text-[11px] text-gray-500 hover:text-gray-700 underline">
+                          Skip membership
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-2">
                     <input id="terms" type="checkbox" checked={formData.agreeToTerms}
                       onChange={(e) => setFormData(prev => ({ ...prev, agreeToTerms: e.target.checked }))} required
@@ -352,7 +411,6 @@ const CustomerRegister = () => {
                       <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-blue-600 hover:text-blue-700 underline font-medium">Privacy Policy</button>
                     </label>
                   </div>
-
                   <div className="flex gap-2.5">
                     <button type="button" onClick={() => setActiveTab('account')}
                       className="flex-1 h-9 rounded-lg text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
@@ -364,7 +422,7 @@ const CustomerRegister = () => {
                         <span className="flex items-center justify-center gap-2">
                           <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Creating...
                         </span>
-                      ) : 'Create Account'}
+                      ) : selectedPlanId ? 'Create Account & Continue' : 'Create Account'}
                     </button>
                   </div>
                 </div>
@@ -373,7 +431,7 @@ const CustomerRegister = () => {
 
             <p className="mt-3 text-center text-sm text-gray-500">
               Already have an account?{' '}
-              <Link to="/customer/login" className="font-semibold text-blue-600 hover:text-blue-700 transition">Sign in</Link>
+              <Link to={safeNextPath ? `/customer/login?next=${encodeURIComponent(safeNextPath)}` : '/customer/login'} className="font-semibold text-blue-600 hover:text-blue-700 transition">Sign in</Link>
             </p>
           </div>
         </div>
@@ -383,38 +441,30 @@ const CustomerRegister = () => {
         </p>
       </div>
 
-      {/* Right — Carousel */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden items-center justify-center bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800">
-        {/* Subtle dot grid */}
         <div className="absolute inset-0" style={{ opacity: 0.04, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
         <div className="relative z-10 w-full max-w-lg px-14">
-          {/* Section label */}
           <div className="flex items-center gap-3 mb-12">
             <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.15), transparent)' }} />
             <span style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>What you can do</span>
             <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.15), transparent)' }} />
           </div>
 
-          {/* Carousel content */}
           <div className="relative" style={{ minHeight: '320px' }}>
             {carouselSlides.map((slide, i) => (
               <div key={i} className={`absolute inset-0 flex flex-col transition-all duration-700 ease-out ${
                 i === carouselIndex ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
               }`}>
-                {/* Step number */}
                 <div className="flex items-center gap-3 mb-7">
                   <span style={{ fontSize: '40px', fontWeight: 800, color: 'rgba(255,255,255,0.12)', lineHeight: 1, letterSpacing: '-0.02em' }}>{slide.step}</span>
                   <div style={{ width: '28px', height: '2px', background: 'rgba(255,255,255,0.25)', borderRadius: '1px' }} />
                 </div>
 
-                {/* Title — using div instead of h2 to avoid global CSS !important heading override */}
                 <div style={{ fontSize: '28px', fontWeight: 700, color: '#ffffff', marginBottom: '14px', lineHeight: 1.2 }}>{slide.title}</div>
 
-                {/* Description */}
                 <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '15px', lineHeight: 1.7, marginBottom: '24px', maxWidth: '420px' }}>{slide.description}</p>
 
-                {/* Feature list */}
                 <div className="flex flex-col gap-2.5">
                   {slide.features.map((feat, fi) => (
                     <div key={fi} className="flex items-center gap-3">
@@ -427,7 +477,6 @@ const CustomerRegister = () => {
             ))}
           </div>
 
-          {/* Carousel indicators */}
           <div className="flex items-center gap-2 mt-6">
             {carouselSlides.map((_, i) => (
               <button key={i} onClick={() => setCarouselIndex(i)}
@@ -448,7 +497,6 @@ const CustomerRegister = () => {
         </div>
       </div>
 
-      {/* Terms Modal */}
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowTermsModal(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -479,7 +527,6 @@ const CustomerRegister = () => {
         </div>
       )}
 
-      {/* Privacy Modal */}
       {showPrivacyModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPrivacyModal(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -511,7 +558,6 @@ const CustomerRegister = () => {
         </div>
       )}
 
-      {/* Google Coming Soon Popup */}
       {showGooglePopup && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowGooglePopup(false)}>
           <div className="bg-white rounded-2xl max-w-xs w-full shadow-2xl" onClick={e => e.stopPropagation()}>

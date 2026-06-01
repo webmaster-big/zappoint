@@ -16,12 +16,10 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
-    // Company fields
     companyName: "",
     companyEmail: "",
     companyPhone: "",
     companyAddress: "",
-    // Location fields
     locationName: "",
     locationAddress: "",
     locationCity: "",
@@ -30,7 +28,6 @@ export default function Register() {
     locationPhone: "",
     locationEmail: "",
     locationTimezone: "America/New_York",
-    // Employee fields
     phone: "",
     employeeId: "",
     department: "",
@@ -64,7 +61,6 @@ export default function Register() {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [isNewLocation, setIsNewLocation] = useState(false);
 
-  // Validate token on component mount
   useEffect(() => {
     if (!token) {
       setTokenValid(false);
@@ -72,7 +68,6 @@ export default function Register() {
       return;
     }
 
-    // Validate token with backend API
     const validateToken = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/shareable-tokens/check`, {
@@ -92,7 +87,6 @@ export default function Register() {
           return;
         }
 
-        // Token is valid, store the email, role, company_id, and location_id
         setTokenData({
           email: data.data.email,
           role: data.data.role as UserRole,
@@ -100,7 +94,6 @@ export default function Register() {
           location_id: data.data.location_id,
         });
         
-        // Pre-fill email from token data
         setFormData(prev => ({
           ...prev,
           email: data.data.email,
@@ -117,7 +110,6 @@ export default function Register() {
     validateToken();
   }, [token]);
 
-  // Fetch locations for location manager role
   useEffect(() => {
     if (tokenValid && tokenData?.role === 'location_manager' && tokenData.company_id) {
       const fetchLocations = async () => {
@@ -132,7 +124,6 @@ export default function Register() {
           const data = await response.json();
 
           if (response.ok && data.success) {
-            // Filter locations by company_id
             const companyLocations = data.data.filter(
               (loc: { company_id: number }) => loc.company_id === tokenData.company_id
             );
@@ -167,7 +158,6 @@ export default function Register() {
     const value = e.target.value;
     
     if (value === 'new') {
-      // Create new location
       setIsNewLocation(true);
       setSelectedLocationId(null);
       setFormData(prev => ({
@@ -182,7 +172,6 @@ export default function Register() {
         locationTimezone: 'Eastern Standard Time'
       }));
     } else if (value) {
-      // Existing location selected
       const locationId = parseInt(value);
       const location = locations.find(loc => loc.id === locationId);
       
@@ -202,7 +191,6 @@ export default function Register() {
         }));
       }
     } else {
-      // No selection
       setIsNewLocation(false);
       setSelectedLocationId(null);
     }
@@ -217,7 +205,6 @@ export default function Register() {
     console.log("Token Data:", tokenData);
     console.log("Form Data:", formData);
 
-    // Basic validation
     if (formData.password !== formData.confirmPassword) {
       console.error("❌ Validation Error: Passwords do not match");
       setErrorMessage("Passwords do not match");
@@ -232,7 +219,6 @@ export default function Register() {
       return;
     }
 
-    // Validate all password requirements
     const allRequirementsMet = passwordRequirements.every(req => req.met);
     if (!allRequirementsMet) {
       console.error("❌ Validation Error: Password requirements not met", passwordRequirements);
@@ -243,14 +229,12 @@ export default function Register() {
 
     console.log("✅ All validations passed");
 
-    // Register user with backend API
     try {
       let companyId = tokenData!.company_id;
       let locationId = tokenData!.location_id;
 
       console.log("Initial IDs - Company:", companyId, "Location:", locationId);
 
-      // Step 1: Create company if needed (company_admin with no company_id)
       if (tokenData!.role === 'company_admin' && !companyId) {
         console.log("📤 STEP 1: Creating company...");
         const companyPayload = {
@@ -282,7 +266,6 @@ export default function Register() {
         console.log("✅ Company created with ID:", companyId);
       }
 
-      // Step 2: Create or use existing location for location_manager
       if (tokenData!.role === 'location_manager' && !locationId) {
         if (isNewLocation) {
           console.log("📤 STEP 2: Creating new location...");
@@ -329,7 +312,6 @@ export default function Register() {
         }
       }
 
-      // Step 3: Create user account
       console.log("📤 STEP 3: Creating user account...");
       const userPayload: Record<string, unknown> = {
         company_id: companyId,
@@ -342,12 +324,10 @@ export default function Register() {
         status: 'active',
       };
 
-      // Only add location_id for location_manager and attendant roles
       if (tokenData!.role !== 'company_admin') {
         userPayload.location_id = locationId;
       }
 
-      // Add employee-specific fields for attendant role
       if (tokenData!.role === 'attendant') {
         if (formData.phone) userPayload.phone = formData.phone;
         if (formData.employeeId) userPayload.employee_id = formData.employeeId;
@@ -378,7 +358,6 @@ export default function Register() {
 
       console.log("✅ User created successfully with ID:", data.data.id);
 
-      // Mark token as used (optional - backend might auto-mark it)
       try {
         console.log("📤 Marking token as used...");
         const markUsedResponse = await fetch(`${API_BASE_URL}/shareable-tokens/mark-used`, {
@@ -393,11 +372,9 @@ export default function Register() {
         console.log("Mark Used Response:", markUsedData);
       } catch (err) {
         console.error('⚠️ Failed to mark token as used (non-critical):', err);
-        // Don't fail registration if this fails
       }
       
       console.log("✅ REGISTRATION COMPLETE - Redirecting to login...");
-      // Redirect to login page
       window.location.href = '/';
     } catch (error) {
       console.error("❌ REGISTRATION FAILED:", error);
@@ -422,12 +399,10 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 py-4 sm:py-8">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-4 sm:p-6 border border-zinc-100 m-3">
-        {/* Logo */}
         <div className="flex justify-center mb-4">
           <img src="/Zap-Zone.png" alt="Zap Zone" className="w-1/3" />
         </div>
 
-        {/* Show loading state while validating token */}
         {tokenValid === null && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800 mb-4"></div>
@@ -435,7 +410,6 @@ export default function Register() {
           </div>
         )}
 
-        {/* Show error if token is invalid */}
         {tokenValid === false && (
           <div className="text-center py-8">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -450,10 +424,8 @@ export default function Register() {
           </div>
         )}
 
-        {/* Show registration form if token is valid */}
         {tokenValid === true && tokenData && (
           <>
-            {/* Header */}
             <div className="text-center mb-4">
               <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 mb-1 tracking-tight">
                 Create {getRoleDisplayName(tokenData.role)} Account
@@ -465,7 +437,6 @@ export default function Register() {
               </p>
             </div>
 
-            {/* Show error message */}
             {errorMessage && (
               <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -474,7 +445,6 @@ export default function Register() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-3">
-              {/* Company Information - Only for Company Admin when no company_id */}
               {tokenData.role === 'company_admin' && !tokenData.company_id && (
                 <>
                   <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
@@ -533,14 +503,11 @@ export default function Register() {
                 </>
               )}
 
-              {/* Location Information - Only for Location Manager when no location_id */}
-              {/* Location Information - Only for Location Manager when no location_id */}
               {tokenData.role === 'location_manager' && !tokenData.location_id && (
                 <>
                   <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
                     <h3 className="text-xs font-semibold text-zinc-700 mb-2 uppercase">Location Information</h3>
                     
-                    {/* Location Selection Dropdown */}
                     <div className="mb-3">
                       <label className="block text-xs font-medium text-zinc-700 mb-1">Select Location</label>
                       <select
@@ -559,7 +526,6 @@ export default function Register() {
                       </select>
                     </div>
 
-                    {/* Show location fields when new location or existing location selected */}
                     {(isNewLocation || selectedLocationId) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -680,7 +646,6 @@ export default function Register() {
                 </>
               )}
 
-          {/* Personal Information */}
           <div className={tokenData.role === 'company_admin' ? "space-y-3" : "grid grid-cols-1 md:grid-cols-3 gap-3"}>
             <div>
               <label className="block text-xs font-medium text-zinc-700 mb-1">First Name</label>
@@ -721,7 +686,6 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Employee Information - Only for Attendant */}
           {tokenData.role === 'attendant' && (
             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
               <h3 className="text-xs font-semibold text-zinc-700 mb-2 uppercase">Employee Information</h3>
@@ -795,7 +759,6 @@ export default function Register() {
             </div>
           )}
 
-          {/* Password */}
           <div className={tokenData.role === 'company_admin' ? "space-y-3" : "grid grid-cols-1 md:grid-cols-2 gap-3"}>
             <div>
               <label className="block text-xs font-medium text-zinc-700 mb-1">Password</label>
@@ -845,7 +808,6 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Password Requirements */}
           {formData.password && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {passwordRequirements.map((req, index) => (
@@ -871,7 +833,6 @@ export default function Register() {
           </button>
         </form>
 
-        {/* Login Link */}
         <div className="mt-4 text-center">
           <p className="text-zinc-500 text-xs">
             Already have an account?{" "}

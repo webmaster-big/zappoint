@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/packages/Promo.tsx
 
 export type PromoStatus = "active" | "inactive" | "expired" | "exhausted";
 export type PromoType = "fixed" | "percentage";

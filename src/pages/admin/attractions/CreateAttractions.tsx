@@ -23,7 +23,6 @@ const CreateAttraction = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
-  // Get auth token from localStorage
   const getAuthToken = () => {
     const userData = localStorage.getItem('zapzone_user');
     if (userData) {
@@ -47,7 +46,6 @@ const CreateAttraction = () => {
     maxCapacity: '',
     duration: '',
     durationUnit: 'minutes',
-  // location: '',
     images: [],
     bookingLink: '',
     embedCode: '',
@@ -68,12 +66,10 @@ const CreateAttraction = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [displayCapacityToCustomers, setDisplayCapacityToCustomers] = useState(true);
 
-  // Add-on state
   const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
 
-  // Drag and drop handlers for add-ons
   const handleAddOnDragStart = (index: number) => {
     setDraggedAddOnIndex(index);
   };
@@ -109,7 +105,6 @@ const CreateAttraction = () => {
       const response = await locationService.getLocations();
       const locationsArray = Array.isArray(response.data) ? response.data : [];
       setLocations(locationsArray);
-      // Set first location as default if available
       if (locationsArray.length > 0) {
         setSelectedLocation(locationsArray[0].id.toString());
       }
@@ -233,11 +228,9 @@ const CreateAttraction = () => {
       return;
     }
 
-    // Create previews using object URLs
     const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newImagePreviews]);
 
-    // Convert files to base64 for backend
     const base64Promises = fileArray.map(file => {
       return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -315,7 +308,6 @@ const CreateAttraction = () => {
     }
   };
 
-  // Location handlers removed
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -323,8 +315,6 @@ const CreateAttraction = () => {
     try {
       setIsSubmitting(true);
 
-      // Convert form data to API format
-      // Include location_id from selected location or from the currently stored user
       const attractionData: CreateAttractionData = {
         location_id: selectedLocation ? Number(selectedLocation) : (getStoredUser()?.location_id || undefined),
         name: formData.name,
@@ -352,14 +342,12 @@ const CreateAttraction = () => {
       
       console.log('Attraction created:', response);
       
-      // Add to cache
       if (response.success && response.data) {
         await attractionCacheService.addAttractionToCache(response.data);
       }
       
       setToast({ message: 'Attraction created successfully!', type: 'success' });
       
-      // Navigate after a short delay to show success message
       setTimeout(() => {
         navigate('/attractions');
       }, 1500);
@@ -388,7 +376,6 @@ const CreateAttraction = () => {
     { key: 'sunday', label: 'Sun' }
   ] as const;
 
-  // LivePreview component
   const LivePreview: React.FC<{ formData: CreateAttractionsFormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
@@ -432,7 +419,6 @@ const CreateAttraction = () => {
             )}
           </div>
           
-          {/* Location preview removed */}
           
           <div className="text-sm text-gray-600">
             <span className="font-medium">Capacity:</span> {formData.maxCapacity ? `Up to ${formData.maxCapacity} people` : "Not specified"}
@@ -464,7 +450,6 @@ const CreateAttraction = () => {
 
   return (
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
-      {/* Form Section */}
       <div className="flex-1 mx-auto">
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
           <div className="mb-6">
@@ -473,7 +458,6 @@ const CreateAttraction = () => {
           </div>
           
           <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
-            {/* Location Selection for company_admin */}
             {isCompanyAdmin && (
               <div>
                 <LocationSelector
@@ -489,7 +473,6 @@ const CreateAttraction = () => {
               </div>
             )}
             
-            {/* Basic Information Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Info className="w-5 h-5 text-primary" /> Basic Information
@@ -585,7 +568,6 @@ const CreateAttraction = () => {
               </div>
             </div>
 
-            {/* Pricing & Capacity Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Tag className="w-5 h-5 text-primary" /> Pricing & Capacity
@@ -679,7 +661,6 @@ const CreateAttraction = () => {
               </div>
             </div>
 
-            {/* Availability Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Availability Schedules
@@ -774,7 +755,6 @@ const CreateAttraction = () => {
               </div>
             </div>
 
-            {/* Add-ons Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -799,7 +779,6 @@ const CreateAttraction = () => {
                 </StandardButton>
               </div>
 
-              {/* Selected Add-ons - Draggable list */}
               {selectedAddOns.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
@@ -834,7 +813,6 @@ const CreateAttraction = () => {
                 </div>
               )}
 
-              {/* Available Add-ons to select */}
               <div className="flex flex-wrap gap-2 mb-2">
                 {addOns.filter(add => !selectedAddOns.includes(add.name)).map((add) => (
                   <StandardButton
@@ -853,7 +831,6 @@ const CreateAttraction = () => {
               </div>
             </div>
 
-            {/* Images Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900">Images</h3>
               <div className="space-y-5">
@@ -899,7 +876,6 @@ const CreateAttraction = () => {
               </div>
             </div>
 
-            {/* Display Order */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Display Order</h3>
               <div>
@@ -916,7 +892,6 @@ const CreateAttraction = () => {
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className="flex gap-3 pt-6 border-t border-gray-200">
               <StandardButton
                 variant="secondary"
@@ -942,12 +917,10 @@ const CreateAttraction = () => {
         </div>
       </div>
 
-      {/* Live Preview Section */}
       <div className="w-full md:w-[420px] md:max-w-sm md:sticky md:top-1 h-fit">
         <LivePreview formData={formData} imagePreviews={imagePreviews} />
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

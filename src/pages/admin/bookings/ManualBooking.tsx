@@ -26,13 +26,11 @@ import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.type
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 
-// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
-// Interface for day offs with time info for partial closures
 interface DayOffWithTime {
   date: Date;
   time_start?: string | null;
@@ -42,31 +40,25 @@ interface DayOffWithTime {
   room_ids?: number[] | null;
 }
 
-// Extended booking data interface for manual booking (includes guest of honor fields)
 interface ExtendedBookingData extends CreateBookingData {
   guest_of_honor_name?: string;
   guest_of_honor_age?: number;
   guest_of_honor_gender?: 'male' | 'female' | 'other';
   skip_date_validation?: boolean;
   is_manual_entry?: boolean;
-  // Optional address fields
   guest_address?: string;
   guest_city?: string;
   guest_state?: string;
   guest_zip?: string;
   guest_country?: string;
-  // Email notification flags
   sent_email_to_staff?: boolean;
 }
 
-// Helper function to sort rooms numerically (extracts numbers from room names)
 const sortRoomsNumerically = (rooms: any[]): any[] => {
   return [...rooms].sort((a, b) => {
-    // Extract numbers from room names (e.g., "Room 1" -> 1, "Space 10" -> 10)
     const numA = parseInt(a.name.replace(/\D/g, '')) || 0;
     const numB = parseInt(b.name.replace(/\D/g, '')) || 0;
     if (numA !== numB) return numA - numB;
-    // If no numbers or same numbers, sort alphabetically
     return a.name.localeCompare(b.name);
   });
 };
@@ -77,7 +69,6 @@ const ManualBooking: React.FC = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   
-  // Booking mode: 'flexible' (original - allows past dates, manual selection) or 'standard' (like OnsiteBooking)
   const [bookingMode, setBookingMode] = useState<'flexible' | 'standard'>('standard');
   
   const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
@@ -97,7 +88,6 @@ const ManualBooking: React.FC = () => {
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   
-  // Standard mode specific state (like OnsiteBooking)
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
@@ -123,7 +113,6 @@ const ManualBooking: React.FC = () => {
     guestOfHonorName: string;
     guestOfHonorAge: string;
     guestOfHonorGender: string;
-    // Optional address fields
     guestAddress: string;
     guestCity: string;
     guestState: string;
@@ -147,7 +136,6 @@ const ManualBooking: React.FC = () => {
     guestOfHonorName: '',
     guestOfHonorAge: '',
     guestOfHonorGender: '',
-    // Optional address fields
     guestAddress: '',
     guestCity: '',
     guestState: '',
@@ -155,7 +143,6 @@ const ManualBooking: React.FC = () => {
     guestCountry: ''
   });
 
-  // Helper function to get week of month (1-5, where 5 is last week)
   const getWeekOfMonth = (date: Date): number => {
     const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const dayOfMonth = date.getDate();
@@ -163,14 +150,12 @@ const ManualBooking: React.FC = () => {
     return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
   };
 
-  // Helper function to check if date is in last week of month
   const isLastWeekOfMonth = (date: Date): boolean => {
     const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
     return daysUntilEndOfMonth < 7;
   };
 
-  // Helper function to check if a time slot conflicts with a partial day off
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
     if (!form.bookingDate || dayOffsWithTime.length === 0 || !pkg) return false;
     
@@ -213,12 +198,10 @@ const ManualBooking: React.FC = () => {
     return false;
   };
 
-  // Filter available time slots based on partial day offs
   const filteredTimeSlots = availableTimeSlots.filter(slot => 
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
   );
 
-  // Fetch locations for company admin
   useEffect(() => {
     if (isCompanyAdmin) {
       const fetchLocations = async () => {
@@ -258,7 +241,6 @@ const ManualBooking: React.FC = () => {
         return;
       }
 
-      // Try cache first for faster loading
       const cacheFilters = selectedLocation !== null 
         ? { location_id: selectedLocation, status: 'active' as const }
         : { status: 'active' as const };
@@ -268,16 +250,13 @@ const ManualBooking: React.FC = () => {
       if (cachedPackages && cachedPackages.length > 0) {
         console.log('📦 Using cached packages:', cachedPackages.length);
         
-        // Filter only active packages from cache
         const activeCachedPackages = cachedPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
         setPackages(activeCachedPackages);
         setLoadingPackages(false);
-        // Trigger background sync for freshness
         packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
 
-      // Use the same method as OnsiteBooking - backend will filter based on user role
       const params: any = {user_id: user.id};
       if (selectedLocation !== null) {
         params.location_id = selectedLocation;
@@ -287,19 +266,16 @@ const ManualBooking: React.FC = () => {
       console.log('📦 Packages response:', response);
       
       if (response.success && response.data && response.data.packages) {
-        // Filter only active packages
         const allPackages = Array.isArray(response.data.packages) ? response.data.packages : [];
         const pkgs = allPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
         console.log('Active packages:', pkgs.length, 'of', allPackages.length);
         
         setPackages(pkgs);
         
-        // Cache only active packages for future use
         if (pkgs.length > 0) {
           await packageCacheService.cachePackages(pkgs);
         }
         
-        // Show modal if no packages available
         if (pkgs.length === 0) {
           setShowEmptyModal(true);
         }
@@ -323,7 +299,6 @@ const ManualBooking: React.FC = () => {
       console.log('📦 Package data received:', response.data);
       setPkg(response.data);
       
-      // Set participants to package minimum if current value is less
       if (response.data?.min_participants && form.participants < response.data.min_participants) {
         setForm(prev => ({
           ...prev,
@@ -331,7 +306,6 @@ const ManualBooking: React.FC = () => {
         }));
       }
       
-      // Reset date/time when package changes in standard mode
       if (bookingMode === 'standard') {
         setForm(prev => ({
           ...prev,
@@ -347,7 +321,6 @@ const ManualBooking: React.FC = () => {
     }
   };
 
-  // Standard Mode: Calculate available dates based on package availability schedules
   useEffect(() => {
     if (bookingMode !== 'standard' || !pkg) {
       setAvailableDates([]);
@@ -359,7 +332,6 @@ const ManualBooking: React.FC = () => {
     const today = new Date();
     const dates: Date[] = [];
     
-    // Determine booking window
     const packageWindow = pkg.booking_window_days;
     const locationWindow = pkg.location?.booking_window_days;
     const bookingWindowDays = packageWindow ?? locationWindow ?? null;
@@ -430,7 +402,6 @@ const ManualBooking: React.FC = () => {
     setAvailableDates(dates);
   }, [pkg, bookingMode]);
 
-  // Standard Mode: Fetch day offs for the selected location
   useEffect(() => {
     if (bookingMode !== 'standard') return;
     
@@ -490,7 +461,6 @@ const ManualBooking: React.FC = () => {
     fetchDayOffs();
   }, [selectedLocation, isCompanyAdmin, currentUser?.location_id, bookingMode]);
 
-  // Standard Mode: Fetch available time slots via SSE when date changes
   useEffect(() => {
     if (bookingMode !== 'standard' || !pkg || !form.bookingDate) {
       setAvailableTimeSlots([]);
@@ -535,7 +505,6 @@ const ManualBooking: React.FC = () => {
     };
   }, [form.bookingDate, pkg, bookingMode]);
 
-  // Handle time slot selection in standard mode (auto-assigns room)
   const handleTimeSlotSelect = (slot: TimeSlot) => {
     setForm(prev => ({
       ...prev,
@@ -567,18 +536,15 @@ const ManualBooking: React.FC = () => {
       const currentValue = prev[addOnId] || 0;
       let newValue = currentValue + change;
       
-      // Enforce max quantity limit
       if (newValue > maxQty) {
         newValue = maxQty;
       }
       
-      // If decreasing and going to 0 or below, remove the item
       if (newValue <= 0) {
         const { [addOnId]: _removed, ...rest } = prev;
         return rest;
       }
       
-      // If setting for first time and min_quantity is set, use min_quantity
       if (currentValue === 0 && change > 0 && minQty > 1) {
         newValue = minQty;
       }
@@ -596,18 +562,15 @@ const ManualBooking: React.FC = () => {
       const currentValue = prev[attractionId] || 0;
       let newValue = currentValue + change;
       
-      // Enforce max quantity limit
       if (newValue > maxQty) {
         newValue = maxQty;
       }
       
-      // If decreasing and going to 0 or below, remove the item
       if (newValue <= 0) {
         const { [attractionId]: _removed, ...rest } = prev;
         return rest;
       }
       
-      // If setting for first time and min_quantity is set, use min_quantity
       if (currentValue === 0 && change > 0 && minQty > 1) {
         newValue = minQty;
       }
@@ -635,7 +598,6 @@ const ManualBooking: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        // Add room to package_room table
         if (form.packageId) {
           try {
             await bookingService.createPackageRoom({
@@ -644,23 +606,19 @@ const ManualBooking: React.FC = () => {
             });
           } catch (error) {
             console.error('Error linking space to package:', error);
-            // Continue even if linking fails - room is still created
           }
         }
 
-        // Update the package's rooms list
         setPkg((prev: any) => ({
           ...prev,
           rooms: [...(prev.rooms || []), response.data]
         }));
 
-        // Set the newly created space as selected
         setForm(prev => ({
           ...prev,
           roomId: response.data.id.toString()
         }));
 
-        // Reload package details to get updated spaces
         if (form.packageId) {
           await loadPackageDetails(parseInt(form.packageId));
         }
@@ -674,7 +632,6 @@ const ManualBooking: React.FC = () => {
     }
   };
 
-  // Calculate total - now updates state for better reactivity
   const calculateTotal = () => {
     if (!pkg) return 0;
 
@@ -683,10 +640,8 @@ const ManualBooking: React.FC = () => {
     const pricePerAdditional = Number(pkg.price_per_additional || 0);
 
     if (pkg.pricing_type === 'per_person') {
-      // Per-person pricing: base price covers all participants
       total += Number(pkg.price) * form.participants;
     } else {
-      // Fixed pricing: base price covers min_participants, charge extra for participants beyond min
       if (form.participants <= minParticipants) {
         total += Number(pkg.price);
       } else {
@@ -720,7 +675,6 @@ const ManualBooking: React.FC = () => {
     return total;
   };
 
-  // Recalculate total whenever relevant values change
   useEffect(() => {
     if (pkg) {
       const total = calculateTotal();
@@ -728,7 +682,6 @@ const ManualBooking: React.FC = () => {
     }
   }, [pkg, form.participants, selectedAddOns, selectedAttractions]);
 
-  // Fetch fee breakdown when package or total changes
   useEffect(() => {
     const fetchFeeBreakdown = async () => {
       if (!pkg) {
@@ -754,7 +707,6 @@ const ManualBooking: React.FC = () => {
     fetchFeeBreakdown();
   }, [pkg, form.participants, selectedAddOns, selectedAttractions, selectedLocation]);
 
-  // Fetch special pricing breakdown when package and date are selected
   useEffect(() => {
     const fetchSpecialPricing = async () => {
       if (!pkg || !form.bookingDate) {
@@ -782,16 +734,13 @@ const ManualBooking: React.FC = () => {
     fetchSpecialPricing();
   }, [pkg, form.bookingDate]);
 
-  // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
 
-    // Cooldown: reject if last submission was less than 3 seconds ago
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < 3000) {
       console.warn('⚠️ Booking submission blocked (cooldown)');
@@ -813,7 +762,6 @@ const ManualBooking: React.FC = () => {
       return;
     }
 
-    // Validate space selection if spaces are available for the package
     if (pkg.rooms && pkg.rooms.length > 0 && !form.roomId) {
       setToast({ message: 'Please select a space for this booking', type: 'error' });
       isSubmittingRef.current = false;
@@ -829,7 +777,6 @@ const ManualBooking: React.FC = () => {
       const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : feeTotal;
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
       
-      // Auto-derive payment status from amounts
       const derivedPaymentStatus = derivePaymentStatus(finalAmountPaid, finalTotalAmount);
       
       console.log('📦 Building additional attractions/addons...', {
@@ -839,7 +786,6 @@ const ManualBooking: React.FC = () => {
         pkgAddOns: pkg?.add_ons
       });
       
-      // Prepare add-ons with price_at_booking - filter out zero quantities and validate
       const additionalAddons = Object.entries(selectedAddOns)
         .filter(([, quantity]) => quantity > 0)
         .map(([id, quantity]) => {
@@ -851,7 +797,6 @@ const ManualBooking: React.FC = () => {
             return null;
           }
           
-          // price_at_booking is unit price, backend calculates total with quantity
           const unitPrice = Number(addOn.price);
           console.log(`✅ Add-on found: ${addOn.name}, price: ${unitPrice}, quantity: ${quantity}`);
           
@@ -863,7 +808,6 @@ const ManualBooking: React.FC = () => {
         })
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
 
-      // Prepare attractions with price_at_booking - filter out zero quantities and validate
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, quantity]) => quantity > 0)
         .map(([id, quantity]) => {
@@ -875,7 +819,6 @@ const ManualBooking: React.FC = () => {
             return null;
           }
           
-          // price_at_booking is unit price, backend calculates total with quantity
           const unitPrice = Number(attraction.price);
           console.log(`✅ Attraction found: ${attraction.name}, price: ${unitPrice}, quantity: ${quantity}`);
           
@@ -887,7 +830,6 @@ const ManualBooking: React.FC = () => {
         })
         .filter((item): item is { attraction_id: number; quantity: number; price_at_booking: number } => item !== null);
       
-      // Calculate duration - convert days to hours if needed (API only accepts minutes, hours, or hours and minutes)
       const durationValue = pkg.duration ? Number(pkg.duration) : 2;
       const durationUnitRaw = pkg.duration_unit || 'hours';
       let finalDuration = durationValue;
@@ -907,7 +849,6 @@ const ManualBooking: React.FC = () => {
         finalDurationUnit = 'hours';
       }
       
-      // Determine location_id: use selected location (for company admin) or user's location
       const locationId = selectedLocation || user?.location_id || 1;
       
       const bookingData: ExtendedBookingData = {
@@ -935,20 +876,15 @@ const ManualBooking: React.FC = () => {
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
         guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
-        // Optional address fields
         guest_address: form.guestAddress || undefined,
         guest_city: form.guestCity || undefined,
         guest_state: form.guestState || undefined,
         guest_zip: form.guestZip || undefined,
         guest_country: form.guestCountry || undefined,
-        // Email notification flags
         sent_email_to_staff: sendEmailToStaff,
-        // Only skip validation in flexible mode (for past date entries)
         skip_date_validation: bookingMode === 'flexible',
         is_manual_entry: true,
-        // Applied fees snapshot
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
-        // Applied discounts snapshot
         discount_amount: specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
       };
@@ -984,10 +920,8 @@ const ManualBooking: React.FC = () => {
         
         console.log('✅ Booking created:', { bookingId, referenceNumber });
         
-        // Add the new booking to cache
         await bookingCacheService.addBookingToCache(response.data);
         
-        // Generate QR code with the reference number
         try {
           const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
             width: 300,
@@ -997,13 +931,11 @@ const ManualBooking: React.FC = () => {
           
           console.log('📱 QR Code generated for reference:', referenceNumber);
           
-          // Store QR code with email preference - this triggers email sending
           const qrResponse = await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
           console.log('✅ QR code stored with response:', qrResponse);
           console.log('✅ Email preference sent:', sendEmail);
         } catch (qrError) {
           console.error('⚠️ Failed to generate/store QR code:', qrError);
-          // Don't fail the entire process if QR code fails
         }
         
         const emailStatus = sendEmail ? ' Confirmation email sent.' : '';
@@ -1012,7 +944,6 @@ const ManualBooking: React.FC = () => {
           : `Booking recorded successfully! Reference: ${referenceNumber}${emailStatus}`;
         setToast({ message: successMsg, type: 'success' });
         
-        // Navigate after short delay to show toast
         setTimeout(() => {
           navigate('/bookings');
         }, 1500);
@@ -1036,20 +967,17 @@ const ManualBooking: React.FC = () => {
         message?: string 
       };
       
-      // Log detailed error info for debugging
       if (err.response) {
         console.error('Response status:', err.response.status);
         console.error('Response data:', err.response.data);
       }
       
-      // Extract error message from various possible locations
       let errorMsg = 'Unknown error';
       if (err.response?.data?.message) {
         errorMsg = err.response.data.message;
       } else if (err.response?.data?.error) {
         errorMsg = err.response.data.error;
       } else if (err.response?.data?.errors) {
-        // Handle Laravel validation errors
         const validationErrors = Object.entries(err.response.data.errors)
           .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
           .join('; ');
@@ -1058,7 +986,6 @@ const ManualBooking: React.FC = () => {
         errorMsg = err.message;
       }
       
-      // Check if error response actually contains booking data (false error)
       if (err.response?.data?.id) {
         console.log('Booking may have been created despite error response');
         setToast({ message: 'Booking may have been recorded. Please check the bookings list to confirm.', type: 'info' });
@@ -1076,11 +1003,9 @@ const ManualBooking: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Compact Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-3">
-            {/* Left: Back + Title */}
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1097,9 +1022,7 @@ const ManualBooking: React.FC = () => {
               </div>
             </div>
             
-            {/* Right: Toggle + Location */}
             <div className="flex items-center gap-2">
-              {/* Compact Mode Toggle */}
               <div className="flex items-center bg-gray-100 rounded-md p-0.5">
                 <button
                   type="button"
@@ -1163,12 +1086,10 @@ const ManualBooking: React.FC = () => {
             : 'grid-cols-1'
         }`}>
           
-          {/* Main Content - Left Side with independent scrolling */}
           <div className={`space-y-4 transition-all duration-500 ${
             form.packageId ? 'lg:col-span-2 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:pr-2' : 'col-span-1'
           }`}>
             
-            {/* Step 1: Package Selection */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="mb-4 flex items-center justify-between">
                 <div>
@@ -1196,7 +1117,6 @@ const ManualBooking: React.FC = () => {
                 )}
               </div>
               
-              {/* Loading State for Packages */}
               {loadingPackages ? (
                 <div className="flex flex-col items-center justify-center py-8">
                   <div className={`animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-${themeColor}-600`}></div>
@@ -1259,14 +1179,12 @@ const ManualBooking: React.FC = () => {
 
             {pkg && (
               <>
-                {/* Step 2: Customer & Booking Info */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <div className="mb-4">
                     <h2 className="text-base font-semibold text-gray-900">Customer & Booking Details</h2>
                     <p className="text-xs text-gray-500 mt-0.5">Enter customer information and schedule</p>
                   </div>
                   <div className="space-y-4">
-                    {/* Customer Info */}
                     <div>
                       <h3 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">
                         Customer Information
@@ -1308,7 +1226,6 @@ const ManualBooking: React.FC = () => {
                           />
                         </div>
                         
-                        {/* Optional Address Fields */}
                         <div className="md:col-span-2 mt-1">
                           <label className="block text-xs font-medium text-gray-600 mb-1">Address <span className="text-gray-400">(Optional)</span></label>
                           <input
@@ -1369,14 +1286,12 @@ const ManualBooking: React.FC = () => {
 
                     <div className="border-t border-gray-100 my-3"></div>
 
-                    {/* Booking Details - Standard Mode with DatePicker and Time Slots */}
                     {bookingMode === 'standard' ? (
                       <div className="space-y-4">
                         <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
                           Select Date & Time
                         </h3>
                         
-                        {/* Date Picker */}
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-2">Date *</label>
                           <DatePicker
@@ -1391,7 +1306,6 @@ const ManualBooking: React.FC = () => {
                           />
                         </div>
 
-                        {/* Time Slots */}
                         {form.bookingDate && (
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -1434,7 +1348,6 @@ const ManualBooking: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Participants */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Participants *</label>
@@ -1482,7 +1395,6 @@ const ManualBooking: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      /* Flexible Mode - Original date/time inputs */
                       <div>
                         <h3 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">
                           Booking Schedule
@@ -1563,7 +1475,6 @@ const ManualBooking: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Room Selection - Only show in Flexible mode */}
                     {bookingMode === 'flexible' && pkg.rooms && pkg.rooms.length > 0 && (
                       <>
                         <div className="border-t border-gray-100 my-3"></div>
@@ -1626,7 +1537,6 @@ const ManualBooking: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Step 3: Add-ons & Attractions */}
                 {((pkg.add_ons && pkg.add_ons.length > 0) || (pkg.attractions && pkg.attractions.length > 0)) && (
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                     <div className="mb-3">
@@ -1681,7 +1591,6 @@ const ManualBooking: React.FC = () => {
                                     value={quantity}
                                     onChange={(e) => {
                                       let newQty = parseInt(e.target.value) || 0;
-                                      // Enforce max limit
                                       if (newQty > maxQty) newQty = maxQty;
                                       if (newQty === 0) {
                                         setSelectedAddOns(prev => {
@@ -1739,7 +1648,6 @@ const ManualBooking: React.FC = () => {
                                   <span className={`text-base font-bold text-${themeColor}-600`}>${attraction.price}</span>
                                   <span className="text-xs text-gray-500">{attraction.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
-                                {/* Show quantity limits */}
                                 {(minQty > 1 || maxQty < 99) && (
                                   <p className="text-xs text-gray-400 mb-2">
                                     {minQty > 1 && `Min: ${minQty}`}
@@ -1766,7 +1674,6 @@ const ManualBooking: React.FC = () => {
                                     value={quantity}
                                     onChange={(e) => {
                                       let newQty = parseInt(e.target.value) || 0;
-                                      // Enforce max limit
                                       if (newQty > maxQty) newQty = maxQty;
                                       if (newQty === 0) {
                                         setSelectedAttractions(prev => {
@@ -1803,12 +1710,10 @@ const ManualBooking: React.FC = () => {
             )}
           </div>
 
-          {/* Sidebar - Right Side - Only shows when package is selected */}
           {form.packageId && (
             <div className="lg:col-span-1 transition-all duration-500 lg:sticky lg:top-20 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
               <div className="space-y-4">
               
-              {/* Package Summary */}
               {pkg && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <div className="flex items-start gap-4">
@@ -1830,14 +1735,11 @@ const ManualBooking: React.FC = () => {
                 </div>
               )}
 
-              {/* Payment Summary */}
               {pkg && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4">Payment Details</h3>
                   <div className="space-y-4">
-                    {/* Price Breakdown */}
                     <div className="space-y-1.5 text-xs">
-                      {/* Package Price */}
                       {pkg.pricing_type === 'per_person' ? (
                         <div className="flex justify-between text-gray-600">
                           <span>{form.participants} × ${pkg.price}</span>
@@ -1868,7 +1770,6 @@ const ManualBooking: React.FC = () => {
                         </>
                       )}
 
-                      {/* Add-ons */}
                       {Object.entries(selectedAddOns).map(([id, quantity]) => {
                         const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
                         if (!addOn) return null;
@@ -1883,7 +1784,6 @@ const ManualBooking: React.FC = () => {
                         );
                       })}
 
-                      {/* Attractions */}
                       {Object.entries(selectedAttractions).map(([id, quantity]) => {
                         const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
                         if (!attraction) return null;
@@ -1899,7 +1799,6 @@ const ManualBooking: React.FC = () => {
                       })}
                     </div>
 
-                    {/* Special Pricing Discount - automatic discounts based on date */}
                     {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
                       <div className="pt-2 border-t border-dashed border-gray-200 mb-2">
                         {specialPricingBreakdown.discounts_applied.map((discount, index) => (
@@ -1911,12 +1810,10 @@ const ManualBooking: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Fee Breakdown */}
                     {feeBreakdown && feeBreakdown.fees.length > 0 && (
                       <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="mb-2" />
                     )}
 
-                    {/* Calculated Total */}
                     <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-3`}>
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-700">Total</span>
@@ -1928,7 +1825,6 @@ const ManualBooking: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Manual Inputs */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Total Amount</label>
@@ -2012,7 +1908,6 @@ const ManualBooking: React.FC = () => {
                       />
                     </div>
 
-                    {/* Guest of Honor Fields */}
                     {pkg?.has_guest_of_honor && (
                       <div className="border-t border-gray-100 pt-4">
                         <h4 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Guest of Honor</h4>
@@ -2062,7 +1957,6 @@ const ManualBooking: React.FC = () => {
                 </div>
               )}
 
-              {/* Email Options & Actions */}
               {pkg && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <h4 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Notifications</h4>
@@ -2118,7 +2012,6 @@ const ManualBooking: React.FC = () => {
         </div>
       </form>
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}
@@ -2127,7 +2020,6 @@ const ManualBooking: React.FC = () => {
         />
       )}
 
-      {/* Empty State Modal */}
       <EmptyStateModal
         type="packages"
         isOpen={showEmptyModal}

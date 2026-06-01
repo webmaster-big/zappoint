@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 
-// Types
-// interface AddOn { name: string; price: number; unit?: string; }
 interface Attraction { name: string; price: number; unit?: string; }
 interface PromoOrGiftCard { name: string; code: string; description?: string; }
 interface Package {
@@ -23,7 +21,6 @@ interface Package {
   availableMonthDays: string[];
 }
 
-// Time slots for booking
 const TIME_SLOTS = [
   "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
   "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", 
@@ -38,7 +35,6 @@ interface BookingWidgetProps {
 
 const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingComplete, apiUrl }) => {
   const [pkg, setPkg] = useState<Package | null>(null);
-//   const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
@@ -57,29 +53,16 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Date and time selection
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
 
-  // Load package and options from localStorage or API
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       
-      // For now, use localStorage. Later, we can fetch from API if apiUrl is provided
       if (apiUrl) {
-        // Future implementation for Laravel backend
-        // try {
-        //   const response = await fetch(`${apiUrl}/packages/${packageId}`);
-        //   const data = await response.json();
-        //   setPkg(data);
-        // } catch (error) {
-        //   console.error("Failed to fetch package data:", error);
-        //   // Fallback to localStorage
-        //   loadFromLocalStorage();
-        // }
         loadFromLocalStorage();
       } else {
         loadFromLocalStorage();
@@ -93,7 +76,6 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
         const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
         const found = packages.find((p: Package) => p.id === packageId);
         setPkg(found || null);
-        // setAddOns(JSON.parse(localStorage.getItem("zapzone_addons") || "[]"));
         setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
       } catch (error) {
         console.error("Failed to load data from localStorage:", error);
@@ -103,19 +85,16 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     loadData();
   }, [packageId, apiUrl]);
 
-  // Calculate available dates based on package availability
   useEffect(() => {
     if (!pkg) return;
     
     const today = new Date();
     const dates: Date[] = [];
     
-    // Generate available dates for the next 60 days
     for (let i = 0; i < 60; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
       
-      // Check if date matches package availability
       let isAvailable = false;
       
       if (pkg.availabilityType === "daily") {
@@ -141,28 +120,22 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     
     setAvailableDates(dates);
     
-    // Set default selected date to first available date
     if (dates.length > 0 && !selectedDate) {
       const firstDate = dates[0].toISOString().split('T')[0];
       setSelectedDate(firstDate);
     }
   }, [pkg, selectedDate]);
 
-  // Set available times when date is selected
   useEffect(() => {
     if (selectedDate) {
-      // For demo purposes, all time slots are available
-      // In a real app, you might check against existing bookings
       setAvailableTimes(TIME_SLOTS);
       
-      // Set default selected time to first available time
       if (TIME_SLOTS.length > 0 && !selectedTime) {
         setSelectedTime(TIME_SLOTS[0]);
       }
     }
   }, [selectedDate, selectedTime]);
 
-  // Handle add-on/attraction quantity change
   const handleAddOnQty = (name: string, qty: number) => {
     setSelectedAddOns((prev) => ({ ...prev, [name]: Math.max(0, qty) }));
   };
@@ -170,7 +143,6 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     setSelectedAttractions((prev) => ({ ...prev, [name]: Math.max(0, qty) }));
   };
 
-  // Handle promo/gift card code apply
   const handleApplyCode = (type: "promo" | "giftcard") => {
     if (!pkg) return;
     if (type === "promo") {
@@ -182,7 +154,6 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     }
   };
 
-  // Calculate base price with additional participants
   const calculateBasePrice = () => {
     if (!pkg) return 0;
     const basePrice = Number(pkg.price);
@@ -197,7 +168,6 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     }
   };
 
-  // Calculate totals
   const basePrice = calculateBasePrice();
   const addOnsTotal = Object.entries(selectedAddOns).reduce((sum, [name, qty]) => {
     const found = pkg && pkg.addOns.find((a) => (typeof a === "string" ? a : a.name) === name);
@@ -205,12 +175,10 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     return sum + price * qty;
   }, 0);
   const attractionsTotal = Object.entries(selectedAttractions).reduce((sum, [name, qty]) => {
-    // Find the attraction in package attractions
     let price = 0;
     if (pkg) {
       for (const a of pkg.attractions) {
         if (typeof a === "string" && a === name) {
-          // Look up in master attractions list
           const masterAttraction = attractions.find(attr => attr.name === name);
           price = masterAttraction ? masterAttraction.price : 0;
           break;
@@ -223,21 +191,17 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     return sum + price * qty;
   }, 0);
   
-  // Promo and gift card discounts (simplified for demo)
   const promoDiscount = appliedPromo ? 10 : 0;
   const giftCardDiscount = appliedGiftCard ? 10 : 0;
   
-  // Calculate subtotal and tax (Michigan tax rate: 6%)
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
   const taxRate = 0.06; // Michigan tax
   const tax = (subtotal - promoDiscount - giftCardDiscount) * taxRate;
   const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount + tax);
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prepare booking data
     const bookingData = {
       package: pkg,
       selectedDate,
@@ -252,18 +216,14 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
       giftCardCode: appliedGiftCard ? giftCardCode : null
     };
     
-    // For now, just log the data. Later, we can send to API
     console.log("Booking data:", bookingData);
     
-    // Call the callback if provided
     if (onBookingComplete) {
       onBookingComplete(bookingData);
     }
     
-    // Show success message
     alert("Booking completed successfully!");
     
-    // Reset form
     setCurrentStep(1);
     setForm({
       firstName: "",
@@ -303,7 +263,6 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
       </div>
       
       <form onSubmit={handleSubmit} className="p-6">
-        {/* Step Navigation */}
         <div className="flex mb-6">
           <div className="flex-1 flex items-center">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
@@ -327,7 +286,6 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
         
         {currentStep === 1 && (
           <div className="space-y-6">
-            {/* Date and Time Selection */}
             <div className="bg-blue-50 p-5 rounded-xl">
               <h3 className="font-medium mb-4 text-gray-700 text-sm uppercase tracking-wide">Select Date & Time</h3>
               
@@ -400,10 +358,8 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
                 <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Attractions</label>
                 <div className="space-y-4">
                   {pkg.attractions.map((a) => {
-                    // If a is an object, use its properties; if string, use all available from attractions array
                     let attraction: { name: string; price?: number; unit?: string };
                     if (typeof a === "string") {
-                      // Try to find the full object in attractions array if available
                       const found = attractions.find(attr => attr.name === a);
                       if (found) {
                         attraction = found;

@@ -1,4 +1,3 @@
-// Types for: src/pages/customer/CustomerReservation.tsx
 
 export type CustomerReservationSortBy = 'date' | 'status' | 'amount';
 export type CustomerReservationSortOrder = 'asc' | 'desc';

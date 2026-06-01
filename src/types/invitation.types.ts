@@ -1,4 +1,3 @@
-// src/types/invitation.types.ts
 
 export interface InvitationGuest {
   name: string;

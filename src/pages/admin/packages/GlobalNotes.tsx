@@ -23,7 +23,6 @@ const GlobalNotes: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   
-  // Form state
   const [showForm, setShowForm] = useState(false);
   const [editingNote, setEditingNote] = useState<GlobalNote | null>(null);
   const [formData, setFormData] = useState({
@@ -35,7 +34,6 @@ const GlobalNotes: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch notes and packages on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -188,7 +186,6 @@ const GlobalNotes: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link to="/packages">
@@ -209,14 +206,12 @@ const GlobalNotes: React.FC = () => {
         </StandardButton>
       </div>
 
-      {/* Info Box */}
       <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <p className="text-xs text-gray-600">
           <strong>Note:</strong> Global notes (no packages selected) appear on all bookings. Package-specific notes only appear on selected packages.
         </p>
       </div>
 
-      {/* Notes List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         {notes.length === 0 ? (
           <div className="flex flex-col items-center py-16">
@@ -304,7 +299,6 @@ const GlobalNotes: React.FC = () => {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -323,7 +317,6 @@ const GlobalNotes: React.FC = () => {
             </div>
             
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              {/* Title (Optional) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Title <span className="text-gray-400">(optional)</span>
@@ -337,7 +330,6 @@ const GlobalNotes: React.FC = () => {
                 />
               </div>
 
-              {/* Content */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Note Content <span className="text-red-500">*</span>
@@ -352,7 +344,6 @@ const GlobalNotes: React.FC = () => {
                 />
               </div>
 
-              {/* Package Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Apply to Packages
@@ -392,7 +383,6 @@ const GlobalNotes: React.FC = () => {
                 )}
               </div>
 
-              {/* Active Toggle */}
               <div className="flex items-center gap-3">
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -406,7 +396,6 @@ const GlobalNotes: React.FC = () => {
                 <span className="text-sm text-gray-700">Active</span>
               </div>
 
-              {/* Display Order */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Display Order
@@ -422,7 +411,6 @@ const GlobalNotes: React.FC = () => {
                 <p className="mt-1 text-xs text-gray-500">Lower numbers display first</p>
               </div>
 
-              {/* Actions */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <StandardButton
                   type="button"
@@ -448,7 +436,6 @@ const GlobalNotes: React.FC = () => {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed top-6 right-6 z-50">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

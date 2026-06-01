@@ -37,7 +37,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -126,13 +125,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     );
   }
 
-  // Responsive layout logic
   let effectiveLayout = layout;
   if (layout === 'auto') {
     effectiveLayout = locations.length > 4 ? 'scroll' : 'grid';
   }
 
-  // Scrollable horizontal pill selector
   if (effectiveLayout === 'scroll') {
     return (
       <div className={`space-y-3 ${className}`} style={maxWidth ? { maxWidth } : undefined}>
@@ -181,7 +178,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     );
   }
 
-  // Grid layout (default)
   return (
     <div className={`space-y-3 ${className}`} style={maxWidth ? { maxWidth } : undefined}>
       <label className="block text-sm font-medium text-gray-800 mb-3">

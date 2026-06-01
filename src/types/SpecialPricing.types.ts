@@ -1,9 +1,3 @@
-/**
- * Special Pricing Types
- * 
- * Defines types for the automatic discount system that supports
- * weekly, monthly, and one-time discounts for packages and attractions.
- */
 
 export type DiscountType = 'fixed' | 'percentage';
 export type RecurrenceType = 'one_time' | 'weekly' | 'monthly';
@@ -164,9 +158,6 @@ export const ENTITY_TYPE_OPTIONS = [
   { value: 'attraction', label: 'Attractions Only' },
 ];
 
-/**
- * Helper function to get ordinal suffix for day of month
- */
 export function getOrdinalSuffix(n: number): string {
   if ([11, 12, 13].includes(n % 100)) return 'th';
   switch (n % 10) {
@@ -177,9 +168,6 @@ export function getOrdinalSuffix(n: number): string {
   }
 }
 
-/**
- * Generate day of month options (1-31)
- */
 export const DAY_OF_MONTH_OPTIONS = Array.from({ length: 31 }, (_, i) => ({
   value: i + 1,
   label: `${i + 1}${getOrdinalSuffix(i + 1)}`,

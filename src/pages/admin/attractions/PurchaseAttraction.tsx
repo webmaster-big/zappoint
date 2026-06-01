@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -38,64 +38,54 @@ import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.type
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
 import { buildAppliedFees } from '../../../utils/fees';
+import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
+import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 
-// Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
   const responseMessage = error?.response?.data?.message?.toLowerCase() || '';
   const combinedMessage = `${errorMessage} ${responseMessage}`;
   
-  // Card declined errors
   if (combinedMessage.includes('declined') || combinedMessage.includes('decline')) {
     return 'Your card was declined. Please check your card details or try a different payment method.';
   }
   
-  // Insufficient funds
   if (combinedMessage.includes('insufficient') || combinedMessage.includes('nsf')) {
     return 'Insufficient funds. Please try a different card or payment method.';
   }
   
-  // Invalid card number
   if (combinedMessage.includes('invalid card') || combinedMessage.includes('card number')) {
     return 'Invalid card number. Please check and re-enter your card details.';
   }
   
-  // Expired card
   if (combinedMessage.includes('expired') || combinedMessage.includes('expiration')) {
     return 'Your card has expired. Please use a different card.';
   }
   
-  // CVV/Security code errors
   if (combinedMessage.includes('cvv') || combinedMessage.includes('security code') || combinedMessage.includes('cvc')) {
     return 'Invalid security code (CVV). Please check the 3 or 4 digit code on your card.';
   }
   
-  // Authentication errors
   if (combinedMessage.includes('authentication') || combinedMessage.includes('3d secure')) {
     return 'Card authentication failed. Please try again or use a different card.';
   }
   
-  // Network/connection errors
   if (combinedMessage.includes('network') || combinedMessage.includes('connection') || combinedMessage.includes('timeout')) {
     return 'Connection error. Please check your internet and try again.';
   }
   
-  // Fraud detection
   if (combinedMessage.includes('fraud') || combinedMessage.includes('suspicious')) {
     return 'Transaction blocked for security reasons. Please contact your bank or try a different card.';
   }
   
-  // Rate limiting
   if (combinedMessage.includes('too many') || combinedMessage.includes('rate limit')) {
     return 'Too many attempts. Please wait a moment and try again.';
   }
   
-  // Default fallback
   return error?.message || 'Payment could not be processed. Please check your card details and try again.';
 };
 
-// Country codes (ISO 3166-1 alpha-2) with display names
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
   { code: 'CA', name: 'Canada' },
@@ -153,7 +143,6 @@ const PurchaseAttraction = () => {
     lastName: '',
     email: '',
     phone: '',
-    // Billing Information (optional)
     address: '',
     address2: '',
     city: '',
@@ -165,7 +154,6 @@ const PurchaseAttraction = () => {
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
-  // Payment card details
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -189,22 +177,18 @@ const PurchaseAttraction = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
 
-  // Add-on selection state: { addonId: quantity }
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<PurchaseAttractionAddOn | null>(null);
 
-  // Signature & Terms state
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
-  // SMS consent state
   const [smsConsent, setSmsConsent] = useState<boolean>(false);
 
-  // Scheduled date & time state
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
@@ -213,7 +197,6 @@ const PurchaseAttraction = () => {
 
   const dayNumberToName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  // Generate time slots from start to end time with given interval (in minutes)
   const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
     const slots: string[] = [];
     const [startHours, startMins] = startTime.split(':').map(Number);
@@ -232,20 +215,15 @@ const PurchaseAttraction = () => {
     return slots;
   };
 
-  // Get attraction availability as normalized array
-  // Backend format: { days: ["tuesday"], start_time: "16:00", end_time: "21:00" }
-  // Legacy format: { Monday: true, Tuesday: false, ... }
   const getAttractionAvailability = (): Array<{ days: string[]; start_time: string; end_time: string }> => {
     if (!attraction) return [];
     
     const rawAvailability = attraction.availability;
     
-    // New array format: [{ days: ["tuesday"], start_time, end_time }]
     if (Array.isArray(rawAvailability)) {
       return rawAvailability as Array<{ days: string[]; start_time: string; end_time: string }>;
     }
     
-    // Legacy format: Record<string, boolean> → convert to array format with default times
     if (typeof rawAvailability === 'object' && rawAvailability !== null) {
       const enabledDays = Object.entries(rawAvailability)
         .filter(([, isAvailable]) => isAvailable)
@@ -257,7 +235,6 @@ const PurchaseAttraction = () => {
     return [];
   };
 
-  // Update available time slots when scheduled date changes
   useEffect(() => {
     if (!scheduledDate || !attraction) {
       setAvailableTimeSlots([]);
@@ -272,7 +249,6 @@ const PurchaseAttraction = () => {
     if (dayAvailability) {
       const slots = generateTimeSlots(dayAvailability.start_time, dayAvailability.end_time, 60);
       setAvailableTimeSlots(slots);
-      // Reset selected time if not in available slots
       if (!slots.includes(scheduledTime)) {
         setScheduledTime('');
       }
@@ -282,7 +258,6 @@ const PurchaseAttraction = () => {
     }
   }, [scheduledDate, attraction]);
 
-  // Fetch day-offs for the attraction's location
   useEffect(() => {
     const fetchDayOffs = async () => {
       if (!attraction) return;
@@ -296,7 +271,6 @@ const PurchaseAttraction = () => {
           now.setHours(0, 0, 0, 0);
           response.data.forEach((dayOff: DayOff) => {
             const offDate = new Date(dayOff.date);
-            // Only full-day blocks (no time/package/room restrictions) apply to attractions
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             if (hasTimeRestriction) return;
             if (dayOff.is_recurring) {
@@ -311,22 +285,18 @@ const PurchaseAttraction = () => {
           setDayOffDates(blocked);
         }
       } catch {
-        // Day-off fetch failed — proceed without blocking
       }
     };
     fetchDayOffs();
   }, [attraction]);
 
-  // Show account modal for non-logged-in users (optional, doesn't block access)
   useEffect(() => {
     const customerData = localStorage.getItem('zapzone_customer');
     if (!customerData) {
-      // Show modal but don't block access
       setShowAccountModal(true);
     }
   }, []);
 
-  // Auto-fill form if customer is logged in
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
@@ -334,7 +304,6 @@ const PurchaseAttraction = () => {
         if (customerData) {
           const customer: any = JSON.parse(customerData);
           
-          // Immediately autofill from localStorage (instant feedback)
           setCustomerInfo(prev => ({
             ...prev,
             firstName: customer.firstName || customer.first_name || prev.firstName,
@@ -352,7 +321,6 @@ const PurchaseAttraction = () => {
           if (customer.id) {
             setSelectedCustomerId(customer.id);
             
-            // Optionally refresh from API for latest data
             try {
               const response = await customerService.getCustomerById(customer.id);
               if (response.success && response.data) {
@@ -372,19 +340,16 @@ const PurchaseAttraction = () => {
                 }));
               }
             } catch {
-              // API refresh skipped, using localStorage data
             }
           }
         }
       } catch {
-        // Error loading customer data - silent fail
       }
     };
     
     fetchCustomerData();
   }, []);
 
-  // Load attraction data from backend
   useEffect(() => {
     const loadAttraction = async () => {
       if (!attractionId) {
@@ -394,12 +359,9 @@ const PurchaseAttraction = () => {
 
       try {
         setLoading(true);
-        // If location parameter exists, use it (future enhancement for location-based filtering)
-        // For now, we fetch by ID directly
         const response = await attractionService.getAttraction(Number(attractionId));
         const attr = response.data as Attraction & { location?: { id: number; name: string } };
         
-        // Convert API format to component format
         const convertedAttraction: PurchaseAttractionAttraction = {
           id: attr.id.toString(),
           name: attr.name,
@@ -430,6 +392,16 @@ const PurchaseAttraction = () => {
           addOnsOrder: attr.add_ons_order || [],
         };
         setAttraction(convertedAttraction);
+
+        if (!pageViewFiredRef.current) {
+          pageViewFiredRef.current = true;
+          void trackPageView({
+            page_type: 'attraction_buy',
+            entity_type: 'attraction',
+            entity_id: Number(attractionId),
+            location_id: convertedAttraction.locationId ?? undefined,
+          });
+        }
       } catch {
         setToast({ message: 'Failed to load attraction. Please refresh the page.', type: 'error' });
       } finally {
@@ -440,7 +412,6 @@ const PurchaseAttraction = () => {
     loadAttraction();
   }, [attractionId]);
 
-  // Initialize Authorize.Net
   useEffect(() => {
     const initializeAuthorizeNet = async () => {
       if (!attraction) return;
@@ -450,7 +421,6 @@ const PurchaseAttraction = () => {
         
         const response = await getAuthorizeNetPublicKey(locationId);
         
-        // API returns data directly: { api_login_id, client_key, environment }
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
@@ -460,17 +430,14 @@ const PurchaseAttraction = () => {
           setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
           
-          // Load Accept.js with the correct environment from API response
           await loadAcceptJS(environment as 'sandbox' | 'production');
         }
       } catch {
-        // Payment system initialization failed - will show error when user tries to pay
       }
     };
     initializeAuthorizeNet();
   }, [attraction]);
 
-  // Debounced customer search by email
   useEffect(() => {
     const searchCustomer = async () => {
       const email = customerInfo.email.trim();
@@ -488,7 +455,6 @@ const PurchaseAttraction = () => {
         setFoundCustomers(response.data);
         setShowCustomerDropdown(response.data.length > 0);
         
-        // Auto-select if exact email match
         const exactMatch = response.data.find(c => c.email.toLowerCase() === email.toLowerCase());
         if (exactMatch) {
           setSelectedCustomerId(exactMatch.id);
@@ -510,7 +476,6 @@ const PurchaseAttraction = () => {
       }
     };
 
-    // Debounce search by 500ms
     const timeoutId = setTimeout(searchCustomer, 500);
     return () => clearTimeout(timeoutId);
   }, [customerInfo.email]);
@@ -522,7 +487,6 @@ const PurchaseAttraction = () => {
       [name]: value
     }));
     
-    // Reset customer selection when email changes
     if (name === 'email') {
       setSelectedCustomerId(null);
     }
@@ -547,7 +511,6 @@ const PurchaseAttraction = () => {
     }
   };
 
-  // Calculate total
   const calculateTotal = () => {
     if (!attraction) return 0;
     const base = parseFloat(attraction.price.toString()) * quantity;
@@ -560,7 +523,6 @@ const PurchaseAttraction = () => {
     return base + addOnsSum;
   };
 
-  // Handle add-on quantity change
   const handleAddOnQty = (id: number, qty: number) => {
     const addOn = attraction?.addOns?.find(a => a.id === id);
     if (!addOn) return;
@@ -568,7 +530,6 @@ const PurchaseAttraction = () => {
     const minQty = addOn.min_quantity || 0;
     if (qty > maxQty) qty = maxQty;
     if (qty < 0) qty = 0;
-    // If going from 0 to positive and min_quantity is set, use min_quantity
     const currentQty = selectedAddOns[id] || 0;
     if (currentQty === 0 && qty > 0 && minQty > 1) {
       qty = minQty;
@@ -576,13 +537,28 @@ const PurchaseAttraction = () => {
     setSelectedAddOns(prev => ({ ...prev, [id]: Math.max(0, qty) }));
   };
   
-  // Use dynamic fee breakdown if available - no fallback to hardcoded rate
   const baseTotal = calculateTotal();
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
   const totalAfterSpecialPricing = Math.max(0, baseTotal - specialPricingDiscount);
-  const total = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
+  const totalBeforeMembership = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
 
-  // Fetch fee breakdown when attraction or quantity changes (debounced to prevent rapid API calls)
+  const benefitItems = useMemo<MembershipBenefitQuoteItem[]>(() => {
+    if (!attraction) return [];
+    const list: MembershipBenefitQuoteItem[] = [
+      { type: 'attraction', id: Number(attraction.id), unit_price: Number(attraction.price), quantity },
+    ];
+    Object.entries(selectedAddOns).forEach(([idStr, qty]) => {
+      const id = Number(idStr);
+      const addOn = attraction.addOns?.find((a) => a.id === id);
+      if (addOn && qty > 0) list.push({ type: 'addon', id, unit_price: Number(addOn.price), quantity: qty });
+    });
+    return list;
+  }, [attraction, quantity, selectedAddOns]);
+
+  const membershipBenefits = useMembershipBenefits(selectedCustomerId, attraction?.locationId ?? null, benefitItems);
+  const membershipDiscount = membershipBenefits.discount;
+  const total = Math.max(0, totalBeforeMembership - membershipDiscount);
+
   useEffect(() => {
     if (!attraction) {
       setFeeBreakdown(null);
@@ -608,7 +584,6 @@ const PurchaseAttraction = () => {
     return () => clearTimeout(timeoutId);
   }, [attraction, quantity, selectedAddOns]);
 
-  // Fetch special pricing breakdown for attraction (debounced, use scheduled/visit date for pricing)
   useEffect(() => {
     if (!attraction) {
       setSpecialPricingBreakdown(null);
@@ -616,7 +591,6 @@ const PurchaseAttraction = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        // Use the scheduled visit date if set, otherwise fall back to today
         const pricingDate = scheduledDate || new Date().toISOString().split('T')[0];
         const basePrice = calculateTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
@@ -638,11 +612,11 @@ const PurchaseAttraction = () => {
     return () => clearTimeout(timeoutId);
   }, [attraction, quantity, selectedAddOns, scheduledDate]);
 
-  // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
-  // Fire `form_started` engagement exactly once per offer-page mount.
+  const pageViewFiredRef = useRef(false);
+
   const formStartedRef = useRef(false);
   const handleFormStarted = () => {
     if (formStartedRef.current) return;
@@ -657,26 +631,21 @@ const PurchaseAttraction = () => {
   };
 
   const handlePurchase = async (e?: React.MouseEvent) => {
-    // Prevent event bubbling and default behavior
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
     if (!attraction) return;
-    // Block if purchase already completed this session
     if (purchaseComplete) return;
-    // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
 
-    // Cooldown: reject if last submission was less than 3 seconds ago
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < 3000) {
       console.warn('⚠️ Purchase submission blocked (cooldown)');
       return;
     }
 
-    // localStorage-based dedup to survive page reloads
     const dedupFingerprint = `${attraction.id}-${customerInfo.email}-${quantity}-${total.toFixed(2)}`;
     const lastPurchaseKey = localStorage.getItem('_lastAttractionPurchaseKey');
     const lastPurchaseTime = Number(localStorage.getItem('_lastAttractionPurchaseTime') || '0');
@@ -689,14 +658,12 @@ const PurchaseAttraction = () => {
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
 
-    // Validate scheduled visit date/time
     if (!scheduledDate || !scheduledTime) {
       setToast({ message: 'Please select a visit date and time before purchasing.', type: 'error' });
       isSubmittingRef.current = false;
       return;
     }
 
-    // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
     if (!signatureImage) {
       stErrors.signature = 'Please provide your signature before proceeding.';
@@ -711,7 +678,6 @@ const PurchaseAttraction = () => {
     }
     setSignatureTermsErrors({});
 
-    // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
       setPaymentError('Please fill in all card details');
       isSubmittingRef.current = false;
@@ -738,10 +704,8 @@ const PurchaseAttraction = () => {
       setIsProcessingPayment(true);
       setPaymentError('');
 
-      // Use the final total (includes fees + special pricing), matching what customer sees
       const totalAmount = total;
 
-      // Prepare card data
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -749,7 +713,6 @@ const PurchaseAttraction = () => {
         cardCode: cardCVV,
       };
       
-      // Customer billing data for Authorize.Net
       const customerData = {
         first_name: customerInfo.firstName,
         last_name: customerInfo.lastName,
@@ -763,9 +726,6 @@ const PurchaseAttraction = () => {
         country: customerInfo.country,
       };
       
-      // ===== CREATE-FIRST FLOW =====
-      // Step 1: Create attraction purchase FIRST (no charge yet)
-      // Build additional_addons array from selected add-ons
       const additionalAddons = Object.entries(selectedAddOns)
         .filter(([, qty]) => qty > 0)
         .map(([idStr, qty]) => {
@@ -802,6 +762,7 @@ const PurchaseAttraction = () => {
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
+        membership_id: membershipBenefits.membershipId ?? undefined,
       };
 
       let response;
@@ -815,7 +776,6 @@ const PurchaseAttraction = () => {
       const createdPurchase = response.data;
       console.log('✅ Purchase created, ID:', createdPurchase.id);
 
-      // Step 2: Generate QR code
       let qrData = '';
       try {
         qrData = await generatePurchaseQRCode(createdPurchase.id);
@@ -823,7 +783,6 @@ const PurchaseAttraction = () => {
         console.error('⚠️ QR code generation failed:', qrError);
       }
 
-      // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
       const paymentData = {
         location_id: attraction.locationId || 1,
         amount: totalAmount,
@@ -848,8 +807,6 @@ const PurchaseAttraction = () => {
           customerData
         );
       } catch (paymentErr) {
-        // processCardPayment threw (tokenization or network error)
-        // Clean up the purchase since payment was not completed
         console.error('❌ Payment processing error, force deleting purchase:', createdPurchase.id);
         try {
           await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
@@ -861,7 +818,6 @@ const PurchaseAttraction = () => {
       }
       
       if (!paymentResponse.success) {
-        // Payment failed — clean up the purchase we created
         console.error('❌ Payment failed, force deleting purchase:', createdPurchase.id);
         try {
           await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
@@ -869,7 +825,6 @@ const PurchaseAttraction = () => {
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
         }
-        // Throw with the raw message — getPaymentErrorMessage in catch will make it friendly
         const rawMsg = paymentResponse.message || '';
         throw new Error(rawMsg || 'Your payment could not be processed. No charges were made to your card. Please check your card details and try again.');
       }
@@ -879,7 +834,6 @@ const PurchaseAttraction = () => {
       setQrCodeImage(qrData);
       setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
-      // Mark purchase complete and store dedup fingerprint in localStorage
       const dedupFp = `${attraction.id}-${customerInfo.email}-${quantity}-${total.toFixed(2)}`;
       localStorage.setItem('_lastAttractionPurchaseKey', dedupFp);
       localStorage.setItem('_lastAttractionPurchaseTime', Date.now().toString());
@@ -926,7 +880,6 @@ const PurchaseAttraction = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40">
-      {/* Account Modal */}
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
           <div 
@@ -1010,10 +963,8 @@ const PurchaseAttraction = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
-              {/* Progress Steps */}
               <div className="bg-gradient-to-r from-gray-50 to-white">
                 <div className="px-4 md:px-6 py-4 md:py-5">
                   <div className="flex items-center justify-between mb-2">
@@ -1044,7 +995,6 @@ const PurchaseAttraction = () => {
                 </div>
               </div>
 
-              {/* Step 1: Quantity Selection */}
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
@@ -1092,7 +1042,6 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
 
-                  {/* Schedule Selection - Required */}
                   <div>
                     <div className="flex items-center gap-1 mb-1">
                       <label className="block font-medium text-gray-800 text-xs md:text-sm uppercase tracking-wide">Schedule Visit</label>
@@ -1113,7 +1062,6 @@ const PurchaseAttraction = () => {
                     )}
                   </div>
 
-                  {/* Add-ons Selection */}
                   {attraction.addOns && attraction.addOns.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
@@ -1132,7 +1080,6 @@ const PurchaseAttraction = () => {
 
                           return (
                             <div key={addOn.id} className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-white">
-                              {/* Add-on Image */}
                               <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
                                 {addOn.image ? (
                                   <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
@@ -1208,7 +1155,6 @@ const PurchaseAttraction = () => {
                 </div>
               )}
 
-              {/* Step 2: Customer Information */}
               {currentStep === 2 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6" onFocusCapture={handleFormStarted}>
                   <div>
@@ -1241,7 +1187,6 @@ const PurchaseAttraction = () => {
                         </div>
                       )}
                       
-                      {/* Customer Dropdown */}
                       {showCustomerDropdown && foundCustomers.length > 0 && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                           {foundCustomers.map((customer) => (
@@ -1309,7 +1254,6 @@ const PurchaseAttraction = () => {
                         placeholder="+1 (555) 123-4567"
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                       />
-                      {/* SMS Consent */}
                       <label className="flex items-start gap-2 cursor-pointer mt-2">
                         <input
                           type="checkbox"
@@ -1328,7 +1272,6 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
                   
-                  {/* Billing Information Section */}
                   <div className="mt-6 pt-6">
                     <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
                     <div className="space-y-4">
@@ -1405,14 +1348,12 @@ const PurchaseAttraction = () => {
                               setCountrySearch(value);
                               setShowCountrySuggestions(true);
                               
-                              // If exact match by name, auto-select it
                               const exactMatch = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
                               if (exactMatch) {
                                 setCustomerInfo(prev => ({ ...prev, country: exactMatch.code }));
                               }
                             }}
                             onFocus={() => {
-                              // If input is empty but country is selected, show the country name
                               if (!countrySearch && customerInfo.country) {
                                 const selectedCountry = countries.find(c => c.code === customerInfo.country);
                                 if (selectedCountry) setCountrySearch(selectedCountry.name);
@@ -1422,7 +1363,6 @@ const PurchaseAttraction = () => {
                             onBlur={() => {
                               setTimeout(() => {
                                 setShowCountrySuggestions(false);
-                                // If the typed value doesn't match any country, reset to selected country
                                 const matchedCountry = countries.find(c => c.name.toLowerCase() === countrySearch.toLowerCase());
                                 if (matchedCountry) {
                                   setCustomerInfo(prev => ({ ...prev, country: matchedCountry.code }));
@@ -1438,7 +1378,6 @@ const PurchaseAttraction = () => {
                             required
                             autoComplete="off"
                           />
-                          {/* Country Suggestions Dropdown */}
                           {showCountrySuggestions && countrySearch && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                               {countries
@@ -1501,7 +1440,6 @@ const PurchaseAttraction = () => {
                 </div>
               )}
 
-              {/* Step 3: Payment Method */}
               {currentStep === 3 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1529,9 +1467,7 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
 
-                  {/* Card Form */}
                   <div className="space-y-4">
-                    {/* Card Number */}
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Card Number</label>
                       <div className="relative">
@@ -1563,7 +1499,6 @@ const PurchaseAttraction = () => {
                       )}
                     </div>
                     
-                    {/* Expiration and CVV */}
                     <div className="grid grid-cols-3 gap-2 md:gap-4">
                       <div>
                         <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Exp Month</label>
@@ -1614,7 +1549,6 @@ const PurchaseAttraction = () => {
                       </div>
                     </div>
                     
-                    {/* Error Message */}
                     {paymentError && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 md:p-3 text-xs md:text-sm text-red-800 flex items-start gap-2">
                         <svg className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -1624,7 +1558,6 @@ const PurchaseAttraction = () => {
                       </div>
                     )}
                     
-                    {/* Security Notice */}
                     <div className="bg-blue-50 rounded-lg p-2.5 md:p-3 flex items-start gap-2">
                       <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
@@ -1636,7 +1569,6 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
                   
-                  {/* Signature & Terms Section */}
                   <div className="space-y-4 mt-6 pt-6">
                     <h3 className="text-lg font-semibold">Signature & Agreement</h3>
 
@@ -1710,7 +1642,6 @@ const PurchaseAttraction = () => {
 
               )}
 
-              {/* Step 4: Confirmation */}
               {currentStep === 4 && purchaseComplete && (
                 <div className="p-4 md:p-6">
                   <div className="text-center mb-6">
@@ -1724,7 +1655,6 @@ const PurchaseAttraction = () => {
                     </p>
                   </div>
                   
-                  {/* Customer Information */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                     <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1744,7 +1674,6 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
 
-                  {/* Purchase Details */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1780,7 +1709,6 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
 
-                  {/* Billing Address */}
                   <div className="bg-gray-50 rounded-xl p-4 mb-6">
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1818,10 +1746,8 @@ const PurchaseAttraction = () => {
             </div>
           </div>
 
-          {/* Right Column - Attraction Summary (hidden on mobile, shown on lg+) */}
           <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden lg:sticky lg:top-8">
-              {/* Image Carousel */}
               {attraction.images && attraction.images.length > 0 && (
                 <div className="relative group">
                   <div className="relative h-64 overflow-hidden bg-gray-100">
@@ -1831,7 +1757,6 @@ const PurchaseAttraction = () => {
                       className="w-full h-full object-cover transition-opacity duration-300"
                     />
                     
-                    {/* Navigation Arrows */}
                     {attraction.images.length > 1 && (
                       <>
                         <button
@@ -1856,7 +1781,6 @@ const PurchaseAttraction = () => {
                     )}
                   </div>
                   
-                  {/* Image Indicators */}
                   {attraction.images.length > 1 && (
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                       {attraction.images.map((_, index) => (
@@ -1874,7 +1798,6 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
                   
-                  {/* Image Counter */}
                   {attraction.images.length > 1 && (
                     <div className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2.5 py-1 rounded-full">
                       {currentImageIndex + 1} / {attraction.images.length}
@@ -1884,7 +1807,6 @@ const PurchaseAttraction = () => {
               )}
               
               <div className="p-4 md:p-6">
-                {/* Attraction Header */}
                 <div className="mb-4">
                   <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">{attraction.name}</h2>
                   <div className="flex items-center gap-2 mb-3">
@@ -1896,7 +1818,6 @@ const PurchaseAttraction = () => {
                   <p className="text-sm md:text-base text-gray-500 leading-relaxed">{attraction.description}</p>
                 </div>
                 
-                {/* Attraction Details Grid */}
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   <div className="flex items-start gap-2">
                     <div className="p-2 bg-blue-50 rounded-xl">
@@ -1970,7 +1891,6 @@ const PurchaseAttraction = () => {
                     </>
                   )}
 
-                  {/* Selected Add-ons */}
                   {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-200 space-y-1.5">
                       <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Add-ons</span>
@@ -1988,7 +1908,6 @@ const PurchaseAttraction = () => {
                   )}
                   </div>
                   
-                  {/* Special pricing discount */}
                   {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
                     <div className="mt-3 space-y-1">
                       {specialPricingBreakdown.discounts_applied.map((discount, index) => (
@@ -2000,14 +1919,19 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
                   
-                  {/* Fee breakdown */}
                   {feeBreakdown && feeBreakdown.fees.length > 0 && (
                     <div className="mt-3 pt-1">
                       <PriceBreakdownDisplay breakdown={feeBreakdown} compact />
                     </div>
                   )}
                   
-                  {/* Total */}
+                  {membershipDiscount > 0 && (
+                    <div className="mt-3 flex justify-between text-green-600 text-sm">
+                      <span>Member Savings{membershipBenefits.planName ? ` (${membershipBenefits.planName})` : ''}</span>
+                      <span>-${membershipDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
                   <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Total</span>
@@ -2016,7 +1940,6 @@ const PurchaseAttraction = () => {
                   </div>
                 </div>
                 
-                {/* Trust badges */}
                 <div className="mt-5 bg-gray-50 rounded-xl p-3">
                   <div className="flex items-center justify-around text-xs text-gray-500">
                     <div className="text-center">
@@ -2039,7 +1962,6 @@ const PurchaseAttraction = () => {
         </div>
       </div>
 
-      {/* Mobile Floating Summary Button — only visible below lg */}
       <button
         onClick={() => setShowMobileSummary(true)}
         className="fixed top-4 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
@@ -2049,17 +1971,13 @@ const PurchaseAttraction = () => {
         <span className="text-sm font-medium">${total.toFixed(2)}</span>
       </button>
 
-      {/* Mobile Order Summary Sidebar */}
       {showMobileSummary && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 animate-mobile-summary-fade-in"
             onClick={() => setShowMobileSummary(false)}
           />
-          {/* Slide-in Panel */}
           <div className="absolute top-0 left-0 h-full w-[85vw] max-w-sm bg-white shadow-2xl animate-mobile-summary-slide-in overflow-y-auto rounded-r-2xl">
-            {/* Header */}
             <div className="sticky top-0 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-4 flex items-center justify-between z-10 rounded-tr-2xl">
               <h3 className="font-bold text-lg text-white">Order Summary</h3>
               <button
@@ -2073,9 +1991,7 @@ const PurchaseAttraction = () => {
               </button>
             </div>
 
-            {/* Summary Content */}
             <div className="p-4">
-              {/* Image */}
               {attraction.images && attraction.images.length > 0 && (
                 <div className="relative h-48 rounded-xl overflow-hidden mb-4">
                   <img
@@ -2086,7 +2002,6 @@ const PurchaseAttraction = () => {
                 </div>
               )}
 
-              {/* Attraction Info */}
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">{attraction.name}</h2>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -2095,7 +2010,6 @@ const PurchaseAttraction = () => {
                 </span>
               </div>
 
-              {/* Details Grid */}
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <div className="flex items-start gap-2">
                   <div className="p-2 bg-blue-50 rounded-xl">
@@ -2144,7 +2058,6 @@ const PurchaseAttraction = () => {
                 </div>
               </div>
 
-              {/* Order Summary Pricing */}
               <div className="pt-4 border-t border-gray-100">
                 <h3 className="font-bold text-gray-900 mb-3 text-sm">Pricing</h3>
                 <div className="space-y-2">
@@ -2164,7 +2077,6 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
 
-                  {/* Selected Add-ons */}
                   {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-200 space-y-1.5">
                       <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Add-ons</span>
@@ -2207,7 +2119,6 @@ const PurchaseAttraction = () => {
                 </div>
               </div>
 
-              {/* Trust badges */}
               <div className="mt-5 bg-gray-50 rounded-xl p-3">
                 <div className="flex items-center justify-around text-xs text-gray-500">
                   <div className="text-center">
@@ -2231,7 +2142,6 @@ const PurchaseAttraction = () => {
 
 
 
-      {/* Add-On Details Modal */}
       {showAddOnDetailsModal && selectedAddOnForDetails && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -2277,7 +2187,6 @@ const PurchaseAttraction = () => {
         </div>
       )}
 
-      {/* QR Code Modal */}
       {showQRModal && qrCodeImage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl">
@@ -2289,7 +2198,6 @@ const PurchaseAttraction = () => {
               <p className="text-sm text-gray-500">Your tickets have been confirmed</p>
             </div>
             
-            {/* QR Code Display */}
             <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4">
               <div className="flex flex-col items-center">
                 <img 
@@ -2301,7 +2209,6 @@ const PurchaseAttraction = () => {
               </div>
             </div>
             
-            {/* Purchase Details */}
             <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4">
               <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Purchase Details</h3>
               <div className="space-y-2">
@@ -2342,7 +2249,6 @@ const PurchaseAttraction = () => {
               </div>
             </div>
             
-            {/* Billing Address */}
             <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4">
               <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Billing Address</h3>
               <div className="text-sm text-gray-700 space-y-1">
@@ -2354,7 +2260,6 @@ const PurchaseAttraction = () => {
               </div>
             </div>
             
-            {/* Payment Summary */}
             <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4">
               <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Payment Summary</h3>
               <div className="space-y-2">
@@ -2379,7 +2284,6 @@ const PurchaseAttraction = () => {
               </div>
             </div>
             
-            {/* Information Notice */}
             <div className="bg-yellow-50 rounded-lg p-3 mb-4">
               <div className="flex">
                 <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -2412,7 +2316,6 @@ const PurchaseAttraction = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

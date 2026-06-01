@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface Attraction {
   id: number;
   location_id: number;
@@ -116,75 +113,48 @@ export interface PaginatedResponse<T> {
 }
 
 class AttractionService {
-  /**
-   * Get all attractions with optional filters
-   */
   async getAttractions(filters?: AttractionFilters): Promise<PaginatedResponse<Attraction>> {
     const response = await api.get('/attractions', { params: filters, headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${getStoredUser()?.token}`} });
     return response.data;
   }
   
 
-  /**
-   * Get a specific attraction by ID
-   */
   async getAttraction(id: number): Promise<ApiResponse<Attraction>> {
     const response = await api.get(`/attractions/${id}`);
     console.log('Attraction response data:', response.data);
     return response.data;
   }
 
-  /**
-   * Create a new attraction
-   */
   async createAttraction(data: CreateAttractionData): Promise<ApiResponse<Attraction>> {
     const response = await api.post('/attractions', data);
     return response.data;
   }
 
-  /**
-   * Update an existing attraction
-   */
   async updateAttraction(id: number, data: UpdateAttractionData): Promise<ApiResponse<Attraction>> {
     const response = await api.put(`/attractions/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete an attraction
-   */
   async deleteAttraction(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/attractions/${id}`);
     return response.data;
   }
 
-  /**
-   * Activate an attraction
-   */
   async activateAttraction(id: number): Promise<ApiResponse<Attraction>> {
     const response = await api.patch(`/attractions/${id}/activate`);
     return response.data;
   }
 
-  /**
-   * Deactivate an attraction
-   */
   async deactivateAttraction(id: number): Promise<ApiResponse<Attraction>> {
     const response = await api.patch(`/attractions/${id}/deactivate`);
     return response.data;
   }
 
-  /**
-   * Bulk delete attractions
-   */
   async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
     const response = await api.post('/attractions/bulk-delete', { ids });
     return response.data;
   }
 
-  /**
-   * Bulk import attractions
-   */
   async bulkImport(data: { attractions: CreateAttractionData[] }): Promise<ApiResponse<{
     imported: Attraction[];
     imported_count: number;
@@ -194,15 +164,11 @@ class AttractionService {
     return response.data;
   }
 
-  /**
-   * Reorder attractions (bulk update display_order)
-   */
   async reorderAttractions(items: { id: number; display_order: number }[]): Promise<ApiResponse<null>> {
     const response = await api.post('/attractions/reorder', { items });
     return response.data;
   }
 }
 
-// Export a singleton instance
 export const attractionService = new AttractionService();
 export default attractionService;

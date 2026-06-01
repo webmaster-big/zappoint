@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/bookings/Bookings.tsx
 
 export interface BookingsPageBooking {
   id: string;
@@ -32,17 +31,14 @@ export interface BookingsPageBooking {
   notes?: string;
   specialRequests?: string;
   internal_notes?: string; // Staff-only notes, never shown to customer
-  // Guest of Honor fields
   guestOfHonorName?: string;
   guestOfHonorAge?: number;
   guestOfHonorGender?: string;
-  // Address fields
   guestAddress?: string;
   guestCity?: string;
   guestState?: string;
   guestZip?: string;
   guestCountry?: string;
-  // Applied fees
   checked_in_at?: string;
   checked_in_by?: number;
   checked_in_by_user?: {
@@ -69,54 +65,42 @@ export interface BookingsPageFilterOptions {
   customerId: string;
 }
 
-// Column visibility configuration - granular control for all available fields
 export interface BookingsColumnVisibility {
-  // Booking identifiers
   id: boolean;                    // Confirmation # (booking ID)
   referenceNumber: boolean;       // Reference number
   
-  // Date & Time group
   bookingDate: boolean;           // Booking date
   bookingTime: boolean;           // Booking time
   duration: boolean;              // Duration
   
-  // Customer info group (displayed together in Customer column)
   guestName: boolean;             // Guest name
   guestEmail: boolean;            // Guest email
   guestPhone: boolean;            // Guest phone
   
-  // Customer address group
   guestAddress: boolean;          // Full address (address, city, state, zip, country)
   
-  // Package & Room group
   packageName: boolean;           // Package name
   roomName: boolean;              // Room/Space name
   location: boolean;              // Location name
   
-  // Booking details
   participants: boolean;          // Number of participants
   status: boolean;                // Booking status
   
-  // Payment group
   paymentMethod: boolean;         // Payment method
   paymentStatus: boolean;         // Payment status
   totalAmount: boolean;           // Total amount
   amountPaid: boolean;            // Amount paid
   fees: boolean;                  // Applied fees
   
-  // Guest of Honor group
   guestOfHonor: boolean;          // Guest of honor info (name, age, gender)
   
-  // Notes group
   notes: boolean;                 // Customer notes
   specialRequests: boolean;       // Special requests
   
-  // Timestamps
   createdAt: boolean;             // Created date
   updatedAt: boolean;             // Updated date
 }
 
-// Column key type for drag-and-drop ordering
 export type BookingsColumnKey = 
   | 'id'
   | 'referenceNumber'
@@ -139,7 +123,6 @@ export type BookingsColumnKey =
   | 'createdAt'
   | 'updatedAt';
 
-// Default column order
 export const DEFAULT_COLUMN_ORDER: BookingsColumnKey[] = [
   'id',
   'referenceNumber',
@@ -163,7 +146,6 @@ export const DEFAULT_COLUMN_ORDER: BookingsColumnKey[] = [
   'updatedAt'
 ];
 
-// Helper to derive payment status from amounts
 export const derivePaymentStatus = (amountPaid: number, totalAmount: number): 'paid' | 'partial' | 'pending' => {
   if (amountPaid <= 0) return 'pending';
   if (amountPaid >= totalAmount) return 'paid';

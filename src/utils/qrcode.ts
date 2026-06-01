@@ -1,11 +1,5 @@
 import QRCode from 'qrcode';
 
-/**
- * Generate a QR code as a base64 data URL
- * @param data - The data to encode in the QR code
- * @param options - QR code generation options
- * @returns Promise<string> - Base64 data URL of the QR code image
- */
 export const generateQRCode = async (
   data: string,
   options?: {
@@ -35,12 +29,6 @@ export const generateQRCode = async (
   }
 };
 
-/**
- * Generate purchase QR code data
- * @param purchaseId - The purchase ID
- * @param additionalData - Additional data to include in QR code
- * @returns QR code data string
- */
 export const generatePurchaseQRData = (
   purchaseId: number | string,
 ): string => {
@@ -52,12 +40,6 @@ export const generatePurchaseQRData = (
   return JSON.stringify(qrData);
 };
 
-/**
- * Generate a QR code for a purchase
- * @param purchaseId - The purchase ID
- * @param purchaseData - Purchase data to include in QR code
- * @returns Promise<string> - Base64 data URL of the QR code
- */
 export const generatePurchaseQRCode = async (
   purchaseId: number | string,
  

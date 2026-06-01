@@ -31,9 +31,7 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
         className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with gradient background */}
         <div className={`relative px-5 py-6 text-center bg-${themeColor}-50`}>
-          {/* Animated icon container */}
           <div className="relative inline-block">
             <div className={`absolute inset-0 rounded-full animate-ping opacity-20 bg-${fullColor}`} />
             <div className={`relative w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 bg-${themeColor}-100 shadow-lg`}>
@@ -46,9 +44,7 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
           </h2>
         </div>
 
-        {/* Body */}
         <div className="px-5 py-5">
-          {/* Info alert */}
           <div className={`flex gap-2.5 p-3 rounded-lg mb-5 bg-${themeColor}-50 border border-${themeColor}-200`}>
             <AlertCircle 
               size={20} 
@@ -59,7 +55,6 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
             </p>
           </div>
 
-          {/* Action buttons */}
           <div className="space-y-3">
             <Link
               to={actionLink}

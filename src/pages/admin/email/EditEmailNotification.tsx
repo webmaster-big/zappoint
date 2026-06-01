@@ -1,4 +1,3 @@
-// src/pages/admin/email/EditEmailNotification.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -78,7 +77,6 @@ const EditEmailNotification: React.FC = () => {
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
   const [formData, setFormData] = useState<UpdateEmailNotificationData>({
     name: '',
     trigger_type: 'booking_created',
@@ -96,7 +94,6 @@ const EditEmailNotification: React.FC = () => {
     send_after_hours: undefined
   });
 
-  // UI state
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [entities, setEntities] = useState<Array<{ id: number; name: string }>>([]);
@@ -113,7 +110,6 @@ const EditEmailNotification: React.FC = () => {
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
 
-  // Default-template / code-editor state
   const [isDefault, setIsDefault] = useState(false);
   const [defaultKey, setDefaultKey] = useState<string | null>(null);
   const [isBodyCustomized, setIsBodyCustomized] = useState(false);
@@ -125,12 +121,10 @@ const EditEmailNotification: React.FC = () => {
   const [previewSubject, setPreviewSubject] = useState<string | null>(null);
   const [previewBody, setPreviewBody] = useState<string | null>(null);
   
-  // Variables panel state
   const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
 
-  // Trigger type configurations
   const bookingTriggers = [
     { value: 'booking_created', label: 'Booking Created' },
     { value: 'booking_confirmed', label: 'Booking Confirmed' },
@@ -163,7 +157,6 @@ const EditEmailNotification: React.FC = () => {
     { value: 'payment_pending', label: 'Payment Pending' },
   ];
 
-  // Get available triggers based on entity type
   const getAvailableTriggers = () => {
     const entityType = formData.entity_type;
     if (entityType === 'package') {
@@ -185,7 +178,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Recipient type options
   const recipientTypeOptions: Array<{ value: RecipientType; label: string }> = [
     { value: 'customer', label: 'Customer' },
     { value: 'staff', label: 'Staff' },
@@ -197,7 +189,6 @@ const EditEmailNotification: React.FC = () => {
   const isReminderTrigger = formData.trigger_type?.endsWith('_reminder') || false;
   const isFollowupTrigger = formData.trigger_type?.endsWith('_followup') || false;
 
-  // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -213,7 +204,6 @@ const EditEmailNotification: React.FC = () => {
         
         if (notificationRes.success && notificationRes.data) {
           const notification = notificationRes.data;
-          // Prefer effective values so defaults render seeded HTML when un-customized
           const initialSubject = notification.effective_subject ?? notification.subject ?? '';
           const initialBody = notification.effective_body ?? notification.body ?? '';
           setIsDefault(!!notification.is_default);
@@ -263,7 +253,6 @@ const EditEmailNotification: React.FC = () => {
     fetchData();
   }, [id, isCompanyAdmin]);
 
-  // Reset trigger when entity type changes
   useEffect(() => {
     const availableTriggers = getAvailableTriggers();
     const allOptions = availableTriggers.flatMap(g => g.options.map(o => o.value));
@@ -274,7 +263,6 @@ const EditEmailNotification: React.FC = () => {
     }
   }, [formData.entity_type]);
 
-  // Fetch variables when trigger type changes
   useEffect(() => {
     if (!formData.trigger_type) return;
     
@@ -321,7 +309,6 @@ const EditEmailNotification: React.FC = () => {
     fetchVariables();
   }, [formData.trigger_type]);
 
-  // Fetch entities when entity type changes
   useEffect(() => {
     if (formData.entity_type === 'all') {
       setEntities([]);
@@ -341,7 +328,6 @@ const EditEmailNotification: React.FC = () => {
     fetchEntities();
   }, [formData.entity_type, formData.location_id]);
 
-  // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
@@ -354,12 +340,10 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Handle entity type change
   const handleEntityTypeChange = (entityType: EntityType) => {
     setFormData(prev => ({ ...prev, entity_type: entityType, entity_ids: [] }));
   };
 
-  // Handle recipient type toggle
   const handleRecipientTypeToggle = (type: RecipientType) => {
     setFormData(prev => {
       const types = prev.recipient_types?.includes(type)
@@ -372,7 +356,6 @@ const EditEmailNotification: React.FC = () => {
     });
   };
 
-  // Add custom email
   const addCustomEmail = () => {
     const email = customEmail.trim().toLowerCase();
     if (!email) return;
@@ -389,35 +372,29 @@ const EditEmailNotification: React.FC = () => {
     setCustomEmail('');
   };
 
-  // Remove custom email
   const removeCustomEmail = (email: string) => {
     setFormData(prev => ({ ...prev, custom_emails: prev.custom_emails?.filter(e => e !== email) || [] }));
   };
 
-  // Handle body content change
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || '' }));
     }
   };
 
-  // Handle CodeMirror code-editor body changes
   const handleCodeBodyChange = (value: string) => {
     setFormData(prev => ({ ...prev, body: value }));
   };
 
-  // Switch editor mode and keep both editors in sync
   const switchEditorMode = (mode: 'wysiwyg' | 'code') => {
     if (mode === editorMode) return;
     if (mode === 'code') {
-      // Push current WYSIWYG html into formData first
       if (bodyEditorRef.current) {
         setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || prev.body || '' }));
       }
       setEditorMode('code');
     } else {
       setEditorMode('wysiwyg');
-      // Sync code value back to WYSIWYG editor on next paint
       setTimeout(() => {
         if (bodyEditorRef.current) {
           bodyEditorRef.current.innerHTML = formData.body || '';
@@ -426,7 +403,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Reset default notification (subject + body) back to seeded values
   const handleResetDefault = async () => {
     if (!id) return;
     try {
@@ -453,7 +429,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Open the live preview modal — fetches rendered HTML with sample data
   const openPreview = async () => {
     setShowPreview(true);
     setPreviewLoading(true);
@@ -474,7 +449,6 @@ const EditEmailNotification: React.FC = () => {
       }
     } catch (error) {
       console.error('Error generating preview:', error);
-      // Fall back to raw values without rendered variables
       setPreviewSubject(formData.subject || '');
       setPreviewBody(formData.body || '');
     } finally {
@@ -482,7 +456,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Toolbar click handler
   const handleToolbarClick = (e: React.MouseEvent, command: string, value?: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -490,7 +463,6 @@ const EditEmailNotification: React.FC = () => {
     handleBodyChange();
   };
 
-  // Apply text color
   const applyTextColor = (color: string) => {
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
@@ -499,7 +471,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Apply highlight
   const applyHighlight = (color: string) => {
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
@@ -508,7 +479,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Insert link
   const insertLink = () => {
     if (!linkUrl.trim()) {
       setToast({ message: 'Please enter a URL', type: 'error' });
@@ -527,12 +497,10 @@ const EditEmailNotification: React.FC = () => {
     setLinkText('');
   };
 
-  // Handle image file selection - show size modal
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       setToast({ message: 'Please select a valid image file (PNG, JPG, GIF, WebP)', type: 'error' });
@@ -540,19 +508,16 @@ const EditEmailNotification: React.FC = () => {
       return;
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setToast({ message: 'Image must be less than 5MB', type: 'error' });
       if (imageInputRef.current) imageInputRef.current.value = '';
       return;
     }
 
-    // Store file and show size picker modal
     setPendingImageFile(file);
     setShowImageSizeModal(true);
   };
 
-  // Upload and insert image with selected size
   const handleImageUpload = async (maxWidth: string) => {
     if (!pendingImageFile) return;
 
@@ -563,7 +528,6 @@ const EditEmailNotification: React.FC = () => {
       const response = await emailCampaignService.uploadImage(pendingImageFile);
       
       if (response.success) {
-        // Insert image at cursor position with chosen size
         if (bodyEditorRef.current) {
           bodyEditorRef.current.focus();
           const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
@@ -582,7 +546,6 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Insert variable
   const insertVariable = (variable: string) => {
     const variableText = `{{ ${variable} }}`;
     if (bodyEditorRef.current) {
@@ -603,29 +566,24 @@ const EditEmailNotification: React.FC = () => {
     }
   };
 
-  // Copy variable
   const copyVariable = (variable: string) => {
     navigator.clipboard.writeText(`{{ ${variable} }}`);
     setCopiedVariable(variable);
     setTimeout(() => setCopiedVariable(null), 2000);
   };
 
-  // Toggle variable group - only one open at a time
   const toggleGroup = (groupName: string) => {
     setExpandedGroups(prev => {
       const isCurrentlyOpen = prev[groupName];
-      // Close all groups, then toggle the clicked one
       const allClosed = Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {} as Record<string, boolean>);
       return { ...allClosed, [groupName]: !isCurrentlyOpen };
     });
   };
 
-  // Format group name
   const formatGroupName = (name: string) => {
     return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ') + ' Variables';
   };
 
-  // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -664,7 +622,6 @@ const EditEmailNotification: React.FC = () => {
       setLoading(true);
       const submitData: UpdateEmailNotificationData = isDefault
         ? {
-            // Defaults: only the allowed fields are accepted by the API
             subject: formData.subject,
             body: formData.body,
             description: formData.description,
@@ -684,7 +641,6 @@ const EditEmailNotification: React.FC = () => {
       const response = await emailNotificationService.update(parseInt(id), submitData);
       if (response.success) {
         const updated = response.data;
-        // Refresh customization flags from the server response
         setIsBodyCustomized(!!updated.is_body_customized);
         setIsSubjectCustomized(!!updated.is_subject_customized);
         setToast({ message: 'Email notification updated successfully', type: 'success' });
@@ -710,7 +666,6 @@ const EditEmailNotification: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -777,9 +732,7 @@ const EditEmailNotification: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Basic Info & Trigger Config */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Notification Settings</h2>
               
@@ -860,7 +813,6 @@ const EditEmailNotification: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Timing for Reminder/Follow-up */}
                 {(isReminderTrigger || isFollowupTrigger) && (
                   <div className="md:col-span-2">
                     <div className={`flex items-center gap-3 p-3 rounded-lg border bg-${themeColor}-50 border-${themeColor}-200`}>
@@ -882,7 +834,6 @@ const EditEmailNotification: React.FC = () => {
                   </div>
                 )}
 
-                {/* Entity Selection */}
                 {formData.entity_type !== 'all' && entities.length > 0 && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -927,7 +878,6 @@ const EditEmailNotification: React.FC = () => {
               </div>
             </div>
 
-            {/* Recipients */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Recipients</h2>
               
@@ -997,7 +947,6 @@ const EditEmailNotification: React.FC = () => {
               </div>
             </div>
 
-            {/* Email Content */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Email Content</h2>
@@ -1096,7 +1045,6 @@ const EditEmailNotification: React.FC = () => {
                       />
                     ) : (
                     <>
-                    {/* Toolbar */}
                     <div className="flex flex-wrap items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
                       <button type="button" onMouseDown={(e) => handleToolbarClick(e, 'undo')} className="p-1.5 hover:bg-gray-200 rounded text-gray-600" title="Undo">
                         <Undo2 className="w-4 h-4" />
@@ -1172,7 +1120,6 @@ const EditEmailNotification: React.FC = () => {
                       </button>
                     </div>
                     
-                    {/* Editor */}
                     <div className="relative">
                       {!formData.body && (
                         <div className="absolute top-3 left-4 text-gray-400 pointer-events-none select-none z-0">
@@ -1200,7 +1147,6 @@ const EditEmailNotification: React.FC = () => {
             </div>
           </div>
 
-          {/* Variables Panel - Right Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
@@ -1288,7 +1234,6 @@ const EditEmailNotification: React.FC = () => {
         </div>
       </div>
 
-      {/* Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1338,7 +1283,6 @@ const EditEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Image Size Picker Modal */}
       {showImageSizeModal && pendingImageFile && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -1352,7 +1296,6 @@ const EditEmailNotification: React.FC = () => {
               </div>
             </div>
             
-            {/* Image Preview */}
             <div className="mb-4 p-4 bg-gray-50 rounded-lg flex justify-center">
               <img 
                 src={URL.createObjectURL(pendingImageFile)} 
@@ -1413,7 +1356,6 @@ const EditEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Link Modal */}
       {showLinkModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -1460,7 +1402,6 @@ const EditEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Reset to Default Confirmation Modal */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -1489,7 +1430,6 @@ const EditEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );

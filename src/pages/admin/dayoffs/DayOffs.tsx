@@ -15,7 +15,6 @@ import { getStoredUser } from '../../../utils/storage';
 const DayOffs: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
     
-    // State management
     const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -33,18 +32,15 @@ const DayOffs: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     
-    // Bulk selection state
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedDayOffIds, setSelectedDayOffIds] = useState<Set<number>>(new Set());
     
-    // Location filtering for company_admin
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
     const [locations, setLocations] = useState<Location[]>([]);
     const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
     const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
-    // Form state for create/edit
     const [formData, setFormData] = useState({
         date: '',
         reason: '',
@@ -53,12 +49,10 @@ const DayOffs: React.FC = () => {
         time_end: ''     // Delayed opening until this time
     });
 
-    // Blocking scope state for create/edit form
     const [blockingScope, setBlockingScope] = useState<BlockingScope>('location');
     const [selectedPackageIds, setSelectedPackageIds] = useState<number[]>([]);
     const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
     
-    // Available packages and spaces for selection (with caching)
     const [availablePackages, setAvailablePackages] = useState<Package[]>([]);
     const [availableRooms, setAvailableRooms] = useState<Room[]>([]); // Called "spaces" in UI
     const [loadingResources, setLoadingResources] = useState(false);
@@ -69,12 +63,10 @@ const DayOffs: React.FC = () => {
         timestamp: number;
     } | null>(null);
     
-    // Bulk modal blocking scope state
     const [bulkBlockingScope, setBulkBlockingScope] = useState<BlockingScope>('location');
     const [bulkSelectedPackageIds, setBulkSelectedPackageIds] = useState<number[]>([]);
     const [bulkSelectedRoomIds, setBulkSelectedRoomIds] = useState<number[]>([]);
 
-    // Multi-select calendar state
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
     const [bulkSelectedDates, setBulkSelectedDates] = useState<Set<string>>(new Set());
@@ -84,14 +76,12 @@ const DayOffs: React.FC = () => {
     const [bulkTimeEnd, setBulkTimeEnd] = useState('');      // Delayed opening until this time
     const [bulkCreating, setBulkCreating] = useState(false);
 
-    // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
     const showToast = (message: string, type?: "success" | "error" | "info") => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     };
 
-    // View mode state (card or table) with localStorage persistence
     const [viewMode, setViewMode] = useState<'card' | 'table'>(() => {
         const saved = localStorage.getItem('dayoffs_view_mode');
         return (saved === 'table' || saved === 'card') ? saved : 'card';
@@ -102,16 +92,13 @@ const DayOffs: React.FC = () => {
         localStorage.setItem('dayoffs_view_mode', mode);
     };
 
-    // Advanced filters toggle state
     const [showFilters, setShowFilters] = useState(false);
 
-    // Editable cell state
     const [editingCell, setEditingCell] = useState<{ dayOffId: number; field: string } | null>(null);
     const [editValue, setEditValue] = useState('');
     const [savingCell, setSavingCell] = useState<{ dayOffId: number; field: string } | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Fetch locations for company_admin
     useEffect(() => {
         const fetchLocations = async () => {
             if (isCompanyAdmin) {
@@ -120,13 +107,11 @@ const DayOffs: React.FC = () => {
                     if (response.success && response.data) {
                         const locationsArray = Array.isArray(response.data) ? response.data : [];
                         setLocations(locationsArray);
-                        // Set first location as default if available
                         if (locationsArray.length > 0 && selectedLocationId === null) {
                             setSelectedLocationId(locationsArray[0].id);
                         }
                     }
                 } catch {
-                    // Error fetching locations - handled silently
                 }
             }
         };
@@ -134,7 +119,6 @@ const DayOffs: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Fetch day offs
     const fetchDayOffs = React.useCallback(async () => {
         try {
             setLoading(true);
@@ -150,7 +134,6 @@ const DayOffs: React.FC = () => {
             if (response.data) {
                 let filteredDayOffs = response.data.day_offs || [];
                 
-                // Client-side search filtering by reason
                 if (searchTerm) {
                     filteredDayOffs = filteredDayOffs.filter(dayOff => 
                         dayOff.reason?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -173,7 +156,6 @@ const DayOffs: React.FC = () => {
         fetchDayOffs();
     }, [fetchDayOffs]);
 
-    // Fetch packages and spaces when modal location changes (with caching)
     useEffect(() => {
         const fetchPackagesAndRooms = async () => {
             const locationId = isCompanyAdmin && modalLocationId 
@@ -182,7 +164,6 @@ const DayOffs: React.FC = () => {
             
             if (!locationId) return;
             
-            // Check cache - valid for 2 minutes
             const CACHE_TTL = 120000;
             if (resourcesCache && 
                 resourcesCache.locationId === locationId && 
@@ -205,7 +186,6 @@ const DayOffs: React.FC = () => {
                 setAvailablePackages(packages);
                 setAvailableRooms(rooms);
                 
-                // Update cache
                 setResourcesCache({
                     locationId,
                     packages,
@@ -213,7 +193,6 @@ const DayOffs: React.FC = () => {
                     timestamp: Date.now()
                 });
             } catch {
-                // Error fetching packages/spaces - handled silently
             } finally {
                 setLoadingResources(false);
             }
@@ -224,7 +203,6 @@ const DayOffs: React.FC = () => {
         }
     }, [modalLocationId, showCreateModal, showEditModal, showBulkModal, isCompanyAdmin, currentUser?.location_id, resourcesCache]);
 
-    // Handle form input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
@@ -235,7 +213,6 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Reset form
     const resetForm = () => {
         setFormData({
             date: '',
@@ -250,11 +227,9 @@ const DayOffs: React.FC = () => {
         setSelectedRoomIds([]);
     };
 
-    // Handle create day off
     const handleCreateDayOff = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Validate blocking scope selections
         if ((blockingScope === 'packages' || blockingScope === 'both') && selectedPackageIds.length === 0) {
             showToast('Please select at least one package', 'error');
             return;
@@ -265,12 +240,10 @@ const DayOffs: React.FC = () => {
         }
         
         try {
-            // Use modal location for company_admin, default to user's location_id otherwise
             const locationId = isCompanyAdmin && modalLocationId 
                 ? modalLocationId 
                 : (currentUser?.location_id || 1);
             
-            // Determine package_ids and room_ids based on blocking scope
             let package_ids: number[] | null = null;
             let room_ids: number[] | null = null;
             
@@ -285,7 +258,6 @@ const DayOffs: React.FC = () => {
                     package_ids = selectedPackageIds;
                     room_ids = selectedRoomIds;
                     break;
-                // 'location' scope: both null = location-wide
             }
             
             await dayOffService.createDayOff({
@@ -309,12 +281,10 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Handle update day off
     const handleUpdateDayOff = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedDayOff) return;
 
-        // Validate blocking scope selections
         if ((blockingScope === 'packages' || blockingScope === 'both') && selectedPackageIds.length === 0) {
             showToast('Please select at least one package', 'error');
             return;
@@ -325,7 +295,6 @@ const DayOffs: React.FC = () => {
         }
 
         try {
-            // Determine package_ids and room_ids based on blocking scope
             let package_ids: number[] | null = null;
             let room_ids: number[] | null = null;
             
@@ -340,10 +309,8 @@ const DayOffs: React.FC = () => {
                     package_ids = selectedPackageIds;
                     room_ids = selectedRoomIds;
                     break;
-                // 'location' scope: both null = location-wide
             }
             
-            // Build update data with properly sanitized time values
             const updateData = {
                 location_id: selectedDayOff.location_id, // Include location_id from the original day off
                 date: formData.date,
@@ -367,7 +334,6 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Handle delete day off
     const handleDeleteDayOff = async (dayOffId: number, dayOffDate: string) => {
         if (!window.confirm(`Are you sure you want to delete the Day Off on "${dayOffDate}"?`)) {
             return;
@@ -382,7 +348,6 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Editable cell functions
     const startEditing = (dayOffId: number, field: string, currentValue: string) => {
         setEditingCell({ dayOffId, field });
         setEditValue(currentValue || '');
@@ -410,7 +375,6 @@ const DayOffs: React.FC = () => {
                 time_end: dayOff.time_end || undefined,
             });
 
-            // Update local state
             setDayOffs(prev => prev.map(d => 
                 d.id === editingCell.dayOffId 
                     ? { ...d, [editingCell.field]: editValue }
@@ -435,7 +399,6 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Render editable cell
     const renderEditableCell = (
         dayOff: DayOff, 
         field: string, 
@@ -492,7 +455,6 @@ const DayOffs: React.FC = () => {
         );
     };
 
-    // Clear filters function
     const clearFilters = () => {
         setFilters({
             is_recurring: undefined,
@@ -505,13 +467,11 @@ const DayOffs: React.FC = () => {
         setSearchTerm('');
     };
 
-    // Toggle selection mode
     const toggleSelectionMode = () => {
         setSelectionMode(!selectionMode);
         setSelectedDayOffIds(new Set());
     };
 
-    // Toggle day off selection
     const toggleDayOffSelection = (dayOffId: number) => {
         const newSelected = new Set(selectedDayOffIds);
         if (newSelected.has(dayOffId)) {
@@ -522,7 +482,6 @@ const DayOffs: React.FC = () => {
         setSelectedDayOffIds(newSelected);
     };
 
-    // Select all day offs
     const selectAllDayOffs = () => {
         if (selectedDayOffIds.size === dayOffs.length) {
             setSelectedDayOffIds(new Set());
@@ -531,7 +490,6 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Handle bulk delete
     const handleBulkDelete = async () => {
         if (selectedDayOffIds.size === 0) {
             showToast('Please select Day Offs to delete', 'info');
@@ -553,14 +511,11 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    // Handle edit click
     const handleEditClick = (dayOff: DayOff) => {
         setSelectedDayOff(dayOff);
         
-        // Normalize time format - backend may return HH:mm:ss, but HTML time input needs HH:mm
         const normalizeTime = (time: string | null | undefined): string => {
             if (!time) return '';
-            // If it's HH:mm:ss format, extract just HH:mm
             const match = time.match(/^(\d{2}:\d{2})/);
             return match ? match[1] : time;
         };
@@ -576,7 +531,6 @@ const DayOffs: React.FC = () => {
             time_end: timeEnd
         });
         
-        // Determine blocking scope from package_ids and room_ids
         const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
         const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
         
@@ -598,7 +552,6 @@ const DayOffs: React.FC = () => {
             setSelectedRoomIds([]);
         }
         
-        // Set modal location for fetching packages/rooms
         if (dayOff.location_id) {
             setModalLocationId(dayOff.location_id);
         }
@@ -606,24 +559,20 @@ const DayOffs: React.FC = () => {
         setShowEditModal(true);
     };
 
-    // Handle filter changes
     const handleFilterChange = (key: keyof DayOffFilters, value: boolean | undefined) => {
         setFilters(prev => ({ ...prev, [key]: value }));
         setCurrentPage(1);
     };
 
-    // Handle search
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
 
-    // Pagination
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
     };
 
-    // Format date for display
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', { 
@@ -634,7 +583,6 @@ const DayOffs: React.FC = () => {
         });
     };
 
-    // Check if date is in the past
     const isPastDate = (dateString: string) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -642,28 +590,22 @@ const DayOffs: React.FC = () => {
         return date < today;
     };
 
-    // Sanitize time value - convert empty strings to null and validate/normalize format
     const sanitizeTimeValue = (time: string | null | undefined): string | null => {
-        // If explicitly null or undefined, return null
         if (time === null || time === undefined) return null;
         
-        // If empty string, return null (user cleared the field)
         const trimmed = time.trim();
         if (trimmed === '') {
             return null;
         }
         
-        // Accept both HH:mm and HH:mm:ss formats, normalize to HH:mm
         const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
         if (!timeRegex.test(trimmed)) {
             return null; // Return null for invalid formats
         }
         
-        // Return only HH:mm part
         return trimmed.substring(0, 5);
     };
 
-    // Format time for display (24h to 12h format)
     const formatTime = (time: string | null | undefined): string => {
         if (!time) return '';
         const [hours, minutes] = time.split(':');
@@ -673,7 +615,6 @@ const DayOffs: React.FC = () => {
         return `${h12}:${minutes} ${ampm}`;
     };
 
-    // Get closure type label
     const getClosureTypeLabel = (dayOff: DayOff): { label: string; color: string } | null => {
         const hasStart = dayOff.time_start && dayOff.time_start !== '';
         const hasEnd = dayOff.time_end && dayOff.time_end !== '';
@@ -687,11 +628,9 @@ const DayOffs: React.FC = () => {
         if (!hasStart && hasEnd) {
             return { label: `Opens at ${formatTime(dayOff.time_end)}`, color: 'bg-blue-100 text-blue-700' };
         }
-        // Both set - specific time range
         return { label: `${formatTime(dayOff.time_start)} - ${formatTime(dayOff.time_end)}`, color: 'bg-yellow-100 text-yellow-700' };
     };
 
-    // Get blocking scope badge info
     const getBlockingScopeBadge = (dayOff: DayOff): { label: string; color: string; icon: typeof Building2 } | null => {
         const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
         const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
@@ -712,7 +651,6 @@ const DayOffs: React.FC = () => {
         return null;
     };
 
-    // Bulk calendar helper functions
     const getDaysInMonth = (year: number, month: number) => {
         return new Date(year, month + 1, 0).getDate();
     };
@@ -750,7 +688,6 @@ const DayOffs: React.FC = () => {
             return;
         }
         
-        // Validate blocking scope selections
         if ((bulkBlockingScope === 'packages' || bulkBlockingScope === 'both') && bulkSelectedPackageIds.length === 0) {
             setToast({ message: 'Please select at least one package', type: 'error' });
             return;
@@ -766,12 +703,10 @@ const DayOffs: React.FC = () => {
 
         const sortedDates = Array.from(bulkSelectedDates).sort();
 
-        // Use modal location for company_admin, default to user's location_id otherwise
         const locationId = isCompanyAdmin && modalLocationId 
             ? modalLocationId 
             : (currentUser?.location_id || 1);
 
-        // Determine package_ids and room_ids based on blocking scope
         let package_ids: number[] | null = null;
         let room_ids: number[] | null = null;
         
@@ -786,7 +721,6 @@ const DayOffs: React.FC = () => {
                 package_ids = bulkSelectedPackageIds;
                 room_ids = bulkSelectedRoomIds;
                 break;
-            // 'location' scope: both null = location-wide
         }
 
         for (const dateStr of sortedDates) {
@@ -835,7 +769,6 @@ const DayOffs: React.FC = () => {
 
     return (
         <div className="px-6 py-8">
-            {/* Page Header with Action Buttons */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Day Offs</h1>
@@ -886,9 +819,7 @@ const DayOffs: React.FC = () => {
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                {/* Selection Info Bar */}
                 {selectionMode && dayOffs.length > 0 && (
                     <div className={`mb-4 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
                         <div className="flex items-center gap-3 flex-wrap">
@@ -920,10 +851,8 @@ const DayOffs: React.FC = () => {
                     </div>
                 )}
 
-                {/* Search and Filter Section */}
                 {!loading && (
                     <div className="mb-6">
-                        {/* Search Row */}
                         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                             <div className="relative flex-1 max-w-lg">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -957,7 +886,6 @@ const DayOffs: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Advanced Filters */}
                         {showFilters && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1010,7 +938,6 @@ const DayOffs: React.FC = () => {
                                         </select>
                                     </div>
                                 </div>
-                                {/* Location Filter for Company Admin */}
                                 {isCompanyAdmin && locations.length > 0 && (
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
                                         <div>
@@ -1048,13 +975,11 @@ const DayOffs: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Results count and View Toggle */}
                         <div className="flex items-center justify-between mt-3">
                             <div className="text-sm text-gray-500">
                                 Showing {dayOffs.length} day off{dayOffs.length !== 1 ? 's' : ''}
                             </div>
                             
-                            {/* View Toggle */}
                             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                                 <button
                                     onClick={() => toggleViewMode('card')}
@@ -1083,14 +1008,12 @@ const DayOffs: React.FC = () => {
                     </div>
                 )}
 
-                {/* Day Offs Display */}
                 {loading ? (
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
                     </div>
                 ) : dayOffs.length > 0 ? (
                     <>
-                        {/* Card View */}
                         {viewMode === 'card' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {dayOffs.map((dayOff) => {
@@ -1114,7 +1037,6 @@ const DayOffs: React.FC = () => {
                                             }`}
                                             onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
                                         >
-                                            {/* Header Row: Date + Actions */}
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                                     {selectionMode ? (
@@ -1176,7 +1098,6 @@ const DayOffs: React.FC = () => {
                                                 )}
                                             </div>
 
-                                            {/* Badges Row */}
                                             <div className="flex items-center gap-2 flex-wrap mb-3">
                                                 {blockingScopeBadge && (
                                                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${blockingScopeBadge.color}`}>
@@ -1196,7 +1117,6 @@ const DayOffs: React.FC = () => {
                                                 )}
                                             </div>
 
-                                            {/* Reason & Location */}
                                             {(dayOff.reason || dayOff.location) && (
                                                 <div className="text-sm text-gray-500 space-y-1 pt-2 border-t border-gray-100">
                                                     {dayOff.reason && (
@@ -1216,7 +1136,6 @@ const DayOffs: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Table View */}
                         {viewMode === 'table' && (
                             <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                                 <div className="overflow-x-auto">
@@ -1404,7 +1323,6 @@ const DayOffs: React.FC = () => {
                     </div>
                 )}
 
-                {/* Pagination */}
                 {!loading && totalPages > 1 && (
                     <div className="flex items-center justify-center mt-6">
                         <Pagination
@@ -1416,7 +1334,6 @@ const DayOffs: React.FC = () => {
                 )}
             </div>
 
-            {/* Create Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowCreateModal(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
@@ -1424,7 +1341,6 @@ const DayOffs: React.FC = () => {
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Day Off</h2>
                             
                             <form onSubmit={handleCreateDayOff} className="space-y-4">
-                                {/* Location Selector for Company Admin */}
                                 {isCompanyAdmin && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1479,7 +1395,6 @@ const DayOffs: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Blocking Scope Section */}
                                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                     <label className="block text-sm font-medium text-gray-700 mb-3">
                                         What should be blocked?
@@ -1555,7 +1470,6 @@ const DayOffs: React.FC = () => {
                                         </button>
                                     </div>
                                     
-                                    {/* Package Selection */}
                                     {(blockingScope === 'packages' || blockingScope === 'both') && (
                                         <div className="mb-3">
                                             <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -1589,7 +1503,6 @@ const DayOffs: React.FC = () => {
                                         </div>
                                     )}
                                     
-                                    {/* Room Selection */}
                                     {(blockingScope === 'rooms' || blockingScope === 'both') && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -1624,7 +1537,6 @@ const DayOffs: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Partial Day Closure Options */}
                                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                     <label className="block text-sm font-medium text-gray-700 mb-3">
                                         Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
@@ -1727,7 +1639,6 @@ const DayOffs: React.FC = () => {
                 </div>
             )}
 
-            {/* Edit Modal */}
             {showEditModal && selectedDayOff && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowEditModal(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
@@ -1762,7 +1673,6 @@ const DayOffs: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Blocking Scope Section */}
                                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                     <label className="block text-sm font-medium text-gray-700 mb-3">
                                         What should be blocked?
@@ -1838,7 +1748,6 @@ const DayOffs: React.FC = () => {
                                         </button>
                                     </div>
                                     
-                                    {/* Package Selection */}
                                     {(blockingScope === 'packages' || blockingScope === 'both') && (
                                         <div className="mb-3">
                                             <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -1872,7 +1781,6 @@ const DayOffs: React.FC = () => {
                                         </div>
                                     )}
                                     
-                                    {/* Room Selection */}
                                     {(blockingScope === 'rooms' || blockingScope === 'both') && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -1907,7 +1815,6 @@ const DayOffs: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Partial Day Closure Options */}
                                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                     <label className="block text-sm font-medium text-gray-700 mb-3">
                                         Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
@@ -2010,7 +1917,6 @@ const DayOffs: React.FC = () => {
                 </div>
             )}
 
-            {/* Bulk Create Modal */}
             {showBulkModal && (
                 <div 
                     className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50 overflow-y-auto" 
@@ -2049,7 +1955,6 @@ const DayOffs: React.FC = () => {
                         </div>
 
                         <div className="p-6">
-                                {/* Location selector for company admin */}
                                 {isCompanyAdmin && (
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
@@ -2066,7 +1971,6 @@ const DayOffs: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Selected count */}
                                 <div className="mb-4 flex items-center justify-between">
                                     <span className="text-sm text-gray-600">
                                         {bulkSelectedDates.size} date{bulkSelectedDates.size !== 1 ? 's' : ''} selected
@@ -2082,21 +1986,17 @@ const DayOffs: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Calendar grid - 12 months */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                                     {monthNames.map((monthName, monthIndex) => (
                                         <div key={monthIndex} className="border border-gray-200 rounded-lg p-3">
                                             <h4 className="text-sm font-semibold text-gray-700 mb-2 text-center">{monthName}</h4>
                                             <div className="grid grid-cols-7 gap-1 text-xs">
-                                                {/* Day headers */}
                                                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
                                                     <div key={i} className="text-center text-gray-400 font-medium py-1">{day}</div>
                                                 ))}
-                                                {/* Empty cells for first day offset */}
                                                 {Array.from({ length: getFirstDayOfMonth(bulkYear, monthIndex) }).map((_, i) => (
                                                     <div key={`empty-${i}`} />
                                                 ))}
-                                                {/* Day cells */}
                                                 {Array.from({ length: getDaysInMonth(bulkYear, monthIndex) }).map((_, dayIndex) => {
                                                     const day = dayIndex + 1;
                                                     const dateStr = formatDateString(bulkYear, monthIndex, day);
@@ -2128,7 +2028,6 @@ const DayOffs: React.FC = () => {
                                     ))}
                                 </div>
 
-                                {/* Reason and recurring options */}
                                 <div className="space-y-4 border-t pt-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2144,7 +2043,6 @@ const DayOffs: React.FC = () => {
                                         />
                                     </div>
 
-                                    {/* Blocking Scope Section */}
                                     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                         <label className="block text-sm font-medium text-gray-700 mb-3">
                                             What should be blocked? <span className="text-xs text-gray-500">(Applies to all selected dates)</span>
@@ -2220,9 +2118,7 @@ const DayOffs: React.FC = () => {
                                             </button>
                                         </div>
                                         
-                                        {/* Package/Room Selection */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* Package Selection */}
                                             {(bulkBlockingScope === 'packages' || bulkBlockingScope === 'both') && (
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -2257,7 +2153,6 @@ const DayOffs: React.FC = () => {
                                                 </div>
                                             )}
                                             
-                                            {/* Room Selection */}
                                             {(bulkBlockingScope === 'rooms' || bulkBlockingScope === 'both') && (
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-2">
@@ -2294,7 +2189,6 @@ const DayOffs: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Partial Day Closure Options */}
                                     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                         <label className="block text-sm font-medium text-gray-700 mb-3">
                                             Partial Day Closure <span className="text-xs text-gray-500">(Optional - applies to all selected dates)</span>
@@ -2370,7 +2264,6 @@ const DayOffs: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Actions */}
                                 <div className="flex gap-3 pt-6">
                                     <StandardButton
                                         onClick={handleBulkCreateDayOffs}
@@ -2399,7 +2292,6 @@ const DayOffs: React.FC = () => {
                     </div>
             )}
 
-            {/* Toast */}
             {toast && (
                 <div className="fixed top-4 right-4 z-50">
                     <Toast 

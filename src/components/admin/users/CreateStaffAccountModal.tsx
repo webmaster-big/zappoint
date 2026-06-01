@@ -26,7 +26,6 @@ import Toast from '../../ui/Toast';
 interface CreateStaffAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called after a successful create so the parent can refetch its user list. */
   onCreated?: (result: StaffAccountResult) => void;
 }
 
@@ -45,16 +44,6 @@ const initialForm: CreateStaffAccountData = {
   return_password: true,
 };
 
-/**
- * Create Staff Account modal.
- *
- * Implements the FE side of POST /api/users/staff (Section 4 of
- * BACKEND_PROMPT_DIRECT_ACCOUNT_PROVISIONING.md). The backend forces
- * `company_id` from the bearer token, so we never send it. We DO send
- * `location_id` for location_manager / attendant — the dropdown is
- * sourced from /api/locations which is already auto-scoped to the
- * caller's company.
- */
 const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAccountModalProps) => {
   const { themeColor } = useThemeColor();
   const currentUser = getStoredUser();
@@ -75,9 +64,7 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Only company_admin can create new locations.
   const canCreateLocation = currentUser?.role === 'company_admin';
-  // Location managers are restricted to their own location/store.
   const isLocationManager = currentUser?.role === 'location_manager';
   const lockedLocationId = isLocationManager ? (currentUser?.location_id ?? null) : null;
 
@@ -89,16 +76,13 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
         setLocations(res.data.map((l) => ({ id: l.id, name: l.name })));
       }
     } catch {
-      // Non-fatal; the user can still try a role that doesn't need location_id.
     } finally {
       setLoadingLocations(false);
     }
   }, []);
 
-  // Reset everything when the modal opens, fetch locations.
   useEffect(() => {
     if (!isOpen) return;
-    // Pre-select the location manager's own location so they can't pick another store.
     setForm({
       ...initialForm,
       location_id: lockedLocationId ?? initialForm.location_id,
@@ -151,7 +135,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
       if (form.phone?.trim()) payload.phone = form.phone.trim();
       if (requiresLocation) payload.location_id = form.location_id ?? undefined;
       if (form.password_mode === 'custom') payload.password = form.password;
-      // Frontend default base for the email's "Log in" button.
       payload.login_url = `${window.location.origin}/admin`;
 
       const res = await userService.createStaff(payload);
@@ -191,13 +174,11 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore clipboard failures
     }
   };
 
   if (!isOpen) return null;
 
-  // Hide Company Admin role unless current user is themselves a company_admin.
   const canCreatePeerAdmin = currentUser?.role === 'company_admin';
 
   return (
@@ -209,7 +190,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
@@ -234,7 +214,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
           />
         </div>
 
-        {/* SUCCESS VIEW ----------------------------------------------------- */}
         {success ? (
           <div className="px-6 py-4 space-y-4">
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
@@ -312,7 +291,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
             </div>
           </div>
         ) : (
-          /* FORM VIEW ----------------------------------------------------- */
           <div className="px-6 py-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -376,7 +354,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
                 onChange={(e) => {
                   const role = e.target.value as Role;
                   update('role', role);
-                  // Clear location when switching to a role that doesn't need one.
                   if (role === 'company_admin') update('location_id', null);
                 }}
                 disabled={submitting}
@@ -522,8 +499,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
         )}
       </div>
 
-      {/* Nested CreateLocation modal (company_admin only). After creating a
-          new location we refetch the list and auto-select the new one. */}
       {canCreateLocation && (
         <CreateLocationModal
           isOpen={showCreateLocation}
@@ -536,7 +511,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
         />
       )}
 
-      {/* Toast */}
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}

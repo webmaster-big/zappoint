@@ -2,7 +2,6 @@ import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from './../utils/storage';
 
 
-// // Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -11,7 +10,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -45,32 +43,27 @@ export interface UpdateCategoryData {
 }
 
 class CategoryService {
-    // Get all categories
     async getCategories() {
         const response = await api.get('/categories');
         console.log('CategoryService - Fetched categories:', response.data);
         return response.data;
     }
 
-    // Get single category
     async getCategory(id: number) {
         const response = await api.get(`/categories/${id}`);
         return response.data;
     }
 
-    // Create category
     async createCategory(data: CreateCategoryData) {
         const response = await api.post('/categories', data);
         return response.data;
     }
 
-    // Update category
     async updateCategory(id: number, data: UpdateCategoryData) {
         const response = await api.put(`/categories/${id}`, data);
         return response.data;
     }
 
-    // Delete category
     async deleteCategory(id: number) {
         const response = await api.delete(`/categories/${id}`);
         return response.data;

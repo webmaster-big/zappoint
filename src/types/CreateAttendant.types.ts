@@ -1,7 +1,5 @@
-// Types for: src/pages/admin/users/CreateAttendant.tsx
 
 export interface CreateAttendantFormData {
-  // Personal Information
   firstName: string;
   lastName: string;
   email: string;
@@ -10,13 +8,11 @@ export interface CreateAttendantFormData {
   position: string;
   employeeId: string;
   
-  // Work Details
   department: string;
   shift: string;
   assignedAreas: string[];
   status: string;
 
-  // Login Credentials
   username: string;
   password: string;
   confirmPassword: string;

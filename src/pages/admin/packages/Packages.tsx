@@ -33,7 +33,6 @@ const Packages: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   
-  // Bulk update min notice state
   const [selectedForBulkUpdate, setSelectedForBulkUpdate] = useState<number[]>([]);
   const [showBulkMinNoticeModal, setShowBulkMinNoticeModal] = useState(false);
   const [bulkMinNoticeHours, setBulkMinNoticeHours] = useState<string>("");
@@ -41,7 +40,6 @@ const Packages: React.FC = () => {
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Load user data from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('zapzone_user');
     if (stored) {
@@ -49,14 +47,12 @@ const Packages: React.FC = () => {
     }
   }, []);
 
-  // Fetch packages from backend
   useEffect(() => {
     const fetchPackages = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Check if cache has data first for instant loading
         const hasCachedData = await packageCacheService.hasCachedData();
         
         if (hasCachedData) {
@@ -64,8 +60,6 @@ const Packages: React.FC = () => {
           const cachedPackages = await packageCacheService.getCachedPackages();
           
           if (cachedPackages && cachedPackages.length > 0) {
-            // Filter to only show regular packages (exclude custom, holiday, seasonal, special)
-            // Also filter out soft-deleted packages
             const regularPackages = cachedPackages.filter(
               (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
             );
@@ -73,13 +67,11 @@ const Packages: React.FC = () => {
             setPackages(regularPackages);
             setLoading(false);
 
-            // Always background-sync with API to catch deletions/updates from other tabs/users
             packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
             return;
           }
         }
         
-        // No cache or cache is empty - fetch from API
         console.log('[Packages] Fetching from API...');
         const response = await packageService.getPackages({ 
           per_page: 50, // Backend max is 50 for better performance
@@ -90,21 +82,17 @@ const Packages: React.FC = () => {
         
         const packagesData = response.data.packages || [];
         
-        // Filter to only show regular packages (exclude custom, holiday, seasonal, special)
-        // Also filter out soft-deleted packages
         const regularPackages = packagesData.filter(
           (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
         );
         
         setPackages(regularPackages);
         
-        // Cache packages using PackageCacheService
         await packageCacheService.cachePackages(packagesData);
         console.log('[Packages] Cached', packagesData.length, 'packages');
       } catch (err: unknown) {
         console.error('Error fetching packages:', err);
         
-        // Detailed error logging
         const error = err as { response?: { status?: number; data?: { message?: string }; headers?: unknown }; request?: unknown; message?: string };
         
         if (error.response) {
@@ -129,11 +117,9 @@ const Packages: React.FC = () => {
           setError('An unexpected error occurred.');
         }
         
-        // Try to load from cache as fallback
         try {
           const cachedPackages = await packageCacheService.getCachedPackages();
           if (cachedPackages && cachedPackages.length > 0) {
-            // Filter out custom and soft-deleted packages
             const regularPackages = cachedPackages.filter(
               (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
             );
@@ -154,11 +140,9 @@ const Packages: React.FC = () => {
     fetchPackages();
   }, []);
 
-  // Listen for cache updates (from background sync) and refresh UI
   useEffect(() => {
     const unsubscribe = packageCacheService.onCacheUpdate((event: CustomEvent) => {
       if (event.detail?.source === 'api') {
-        // Background sync completed — reload packages from the now-fresh cache
         const refreshFromCache = async () => {
           const cachedPackages = await packageCacheService.getCachedPackages();
           if (cachedPackages && cachedPackages.length > 0) {
@@ -174,22 +158,18 @@ const Packages: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Search and filter effect
   useEffect(() => {
     let result = [...packages];
 
-    // Filter by location (for company-admin users)
     if (filterLocation !== "all") {
       const locationId = parseInt(filterLocation);
       result = result.filter(pkg => pkg.location_id === locationId);
     }
 
-    // Filter by category
     if (filterCategory !== "all") {
       result = result.filter(pkg => pkg.category === filterCategory);
     }
 
-    // Filter by search term
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       result = result.filter(pkg => {
@@ -204,7 +184,6 @@ const Packages: React.FC = () => {
       });
     }
 
-    // Sort packages
     result.sort((a, b) => {
       let aValue: string | number = '';
       let bValue: string | number = '';
@@ -233,10 +212,8 @@ const Packages: React.FC = () => {
     setFilteredPackages(result);
   }, [packages, filterCategory, filterLocation, searchTerm, sortBy, sortOrder]);
 
-  // Get unique categories for filtering
   const categories = ["all", ...new Set(packages.map(pkg => pkg.category).filter(Boolean))];
 
-  // Get unique locations for filtering (for company-admin)
   const uniqueLocations = packages
     .filter(pkg => pkg.location)
     .reduce((acc, pkg) => {
@@ -248,7 +225,6 @@ const Packages: React.FC = () => {
   
   const isCompanyAdmin = userData?.role === 'company_admin';
 
-  // Drag-and-drop reorder handlers
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
   };
@@ -287,7 +263,6 @@ const Packages: React.FC = () => {
     }
   };
 
-  // Export functionality
   const handleOpenExportModal = () => {
     setSelectedForExport(packages.map(pkg => pkg.id));
     setShowExportModal(true);
@@ -310,7 +285,6 @@ const Packages: React.FC = () => {
   const handleExport = () => {
     const packagesToExport = packages.filter(pkg => selectedForExport.includes(pkg.id));
     
-    // Remove IDs and timestamps from exported data
     const cleanedPackages = packagesToExport.map(pkg => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id: _id, created_at: _created, updated_at: _updated, ...cleanPkg } = pkg;
@@ -330,7 +304,6 @@ const Packages: React.FC = () => {
     setShowExportModal(false);
   };
 
-  // Import functionality
   const handleImport = async () => {
     try {
       const parsedData = JSON.parse(importData);
@@ -340,7 +313,6 @@ const Packages: React.FC = () => {
         return;
       }
 
-      // Validate the structure
       const isValid = parsedData.every(pkg => 
         typeof pkg === 'object' && pkg.name && pkg.price
       );
@@ -350,11 +322,9 @@ const Packages: React.FC = () => {
         return;
       }
 
-      // Get the current user's location_id
       const currentUser = getStoredUser();
       const userLocationId = currentUser?.location_id || 1;
 
-      // Prepare packages for bulk import (remove any IDs that might exist)
       const packagesForImport = parsedData.map(pkg => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, created_at: _created, updated_at: _updated, ...cleanPkg } = pkg;
@@ -375,7 +345,6 @@ const Packages: React.FC = () => {
           available_month_days: cleanPkg.available_month_days,
           image: cleanPkg.image,
           is_active: cleanPkg.is_active !== false,
-          // Include relationship IDs if they exist
           attraction_ids: cleanPkg.attraction_ids || [],
           addon_ids: cleanPkg.addon_ids || [],
           room_ids: cleanPkg.room_ids || [],
@@ -384,10 +353,8 @@ const Packages: React.FC = () => {
         };
       });
 
-      // Use bulk import endpoint
       const response = await packageService.bulkImport(packagesForImport);
       
-      // Refresh the packages list
       const packagesResponse = await packageService.getPackages({ 
         per_page: 50,
         sort_by: 'id',
@@ -429,9 +396,7 @@ const Packages: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
       try {
         await packageService.deletePackage(id);
-        // Remove from local state
         setPackages(prev => prev.filter(pkg => pkg.id !== id));
-        // Remove from cache
         await packageCacheService.removePackageFromCache(id);
         alert('Package deleted successfully!');
       } catch (err) {
@@ -445,12 +410,10 @@ const Packages: React.FC = () => {
     try {
       const response = await packageService.toggleStatus(id);
       
-      // Update local state with the new status
       setPackages(prev => prev.map(pkg => 
         pkg.id === id ? { ...pkg, is_active: response.data.is_active } : pkg
       ));
       
-      // Update in cache
       await packageCacheService.updatePackageInCache(response.data);
       
       const statusText = response.data.is_active ? 'activated' : 'deactivated';
@@ -465,11 +428,9 @@ const Packages: React.FC = () => {
     try {
       setDuplicatingId(pkg.id);
 
-      // Fetch full package data from API
       const response = await packageService.getPackage(pkg.id);
       const original = response.data;
 
-      // Build create payload, stripping server-generated fields
       const duplicateData: CreatePackageData = {
         location_id: original.location_id,
         name: `${original.name} (Copy)`,
@@ -506,10 +467,8 @@ const Packages: React.FC = () => {
       const createResponse = await packageService.createPackage(duplicateData);
 
       if (createResponse.success && createResponse.data) {
-        // Add to cache
         await packageCacheService.addPackageToCache(createResponse.data);
 
-        // Add to local state
         setPackages(prev => [createResponse.data, ...prev]);
 
         alert(`"${original.name}" duplicated successfully!`);
@@ -522,7 +481,6 @@ const Packages: React.FC = () => {
     }
   };
 
-  // Bulk update handlers
   const handleSelectForBulkUpdate = (id: number) => {
     setSelectedForBulkUpdate(prev =>
       prev.includes(id) ? prev.filter(pkgId => pkgId !== id) : [...prev, id]
@@ -547,8 +505,6 @@ const Packages: React.FC = () => {
       const response = await packageService.bulkUpdateMinNotice(selectedForBulkUpdate, minHours);
       
       if (response.success) {
-        // Update local state with the new values
-        // API may return packages in response.data.packages or response.data directly
         const responseData = response.data as unknown as { packages?: Package[] } | Package[];
         const updatedPackages: Package[] = Array.isArray(responseData) 
           ? responseData 
@@ -560,12 +516,10 @@ const Packages: React.FC = () => {
             return updated || pkg;
           }));
           
-          // Update cache
           for (const updatedPkg of updatedPackages) {
             await packageCacheService.updatePackageInCache(updatedPkg);
           }
         } else {
-          // If no packages returned, just update local state directly
           setPackages(prev => prev.map(pkg => {
             if (selectedForBulkUpdate.includes(pkg.id)) {
               return { ...pkg, min_booking_notice_hours: minHours };
@@ -587,7 +541,6 @@ const Packages: React.FC = () => {
     }
   };
 
-  // Format advance booking time for display
   const formatMinNotice = (hours: number | null | undefined): string => {
     if (!hours || hours === 0) return 'No buffer';
     if (hours >= 24) {
@@ -626,7 +579,6 @@ const Packages: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Page Header */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
@@ -643,7 +595,6 @@ const Packages: React.FC = () => {
         </Link>
       </div>
 
-      {/* Action Buttons Row */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
         {selectedForBulkUpdate.length > 0 && (
           <StandardButton
@@ -671,7 +622,6 @@ const Packages: React.FC = () => {
         </Link>
       </div>
 
-      {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         {(packages == null || packages.length === 0) ? (
           <div className="flex flex-col items-center py-16">
@@ -692,9 +642,7 @@ const Packages: React.FC = () => {
           </div>
         ) : (
           <>
-        {/* Search and Filter Section */}
         <div className="mb-6">
-          {/* Search Bar */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-lg">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -710,7 +658,6 @@ const Packages: React.FC = () => {
             </div>
             
             <div className="flex gap-1 items-center">
-              {/* Location Filter (Company Admin only) */}
               {isCompanyAdmin && uniqueLocations.length > 0 && (
                 <select
                   value={filterLocation}
@@ -726,7 +673,6 @@ const Packages: React.FC = () => {
                 </select>
               )}
               
-              {/* Sort Controls */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -747,7 +693,6 @@ const Packages: React.FC = () => {
             </div>
           </div>
 
-          {/* Category Filter */}
           {categories.length > 1 && (
             <div className="flex items-center gap-2 flex-wrap mt-3">
               {categories.map((category) => (
@@ -764,16 +709,13 @@ const Packages: React.FC = () => {
             </div>
           )}
 
-          {/* Results count */}
           <div className="text-sm text-gray-500 mt-3">
             Showing {filteredPackages.length} of {packages.length} package{packages.length !== 1 ? 's' : ''}
           </div>
         </div>
 
-        {/* Packages Grid */}
         {filteredPackages.length > 0 ? (
           <>
-            {/* Select All Checkbox */}
             <div className="flex items-center gap-2 mb-4">
               <button
                 onClick={handleSelectAllForBulkUpdate}
@@ -808,11 +750,9 @@ const Packages: React.FC = () => {
               >
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-3">
-                    {/* Drag handle */}
                     <div className="cursor-grab mr-1 flex-shrink-0 mt-0.5">
                       <GripVertical className="w-4 h-4 text-gray-400" />
                     </div>
-                    {/* Checkbox for bulk selection */}
                     <button
                       onClick={() => handleSelectForBulkUpdate(pkg.id)}
                       className="mr-2 flex-shrink-0"
@@ -958,7 +898,6 @@ const Packages: React.FC = () => {
     )}
   </div>
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
@@ -1048,7 +987,6 @@ const Packages: React.FC = () => {
         </div>
       )}
 
-      {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
@@ -1146,7 +1084,6 @@ const Packages: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Min Notice Modal */}
       {showBulkMinNoticeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
@@ -1176,7 +1113,6 @@ const Packages: React.FC = () => {
                   Block bookings within this many hours of the time slot
                 </label>
                 
-                {/* Quick select buttons */}
                 <div className="flex flex-wrap gap-2 mb-3">
                   {[
                     { hours: 2, label: '2 hours' },
@@ -1200,7 +1136,6 @@ const Packages: React.FC = () => {
                   ))}
                 </div>
                 
-                {/* Custom input */}
                 <div className="flex items-center gap-2">
                   <input
                     type="number"

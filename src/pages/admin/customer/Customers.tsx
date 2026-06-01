@@ -70,7 +70,6 @@ const CustomerListing: React.FC = () => {
     activeOnly: false
   });
 
-  // Inline editing state
   const [editingCell, setEditingCell] = useState<{ contactId: number; field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [savingCell, setSavingCell] = useState<{ contactId: number; field: string } | null>(null);
@@ -104,7 +103,6 @@ const CustomerListing: React.FC = () => {
   const [viewEditData, setViewEditData] = useState<Partial<Contact>>({});
   const [savingViewEdit, setSavingViewEdit] = useState(false);
 
-  // Editable fields configuration
   const editableFields = [
     { key: 'first_name', label: 'First Name', type: 'text', apiField: 'first_name' },
     { key: 'last_name', label: 'Last Name', type: 'text', apiField: 'last_name' },
@@ -120,7 +118,6 @@ const CustomerListing: React.FC = () => {
     { key: 'notes', label: 'Notes', type: 'text', apiField: 'notes' },
   ];
 
-  // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -129,12 +126,10 @@ const CustomerListing: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch contacts from API
   const fetchContacts = useCallback(async (_forceRefresh: boolean = false) => {
     if (!currentUser?.company_id) return;
     
     try {
-      // Only show loading spinner on initial load, not on pagination
       if (contacts.length === 0) {
         setInitialLoading(true);
       }
@@ -152,7 +147,6 @@ const CustomerListing: React.FC = () => {
         sort_order: sortOrder,
       };
 
-      // Add location filter if user has a specific location
       if (currentUser.location_id) {
         filters.location_id = currentUser.location_id;
       }
@@ -172,7 +166,6 @@ const CustomerListing: React.FC = () => {
     }
   }, [currentUser?.company_id, currentUser?.location_id, currentPage, itemsPerPage, debouncedSearchTerm, statusFilter, tagFilter, sourceFilter, sortBy, sortOrder]);
 
-  // Fetch available tags
   const fetchTags = useCallback(async () => {
     if (!currentUser?.company_id) return;
     
@@ -186,7 +179,6 @@ const CustomerListing: React.FC = () => {
     }
   }, [currentUser?.company_id]);
 
-  // Fetch statistics
   const fetchStatistics = useCallback(async () => {
     if (!currentUser?.company_id) return;
     
@@ -200,18 +192,15 @@ const CustomerListing: React.FC = () => {
     }
   }, [currentUser?.company_id]);
 
-  // Initialize contacts
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
 
-  // Fetch tags and statistics on mount
   useEffect(() => {
     fetchTags();
     fetchStatistics();
   }, [fetchTags, fetchStatistics]);
 
-  // Export functionality
   const handleExport = async () => {
     if (!currentUser?.company_id) return;
     
@@ -227,10 +216,8 @@ const CustomerListing: React.FC = () => {
       });
       
       if (response.success && response.data) {
-        // Convert to CSV
         const csvData = convertToCSV(response.data.contacts);
         
-        // Download CSV
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -256,7 +243,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Bulk actions handler
   const handleBulkAction = async () => {
     if (!selectedContacts.length || !bulkAction) return;
     
@@ -310,7 +296,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Delete single contact
   const handleDeleteContact = async (contactId: number) => {
     if (!confirm('Are you sure you want to delete this customer?')) return;
     
@@ -351,7 +336,6 @@ const CustomerListing: React.FC = () => {
     return csvContent;
   };
 
-  // Toggle contact selection
   const toggleContactSelection = (contactId: number) => {
     setSelectedContacts(prev => 
       prev.includes(contactId) 
@@ -360,7 +344,6 @@ const CustomerListing: React.FC = () => {
     );
   };
 
-  // Select all contacts
   const toggleSelectAll = () => {
     if (selectedContacts.length === contacts.length) {
       setSelectedContacts([]);
@@ -369,7 +352,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Inline editing functions
   const startEditing = (contactId: number, field: string, currentValue: string | number | null) => {
     setEditingCell({ contactId, field });
     setEditValue(String(currentValue ?? ''));
@@ -402,7 +384,6 @@ const CustomerListing: React.FC = () => {
     const oldValue = contact[editingCell.field as keyof Contact];
     const oldValueStr = String(oldValue ?? '');
 
-    // Skip if no change
     if (editValue === oldValueStr) {
       setEditingCell(null);
       setEditValue('');
@@ -419,7 +400,6 @@ const CustomerListing: React.FC = () => {
       });
 
       if (response.success) {
-        // Update local state
         setContacts(prev =>
           prev.map(c => {
             if (c.id === editingCell.contactId) {
@@ -439,7 +419,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Add tag to single contact
   const handleAddTag = async () => {
     if (!selectedContactForTag || !newTag.trim()) return;
     
@@ -447,7 +426,6 @@ const CustomerListing: React.FC = () => {
     try {
       const response = await contactService.addTag(selectedContactForTag.id, newTag.trim());
       if (response.success) {
-        // Update local state
         setContacts(prev =>
           prev.map(c => {
             if (c.id === selectedContactForTag.id) {
@@ -470,12 +448,10 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Remove tag from single contact
   const handleRemoveTag = async (contactId: number, tag: string) => {
     try {
       const response = await contactService.removeTag(contactId, tag);
       if (response.success) {
-        // Update local state
         setContacts(prev =>
           prev.map(c => {
             if (c.id === contactId) {
@@ -491,7 +467,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Toggle contact status
   const handleToggleStatus = async (contact: Contact) => {
     const newStatus = contact.status === 'active' ? 'inactive' : 'active';
     try {
@@ -508,7 +483,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Create new contact
   const handleCreateContact = async () => {
     if (!currentUser?.company_id || !newContact.email.trim()) return;
     
@@ -565,7 +539,6 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Start editing in view modal
   const startViewEdit = () => {
     if (!selectedContactForView) return;
     setViewEditData({
@@ -587,13 +560,11 @@ const CustomerListing: React.FC = () => {
     setViewEditMode(true);
   };
 
-  // Save view edit
   const saveViewEdit = async () => {
     if (!selectedContactForView) return;
     
     setSavingViewEdit(true);
     try {
-      // Build update data with only defined string values
       const updateData: Record<string, string | undefined> = {};
       if (viewEditData.first_name !== undefined) updateData.first_name = viewEditData.first_name || undefined;
       if (viewEditData.last_name !== undefined) updateData.last_name = viewEditData.last_name || undefined;
@@ -612,7 +583,6 @@ const CustomerListing: React.FC = () => {
       
       const response = await contactService.updateContact(selectedContactForView.id, updateData);
       if (response.success) {
-        // Update local state
         const updatedContact = { ...selectedContactForView, ...viewEditData };
         setContacts(prev => prev.map(c => c.id === selectedContactForView.id ? updatedContact : c));
         setSelectedContactForView(updatedContact);
@@ -627,13 +597,11 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  // Cancel view edit
   const cancelViewEdit = () => {
     setViewEditMode(false);
     setViewEditData({});
   };
 
-  // Render editable cell
   const renderEditableCell = (
     contact: Contact, 
     field: string, 
@@ -687,22 +655,17 @@ const CustomerListing: React.FC = () => {
     );
   };
 
-  // Pagination calculations
   const startIndex = (currentPage - 1) * itemsPerPage;
 
-  // Handle page change
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
-  // Handle items per page change
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
     setCurrentPage(1);
-    // Fetch will trigger automatically via useEffect
   };
 
-  // Status badge component
   const StatusBadge = ({ status }: { status: string }) => {
     const statusConfig = {
       active: { color: 'bg-green-100 text-green-800', label: 'Active' },
@@ -717,7 +680,6 @@ const CustomerListing: React.FC = () => {
     );
   };
 
-  // Get contact display name
   const getContactName = (contact: Contact): string => {
     const name = `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
     return name || contact.email || 'Unknown';
@@ -731,7 +693,6 @@ const CustomerListing: React.FC = () => {
     );
   }
 
-  // Metrics configuration for the cards
   const metrics = [
     {
       icon: Users,
@@ -765,7 +726,6 @@ const CustomerListing: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
@@ -803,7 +763,6 @@ const CustomerListing: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -825,7 +784,6 @@ const CustomerListing: React.FC = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -860,7 +818,6 @@ const CustomerListing: React.FC = () => {
           </div>
         </div>
         
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -944,7 +901,6 @@ const CustomerListing: React.FC = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {selectedContacts.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -963,7 +919,6 @@ const CustomerListing: React.FC = () => {
         </div>
       )}
 
-      {/* Customers Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
           <span className="text-xs text-gray-500">
@@ -1145,7 +1100,6 @@ const CustomerListing: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="bg-white px-6 py-4 border-t border-gray-100">
             <Pagination
@@ -1160,7 +1114,6 @@ const CustomerListing: React.FC = () => {
         )}
       </div>
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -1189,7 +1142,6 @@ const CustomerListing: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Status Filter */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Customer Status</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1214,7 +1166,6 @@ const CustomerListing: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tags Filter */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Filter by Tags</h3>
                 <div className="flex flex-wrap gap-2">
@@ -1242,7 +1193,6 @@ const CustomerListing: React.FC = () => {
                 </div>
               </div>
 
-              {/* Active Only */}
               <div>
                 <label className="flex items-center">
                   <input
@@ -1255,7 +1205,6 @@ const CustomerListing: React.FC = () => {
                 </label>
               </div>
 
-              {/* Export Info */}
               <div className={`bg-${themeColor}-50 border-2 border-${themeColor}-200 rounded-lg p-4`}>
                 <div className="flex items-start gap-3">
                   <Download className={`h-5 w-5 text-${fullColor} flex-shrink-0 mt-0.5`} />
@@ -1308,7 +1257,6 @@ const CustomerListing: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Actions Modal */}
       {showBulkActionsModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
@@ -1334,7 +1282,6 @@ const CustomerListing: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Action Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Action</label>
                 <select
@@ -1350,7 +1297,6 @@ const CustomerListing: React.FC = () => {
                 </select>
               </div>
 
-              {/* Tags Selection */}
               {(bulkAction === 'add_tags' || bulkAction === 'remove_tags') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Tags</label>
@@ -1379,7 +1325,6 @@ const CustomerListing: React.FC = () => {
                 </div>
               )}
 
-              {/* Status Selection */}
               {bulkAction === 'set_status' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Status</label>
@@ -1394,7 +1339,6 @@ const CustomerListing: React.FC = () => {
                 </div>
               )}
 
-              {/* Delete Warning */}
               {bulkAction === 'delete' && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <p className="text-sm text-red-700">
@@ -1437,7 +1381,6 @@ const CustomerListing: React.FC = () => {
         </div>
       )}
 
-      {/* Create Customer Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1478,7 +1421,6 @@ const CustomerListing: React.FC = () => {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Personal Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <Users className="w-4 h-4" /> Personal Information
@@ -1528,7 +1470,6 @@ const CustomerListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Work Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <Briefcase className="w-4 h-4" /> Work Information
@@ -1578,7 +1519,6 @@ const CustomerListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Address Info */}
                 <div className="space-y-4 md:col-span-2">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <MapPin className="w-4 h-4" /> Address
@@ -1637,7 +1577,6 @@ const CustomerListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Tags */}
                 <div className="space-y-4 md:col-span-2">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <Tag className="w-4 h-4" /> Tags
@@ -1677,7 +1616,6 @@ const CustomerListing: React.FC = () => {
                   )}
                 </div>
 
-                {/* Notes */}
                 <div className="space-y-4 md:col-span-2">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <FileText className="w-4 h-4" /> Notes
@@ -1734,7 +1672,6 @@ const CustomerListing: React.FC = () => {
         </div>
       )}
 
-      {/* Add Tag Modal */}
       {showAddTagModal && selectedContactForTag && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
@@ -1812,7 +1749,6 @@ const CustomerListing: React.FC = () => {
         </div>
       )}
 
-      {/* View Contact Modal - Editable */}
       {showViewModal && selectedContactForView && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1851,7 +1787,6 @@ const CustomerListing: React.FC = () => {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Personal Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <Users className="w-4 h-4" /> Personal Information
@@ -1922,7 +1857,6 @@ const CustomerListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Work Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <Briefcase className="w-4 h-4" /> Work Information
@@ -1987,7 +1921,6 @@ const CustomerListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Address Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <MapPin className="w-4 h-4" /> Address
@@ -2065,7 +1998,6 @@ const CustomerListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Additional Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <FileText className="w-4 h-4" /> Additional Info
@@ -2087,7 +2019,6 @@ const CustomerListing: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tags */}
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2 mb-3">
                   <Tag className="w-4 h-4" /> Tags
@@ -2109,7 +2040,6 @@ const CustomerListing: React.FC = () => {
                 </div>
               </div>
 
-              {/* Notes */}
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2 mb-3">
                   <FileText className="w-4 h-4" /> Notes

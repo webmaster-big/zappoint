@@ -14,7 +14,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const location = useLocation();
   
-  // Get user data from localStorage
   const getUserData = () => {
     try {
       const stored = localStorage.getItem('zapzone_user');
@@ -31,15 +30,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const user = getUserData();
   const isAuthenticated = user && user.token;
 
-  // If authentication is required and user is not authenticated
   if (requireAuth && !isAuthenticated) {
     return <Navigate to="/admin" state={{ from: location }} replace />;
   }
 
-  // If specific roles are required, check if user has the right role
   if (allowedRoles && allowedRoles.length > 0) {
     if (!user || !allowedRoles.includes(user.role)) {
-      // Redirect to appropriate dashboard based on user's role
       const redirectPaths: Record<string, string> = {
         'company_admin': '/company/dashboard',
         'location_manager': '/manager/dashboard',

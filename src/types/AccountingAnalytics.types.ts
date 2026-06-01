@@ -1,4 +1,3 @@
-// Types for Accounting & Analytics API
 
 export interface AccountingSummary {
   quantity_sold: number;

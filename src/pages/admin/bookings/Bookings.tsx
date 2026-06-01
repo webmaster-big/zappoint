@@ -1,4 +1,3 @@
-// src/pages/admin/bookings/Bookings.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -55,7 +54,6 @@ import { packageCacheService } from '../../../services/PackageCacheService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import BulkImportModal from '../../../components/admin/bookings/BulkImportModal';
 
-// Convert 24-hour time to 12-hour format with AM/PM
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
   const [hours24, minutes] = time24.split(':');
@@ -65,8 +63,6 @@ const formatTime12Hour = (time24: string): string => {
   return `${hours12}:${minutes} ${period}`;
 };
 
-// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
-// Avoids UTC offset issues that cause date to show as previous day
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -77,7 +73,6 @@ const Bookings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
 
-  // Helper: transform raw API/cache booking data to BookingsPageBooking format
   const transformRawBooking = (booking: any): BookingsPageBooking => {
     const totalAmount = Number(booking.total_amount);
     const amountPaid = Number(booking.amount_paid || 0);
@@ -187,58 +182,46 @@ const Bookings: React.FC = () => {
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
-  // Column visibility state - persisted to localStorage
   const getDefaultColumnVisibility = (): BookingsColumnVisibility => {
     const saved = localStorage.getItem('bookings_column_visibility');
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch {
-        // fallback to defaults
       }
     }
     return {
-      // Booking identifiers
       id: true,                    // Confirmation #
       referenceNumber: false,      // Reference number (hidden by default)
       
-      // Date & Time
       bookingDate: true,           // Booking date
       bookingTime: true,           // Booking time
       duration: true,              // Duration
       
-      // Customer info
       guestName: true,             // Guest name
       guestEmail: true,            // Guest email
       guestPhone: true,            // Guest phone
       
-      // Customer address
       guestAddress: false,         // Address (hidden by default)
       
-      // Package & Room
       packageName: true,           // Package name
       roomName: true,              // Room name
       location: isCompanyAdmin,    // Location (only for company admin)
       
-      // Booking details
       participants: true,          // Participants
       status: true,                // Status
       
-      // Payment
       paymentMethod: true,         // Payment method
       paymentStatus: true,         // Payment status
       totalAmount: true,           // Total amount
       amountPaid: true,            // Amount paid
       fees: false,                 // Applied fees (hidden by default)
       
-      // Guest of Honor
       guestOfHonor: false,         // Guest of honor (hidden by default)
       
-      // Notes
       notes: false,                // Notes (hidden by default)
       specialRequests: false,      // Special requests (hidden by default)
       
-      // Timestamps
       createdAt: false,            // Created date (hidden by default)
       updatedAt: false,            // Updated date (hidden by default)
     };
@@ -247,14 +230,12 @@ const Bookings: React.FC = () => {
   const [columnVisibility, setColumnVisibility] = useState<BookingsColumnVisibility>(getDefaultColumnVisibility);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   
-  // Column order state for drag-and-drop reordering
   const getDefaultColumnOrder = (): BookingsColumnKey[] => {
     const saved = localStorage.getItem('bookings_column_order');
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch {
-        // fallback to defaults
       }
     }
     return DEFAULT_COLUMN_ORDER;
@@ -264,14 +245,11 @@ const Bookings: React.FC = () => {
   const [draggedColumn, setDraggedColumn] = useState<BookingsColumnKey | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<BookingsColumnKey | null>(null);
 
-  // Column sorting state
   const [sortColumn, setSortColumn] = useState<BookingsColumnKey | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Check-in confirmation state
   const [showCheckInConfirm, setShowCheckInConfirm] = useState<string | null>(null);
   
-  // Soft delete (trash) states
   const [showTrashed, setShowTrashed] = useState(false);
   const [trashedBookings, setTrashedBookings] = useState<BookingsPageBooking[]>([]);
   const [trashedLoading, setTrashedLoading] = useState(false);
@@ -280,12 +258,10 @@ const Bookings: React.FC = () => {
   const [trashedTotal, setTrashedTotal] = useState(0);
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
   
-  // Drag and drop handlers for column reordering
   const handleDragStart = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
     setDraggedColumn(columnKey);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', columnKey);
-    // Add a slight delay to show drag effect
     setTimeout(() => {
       (e.target as HTMLElement).style.opacity = '0.5';
     }, 0);
@@ -322,7 +298,6 @@ const Bookings: React.FC = () => {
     const draggedIndex = newOrder.indexOf(draggedColumn);
     const targetIndex = newOrder.indexOf(targetColumnKey);
 
-    // Remove dragged item and insert at new position
     newOrder.splice(draggedIndex, 1);
     newOrder.splice(targetIndex, 0, draggedColumn);
 
@@ -338,31 +313,26 @@ const Bookings: React.FC = () => {
     localStorage.removeItem('bookings_column_order');
   };
   
-  // Filter dropdown data
   const [filterPackages, setFilterPackages] = useState<Array<{id: number, name: string}>>([]);
   const [filterRooms, setFilterRooms] = useState<Array<{id: number, name: string}>>([]);
   const [filterCustomers, setFilterCustomers] = useState<Array<{id: number, name: string}>>([]);
   
-  // Save column visibility to localStorage
   const updateColumnVisibility = (column: keyof BookingsColumnVisibility, visible: boolean) => {
     const updated = { ...columnVisibility, [column]: visible };
     setColumnVisibility(updated);
     localStorage.setItem('bookings_column_visibility', JSON.stringify(updated));
   };
 
-  // Toggle column visibility
   const toggleColumnVisibility = (column: keyof BookingsColumnVisibility) => {
     updateColumnVisibility(column, !columnVisibility[column]);
   };
 
-  // Inline editing state
   const [editingCell, setEditingCell] = useState<{ bookingId: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [savingCell, setSavingCell] = useState<{ bookingId: string; field: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const filterVersionRef = useRef(0);
 
-  // Package/Room selection modal states
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [selectedBookingForEdit, setSelectedBookingForEdit] = useState<BookingsPageBooking | null>(null);
@@ -373,13 +343,11 @@ const Bookings: React.FC = () => {
   const [savingPackage, setSavingPackage] = useState(false);
   const [savingRoom, setSavingRoom] = useState(false);
 
-  // Duration editing state
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [durationValue, setDurationValue] = useState<number>(2);
   const [durationUnit, setDurationUnit] = useState<'hours' | 'minutes'>('hours');
   const [savingDuration, setSavingDuration] = useState(false);
 
-  // Date/Time editing state
   const [showDateModal, setShowDateModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [dateValue, setDateValue] = useState<string>('');
@@ -387,7 +355,6 @@ const Bookings: React.FC = () => {
   const [savingDate, setSavingDate] = useState(false);
   const [savingTime, setSavingTime] = useState(false);
 
-  // Booking Details Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportFilters, setReportFilters] = useState({
     packageIds: 'all' as string | number[],
@@ -405,7 +372,6 @@ const Bookings: React.FC = () => {
   const [reportPackages, setReportPackages] = useState<PackageType[]>([]);
   const [loadingReportPackages, setLoadingReportPackages] = useState(false);
 
-  // Editable fields configuration
   const editableFields = [
     { key: 'customerName', label: 'Customer Name', type: 'text', apiField: 'guest_name' },
     { key: 'email', label: 'Email', type: 'email', apiField: 'guest_email' },
@@ -416,7 +382,6 @@ const Bookings: React.FC = () => {
     { key: 'notes', label: 'Notes', type: 'text', apiField: 'notes' },
   ];
 
-  // Status and payment colors
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800',
     confirmed: `bg-${themeColor}-100 text-${fullColor}`,
@@ -440,7 +405,6 @@ const Bookings: React.FC = () => {
     voided: 'bg-red-100 text-red-800'
   };
 
-  // Calculate metrics data
   const metrics = [
     {
       title: 'Total Bookings',
@@ -479,7 +443,6 @@ const Bookings: React.FC = () => {
     },
   ];
 
-  // Column configuration for drag-and-drop table
   const columnConfig: Record<BookingsColumnKey, { 
     label: string; 
     isVisible: () => boolean;
@@ -506,11 +469,9 @@ const Bookings: React.FC = () => {
     updatedAt: { label: 'Updated', isVisible: () => columnVisibility.updatedAt },
   };
 
-  // Load bookings from backend API
   useEffect(() => {
     loadLocations();
     
-    // Warm up package and room caches in background for faster modal loading
     packageCacheService.warmupCache();
     roomCacheService.warmupCache();
   }, []);
@@ -519,7 +480,6 @@ const Bookings: React.FC = () => {
     loadBookings();
   }, [selectedLocation]);
 
-  // Listen for cache updates from background sync
   useEffect(() => {
     const unsubscribe = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -541,7 +501,6 @@ const Bookings: React.FC = () => {
   const loadLocations = async () => {
     try {
       if (isCompanyAdmin) {
-        // Check localStorage cache first for instant load
         const cached = localStorage.getItem('zapzone_locations');
         if (cached) {
           try {
@@ -562,7 +521,6 @@ const Bookings: React.FC = () => {
           localStorage.setItem('zapzone_locations', JSON.stringify(mapped));
         }
       } else if (currentUser?.location_id) {
-        // Check localStorage cache first
         const cached = localStorage.getItem('zapzone_locations');
         if (cached) {
           try {
@@ -574,7 +532,6 @@ const Bookings: React.FC = () => {
             }
           } catch { /* ignore */ }
         }
-        // Fallback to API
         const response = await locationService.getLocation(currentUser.location_id);
         if (response.success && response.data) {
           const loc = response.data;
@@ -588,7 +545,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Apply filters when bookings or filters change
   useEffect(() => {
     applyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -598,37 +554,31 @@ const Bookings: React.FC = () => {
     try {
       setLoading(true);
       
-      // Check if cache has data first for instant loading
       const hasCachedData = await bookingCacheService.hasCachedData();
       
       if (hasCachedData) {
         console.log('[Bookings] Loading from cache...');
         
-        // Build filter for cache
         const cacheFilters: any = {};
         if (selectedLocation !== null) {
           cacheFilters.location_id = selectedLocation;
         }
         
-        // Get bookings from cache
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(cacheFilters);
         
         if (cachedBookings && cachedBookings.length > 0) {
           const transformedBookings: BookingsPageBooking[] = cachedBookings.map(transformRawBooking);
           
-          // Extract unique packages, rooms, customers for filter dropdowns
           extractFilterOptions(transformedBookings);
           
           console.log('[Bookings] Loaded from cache:', transformedBookings.length, 'bookings');
           setBookings(transformedBookings);
           setLoading(false);
-          // Trigger background sync for freshness
           bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
       }
       
-      // No cache or cache is empty - fetch ALL pages from API
       console.log('[Bookings] Fetching from API...');
       const baseParams: any = {
         per_page: 500,
@@ -659,12 +609,10 @@ const Bookings: React.FC = () => {
         const transformedBookings: BookingsPageBooking[] = allRawBookings.map(transformRawBooking);
         console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings across', lastPage, 'page(s)');
         
-        // Extract unique packages, rooms, customers for filter dropdowns
         extractFilterOptions(transformedBookings);
         
         setBookings(transformedBookings);
         
-        // Cache the raw API data in background - don't block UI
         bookingCacheService.cacheBookings(allRawBookings).catch(err => 
           console.warn('[Bookings] Background cache write failed:', err)
         );
@@ -676,9 +624,7 @@ const Bookings: React.FC = () => {
     }
   };
   
-  // Extract unique filter options from bookings
   const extractFilterOptions = (bookingsList: BookingsPageBooking[]) => {
-    // Extract unique packages
     const uniquePackages = new Map<number, string>();
     const uniqueRooms = new Map<number, string>();
     const uniqueCustomers = new Map<number, string>();
@@ -703,11 +649,9 @@ const Bookings: React.FC = () => {
   const applyFilters = async () => {
     const currentVersion = ++filterVersionRef.current;
 
-    // If search term exists, use backend search
     if (filters.search && filters.search.length >= 2) {
       try {
         const response = await bookingService.searchBookings(filters.search);
-        // Ignore stale results if filters changed while awaiting
         if (currentVersion !== filterVersionRef.current) return;
         if (response.success && response.data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -761,7 +705,6 @@ const Bookings: React.FC = () => {
           
           let result: BookingsPageBooking[] = transformedResults;
           
-          // Apply additional client-side filters
           if (filters.status !== 'all') {
             result = result.filter(booking => booking.status === filters.status);
           }
@@ -790,7 +733,6 @@ const Bookings: React.FC = () => {
             });
           }
           
-          // Apply default sort: booking date/time asc, checked-in last
           result = applyDefaultSort(result);
           
           setFilteredBookings(result);
@@ -799,15 +741,12 @@ const Bookings: React.FC = () => {
         }
       } catch (error) {
         console.error('Error searching bookings:', error);
-        // Ignore stale errors if filters changed while awaiting
         if (currentVersion !== filterVersionRef.current) return;
       }
     }
     
-    // Client-side filtering when no search or search fails
     let result = [...bookings];
 
-    // Apply search filter (includes confirmation number/reference number and booking ID)
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(booking =>
@@ -820,32 +759,26 @@ const Bookings: React.FC = () => {
       );
     }
 
-    // Apply status filter
     if (filters.status !== 'all') {
       result = result.filter(booking => booking.status === filters.status);
     }
 
-    // Apply payment filter
     if (filters.payment !== 'all') {
       result = result.filter(booking => booking.paymentMethod === filters.payment);
     }
     
-    // Apply package filter
     if (filters.packageId !== 'all') {
       result = result.filter(booking => booking.packageId?.toString() === filters.packageId);
     }
     
-    // Apply room filter
     if (filters.roomId !== 'all') {
       result = result.filter(booking => booking.roomId?.toString() === filters.roomId);
     }
     
-    // Apply customer filter
     if (filters.customerId !== 'all') {
       result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
     }
 
-    // Apply date range filter
     if (filters.dateRange.start) {
       result = result.filter(booking => {
         const bookingDate = booking.date?.split('T')[0];
@@ -859,23 +792,19 @@ const Bookings: React.FC = () => {
       });
     }
 
-    // Apply default sort: booking date/time asc, checked-in last
     result = applyDefaultSort(result);
 
     setFilteredBookings(result);
     setCurrentPage(1);
   };
 
-  // Default sort: by booking date/time ascending, with checked-in bookings pushed to the end
   const applyDefaultSort = (list: BookingsPageBooking[]): BookingsPageBooking[] => {
     return [...list].sort((a, b) => {
-      // Checked-in bookings always go last regardless of date
       const isCheckedInA = a.status === 'checked-in';
       const isCheckedInB = b.status === 'checked-in';
       if (isCheckedInA && !isCheckedInB) return 1;
       if (!isCheckedInA && isCheckedInB) return -1;
 
-      // Sort by booking date ascending
       const dateA = parseLocalDate(a.date);
       const dateB = parseLocalDate(b.date);
       dateA.setHours(0, 0, 0, 0);
@@ -883,20 +812,17 @@ const Bookings: React.FC = () => {
       const dateComparison = dateA.getTime() - dateB.getTime();
       if (dateComparison !== 0) return dateComparison;
 
-      // If dates equal, sort by time ascending
       const timeA = (a.time || '00:00').split(':').map(Number);
       const timeB = (b.time || '00:00').split(':').map(Number);
       return (timeA[0] * 60 + (timeA[1] || 0)) - (timeB[0] * 60 + (timeB[1] || 0));
     });
   };
 
-  // Column sorting handler
   const handleColumnSort = (columnKey: BookingsColumnKey) => {
     if (sortColumn === columnKey) {
       if (sortDirection === 'asc') {
         setSortDirection('desc');
       } else {
-        // Third click: reset to default sort
         setSortColumn(null);
         setSortDirection('asc');
       }
@@ -906,7 +832,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Apply column sort to filtered bookings (returns sorted copy for display)
   const getSortedBookings = (list: BookingsPageBooking[]): BookingsPageBooking[] => {
     if (!sortColumn) return list;
 
@@ -924,7 +849,6 @@ const Bookings: React.FC = () => {
           valA = parseLocalDate(a.date).getTime();
           valB = parseLocalDate(b.date).getTime();
           if (valA !== valB) return (valA - valB) * dir;
-          // Same date — sort by time
           const tA = (a.time || '00:00').split(':').map(Number);
           const tB = (b.time || '00:00').split(':').map(Number);
           return ((tA[0] * 60 + (tA[1] || 0)) - (tB[0] * 60 + (tB[1] || 0))) * dir;
@@ -1000,16 +924,13 @@ const Bookings: React.FC = () => {
 
   const handleCheckIn = async (referenceNumber: string, checkInStatus: 'checked-in') => {
     try {
-      // Call API to check in booking
       const userId = getStoredUser()?.id;
       const response = await bookingService.checkInBooking(referenceNumber, userId);
       
-      // Update cache with checked-in booking
       if (response?.data) {
         await bookingCacheService.updateBookingInCache(response.data);
       }
       
-      // Update local state
       const updatedBookings = bookings.map(booking =>
         booking.referenceNumber === referenceNumber ? { ...booking, status: checkInStatus } : booking
       );
@@ -1024,24 +945,20 @@ const Bookings: React.FC = () => {
     try {
       setSavingStatusBookingId(id);
       
-      // Find the booking
       const booking = bookings.find(b => b.id === id);
       if (!booking) return;
 
       const response = await bookingService.updateBooking(Number(id), { status: newStatus });
       
-      // Sync the updated booking to cache
       if (response.data) {
         await bookingCacheService.updateBookingInCache(response.data);
       }
       
-      // Update local state immediately for fast UI
       const updatedBookings = bookings.map(b =>
         b.id === id ? { ...b, status: newStatus } : b
       );
       setBookings(updatedBookings);
       
-      // Log activity in background - don't block UI
       logBookingActivity(booking, 'Booking Status Update', `Status changed to ${newStatus}`);
     } catch (error) {
       console.error('Error updating booking status:', error);
@@ -1051,59 +968,7 @@ const Bookings: React.FC = () => {
     }
   };
 
-  /* UNUSED - Commenting out to satisfy TypeScript noUnusedLocals
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handlePaymentStatusChange = async (id: string, newPaymentStatus: BookingsPageBooking['paymentStatus']) => {
-    try {
-      // Find the booking to get total amount
-      const booking = bookings.find(b => b.id === id);
-      if (!booking) return;
-      
-      // If trying to set to 'paid' but amount paid doesn't match total, show payment modal
-      if (newPaymentStatus === 'paid' && booking.amountPaid < booking.totalAmount) {
-        handleOpenPaymentModal(booking);
-        return;
-      }
-      
-      // Build update payload - if setting to 'paid', also update amount_paid to match total
-      const updatePayload: Record<string, unknown> = { payment_status: newPaymentStatus };
-      
-      if (newPaymentStatus === 'paid') {
-        // When marking as paid, set amount_paid to full total amount
-        updatePayload.amount_paid = booking.totalAmount;
-      }
-      
-      // Update payment status via API
-      const response = await bookingService.updateBooking(Number(id), updatePayload);
-      
-      // Sync the updated booking to cache
-      if (response.data) {
-        await bookingCacheService.updateBookingInCache(response.data);
-      }
-      
-      // Log activity
-      await logBookingActivity(booking, 'update', `Payment status changed to ${newPaymentStatus}`);
-      
-      // Update local state
-      const updatedBookings = bookings.map(b => {
-        if (b.id === id) {
-          const updates: Partial<BookingsPageBooking> = { paymentStatus: newPaymentStatus };
-          if (newPaymentStatus === 'paid') {
-            updates.amountPaid = b.totalAmount;
-          }
-          return { ...b, ...updates };
-        }
-        return b;
-      });
-      setBookings(updatedBookings);
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      alert('Failed to update payment status. Please try again.');
-    }
-  };
-  */
 
-  // Activity logging function
   const logBookingActivity = async (
     booking: BookingsPageBooking, 
     action: string, 
@@ -1114,7 +979,6 @@ const Bookings: React.FC = () => {
       const user = getStoredUser();
       if (!user) return;
 
-      // Get location_id from booking cache if not provided
       let bookingLocationId = locationId;
       if (!bookingLocationId) {
         const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
@@ -1149,37 +1013,30 @@ const Bookings: React.FC = () => {
       });
     } catch (error) {
       console.error('Error logging activity:', error);
-      // Don't throw - logging errors shouldn't block the main operation
     }
   };
 
-  // Package modal functions
   const handleOpenPackageModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
     setShowPackageModal(true);
     setLoadingPackages(true);
     
     try {
-      // Get location_id from booking cache
       const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
       const locationId = cachedBooking?.location_id;
       
       if (locationId) {
-        // Try to get packages from cache first for faster loading
         const cachedPackages = await packageCacheService.getCachedPackages();
         
         if (cachedPackages && cachedPackages.length > 0) {
-          // Filter cached packages by location and active status
           const filteredPackages = cachedPackages.filter(
             (pkg: PackageType) => pkg.location_id === locationId && pkg.is_active
           );
           setAvailablePackages(filteredPackages);
           setLoadingPackages(false);
           
-          // Sync in background to keep cache fresh
           packageCacheService.syncInBackground({ location_id: locationId, is_active: true });
         } else {
-          // No cache, fetch from API and cache the result
           const packages = await packageCacheService.fetchAndCachePackages({ 
             location_id: locationId, 
             is_active: true 
@@ -1192,7 +1049,6 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading packages:', error);
-      // Fallback to direct API call if cache fails
       try {
         const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
         const locationId = cachedBooking?.location_id;
@@ -1230,14 +1086,12 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity in background
         logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Package changed to ${pkg.name}`
         );
         
-        // Update local state
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
@@ -1256,33 +1110,27 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Room modal functions
   const handleOpenRoomModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
     setShowRoomModal(true);
     setLoadingRooms(true);
     
     try {
-      // Get location_id from booking cache
       const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
       const locationId = cachedBooking?.location_id;
       
       if (locationId) {
-        // Try to get rooms from cache first for faster loading
         const cachedRooms = await roomCacheService.getCachedRooms();
         
         if (cachedRooms && cachedRooms.length > 0) {
-          // Filter cached rooms by location and availability status
           const filteredRooms = cachedRooms.filter(
             (room: Room) => room.location_id === locationId && room.is_available
           );
           setAvailableRooms(filteredRooms);
           setLoadingRooms(false);
           
-          // Sync in background to keep cache fresh
           roomCacheService.syncInBackground({ location_id: locationId, is_available: true });
         } else {
-          // No cache, fetch from API and cache the result
           const rooms = await roomCacheService.fetchAndCacheRooms({ 
             location_id: locationId, 
             is_available: true 
@@ -1295,7 +1143,6 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading rooms:', error);
-      // Fallback to direct API call if cache fails
       try {
         const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
         const locationId = cachedBooking?.location_id;
@@ -1333,14 +1180,12 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity in background
         logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Room changed to ${room.name}`
         );
         
-        // Update local state
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
@@ -1359,10 +1204,8 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Duration modal functions
   const handleOpenDurationModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
-    // Parse existing duration if available
     const durationMatch = booking.duration?.match(/(\d+)\s*(hour|minute|hr|min)/i);
     if (durationMatch) {
       setDurationValue(parseInt(durationMatch[1], 10));
@@ -1396,14 +1239,12 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity in background
         logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Duration changed to ${durationValue} ${durationUnit}`
         );
         
-        // Update local state
         const formattedDuration = formatDurationDisplay(durationValue, durationUnit);
         setBookings(prev =>
           prev.map(b => 
@@ -1423,7 +1264,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Date modal functions
   const handleOpenDateModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
     setDateValue(booking.date);
@@ -1450,14 +1290,12 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity in background
         logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Date changed to ${dateValue}`
         );
         
-        // Update local state
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
@@ -1476,7 +1314,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Time modal functions
   const handleOpenTimeModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
     setTimeValue(booking.time);
@@ -1503,14 +1340,12 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity in background
         logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Time changed to ${formatTime12Hour(timeValue)}`
         );
         
-        // Update local state
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
@@ -1529,23 +1364,19 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Report modal functions
   const handleOpenReportModal = async () => {
     setShowReportModal(true);
     setLoadingReportPackages(true);
     
     try {
-      // Load packages for selection
       const cachedPackages = await packageCacheService.getCachedPackages();
       
       if (cachedPackages && cachedPackages.length > 0) {
-        // Filter by selected location if applicable
         const filteredPackages = selectedLocation 
           ? cachedPackages.filter((pkg: PackageType) => pkg.location_id === selectedLocation && pkg.is_active)
           : cachedPackages.filter((pkg: PackageType) => pkg.is_active);
         setReportPackages(filteredPackages);
       } else {
-        // Fetch from API
         const params: any = { is_active: true };
         if (selectedLocation) params.location_id = selectedLocation;
         
@@ -1584,17 +1415,14 @@ const Bookings: React.FC = () => {
       const user = getStoredUser();
       const params = new URLSearchParams();
       
-      // Package IDs
       if (Array.isArray(reportFilters.packageIds)) {
         params.append('package_ids', reportFilters.packageIds.join(','));
       } else {
         params.append('package_ids', reportFilters.packageIds);
       }
       
-      // Period type
       params.append('period_type', reportFilters.periodType);
       
-      // Conditional parameters based on period type
       if (reportFilters.periodType === 'weekly') {
         params.append('week_of_month', reportFilters.weekOfMonth.toString());
         params.append('month', reportFilters.month.toString());
@@ -1612,10 +1440,8 @@ const Bookings: React.FC = () => {
         params.append('end_date', reportFilters.endDate);
       }
       
-      // View mode
       params.append('view_mode', reportFilters.viewMode);
       
-      // Optional filters
       if (selectedLocation) {
         params.append('location_id', selectedLocation.toString());
       }
@@ -1632,10 +1458,8 @@ const Bookings: React.FC = () => {
         params.append('user_id', user.id.toString());
       }
       
-      // Build the URL and open in new tab to download
       const reportUrl = `${API_BASE_URL}/bookings/details-report?${params.toString()}`;
       
-      // Use fetch to handle potential errors
       const response = await fetch(reportUrl, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
@@ -1656,13 +1480,11 @@ const Bookings: React.FC = () => {
         return;
       }
       
-      // Download the PDF
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       
-      // Extract filename from Content-Disposition header or generate one
       const contentDisposition = response.headers.get('Content-Disposition');
       let filename = 'booking-details-report.pdf';
       if (contentDisposition) {
@@ -1695,7 +1517,6 @@ const Bookings: React.FC = () => {
 
   const toggleReportPackage = (packageId: number) => {
     if (reportFilters.packageIds === 'all') {
-      // When "All" is selected, clicking a package deselects it (selects all others)
       const allOtherIds = reportPackages.filter(pkg => pkg.id !== packageId).map(pkg => pkg.id);
       setReportFilters(prev => ({ 
         ...prev, 
@@ -1703,14 +1524,12 @@ const Bookings: React.FC = () => {
       }));
     } else if (Array.isArray(reportFilters.packageIds)) {
       if (reportFilters.packageIds.includes(packageId)) {
-        // Remove package
         const newIds = reportFilters.packageIds.filter(id => id !== packageId);
         setReportFilters(prev => ({ 
           ...prev, 
           packageIds: newIds.length === 0 ? 'all' : newIds 
         }));
       } else {
-        // Add package - check if adding this makes it all packages
         const newIds = [...reportFilters.packageIds, packageId];
         const allSelected = reportPackages.every(pkg => newIds.includes(pkg.id));
         setReportFilters(prev => ({ 
@@ -1732,15 +1551,12 @@ const Bookings: React.FC = () => {
 
   const toggleAllPackages = () => {
     if (reportFilters.packageIds === 'all') {
-      // Uncheck all - set to empty array
       setReportFilters(prev => ({ ...prev, packageIds: [] }));
     } else {
-      // Check all
       setReportFilters(prev => ({ ...prev, packageIds: 'all' }));
     }
   };
 
-  // Inline editing functions
   const startEditing = (bookingId: string, field: string, currentValue: string | number) => {
     setEditingCell({ bookingId, field });
     setEditValue(String(currentValue ?? ''));
@@ -1773,7 +1589,6 @@ const Bookings: React.FC = () => {
     const oldValue = booking[editingCell.field as keyof BookingsPageBooking];
     const oldValueStr = String(oldValue ?? '');
 
-    // Skip if no change
     if (editValue === oldValueStr) {
       setEditingCell(null);
       setEditValue('');
@@ -1783,10 +1598,8 @@ const Bookings: React.FC = () => {
     setSavingCell(editingCell);
 
     try {
-      // Prepare update payload
       let updateValue: string | number | null = editValue;
       
-      // Handle numeric fields
       if (['participants', 'totalAmount', 'amountPaid'].includes(editingCell.field)) {
         updateValue = editValue ? parseFloat(editValue) : 0;
       } else if (editValue === '') {
@@ -1800,25 +1613,21 @@ const Bookings: React.FC = () => {
       const response = await bookingService.updateBooking(Number(editingCell.bookingId), payload);
 
       if (response.success || response.data) {
-        // Update cache
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
         }
 
-        // Log activity in background
         logBookingActivity(
           booking, 
           'update', 
           `${fieldConfig.label} updated from "${oldValueStr}" to "${editValue}"`
         );
 
-        // Update local state with proper field mapping
         setBookings(prev =>
           prev.map(b => {
             if (b.id === editingCell.bookingId) {
               const updates: Partial<BookingsPageBooking> = {};
               
-              // Map API field back to local field
               if (editingCell.field === 'customerName') {
                 updates.customerName = editValue;
               } else if (editingCell.field === 'email') {
@@ -1851,7 +1660,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Render editable cell
   const renderEditableCell = (
     booking: BookingsPageBooking, 
     field: string, 
@@ -1905,7 +1713,6 @@ const Bookings: React.FC = () => {
     );
   };
 
-  // Render cell content based on column key - for drag-and-drop column ordering
   const renderColumnCell = (booking: BookingsPageBooking, columnKey: BookingsColumnKey): React.ReactNode => {
     switch (columnKey) {
       case 'id':
@@ -1955,7 +1762,6 @@ const Bookings: React.FC = () => {
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
             <div className="relative group/customer">
-              {/* Edit Booking Button - Top Right */}
               <Link
                 to={`/bookings/edit/${booking.id}?from=bookings`}
                 className="absolute -top-1 -right-1 p-1 rounded bg-white border border-gray-200 shadow-sm opacity-0 group-hover/customer:opacity-100 transition-opacity hover:bg-gray-50 hover:border-gray-300 z-10"
@@ -2179,16 +1985,13 @@ const Bookings: React.FC = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedBookings.length} booking(s)?`)) {
       try {
-        // Delete each booking via API
         await Promise.all(
           selectedBookings.map(async (id) => {
             await bookingService.deleteBooking(Number(id));
-            // Remove from cache
             await bookingCacheService.removeBookingFromCache(Number(id));
           })
         );
         
-        // Update local state
         const updatedBookings = bookings.filter(booking => !selectedBookings.includes(booking.id));
         setBookings(updatedBookings);
         setSelectedBookings([]);
@@ -2204,10 +2007,8 @@ const Bookings: React.FC = () => {
       try {
         await bookingService.deleteBooking(Number(id));
         
-        // Remove from cache
         await bookingCacheService.removeBookingFromCache(Number(id));
         
-        // Update local state
         const updatedBookings = bookings.filter(booking => booking.id !== id);
         setBookings(updatedBookings);
       } catch (error) {
@@ -2217,9 +2018,7 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // ========== SOFT DELETE (TRASH) FUNCTIONS ==========
 
-  // Transform trashed booking to display format
   const transformTrashedBooking = (booking: any): BookingsPageBooking & { deletedAt?: string } => {
     const transformed = transformRawBooking(booking);
     return {
@@ -2228,7 +2027,6 @@ const Bookings: React.FC = () => {
     };
   };
 
-  // Load trashed (soft-deleted) bookings
   const loadTrashedBookings = async (page: number = 1) => {
     try {
       setTrashedLoading(true);
@@ -2255,14 +2053,12 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Restore a single soft-deleted booking
   const handleRestoreBooking = async (id: string) => {
     try {
       const response = await bookingService.restoreBooking(Number(id));
       if (response.success) {
         alert('Booking restored successfully');
         loadTrashedBookings(trashedCurrentPage);
-        // Also update active bookings cache
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
         }
@@ -2273,7 +2069,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Bulk restore selected trashed bookings
   const handleBulkRestoreBookings = async () => {
     if (selectedTrashed.length === 0) return;
 
@@ -2291,7 +2086,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Permanently delete a trashed booking
   const handleForceDeleteBooking = async (id: string, referenceNumber: string) => {
     if (!window.confirm(`Are you sure you want to PERMANENTLY delete booking #${referenceNumber}? This action cannot be undone.`)) {
       return;
@@ -2307,7 +2101,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Toggle trashed view
   const toggleTrashedView = () => {
     setShowTrashed(!showTrashed);
     if (!showTrashed) {
@@ -2316,7 +2109,6 @@ const Bookings: React.FC = () => {
     setSelectedTrashed([]);
   };
 
-  // Handle select trashed booking
   const handleSelectTrashedBooking = (id: string) => {
     setSelectedTrashed(prev =>
       prev.includes(id)
@@ -2325,7 +2117,6 @@ const Bookings: React.FC = () => {
     );
   };
 
-  // Handle select all trashed
   const handleSelectAllTrashed = () => {
     if (selectedTrashed.length === trashedBookings.length) {
       setSelectedTrashed([]);
@@ -2338,7 +2129,6 @@ const Bookings: React.FC = () => {
     if (selectedBookings.length === 0) return;
     
     try {
-      // Update each booking status via API
       await Promise.all(
         selectedBookings.map(async (id) => {
           let response;
@@ -2350,14 +2140,12 @@ const Bookings: React.FC = () => {
           } else {
             response = await bookingService.updateBooking(Number(id), { status: newStatus });
           }
-          // Sync to cache
           if (response?.data) {
             await bookingCacheService.updateBookingInCache(response.data);
           }
         })
       );
       
-      // Update local state
       const updatedBookings = bookings.map(booking =>
         selectedBookings.includes(booking.id) ? { ...booking, status: newStatus } : booking
       );
@@ -2372,7 +2160,6 @@ const Bookings: React.FC = () => {
   const handleOpenPaymentModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForPayment(booking);
     const remainingAmount = Math.max(0, booking.totalAmount - booking.amountPaid);
-    // Use Math.floor to ensure we don't exceed the remaining balance due to rounding
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
@@ -2392,7 +2179,6 @@ const Bookings: React.FC = () => {
     setInternalNotesText(booking.internal_notes || '');
     setShowInternalNotesModal(true);
     setLoadingInternalNotes(true);
-    // Always fetch fresh from API since list endpoint may not include internal_notes
     try {
       const response = await bookingService.getBookingById(Number(booking.id));
       if (response.success && response.data) {
@@ -2400,7 +2186,6 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
-      // Keep whatever we already have from the local booking data
     } finally {
       setLoadingInternalNotes(false);
     }
@@ -2423,7 +2208,6 @@ const Bookings: React.FC = () => {
       );
       
       if (response.success) {
-        // Update local state immediately
         const updatedBookings = bookings.map(booking =>
           booking.id === selectedBookingForNotes.id 
             ? { ...booking, internal_notes: internalNotesText } 
@@ -2431,11 +2215,9 @@ const Bookings: React.FC = () => {
         );
         setBookings(updatedBookings);
         
-        // Update cache: if API returned the full booking, use it; otherwise patch the cache manually
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
         } else {
-          // Patch the cache with the new internal notes directly
           try {
             const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForNotes.id));
             if (cachedBooking) {
@@ -2463,7 +2245,6 @@ const Bookings: React.FC = () => {
   };
 
   const searchCustomersForExport = async (searchTerm: string) => {
-    // Clear previous debounce timer
     if (customerSearchDebounce) {
       clearTimeout(customerSearchDebounce);
     }
@@ -2476,7 +2257,6 @@ const Bookings: React.FC = () => {
 
     setSearchingCustomers(true);
 
-    // Set new debounce timer
     const timer = setTimeout(async () => {
       try {
         const user = getStoredUser();
@@ -2574,10 +2354,8 @@ const Bookings: React.FC = () => {
       const response = await bookingService.exportBookings(params);
       
       if (response.success && response.data.bookings) {
-        // Convert to CSV
         const csvData = convertToCSV(response.data.bookings);
         
-        // Download CSV
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -2589,7 +2367,6 @@ const Bookings: React.FC = () => {
         document.body.removeChild(link);
         
         setShowExportModal(false);
-        // Reset filters
         setExportFilters({
           locations: [],
           customers: [],
@@ -2681,11 +2458,9 @@ const Bookings: React.FC = () => {
       return;
     }
 
-    // Calculate remaining amount with proper rounding to avoid floating-point precision issues
     const remainingAmount = Math.round((selectedBookingForPayment.totalAmount - selectedBookingForPayment.amountPaid) * 100) / 100;
     const roundedAmount = Math.round(amount * 100) / 100;
     
-    // Allow a small tolerance (0.01) for floating-point comparison
     if (roundedAmount > remainingAmount + 0.01) {
       alert(`Payment amount cannot exceed remaining balance of $${remainingAmount.toFixed(2)}`);
       return;
@@ -2694,11 +2469,9 @@ const Bookings: React.FC = () => {
     try {
       setProcessingPayment(true);
 
-      // Get booking details from cache first, fallback to API
       let booking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForPayment.id));
       
       if (!booking) {
-        // Fallback to API if not in cache
         const bookingResponse = await bookingService.getBookingById(Number(selectedBookingForPayment.id));
         if (!bookingResponse.success || !bookingResponse.data) {
           throw new Error('Failed to get booking details');
@@ -2713,7 +2486,6 @@ const Bookings: React.FC = () => {
         throw new Error('Location ID not found for this booking');
       }
 
-      // Create payment record using PaymentService
       const paymentResponse = await createPayment({
         payable_id: Number(selectedBookingForPayment.id),
         payable_type: PAYMENT_TYPE.BOOKING,
@@ -2732,7 +2504,6 @@ const Bookings: React.FC = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update booking's amount_paid and status
       const newAmountPaid = selectedBookingForPayment.amountPaid + amount;
       const newPaymentStatus: BookingsPageBooking['paymentStatus'] = newAmountPaid >= selectedBookingForPayment.totalAmount ? 'paid' : 'partial';
 
@@ -2742,12 +2513,10 @@ const Bookings: React.FC = () => {
         status: 'confirmed', // Set status to confirmed when payment is made
       });
 
-      // Update cache with updated booking
       if (updateResponse?.data) {
         await bookingCacheService.updateBookingInCache(updateResponse.data);
       }
 
-      // Log activity in background
       logBookingActivity(
         selectedBookingForPayment, 
         'payment', 
@@ -2755,7 +2524,6 @@ const Bookings: React.FC = () => {
         locationId
       );
 
-      // Update local state
       const updatedBookings = bookings.map(booking =>
         booking.id === selectedBookingForPayment.id
           ? { ...booking, amountPaid: newAmountPaid, paymentStatus: newPaymentStatus, status: 'confirmed' as BookingsPageBooking['status'] }
@@ -2765,7 +2533,6 @@ const Bookings: React.FC = () => {
 
       alert('Payment processed successfully!');
       handleClosePaymentModal();
-      // No need to reload - cache and local state are already updated
     } catch (error) {
       console.error('Error processing payment:', error);
       alert('Failed to process payment. Please try again.');
@@ -2774,7 +2541,6 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Pagination — apply column sort before slicing
   const sortedBookings = getSortedBookings(filteredBookings);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -2793,7 +2559,6 @@ const Bookings: React.FC = () => {
 
   return (
       <div className="px-6 py-8">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
@@ -2854,7 +2619,6 @@ const Bookings: React.FC = () => {
           </div>
         </div>
 
-        {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
           {metrics.map((metric, index) => {
             const Icon = metric.icon;
@@ -2876,7 +2640,6 @@ const Bookings: React.FC = () => {
           })}
         </div>
 
-        {/* Filters and Search */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-lg">
@@ -2904,7 +2667,6 @@ const Bookings: React.FC = () => {
                   return count > 0 ? <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-${themeColor}-600 text-white`}>{count}</span> : null;
                 })()}
               </StandardButton>
-              {/* Column Visibility Selector */}
               <div className="relative">
                 <StandardButton
                   variant="secondary"
@@ -2918,7 +2680,6 @@ const Bookings: React.FC = () => {
                   <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3 max-h-[80vh] overflow-y-auto">
                     <div className="text-xs font-semibold text-gray-700 mb-2">Toggle Columns</div>
                     
-                    {/* Booking Identifiers */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Identifiers</div>
                       {(['id', 'referenceNumber'] as const).map(key => (
@@ -2929,7 +2690,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Date & Time */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Date & Time</div>
                       {(['bookingDate', 'bookingTime', 'duration'] as const).map(key => (
@@ -2940,7 +2700,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Customer Info */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Customer</div>
                       {(['guestName', 'guestEmail', 'guestPhone', 'guestAddress'] as const).map(key => (
@@ -2951,7 +2710,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Package & Location */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Package & Location</div>
                       {(['packageName', 'roomName', 'location'] as const).map(key => (
@@ -2962,7 +2720,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Booking Details */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Details</div>
                       {(['participants', 'status'] as const).map(key => (
@@ -2973,7 +2730,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Payment */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Payment</div>
                       {(['paymentMethod', 'paymentStatus', 'totalAmount', 'amountPaid'] as const).map(key => (
@@ -2984,7 +2740,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Extra Info */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Additional</div>
                       {(['guestOfHonor', 'notes', 'specialRequests'] as const).map(key => (
@@ -2995,7 +2750,6 @@ const Bookings: React.FC = () => {
                       ))}
                     </div>
                     
-                    {/* Timestamps */}
                     <div className="mb-2">
                       <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Timestamps</div>
                       {(['createdAt', 'updatedAt'] as const).map(key => (
@@ -3015,7 +2769,7 @@ const Bookings: React.FC = () => {
                           setColumnVisibility(allVisible);
                           localStorage.setItem('bookings_column_visibility', JSON.stringify(allVisible));
                         }}
-                        className="text-xs text-blue-600 hover:text-blue-800"
+                        className={`text-xs text-${themeColor}-600 hover:text-${themeColor}-800`}
                       >
                         Show All
                       </button>
@@ -3044,7 +2798,6 @@ const Bookings: React.FC = () => {
             </div>
           </div>
 
-          {/* Active Filter Chips */}
           {(() => {
             const chips: { label: string; onClear: () => void }[] = [];
             if (filters.status !== 'all') chips.push({ label: `Status: ${filters.status}`, onClear: () => handleFilterChange('status', 'all') });
@@ -3087,7 +2840,6 @@ const Bookings: React.FC = () => {
             );
           })()}
 
-          {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -3136,7 +2888,6 @@ const Bookings: React.FC = () => {
                   />
                 </div>
               </div>
-              {/* Second row of filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-800 mb-1">Package</label>
@@ -3191,7 +2942,6 @@ const Bookings: React.FC = () => {
           )}
         </div>
 
-        {/* Bulk Actions */}
         {selectedBookings.length > 0 && (
           <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
             <span className={`text-${fullColor} font-medium`}>
@@ -3220,10 +2970,8 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Bookings Table - Active Bookings */}
         {!showTrashed && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Reset Column Order Button */}
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
             <span className="text-xs text-gray-500">
               <span className="font-medium">Tip:</span> Drag column headers to reorder
@@ -3252,7 +3000,6 @@ const Bookings: React.FC = () => {
                     const config = columnConfig[columnKey];
                     if (!config || !config.isVisible()) return null;
                     
-                    // Sortable columns
                     const sortableColumns: BookingsColumnKey[] = [
                       'id', 'referenceNumber', 'dateTime', 'customer', 'packageRoom',
                       'location', 'participants', 'status', 'paymentMethod', 'paymentStatus',
@@ -3324,13 +3071,11 @@ const Bookings: React.FC = () => {
                           className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                         />
                       </td>
-                      {/* Render columns in drag-and-drop order */}
                       {columnOrder.map((columnKey) => {
                         const config = columnConfig[columnKey];
                         if (!config || !config.isVisible()) return null;
                         return renderColumnCell(booking, columnKey);
                       })}
-                      {/* Actions - always last */}
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-1 relative">
                           {booking.paymentStatus !== 'paid' && (
@@ -3420,7 +3165,6 @@ const Bookings: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination */}
           <div className="bg-white px-6 py-4 border-t border-gray-100">
             <Pagination
               currentPage={currentPage}
@@ -3434,10 +3178,8 @@ const Bookings: React.FC = () => {
         </div>
         )}
 
-        {/* Trashed Bookings View */}
         {showTrashed && (
           <>
-            {/* Bulk Actions for Trashed */}
             {selectedTrashed.length > 0 && (
               <div className="bg-orange-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
                 <span className="text-orange-700 font-medium">
@@ -3454,7 +3196,6 @@ const Bookings: React.FC = () => {
               </div>
             )}
 
-            {/* Trashed Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               {trashedLoading ? (
                 <div className="flex items-center justify-center py-12">
@@ -3563,7 +3304,6 @@ const Bookings: React.FC = () => {
                 </div>
               )}
 
-              {/* Trashed Pagination */}
               <div className="bg-white px-6 py-4 border-t border-gray-100">
                 <Pagination
                   currentPage={trashedCurrentPage}
@@ -3577,7 +3317,6 @@ const Bookings: React.FC = () => {
           </>
         )}
 
-        {/* Bulk Import Modal */}
         <BulkImportModal
           isOpen={showBulkImportModal}
           onClose={() => setShowBulkImportModal(false)}
@@ -3587,7 +3326,6 @@ const Bookings: React.FC = () => {
           userLocationId={currentUser?.location_id ?? null}
         />
 
-        {/* Export Modal */}
         {showExportModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => setShowExportModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -3599,7 +3337,6 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6 space-y-6">
-                {/* Location Filter - Only for Company Admin */}
                 {availableLocations.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Locations</h3>
@@ -3628,7 +3365,6 @@ const Bookings: React.FC = () => {
                   </div>
                 )}
 
-                {/* Customer Filter */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Customers</h3>
                   <div className="space-y-3">
@@ -3682,7 +3418,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Date Range */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-gray-900">Date Range</h3>
@@ -3743,7 +3478,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status Filter */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Status</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -3770,7 +3504,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Amount Range */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Amount Range</h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -3805,15 +3538,14 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Export Info */}
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                <div className={`bg-${themeColor}-50 border-2 border-${themeColor}-200 rounded-lg p-4`}>
                   <div className="flex items-start gap-3">
-                    <Download className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <Download className={`h-5 w-5 text-${fullColor} flex-shrink-0 mt-0.5`} />
                     <div>
-                      <p className="text-sm font-medium text-blue-900">
+                      <p className={`text-sm font-medium text-${themeColor}-900`}>
                         CSV Export Format
                       </p>
-                      <p className="text-xs text-blue-800 mt-1">
+                      <p className={`text-xs text-${themeColor}-800 mt-1`}>
                         Your data will be exported in CSV format including all booking details, customer information, attractions, add-ons, and payment information.
                       </p>
                     </div>
@@ -3861,7 +3593,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Payment Modal */}
         {showPaymentModal && selectedBookingForPayment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedBookingForPayment(null); }}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -3873,7 +3604,6 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Payment Summary */}
                 <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Total Amount:</span>
@@ -3891,7 +3621,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Payment Amount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Amount *
@@ -3911,7 +3640,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Payment Method */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Method
@@ -3944,7 +3672,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Notes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Notes (Optional)
@@ -3982,7 +3709,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Internal Notes Modal */}
         {showInternalNotesModal && selectedBookingForNotes && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseInternalNotesModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -4046,7 +3772,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Package Selection Modal */}
         {showPackageModal && selectedBookingForEdit && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleClosePackageModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -4092,7 +3817,6 @@ const Bookings: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Loading Overlay */}
                 {savingPackage && (
                   <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
                     <div className="text-center">
@@ -4117,7 +3841,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Room Selection Modal */}
         {showRoomModal && selectedBookingForEdit && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseRoomModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -4169,7 +3892,6 @@ const Bookings: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Loading Overlay */}
                 {savingRoom && (
                   <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
                     <div className="text-center">
@@ -4194,7 +3916,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Duration Edit Modal */}
         {showDurationModal && selectedBookingForEdit && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseDurationModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -4253,7 +3974,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Date Edit Modal */}
         {showDateModal && selectedBookingForEdit && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseDateModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -4304,7 +4024,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Time Edit Modal */}
         {showTimeModal && selectedBookingForEdit && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseTimeModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -4355,7 +4074,6 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Booking Details Report Modal */}
         {showReportModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseReportModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -4367,7 +4085,6 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6 space-y-6">
-                {/* Package Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Packages
@@ -4414,7 +4131,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Period Type Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Time Period
@@ -4437,7 +4153,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Conditional Inputs based on Period Type */}
                 {reportFilters.periodType === 'weekly' && (
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -4534,7 +4249,6 @@ const Bookings: React.FC = () => {
                   </div>
                 )}
 
-                {/* View Mode Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Report View
@@ -4577,7 +4291,6 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Filter by Status (optional)
@@ -4603,7 +4316,6 @@ const Bookings: React.FC = () => {
                   )}
                 </div>
 
-                {/* Include Cancelled */}
                 <div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -4617,7 +4329,6 @@ const Bookings: React.FC = () => {
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end bg-gray-50">
                 <StandardButton
                   variant="secondary"

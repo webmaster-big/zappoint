@@ -20,13 +20,6 @@ interface ResendCredentialsModalProps {
   user: { id: number; first_name?: string; last_name?: string; email: string } | null;
 }
 
-/**
- * Resend / rotate staff credentials.
- *
- * Implements POST /api/users/{user}/resend-credentials (Section 5).
- * The new password REPLACES the old one whether the email succeeds or
- * not, so we always show a confirm step before submitting.
- */
 const ResendCredentialsModal = ({ isOpen, onClose, user }: ResendCredentialsModalProps) => {
   const { themeColor } = useThemeColor();
 
@@ -101,7 +94,6 @@ const ResendCredentialsModal = ({ isOpen, onClose, user }: ResendCredentialsModa
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore
     }
   };
 

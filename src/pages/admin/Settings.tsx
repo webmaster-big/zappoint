@@ -102,17 +102,14 @@ const Settings = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
   
-  // Modal states
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   
-  // Email modal states
   const [currentEmail, setCurrentEmail] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
   const [showEmailPassword, setShowEmailPassword] = useState(false);
   
-  // Password modal states
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -120,7 +117,6 @@ const Settings = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // Authorize.Net states
   const [showAuthorizeModal, setShowAuthorizeModal] = useState(false);
   const [authorizeConnected, setAuthorizeConnected] = useState(false);
   const [authorizeAccount, setAuthorizeAccount] = useState<SettingsAuthorizeNetAccount | null>(null);
@@ -133,19 +129,15 @@ const Settings = () => {
   const [loadingAuthorize, setLoadingAuthorize] = useState(false);
   const [loadingAuthorizeAccount, setLoadingAuthorizeAccount] = useState(true);
   
-  // Company Admin - All Accounts Modal
   const [showAllAccountsModal, setShowAllAccountsModal] = useState(false);
   const [allAuthorizeAccounts, setAllAuthorizeAccounts] = useState<SettingsAuthorizeNetAccount[]>([]);
   const [loadingAllAccounts, setLoadingAllAccounts] = useState(false);
   
-  // Company Admin - Connect for specific location
   const [availableLocations, setAvailableLocations] = useState<SettingsLocation[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   
-  // User role
   const [userRole, setUserRole] = useState<string>('');
   
-  // Google Calendar states
   const [gcalLocations, setGcalLocations] = useState<SettingsLocation[]>([]);
   const [gcalSelectedLocationId, setGcalSelectedLocationId] = useState<number | null>(null);
   const [gcalStatus, setGcalStatus] = useState<GoogleCalendarStatus | null>(null);
@@ -164,63 +156,50 @@ const Settings = () => {
   const [gcalResyncResult, setGcalResyncResult] = useState<GoogleCalendarResyncResult | null>(null);
   const [gcalChangingCalendar, setGcalChangingCalendar] = useState(false);
   
-  // Google Calendar - All Connections (company_admin)
   const [showGcalAllModal, setShowGcalAllModal] = useState(false);
   const [allGcalConnections, setAllGcalConnections] = useState<GoogleCalendarConnection[]>([]);
   const [loadingGcalAll, setLoadingGcalAll] = useState(false);
   
   useEffect(() => {
-    // Load saved color from localStorage
     const { color, shade } = getThemeColor();
     
-    // Validate that the saved color exists
     const colorObj = AVAILABLE_COLORS.find((c) => c.name === color);
     if (colorObj) {
       setSelectedColor(color);
       
-      // Validate that the saved shade exists for this color
       const availableShades = Object.keys(colorObj.shades);
       if (availableShades.includes(shade)) {
         setSelectedShade(shade);
       } else {
-        // Use the first available shade if saved shade doesn't exist
         const firstShade = availableShades[0] || '500';
         setSelectedShade(firstShade);
         saveThemeColor(color, firstShade);
       }
     } else {
-      // Default to blue if saved color doesn't exist
       setSelectedColor('blue');
       setSelectedShade('800');
     }
     
-    // Load saved sidebar layout from localStorage
     const savedLayout = localStorage.getItem('zapzone_sidebar_layout');
     if (savedLayout === 'dropdown' || savedLayout === 'grouped') {
       setSidebarLayout(savedLayout);
     }
 
-    // Load user data from localStorage
     const user = getStoredUser();
     if (user) {
       setCurrentEmail(user.email || '');
       setUserRole(user.role || '');
-      // Auto-set location for non-company_admin users (value used silently, no UI display)
       if (user.location_id && user.role !== 'company_admin') {
         setGcalSelectedLocationId(user.location_id);
       }
     }
     
-    // Fetch Authorize.Net account status
     fetchAuthorizeAccount();
     
-    // Fetch locations for Google Calendar
     fetchGcalLocations();
     
-    // Handle Google Calendar OAuth redirect (from URL params if popup fails)
     handleGcalRedirect();
     
-    // Listen for popup message
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'GOOGLE_CALENDAR_CONNECTED') {
         const locId = event.data.location_id;
@@ -241,7 +220,6 @@ const Settings = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
   
-  // ── Google Calendar helpers ──────────────────────────────
   
   const fetchGcalLocations = async () => {
     try {
@@ -255,7 +233,6 @@ const Settings = () => {
           state: loc.state || '',
         }))
       );
-      // Auto-fetch status for non-company_admin users with a location
       const user = getStoredUser();
       if (user?.location_id && user.role !== 'company_admin') {
         fetchGcalStatus(user.location_id);
@@ -273,7 +250,6 @@ const Settings = () => {
       const response = await getGoogleCalendarStatus(locationId);
       if (response.success) {
         setGcalStatus(response.data);
-        // If connected, fetch available calendars
         if (response.data.is_connected) {
           fetchGcalCalendars(locationId);
         } else {
@@ -341,7 +317,6 @@ const Settings = () => {
     try {
       const response = await getGoogleCalendarAuthUrl(gcalSelectedLocationId);
       if (response.success && response.data?.auth_url) {
-        // Open Google consent in a centered popup window
         const width = 600;
         const height = 700;
         const left = window.screenX + (window.outerWidth - width) / 2;
@@ -352,12 +327,10 @@ const Settings = () => {
           `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
         );
         
-        // Poll for popup close (fallback if postMessage doesn't fire)
         if (popup) {
           const pollTimer = setInterval(() => {
             if (popup.closed) {
               clearInterval(pollTimer);
-              // Re-check status after popup closes
               if (gcalSelectedLocationId) {
                 fetchGcalStatus(gcalSelectedLocationId);
               }
@@ -365,7 +338,6 @@ const Settings = () => {
             }
           }, 500);
         } else {
-          // Popup blocked — fall back to redirect
           window.location.href = response.data.auth_url;
         }
       } else {
@@ -513,7 +485,6 @@ const Settings = () => {
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         fetchAllGcalConnections();
-        // If we're also viewing this location inline, refresh
         if (gcalSelectedLocationId === locationId) {
           fetchGcalStatus(locationId);
         }
@@ -534,7 +505,6 @@ const Settings = () => {
         const accounts = response.data || [];
         setAllAuthorizeAccounts(accounts);
         
-        // For company_admin, fetch all company locations and filter out connected ones
         if (userRole === 'company_admin') {
           const connectedLocationIds = accounts.map(acc => acc.location_id);
           
@@ -542,7 +512,6 @@ const Settings = () => {
             const locationsResponse = await locationService.getLocations();
             const allLocations: Location[] = locationsResponse.data || [];
             
-            // Filter to only show locations that don't already have an Authorize.Net account
             setAvailableLocations(
               allLocations
                 .filter((loc: Location) => !connectedLocationIds.includes(loc.id))
@@ -580,14 +549,11 @@ const Settings = () => {
   };
 
   const handleColorSelect = (colorName: string) => {
-    // Find the selected color's available shades
     const selectedColorObj = AVAILABLE_COLORS.find((c) => c.name === colorName);
     if (!selectedColorObj) return;
     
-    // Get available shades for this color
     const availableShades = Object.keys(selectedColorObj.shades);
     
-    // If current shade doesn't exist for this color, pick the first available shade
     let shadeToUse = selectedShade;
     if (!availableShades.includes(selectedShade)) {
       shadeToUse = availableShades[0] || '500';
@@ -633,18 +599,14 @@ const Settings = () => {
       });
       
       if (response.success) {
-        // Update localStorage with new user data
         updateStoredUser(response.data);
         
-        // Update UI state immediately using server response
         setCurrentEmail(response.data?.email || newEmail);
         
-        // Show success message
         setSuccessMessage('Email updated successfully!');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         
-        // Reset and close modal
         setNewEmail('');
         setEmailPassword('');
         setShowEmailModal(false);
@@ -690,17 +652,14 @@ const Settings = () => {
       });
       
       if (response.success) {
-        // Update localStorage if backend returns updated user data
         if (response.data) {
           updateStoredUser(response.data);
         }
         
-        // Show success message - password UI doesn't need state update
         setSuccessMessage('Password updated successfully!');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         
-        // Reset and close modal
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
@@ -730,7 +689,6 @@ const Settings = () => {
   const handleAuthorizeConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // For company_admin, require location selection
     if (userRole === 'company_admin' && !selectedLocationId) {
       alert('Please select a location to connect Authorize.Net');
       return;
@@ -748,32 +706,25 @@ const Settings = () => {
       });
       
       if (response.success) {
-        // Show success message
         setSuccessMessage('Authorize.Net account connected successfully!');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         
-        // Reset form fields
         setAuthorizeApiLoginId('');
         setAuthorizeTransactionKey('');
         setAuthorizePublicClientKey('');
         setSelectedLocationId(null);
         setLoadingAuthorize(false);
         
-        // Close modal
         setShowAuthorizeModal(false);
         
-        // Update UI state immediately based on user role
         if (userRole === 'company_admin') {
-          // For company_admin, refetch all accounts to get updated list
           fetchAllAuthorizeAccounts();
         } else {
-          // For location_admin, immediately show connected state
           if (response.data) {
             setAuthorizeConnected(true);
             setAuthorizeAccount(response.data);
           }
-          // Also silently refetch in background to ensure data consistency
           fetchAuthorizeAccount(false);
         }
       } else {
@@ -796,16 +747,13 @@ const Settings = () => {
       const response = await disconnectAuthorizeNetAccount();
       
       if (response.success) {
-        // Show success message
         setSuccessMessage('Authorize.Net account disconnected successfully');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         
-        // Update UI state immediately
         setAuthorizeConnected(false);
         setAuthorizeAccount(null);
         
-        // For company_admin, also refresh the all-accounts list if it was loaded
         if (userRole === 'company_admin' && allAuthorizeAccounts.length > 0) {
           fetchAllAuthorizeAccounts();
         }
@@ -827,12 +775,10 @@ const Settings = () => {
       const response = await disconnectAuthorizeNetAccount(locationId);
       
       if (response.success) {
-        // Show success message
         setSuccessMessage(`Authorize.Net disconnected for ${locationName}`);
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         
-        // Refetch all accounts to update the UI
         fetchAllAuthorizeAccounts();
       } else {
         alert(response.message || 'Failed to disconnect account');
@@ -846,25 +792,21 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
-        {/* Success Toast */}
         {showSuccess && (
           <div className="fixed top-6 right-6 z-50 animate-fade-in-up">
             <Toast message={successMessage} type="success" onClose={() => setShowSuccess(false)} />
           </div>
         )}
 
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
           <p className="text-gray-600 mt-1">Manage your preferences and account security</p>
         </div>
 
-        {/* Account Information Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Account Information</h2>
           
           <div className="space-y-4">
-            {/* Email Section */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 bg-${themeColor}-100 rounded-full flex items-center justify-center`}>
@@ -884,7 +826,6 @@ const Settings = () => {
               </StandardButton>
             </div>
 
-            {/* Password Section */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 bg-${themeColor}-100 rounded-full flex items-center justify-center`}>
@@ -906,7 +847,6 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Authorize.Net Integration Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Integration</h2>
           
@@ -982,7 +922,6 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Google Calendar Integration Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-xl font-semibold text-gray-900">Google Calendar</h2>
@@ -1016,7 +955,6 @@ const Settings = () => {
             </div>
           </div>
 
-          {/* Location Selector — company_admin only; other roles auto-resolve from their profile */}
           {userRole === 'company_admin' && (
             <div className="mb-4">
               <select
@@ -1096,7 +1034,6 @@ const Settings = () => {
               </div>
             ) : gcalStatus && gcalStatus.is_connected ? (
               <div className="space-y-3">
-                {/* Connected status */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -1135,7 +1072,6 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Calendar & Sync — compact layout */}
                 <div className="pt-3 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="flex items-center gap-1 mb-1">
@@ -1201,7 +1137,6 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Full Resync section */}
                 <div className="pt-3 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1227,7 +1162,6 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Sync result */}
                 {gcalSyncResult && (
                   <div className="text-xs text-gray-600 px-3 py-2 bg-white rounded border border-gray-200">
                     <span className="text-green-600 font-semibold">{gcalSyncResult.created}</span> created · {' '}
@@ -1236,7 +1170,6 @@ const Settings = () => {
                   </div>
                 )}
 
-                {/* Resync result */}
                 {gcalResyncResult && (
                   <div className="text-xs text-gray-600 px-3 py-2 bg-amber-50 rounded border border-amber-200">
                     <span className="text-red-600 font-semibold">{gcalResyncResult.deleted}</span> deleted · {' '}
@@ -1247,7 +1180,6 @@ const Settings = () => {
                 )}
               </div>
             ) : gcalSelectedLocationId ? (
-              /* Fallback: status fetch failed or returned null */
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
@@ -1271,7 +1203,6 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Theme Color Selection Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
@@ -1284,10 +1215,8 @@ const Settings = () => {
           </div>
 
           <div className="space-y-6">
-            {/* Color Grid */}
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-3">
               {AVAILABLE_COLORS.map((color) => {
-                // Get the first two available shades for preview
                 const shadeEntries = Object.entries(color.shades);
                 const shade1 = shadeEntries[0]?.[1] || '#000';
                 const shade2 = shadeEntries[1]?.[1] || shadeEntries[0]?.[1] || '#000';
@@ -1327,7 +1256,6 @@ const Settings = () => {
               })}
             </div>
 
-            {/* Color Preview */}
             <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
               <p className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -1369,13 +1297,11 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Sidebar Layout Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 mt-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Sidebar Layout</h2>
           <p className="text-sm text-gray-600 mb-6">Choose how navigation items are displayed in the sidebar</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Dropdown Layout */}
             <StandardButton
               onClick={() => {
                 setSidebarLayout('dropdown');
@@ -1421,7 +1347,6 @@ const Settings = () => {
               </div>
             </StandardButton>
 
-            {/* Grouped Layout */}
             <StandardButton
               onClick={() => {
                 setSidebarLayout('grouped');
@@ -1464,7 +1389,6 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Email Change Modal */}
         {showEmailModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowEmailModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1553,7 +1477,6 @@ const Settings = () => {
           </div>
         )}
 
-        {/* Password Change Modal */}
         {showPasswordModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowPasswordModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1665,7 +1588,6 @@ const Settings = () => {
           </div>
         )}
 
-        {/* Company Admin - All Authorize.Net Accounts Modal */}
         {showAllAccountsModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAllAccountsModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1799,7 +1721,6 @@ const Settings = () => {
           </div>
         )}
 
-        {/* Company Admin - All Google Calendar Connections Modal */}
         {showGcalAllModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowGcalAllModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1914,7 +1835,6 @@ const Settings = () => {
           </div>
         )}
 
-        {/* Authorize.Net Connection Modal */}
         {showAuthorizeModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => { setShowAuthorizeModal(false); setAuthorizeApiLoginId(''); setAuthorizeTransactionKey(''); setAuthorizePublicClientKey(''); setSelectedLocationId(null); setShowTransactionKey(false); setShowPublicClientKey(false); }}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>

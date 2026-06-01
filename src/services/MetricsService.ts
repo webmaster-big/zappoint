@@ -114,12 +114,6 @@ export interface AttendantResponse {
 }
 
 class MetricsService {
-  /**
-   * Get dashboard metrics based on authenticated user's role and location
-   * - company_admin: All locations (no location filter)
-   * - location_manager: Their specific location only
-   * - attendant: Their specific location only
-   */
   async getDashboardMetrics(params?: {
     timeframe?: TimeframeType;
     date_from?: string;
@@ -177,9 +171,6 @@ class MetricsService {
     return data;
   }
 
-  /**
-   * Get attendant-specific metrics with recent transactions
-   */
   async getAttendantMetrics(params?: {
     location_id?: number;
     timeframe?: TimeframeType;

@@ -12,7 +12,6 @@ import type {
 } from '../types/googleCalendar.types';
 import type { SettingsApiResponse } from '../types/settings.types';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -21,7 +20,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -35,9 +33,6 @@ api.interceptors.request.use(
   }
 );
 
-/**
- * Get Google Calendar connection status for a location
- */
 export const getGoogleCalendarStatus = async (
   locationId: number
 ): Promise<SettingsApiResponse<GoogleCalendarStatus>> => {
@@ -48,9 +43,6 @@ export const getGoogleCalendarStatus = async (
   return response.data;
 };
 
-/**
- * Get Google OAuth authorization URL for a location
- */
 export const getGoogleCalendarAuthUrl = async (
   locationId: number
 ): Promise<SettingsApiResponse<GoogleCalendarAuthUrl>> => {
@@ -61,9 +53,6 @@ export const getGoogleCalendarAuthUrl = async (
   return response.data;
 };
 
-/**
- * Disconnect Google Calendar for a location
- */
 export const disconnectGoogleCalendar = async (
   locationId: number
 ): Promise<SettingsApiResponse> => {
@@ -74,9 +63,6 @@ export const disconnectGoogleCalendar = async (
   return response.data;
 };
 
-/**
- * List available Google Calendars for a location
- */
 export const listGoogleCalendars = async (
   locationId: number
 ): Promise<SettingsApiResponse<GoogleCalendar[]>> => {
@@ -87,9 +73,6 @@ export const listGoogleCalendars = async (
   return response.data;
 };
 
-/**
- * Set which Google Calendar to use for a location
- */
 export const setGoogleCalendar = async (
   data: GoogleCalendarSetCalendarData
 ): Promise<SettingsApiResponse> => {
@@ -100,9 +83,6 @@ export const setGoogleCalendar = async (
   return response.data;
 };
 
-/**
- * Bulk sync existing bookings to Google Calendar
- */
 export const syncGoogleCalendar = async (
   data: GoogleCalendarSyncData
 ): Promise<SettingsApiResponse<GoogleCalendarSyncResult>> => {
@@ -113,9 +93,6 @@ export const syncGoogleCalendar = async (
   return response.data;
 };
 
-/**
- * Sync a single booking to Google Calendar
- */
 export const syncSingleBooking = async (
   bookingId: number
 ): Promise<SettingsApiResponse> => {
@@ -125,10 +102,6 @@ export const syncSingleBooking = async (
   return response.data;
 };
 
-/**
- * Full resync: Delete all existing calendar events and recreate them
- * Useful for fixing duplicate events or incorrect event durations/colors
- */
 export const resyncGoogleCalendar = async (
   data: GoogleCalendarSyncData
 ): Promise<SettingsApiResponse<GoogleCalendarResyncResult>> => {
@@ -139,9 +112,6 @@ export const resyncGoogleCalendar = async (
   return response.data;
 };
 
-/**
- * Remove a booking event from Google Calendar
- */
 export const removeBookingEvent = async (
   bookingId: number
 ): Promise<SettingsApiResponse> => {
@@ -151,9 +121,6 @@ export const removeBookingEvent = async (
   return response.data;
 };
 
-/**
- * Get all Google Calendar connections across all locations (company_admin only)
- */
 export const getAllGoogleCalendarConnections = async (): Promise<SettingsApiResponse<GoogleCalendarConnection[]>> => {
   const response = await api.get<SettingsApiResponse<GoogleCalendarConnection[]>>(
     '/google-calendar/connections'

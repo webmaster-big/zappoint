@@ -1,13 +1,10 @@
 export const API_BASE_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/api"
 export const ASSET_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/storage/"
 
-// Helper function to get correct image URL
 export const getImageUrl = (img?: string | null | any): string => {
   if (!img) return '';
   
-  // If img is not a string, try to convert it or return empty
   if (typeof img !== 'string') {
-    // If it's an array, take the first element
     if (Array.isArray(img) && img.length > 0) {
       img = img[0];
     } else {
@@ -15,21 +12,17 @@ export const getImageUrl = (img?: string | null | any): string => {
     }
   }
   
-  // If already a full URL (http://, https://, or data:), use as-is
   if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:')) {
     return img;
   }
   
-  // If already starts with ASSET_URL, use as-is
   if (img.startsWith(ASSET_URL)) {
     return img;
   }
   
-  // Otherwise prefix with ASSET_URL
   return ASSET_URL + img;
 };
 
-// Convert 24-hour time format (HH:MM) to 12-hour format (h:MM AM/PM)
 export const formatTimeTo12Hour = (time24: string): string => {
   if (!time24) return '';
   
@@ -40,11 +33,9 @@ export const formatTimeTo12Hour = (time24: string): string => {
   return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 };
 
-// Sanitize user data to ensure no nested objects are stored
 export const sanitizeUserData = (userData: any, preserveToken: boolean = false) => {
   if (!userData) return null;
   
-  // Get existing token if we need to preserve it
   const existingUser = getStoredUser();
   const tokenToUse = preserveToken && existingUser?.token ? existingUser.token : (userData.token || '');
   
@@ -52,6 +43,10 @@ export const sanitizeUserData = (userData: any, preserveToken: boolean = false) 
     id: userData.id,
     company_id: typeof userData.company_id === 'object' ? userData.company_id?.id : userData.company_id,
     location_id: typeof userData.location_id === 'object' ? userData.location_id?.id : userData.location_id,
+    location_name: userData.location_name ||
+      (typeof userData.location_id === 'object' ? userData.location_id?.name : null) ||
+      userData.location?.name ||
+      '',
     first_name: userData.first_name || '',
     last_name: userData.last_name || '',
     email: userData.email || '',
@@ -73,16 +68,11 @@ export const sanitizeUserData = (userData: any, preserveToken: boolean = false) 
   };
 };
 
-// fetch user from local storage
 export const getStoredUser = () => {
   const userData = localStorage.getItem('zapzone_user');
   return userData ? JSON.parse(userData) : null;
 };
 
-// Store user data safely (sanitized).
-// If the user identity is changing (login as a different account), purge all
-// tenant-scoped Cache Storage entries so the new user never sees the previous
-// user's cached records. See utils/cacheGuard.ts.
 export const setStoredUser = (userData: any, preserveToken: boolean = true) => {
   const sanitized = sanitizeUserData(userData, preserveToken);
   if (!sanitized) return;
@@ -99,7 +89,6 @@ export const setStoredUser = (userData: any, preserveToken: boolean = true) => {
   localStorage.setItem('zapzone_user', JSON.stringify(sanitized));
 
   if (identityChanged && typeof window !== 'undefined' && 'caches' in window) {
-    // Lazy-import to avoid a circular dep at module-eval time.
     import('./cacheGuard')
       .then((m) => m.purgeAllZapzoneCaches())
       .catch(() => { /* ignore */ });

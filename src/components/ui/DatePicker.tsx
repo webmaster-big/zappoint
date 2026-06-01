@@ -7,7 +7,6 @@ interface BreakTime {
   end_time: string;
 }
 
-// Extended day off type with time information for partial closures
 interface DayOffInfo {
   date: Date;
   time_start?: string | null;  // Closes at this time (e.g., "16:00")
@@ -61,28 +60,22 @@ const DatePicker: React.FC<DatePickerProps> = ({
     });
   };
 
-  // Check if a date is a day off (full day only - legacy support)
   const isDayOff = (date: Date) => {
     return dayOffs.some(dayOff => {
       return dayOff.toDateString() === date.toDateString();
     });
   };
 
-  // Check if a date is a FULL day off (no time_start and time_end)
   const isFullDayOff = (date: Date): boolean => {
-    // Check legacy dayOffs first
     if (isDayOff(date)) return true;
     
-    // Check dayOffsWithTime for full day closures
     const dayOffInfo = dayOffsWithTime.find(d => d.date.toDateString() === date.toDateString());
     if (dayOffInfo) {
-      // Full day off if neither time_start nor time_end is set
       return !dayOffInfo.time_start && !dayOffInfo.time_end;
     }
     return false;
   };
 
-  // Check if a date has a partial day off (has time restrictions)
   const hasPartialDayOff = (date: Date): DayOffInfo | null => {
     const dayOffInfo = dayOffsWithTime.find(d => d.date.toDateString() === date.toDateString());
     if (dayOffInfo && (dayOffInfo.time_start || dayOffInfo.time_end)) {
@@ -91,7 +84,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return null;
   };
 
-  // Get partial day off info for display
   const getPartialDayOffInfo = (date: Date): string | null => {
     const partial = hasPartialDayOff(date);
     if (!partial) return null;
@@ -106,20 +98,17 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return null;
   };
 
-  // Get the day name from a date (e.g., 'monday', 'tuesday')
   const getDayName = (date: Date): string => {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return days[date.getDay()];
   };
 
-  // Check if a date has break time scheduled
   const hasBreakTime = (date: Date): boolean => {
     if (breakTimes.length === 0) return false;
     const dayName = getDayName(date);
     return breakTimes.some(bt => bt.days.includes(dayName));
   };
 
-  // Get break time info for a date
   const getBreakTimeInfo = (date: Date): string | null => {
     const dayName = getDayName(date);
     const breakTime = breakTimes.find(bt => bt.days.includes(dayName));
@@ -127,7 +116,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return `Break: ${formatTime12Hour(breakTime.start_time)} - ${formatTime12Hour(breakTime.end_time)}`;
   };
 
-  // Format time to 12-hour format
   const formatTime12Hour = (time24: string): string => {
     const [hours, minutes] = time24.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
@@ -137,7 +125,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
   const isDateSelected = (date: Date) => {
     if (!selectedDate) return false;
-    // Parse ISO date string (YYYY-MM-DD) in local timezone to avoid UTC offset issues
     const [year, month, day] = selectedDate.split('-').map(Number);
     const selected = new Date(year, month - 1, day);
     return selected.toDateString() === date.toDateString();
@@ -154,7 +141,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
   const handleDateClick = (day: number) => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     if (isDateAvailable(date)) {
-      // Format date as YYYY-MM-DD in local timezone
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const dayStr = String(day).padStart(2, '0');
@@ -168,14 +154,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
     const totalDays = daysInMonth(currentMonth);
     const firstDay = firstDayOfMonth(currentMonth);
 
-    // Add empty cells for days before the first day of month
     for (let i = 0; i < firstDay; i++) {
       days.push(
         <div key={`empty-${i}`} className="aspect-square"></div>
       );
     }
 
-    // Add cells for each day of the month
     for (let day = 1; day <= totalDays; day++) {
       const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
       const available = isDateAvailable(date);
@@ -187,17 +171,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
       const hasBreak = hasBreakTime(date);
       const breakInfo = getBreakTimeInfo(date);
 
-      // Full day off takes precedence - make it unavailable
-      // Partial day off still allows selecting the date
-      // Day off styling should ONLY apply to dates that are in the schedule (available)
       const isDisabled = !available || isPast || isFullOff;
       
-      // Only consider day off styling if the date is actually on the schedule
       const showFullDayOff = available && isFullOff;
       const showPartialOff = available && partialOff && !isFullOff;
       const showBreak = available && hasBreak && !isFullOff && !partialOff;
 
-      // Build tooltip
       let tooltip: string | undefined;
       if (showFullDayOff) {
         tooltip = 'Day Off - Unavailable';
@@ -217,12 +196,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
           disabled={isDisabled}
           title={tooltip}
           className={`aspect-square w-full min-h-[44px] rounded-lg text-xs md:text-sm font-medium transition-all flex flex-col items-center justify-center relative ${
-            // First check if date is NOT on schedule - always show as unavailable (gray)
             !available
               ? isPast
                 ? 'text-gray-300 cursor-not-allowed'
                 : 'text-gray-400 cursor-not-allowed'
-              // Date IS on schedule - now check for day offs and other styling
               : showFullDayOff
               ? 'bg-red-50 text-red-400 cursor-not-allowed border border-red-200'
               : showPartialOff
@@ -254,7 +231,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-2 md:p-3">
-      {/* Header */}
       <div className="flex items-center justify-between mb-2 md:mb-3">
         <button
           type="button"
@@ -275,7 +251,6 @@ const DatePicker: React.FC<DatePickerProps> = ({
         </button>
       </div>
 
-      {/* Day labels */}
       <div className="grid grid-cols-7 gap-1 md:gap-1.5 mb-1 md:mb-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="text-center text-xs md:text-sm font-medium text-gray-500 py-1">
@@ -284,12 +259,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
         ))}
       </div>
 
-      {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-1 md:gap-1.5">
         {renderCalendar()}
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 mt-2 md:mt-3 pt-2 md:pt-3 border-t border-gray-200 text-xs">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded"></div>

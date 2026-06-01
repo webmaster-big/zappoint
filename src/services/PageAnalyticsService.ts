@@ -1,12 +1,3 @@
-/**
- * Page Analytics service — wraps every `/page-analytics/*` dashboard endpoint
- * documented in the Page Analytics integration guide.
- *
- * The backend automatically scopes results by the authenticated user's role
- * (super_admin → all, company_admin → their company, location_manager /
- * attendant → their location), so callers only need to pass `from` / `to`
- * and an optional `location_id` override.
- */
 import axios, { type AxiosInstance } from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
@@ -24,13 +15,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Strip analytics tracking headers from admin dashboard reads.
-// The global monkey-patch in analyticsHeaders.ts attaches X-Visitor-Id /
-// X-Session-Id / X-Analytics-Source to every axios instance; these headers
-// are only meaningful on customer-facing page views, not on admin API reads.
-// Removing them here avoids sending unnecessary visitor identity data and
-// eliminates a CORS preflight surface on backends that haven't whitelisted
-// these headers yet.
 api.interceptors.request.use((config) => {
   try {
     const TRACKING_HEADERS = [
@@ -39,25 +23,19 @@ api.interceptors.request.use((config) => {
       'X-Analytics-Source', 'x-analytics-source',
       'X-Tracking-Id', 'x-tracking-id',
     ];
-    // AxiosHeaders (axios ≥1.x) exposes a .delete() method.
     const h = config.headers;
     if (typeof (h as { delete?: (k: string) => void }).delete === 'function') {
       const del = (h as { delete: (k: string) => void }).delete.bind(h);
       TRACKING_HEADERS.forEach(del);
     } else {
-      // Plain object fallback.
       const plain = h as Record<string, unknown>;
       TRACKING_HEADERS.forEach((k) => { delete plain[k]; });
     }
   } catch {
-    /* never block a request */
   }
   return config;
 });
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export type AnalyticsEntityType =
   | 'package'
@@ -184,7 +162,8 @@ export interface ConversionRow {
   event_name: string;
   entity_type?: AnalyticsEntityType | null;
   entity_id?: number | null;
-  value: number;
+  entity_name?: string | null;
+  conversion_value: number;
   page_path?: string | null;
   created_at: string;
   visitor_id?: string | null;
@@ -286,9 +265,6 @@ export interface EntityDetailResponse {
   recent_conversions: ConversionRow[];
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 const buildParams = (filter: DateRangeFilter, extra: Record<string, unknown> = {}) => {
   const out: Record<string, unknown> = {};
@@ -302,14 +278,12 @@ const buildParams = (filter: DateRangeFilter, extra: Record<string, unknown> = {
 };
 
 const unwrap = <T,>(payload: unknown): T => {
-  // Most Laravel responses are { success, data: ... } — unwrap if present.
   if (payload && typeof payload === 'object' && 'data' in (payload as Record<string, unknown>)) {
     return (payload as { data: T }).data;
   }
   return payload as T;
 };
 
-// Pull the first defined value from a list of candidate keys on a record.
 const pick = <T = unknown>(row: Record<string, unknown>, keys: string[], fallback?: T): T => {
   for (const k of keys) {
     const v = row[k];
@@ -343,13 +317,12 @@ const normalizeLeaderboardRow = (raw: unknown, defaultEntityType: AnalyticsEntit
 const normalizeFunnelStep = (raw: unknown): FunnelStep => {
   const r = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {};
   const rawStep = String(pick(r, ['step', 'name', 'label', 'stage'], ''));
-  // Convert snake_case step names to Title Case: "booking_completed" → "Booking Completed"
   const step = rawStep
     ? rawStep.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
     : '';
   return {
     step,
-    count: toNumber(pick(r, ['count', 'value', 'visits', 'total'])),
+    count: toNumber(pick(r, ['count', 'visitors', 'value', 'visits', 'total'])),
     rate: r.rate !== undefined ? toNumber(r.rate) : undefined,
   };
 };
@@ -357,15 +330,12 @@ const normalizeFunnelStep = (raw: unknown): FunnelStep => {
 const normalizeDeviceRow = (raw: unknown): DeviceRow => {
   const r = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {};
   return {
-    name: String(pick(r, ['name', 'device', 'label', 'browser', 'os', 'source'], 'Unknown')),
-    visits: toNumber(pick(r, ['visits', 'count', 'value', 'sessions'])),
+    name: String(pick(r, ['name', 'device_type', 'device', 'label', 'browser', 'os', 'source'], 'Unknown')),
+    visits: toNumber(pick(r, ['visits', 'views', 'count', 'value', 'sessions'])),
     share: r.share !== undefined ? toNumber(r.share) : undefined,
   };
 };
 
-// ---------------------------------------------------------------------------
-// API
-// ---------------------------------------------------------------------------
 
 const PageAnalyticsService = {
   async getOverview(filter: DateRangeFilter): Promise<OverviewMetrics> {
@@ -419,12 +389,37 @@ const PageAnalyticsService = {
     const r = await api.get(`/page-analytics/entities/${entityType}/${entityId}`, {
       params: buildParams(filter, { bucket }),
     });
-    const d = unwrap<Partial<EntityDetailResponse>>(r.data) ?? {};
+    const d = unwrap<Record<string, unknown>>(r.data) as Record<string, unknown> ?? {};
     const totals = (d.totals ?? {}) as Record<string, unknown>;
+    const entityInfo = d.entity as Record<string, unknown> | undefined;
+    const normSrc = (row: unknown): SourceRow => {
+      const s = (row && typeof row === 'object') ? row as Record<string, unknown> : {};
+      return {
+        source:      (s.source   ?? s.utm_source   ?? null) as string | null,
+        medium:      (s.medium   ?? s.utm_medium   ?? null) as string | null,
+        campaign:    (s.campaign ?? s.utm_campaign ?? null) as string | null,
+        visits:      toNumber(s.visits ?? s.views ?? s.count),
+        conversions: toNumber(s.conversions),
+        revenue:     toNumber(s.revenue),
+      };
+    };
+    const normRef = (row: unknown): ReferrerRow => {
+      const s = (row && typeof row === 'object') ? row as Record<string, unknown> : {};
+      return { referrer: String(s.referrer ?? ''), visits: toNumber(s.visits ?? s.views), conversions: toNumber(s.conversions), revenue: toNumber(s.revenue) };
+    };
+    const srcObj = (d.sources ?? {}) as Record<string, unknown>;
+    const rawDirect = srcObj.direct;
+    const directArr: SourceRow[] = rawDirect
+      ? (Array.isArray(rawDirect) ? rawDirect : [rawDirect]).map(normSrc)
+      : [];
+    const tsRaw = d.timeseries as { series?: TimeseriesPoint[] } | TimeseriesPoint[] | undefined;
+    const timeseries: TimeseriesPoint[] = Array.isArray(tsRaw)
+      ? tsRaw
+      : (Array.isArray((tsRaw as { series?: TimeseriesPoint[] })?.series) ? (tsRaw as { series: TimeseriesPoint[] }).series : []);
     return {
-      entity_type: (d.entity_type ?? entityType) as AnalyticsEntityType,
-      entity_id: toNumber(d.entity_id ?? entityId),
-      name: (d.name ?? null) as string | null,
+      entity_type: ((entityInfo?.type ?? d.entity_type ?? entityType) as AnalyticsEntityType),
+      entity_id:   toNumber(entityInfo?.id ?? d.entity_id ?? entityId),
+      name:        ((entityInfo?.name ?? d.name ?? null) as string | null),
       totals: {
         page_views:       toNumber(totals.page_views),
         unique_visitors:  toNumber(totals.unique_visitors),
@@ -439,9 +434,9 @@ const PageAnalyticsService = {
         form_start_rate:  totals.form_start_rate !== undefined ? toNumber(totals.form_start_rate) : undefined,
         form_finish_rate: totals.form_finish_rate !== undefined ? toNumber(totals.form_finish_rate) : undefined,
       },
-      timeseries: Array.isArray(d.timeseries) ? d.timeseries : [],
+      timeseries,
       by_path: Array.isArray(d.by_path)
-        ? d.by_path.map((p: Record<string, unknown>) => ({
+        ? (d.by_path as Array<Record<string, unknown>>).map((p) => ({
             page_path:     String(p.page_path ?? ''),
             location_id:   p.location_id != null ? toNumber(p.location_id) : null,
             location_name: (p.location_name ?? null) as string | null,
@@ -451,12 +446,11 @@ const PageAnalyticsService = {
           }))
         : [],
       sources: {
-        utm:       Array.isArray(d.sources?.utm)       ? d.sources!.utm       : [],
-        direct:    Array.isArray(d.sources?.direct)    ? d.sources!.direct    : [],
-        referrers: Array.isArray(d.sources?.referrers) ? d.sources!.referrers : [],
+        utm:       Array.isArray(srcObj.utm)       ? (srcObj.utm as unknown[]).map(normSrc) : [],
+        direct:    directArr,
+        referrers: Array.isArray(srcObj.referrers) ? (srcObj.referrers as unknown[]).map(normRef) : [],
       },
       devices: (() => {
-        // Backend may return { devices, browsers, oses } or a flat DeviceRow[]
         const raw = d.devices as unknown;
         if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
           const obj = raw as Partial<DevicesResponse>;
@@ -467,7 +461,6 @@ const PageAnalyticsService = {
             sources:  (Array.isArray(obj.sources)  ? obj.sources  : []).map(normalizeDeviceRow),
           };
         }
-        // Flat array fallback — treat as device_type list
         return {
           devices:  Array.isArray(raw) ? (raw as unknown[]).map(normalizeDeviceRow) : [],
           browsers: [],
@@ -476,22 +469,46 @@ const PageAnalyticsService = {
         };
       })(),
       countries: Array.isArray(d.countries)
-        ? d.countries.map((c: Record<string, unknown>) => ({
+        ? (d.countries as Array<Record<string, unknown>>).map((c) => ({
             country: (c.country ?? null) as string | null,
-            visits:  toNumber(c.visits),
+            visits:  toNumber(c.visits ?? c.views),
           }))
         : [],
-      recent_conversions: Array.isArray(d.recent_conversions) ? d.recent_conversions : [],
+      recent_conversions: Array.isArray(d.recent_conversions) ? d.recent_conversions as ConversionRow[] : [],
     };
   },
 
   async getSources(filter: DateRangeFilter): Promise<SourcesResponse> {
     const r = await api.get('/page-analytics/sources', { params: buildParams(filter) });
-    const d = unwrap<Partial<SourcesResponse>>(r.data) || {};
+    const d = unwrap<Record<string, unknown>>(r.data) as Record<string, unknown> || {};
+    const normalizeSourceRow = (row: unknown): SourceRow => {
+      const s = (row && typeof row === 'object') ? row as Record<string, unknown> : {};
+      return {
+        source:   (s.source   ?? s.utm_source   ?? null) as string | null,
+        medium:   (s.medium   ?? s.utm_medium   ?? null) as string | null,
+        campaign: (s.campaign ?? s.utm_campaign ?? null) as string | null,
+        visits:   toNumber(s.visits ?? s.views ?? s.count),
+        conversions: toNumber(s.conversions),
+        revenue:  toNumber(s.revenue),
+      };
+    };
+    const rawDirect = d.direct;
+    const directArr: SourceRow[] = rawDirect
+      ? (Array.isArray(rawDirect) ? rawDirect : [rawDirect]).map(normalizeSourceRow)
+      : [];
+    const normalizeReferrer = (row: unknown): ReferrerRow => {
+      const s = (row && typeof row === 'object') ? row as Record<string, unknown> : {};
+      return {
+        referrer:    String(s.referrer ?? ''),
+        visits:      toNumber(s.visits ?? s.views ?? s.count),
+        conversions: toNumber(s.conversions),
+        revenue:     toNumber(s.revenue),
+      };
+    };
     return {
-      utm:       Array.isArray(d.utm)       ? d.utm       : [],
-      direct:    Array.isArray(d.direct)    ? d.direct    : [],
-      referrers: Array.isArray(d.referrers) ? d.referrers : [],
+      utm:       Array.isArray(d.utm)       ? (d.utm as unknown[]).map(normalizeSourceRow) : [],
+      direct:    directArr,
+      referrers: Array.isArray(d.referrers) ? (d.referrers as unknown[]).map(normalizeReferrer) : [],
     };
   },
 
@@ -521,9 +538,19 @@ const PageAnalyticsService = {
     const r = await api.get('/page-analytics/conversions', {
       params: buildParams(filter, { page, per_page: perPage }),
     });
+    const raw = r.data as Record<string, unknown>;
+    if (raw && Array.isArray(raw.data) && raw.pagination && typeof raw.pagination === 'object') {
+      const pg = raw.pagination as { current_page?: number; last_page?: number; per_page?: number; total?: number };
+      return {
+        data: raw.data as ConversionRow[],
+        current_page: pg.current_page ?? 1,
+        last_page: pg.last_page ?? 1,
+        per_page: pg.per_page ?? perPage,
+        total: pg.total ?? 0,
+      };
+    }
     const d = unwrap<PaginatedResponse<ConversionRow> | ConversionRow[]>(r.data);
     if (Array.isArray(d)) {
-      // Backend returned a flat array instead of a paginated envelope.
       return { data: d, current_page: 1, per_page: d.length || perPage, total: d.length, last_page: 1 };
     }
     return { ...d, data: Array.isArray(d.data) ? d.data : [] };
@@ -551,13 +578,37 @@ const PageAnalyticsService = {
     const r = await api.get('/page-analytics/live', {
       params: { minutes, ...(locationId ? { location_id: locationId } : {}) },
     });
-    return unwrap<LiveResponse>(r.data);
+    const d = unwrap<Record<string, unknown>>(r.data) as Record<string, unknown> || {};
+    const byPage = Array.isArray(d.by_page)
+      ? (d.by_page as Array<Record<string, unknown>>).map((p) => ({
+          page_path:  String(p.page_path ?? ''),
+          page_title: (p.page_title ?? null) as string | null,
+          visitors:   toNumber(p.visitors ?? p.active_sessions),
+        }))
+      : [];
+    return {
+      active_visitors: toNumber(d.active_visitors),
+      active_sessions: toNumber(d.active_sessions),
+      by_page: byPage,
+    };
   },
 
   async getLandingPages(filter: DateRangeFilter, limit = 10): Promise<LandingPageRow[]> {
     const r = await api.get('/page-analytics/landing-pages', { params: buildParams(filter, { limit }) });
     const d = unwrap<LandingPageRow[] | { rows: LandingPageRow[] }>(r.data);
-    return Array.isArray(d) ? d : d.rows ?? [];
+    const rows = Array.isArray(d) ? d : (d as { rows?: LandingPageRow[] }).rows ?? [];
+    return rows.map((row) => {
+      const raw = row as unknown as Record<string, unknown>;
+      return {
+        page_path:   String(raw.page_path ?? ''),
+        page_title:  (raw.page_title ?? null) as string | null,
+        entries:     toNumber(raw.entries ?? raw.sessions),
+        bounces:     toNumber(raw.bounces),
+        bounce_rate: toNumber(raw.bounce_rate),
+        conversions: toNumber(raw.conversions),
+        revenue:     toNumber(raw.revenue),
+      };
+    });
   },
 
   async getSession(sessionId: string): Promise<SessionDetailResponse> {
@@ -567,19 +618,87 @@ const PageAnalyticsService = {
 
   async getSearches(filter: DateRangeFilter): Promise<SearchesResponse> {
     const r = await api.get('/page-analytics/searches', { params: buildParams(filter) });
-    return unwrap<SearchesResponse>(r.data);
+    const d = unwrap<Record<string, unknown>>(r.data) as Record<string, unknown> || {};
+    const normalizeQuery = (arr: unknown[]): Array<{ query: string; searches: number; results_avg: number }> =>
+      arr.map((item) => {
+        const row = (item && typeof item === 'object') ? item as Record<string, unknown> : {};
+        return {
+          query:       String(row.query ?? row.q ?? ''),
+          searches:    toNumber(row.searches),
+          results_avg: toNumber(row.results_avg ?? row.avg_results),
+        };
+      });
+    const topRaw     = (d.top_queries ?? d.top) as unknown[];
+    const zeroRaw    = (d.zero_result_queries ?? d.zero_result) as unknown[];
+    return {
+      top_queries: Array.isArray(topRaw)
+        ? normalizeQuery(topRaw)
+        : [],
+      zero_result_queries: Array.isArray(zeroRaw)
+        ? zeroRaw.map((item) => {
+            const row = (item && typeof item === 'object') ? item as Record<string, unknown> : {};
+            return { query: String(row.query ?? row.q ?? ''), searches: toNumber(row.searches) };
+          })
+        : [],
+    };
   },
 
   async getPromoPerformance(filter: DateRangeFilter): Promise<PromoPerformanceRow[]> {
     const r = await api.get('/page-analytics/promo-performance', { params: buildParams(filter) });
     const d = unwrap<PromoPerformanceRow[] | { rows: PromoPerformanceRow[] }>(r.data);
-    return Array.isArray(d) ? d : d.rows ?? [];
+    const rows = Array.isArray(d) ? d : (d as { rows?: PromoPerformanceRow[] }).rows ?? [];
+    return rows.map((row) => {
+      const raw = row as unknown as Record<string, unknown>;
+      return {
+        promo_id:     toNumber(raw.promo_id ?? raw.entity_id),
+        code:         String(raw.code ?? ''),
+        validations:  toNumber(raw.validations),
+        applications: toNumber(raw.applications),
+        failures:     toNumber(raw.failures),
+        revenue:      toNumber(raw.revenue ?? raw.revenue_attributed),
+      };
+    });
   },
 
   async getAttribution(filter: DateRangeFilter): Promise<AttributionRow[]> {
     const r = await api.get('/page-analytics/attribution', { params: buildParams(filter) });
-    const d = unwrap<AttributionRow[] | { rows: AttributionRow[] }>(r.data);
-    return Array.isArray(d) ? d : d.rows ?? [];
+    const d = unwrap<Record<string, unknown>>(r.data) as Record<string, unknown>;
+    if (d && !Array.isArray(d) && ('first_touch' in d || 'last_touch' in d)) {
+      type TouchRow = { source?: string | null; medium?: string | null; campaign?: string | null; revenue?: number };
+      const firstArr = Array.isArray(d.first_touch) ? d.first_touch as TouchRow[] : [];
+      const lastArr  = Array.isArray(d.last_touch)  ? d.last_touch  as TouchRow[] : [];
+      const merged = new Map<string, AttributionRow>();
+      firstArr.forEach((row) => {
+        const key = `${row.source ?? ''}|${row.medium ?? ''}|${row.campaign ?? ''}`;
+        merged.set(key, {
+          source: row.source ?? null,
+          medium: row.medium ?? null,
+          campaign: row.campaign ?? null,
+          first_touch_revenue: toNumber(row.revenue),
+          last_touch_revenue: 0,
+        });
+      });
+      lastArr.forEach((row) => {
+        const key = `${row.source ?? ''}|${row.medium ?? ''}|${row.campaign ?? ''}`;
+        const existing = merged.get(key);
+        if (existing) {
+          existing.last_touch_revenue = toNumber(row.revenue);
+        } else {
+          merged.set(key, {
+            source: row.source ?? null,
+            medium: row.medium ?? null,
+            campaign: row.campaign ?? null,
+            first_touch_revenue: 0,
+            last_touch_revenue: toNumber(row.revenue),
+          });
+        }
+      });
+      return Array.from(merged.values()).sort(
+        (a, b) => (b.first_touch_revenue + b.last_touch_revenue) - (a.first_touch_revenue + a.last_touch_revenue)
+      );
+    }
+    const list = Array.isArray(d) ? d : (d as { rows?: AttributionRow[] }).rows ?? [];
+    return Array.isArray(list) ? list as AttributionRow[] : [];
   },
 };
 

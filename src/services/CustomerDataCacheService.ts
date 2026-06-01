@@ -1,14 +1,3 @@
-/**
- * CustomerDataCacheService
- * 
- * Caches grouped customer-facing data (attractions, packages, events) using
- * the Cache Storage API. Follows the same stale-while-revalidate pattern
- * used by admin cache services (PackageCacheService, AttractionCacheService).
- *
- * - Loads cached data instantly on mount
- * - Background-fetches fresh data from the API
- * - Dispatches CustomEvent when cache is updated so components can re-render
- */
 
 import { customerService, type GroupedAttraction, type GroupedPackage, type GroupedEvent } from './CustomerService';
 
@@ -64,7 +53,6 @@ class CustomerDataCacheService {
     return response.json();
   }
 
-  // ── Cache read/write ───────────────────────────────────────────
 
   async getCachedAttractions(): Promise<GroupedAttraction[] | null> {
     const cache = await this.getCache();
@@ -118,7 +106,6 @@ class CustomerDataCacheService {
     return Date.now() - meta.lastUpdated > maxAgeMinutes * 60 * 1000;
   }
 
-  // ── Fetch from API and update cache ────────────────────────────
 
   async fetchAndCache(): Promise<CustomerDataCache> {
     const [attractionsResult, packagesResult, eventsResult] = await Promise.allSettled([

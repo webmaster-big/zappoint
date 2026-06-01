@@ -1,14 +1,3 @@
-/**
- * Analytics request headers — injects X-Visitor-Id, X-Session-Id,
- * X-Analytics-Source (and optional X-Tracking-Id) into every axios request.
- *
- * Hooks into the same `axios.create` monkey-patch pattern used by
- * `apiInterceptors.ts` so every service-layer axios instance picks up the
- * headers automatically.
- *
- * Import this file from `main.tsx` AFTER `./utils/apiInterceptors` so both
- * patches stack.
- */
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 
 const VISITOR_KEY = 'analytics_visitor_id';
@@ -23,9 +12,7 @@ const safeUuid = (): string => {
       return crypto.randomUUID();
     }
   } catch {
-    /* fall through */
   }
-  // RFC4122 v4 fallback
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -42,7 +29,6 @@ const getOrMake = (key: string, store: Storage): string => {
     }
     return v;
   } catch {
-    // Storage may be unavailable (privacy mode). Fall back to a per-call UUID.
     return safeUuid();
   }
 };
@@ -75,12 +61,6 @@ export const isAnalyticsDnt = (): boolean => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// One-shot per-conversion tracking ID. Call `setNextTrackingId()` from your
-// "place order" / "submit RSVP" handler immediately before the POST that
-// creates the booking / purchase. The next outgoing axios request consumes
-// the value and clears it, so a stale ID can't leak into unrelated calls.
-// ---------------------------------------------------------------------------
 let pendingTrackingId: string | null = null;
 
 export const setNextTrackingId = (id?: string): string => {
@@ -99,7 +79,6 @@ const consumePendingTrackingId = (): string | null => {
 const setHeader = (config: InternalAxiosRequestConfig, name: string, value: string): void => {
   const headers = config.headers as unknown as Record<string, unknown> | undefined;
   if (!headers) return;
-  // AxiosHeaders has a `.set()` method; plain objects don't.
   if (typeof (headers as { set?: (k: string, v: string) => void }).set === 'function') {
     (headers as { set: (k: string, v: string) => void }).set(name, value);
   } else {
@@ -114,7 +93,6 @@ const attachAnalyticsHeaders = (instance: AxiosInstance): void => {
         if (isAnalyticsDnt()) return config;
         setHeader(config, 'X-Visitor-Id', getVisitorId());
         setHeader(config, 'X-Session-Id', getSessionId());
-        // Only set source if the caller hasn't already chosen one.
         const headers = config.headers as unknown as Record<string, unknown> | undefined;
         const hasSource = !!headers && (
           'X-Analytics-Source' in headers ||
@@ -125,7 +103,6 @@ const attachAnalyticsHeaders = (instance: AxiosInstance): void => {
         const tracking = consumePendingTrackingId();
         if (tracking) setHeader(config, 'X-Tracking-Id', tracking);
       } catch {
-        /* never block a request because of analytics */
       }
       return config;
     },
@@ -133,7 +110,6 @@ const attachAnalyticsHeaders = (instance: AxiosInstance): void => {
   );
 };
 
-// ---- Monkey-patch axios.create so every instance gets the headers ---------
 const PATCH_FLAG = Symbol.for('zapzone.axios.create.analytics-patched');
 const axiosAny = axios as unknown as { create: typeof axios.create; [k: symbol]: unknown };
 
@@ -145,7 +121,6 @@ if (!axiosAny[PATCH_FLAG]) {
     return instance;
   }) as typeof axios.create;
 
-  // Cover the default singleton too.
   attachAnalyticsHeaders(axios as unknown as AxiosInstance);
 
   axiosAny[PATCH_FLAG] = true;

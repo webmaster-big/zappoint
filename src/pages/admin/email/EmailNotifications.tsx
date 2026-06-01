@@ -1,4 +1,3 @@
-// src/pages/admin/email/EmailNotifications.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -44,7 +43,6 @@ const EmailNotifications: React.FC = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
-  // State
   const [notifications, setNotifications] = useState<EmailNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
@@ -75,7 +73,6 @@ const EmailNotifications: React.FC = () => {
   const [sendingTest, setSendingTest] = useState(false);
   const [triggerTypes, setTriggerTypes] = useState<Record<string, string>>({});
 
-  // Statistics (calculated from loaded notifications)
   const stats = {
     total: totalItems,
     active: notifications.filter(n => n.is_active).length,
@@ -85,7 +82,6 @@ const EmailNotifications: React.FC = () => {
     payment: notifications.filter(n => n.trigger_type.startsWith('payment_')).length,
   };
 
-  // Get trigger type category icon
   const getTriggerIcon = (triggerType: TriggerType) => {
     if (triggerType.startsWith('booking_')) return Calendar;
     if (triggerType.startsWith('purchase_')) return Ticket;
@@ -93,19 +89,16 @@ const EmailNotifications: React.FC = () => {
     return Bell;
   };
 
-  // Get trigger type category color
   const getTriggerColor = () => {
     return `bg-${themeColor}-100 text-${themeColor}-700 border-${themeColor}-200`;
   };
 
-  // Get entity type icon
   const getEntityIcon = (entityType: EntityType) => {
     if (entityType === 'package') return Package;
     if (entityType === 'attraction') return Ticket;
     return Users;
   };
 
-  // Fetch trigger types
   useEffect(() => {
     const fetchTriggerTypes = async () => {
       try {
@@ -120,7 +113,6 @@ const EmailNotifications: React.FC = () => {
     fetchTriggerTypes();
   }, []);
 
-  // Fetch locations for company admin
   useEffect(() => {
     const fetchLocations = async () => {
       if (isCompanyAdmin) {
@@ -137,7 +129,6 @@ const EmailNotifications: React.FC = () => {
     fetchLocations();
   }, [isCompanyAdmin]);
 
-  // Fetch notifications
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
@@ -185,7 +176,6 @@ const EmailNotifications: React.FC = () => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Handle delete notification
   const handleDelete = async (id: number) => {
     try {
       const response = await emailNotificationService.delete(id);
@@ -204,7 +194,6 @@ const EmailNotifications: React.FC = () => {
     }
   };
 
-  // Handle reset-to-default (defaults only)
   const handleResetDefault = async (notification: EmailNotification) => {
     try {
       const response = await emailNotificationService.resetDefault(notification.id);
@@ -220,7 +209,6 @@ const EmailNotifications: React.FC = () => {
     }
   };
 
-  // Handle toggle status
   const handleToggleStatus = async (notification: EmailNotification) => {
     try {
       const response = await emailNotificationService.toggleStatus(notification.id);
@@ -237,7 +225,6 @@ const EmailNotifications: React.FC = () => {
     }
   };
 
-  // Handle duplicate
   const handleDuplicate = async (id: number) => {
     try {
       const response = await emailNotificationService.duplicate(id);
@@ -251,7 +238,6 @@ const EmailNotifications: React.FC = () => {
     }
   };
 
-  // Handle send test email
   const handleSendTestEmail = async () => {
     if (!testEmailModal || !testEmail.trim()) return;
 
@@ -273,14 +259,12 @@ const EmailNotifications: React.FC = () => {
     }
   };
 
-  // Format trigger type for display
   const formatTriggerType = (triggerType: TriggerType) => {
     return triggerTypes[triggerType] || triggerType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Email Notifications</h1>
@@ -303,7 +287,6 @@ const EmailNotifications: React.FC = () => {
         </div>
       </div>
 
-      {/* Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
           <div className="flex items-center gap-2">
@@ -394,7 +377,6 @@ const EmailNotifications: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -432,11 +414,9 @@ const EmailNotifications: React.FC = () => {
           </div>
         </div>
         
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCompanyAdmin && locations.length > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
-              {/* Location Filter (Company Admin only) */}
               {isCompanyAdmin && locations.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
@@ -458,7 +438,6 @@ const EmailNotifications: React.FC = () => {
                 </div>
               )}
 
-              {/* Trigger Type Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Trigger Type</label>
                 <select
@@ -490,7 +469,6 @@ const EmailNotifications: React.FC = () => {
                 </select>
               </div>
 
-              {/* Entity Type Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Entity Type</label>
                 <select
@@ -507,7 +485,6 @@ const EmailNotifications: React.FC = () => {
                 </select>
               </div>
 
-              {/* Status Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                 <select
@@ -524,7 +501,6 @@ const EmailNotifications: React.FC = () => {
                 </select>
               </div>
 
-              {/* Type Filter (Default vs Custom) */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
                 <select
@@ -558,7 +534,6 @@ const EmailNotifications: React.FC = () => {
         )}
       </div>
 
-      {/* Notifications Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
@@ -586,7 +561,6 @@ const EmailNotifications: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -732,7 +706,6 @@ const EmailNotifications: React.FC = () => {
               </table>
             </div>
 
-            {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-gray-100">
               {notifications.map((notification) => {
                 const TriggerIcon = getTriggerIcon(notification.trigger_type);
@@ -803,7 +776,6 @@ const EmailNotifications: React.FC = () => {
               })}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <Pagination
@@ -820,7 +792,6 @@ const EmailNotifications: React.FC = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -848,7 +819,6 @@ const EmailNotifications: React.FC = () => {
         </div>
       )}
 
-      {/* Reset to Default Confirmation Modal */}
       {resetConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -877,7 +847,6 @@ const EmailNotifications: React.FC = () => {
         </div>
       )}
 
-      {/* Test Email Modal */}
       {testEmailModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -928,7 +897,6 @@ const EmailNotifications: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}

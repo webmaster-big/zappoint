@@ -2,7 +2,6 @@ import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import type { GlobalNote, CreateGlobalNoteData, UpdateGlobalNoteData, GlobalNoteFilters } from '../types/globalNotes.types';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -11,7 +10,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -25,7 +23,6 @@ api.interceptors.request.use(
   }
 );
 
-// API Response types
 interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -33,9 +30,6 @@ interface ApiResponse<T> {
 }
 
 class GlobalNoteService {
-  /**
-   * Get all global notes with optional filters
-   */
   async getGlobalNotes(filters?: GlobalNoteFilters): Promise<ApiResponse<GlobalNote[]>> {
     const params = new URLSearchParams();
     
@@ -50,49 +44,31 @@ class GlobalNoteService {
     return response.data;
   }
 
-  /**
-   * Get notes for a specific package (including global notes that apply to it)
-   */
   async getNotesForPackage(packageId: number): Promise<ApiResponse<GlobalNote[]>> {
     const response = await api.get(`/global-notes/package/${packageId}`);
     return response.data;
   }
 
-  /**
-   * Get a single global note by ID
-   */
   async getGlobalNote(id: number): Promise<ApiResponse<GlobalNote>> {
     const response = await api.get(`/global-notes/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new global note
-   */
   async createGlobalNote(data: CreateGlobalNoteData): Promise<ApiResponse<GlobalNote>> {
     const response = await api.post('/global-notes', data);
     return response.data;
   }
 
-  /**
-   * Update an existing global note
-   */
   async updateGlobalNote(id: number, data: UpdateGlobalNoteData): Promise<ApiResponse<GlobalNote>> {
     const response = await api.put(`/global-notes/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a global note
-   */
   async deleteGlobalNote(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/global-notes/${id}`);
     return response.data;
   }
 
-  /**
-   * Toggle the active status of a global note
-   */
   async toggleStatus(id: number): Promise<ApiResponse<GlobalNote>> {
     const response = await api.patch(`/global-notes/${id}/toggle-status`);
     return response.data;

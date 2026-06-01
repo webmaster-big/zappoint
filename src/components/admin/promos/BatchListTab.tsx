@@ -77,7 +77,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
       showToast(`${response.data.quantity} codes generated successfully!`, "success");
       setShowBulkModal(false);
       await loadBatches();
-      // Navigate to the new batch detail
       onViewBatch(response.data.batch_id);
     } catch (err: unknown) {
       const error = err as { response?: { status?: number; data?: { message?: string; errors?: Record<string, string[]> } } };
@@ -149,7 +148,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="text-sm text-gray-500">
           {batches.length} batch{batches.length !== 1 ? "es" : ""}
@@ -164,7 +162,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
         </div>
       </div>
 
-      {/* Batch List */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -180,7 +177,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
                 className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  {/* Left: Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-gray-900 truncate">{batch.name}</h3>
@@ -198,7 +194,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
                       <span>{batch.total_codes} codes</span>
                     </div>
 
-                    {/* Usage Progress */}
                     <div className="mt-3 max-w-md">
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
                         <span>{batch.total_used} used</span>
@@ -212,7 +207,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
                       </div>
                     </div>
 
-                    {/* Stats Pills */}
                     <div className="flex gap-2 mt-3">
                       <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
                         {batch.active_codes} active
@@ -223,7 +217,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
                   <div className="flex flex-wrap gap-2 lg:flex-nowrap">
                     <StandardButton variant="secondary" size="sm" icon={Eye} onClick={() => onViewBatch(batch.batch_id)}>
                       View
@@ -266,7 +259,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
         </div>
       )}
 
-      {/* Generate Bulk Modal */}
       <GenerateBulkModal
         open={showBulkModal}
         onClose={() => setShowBulkModal(false)}
@@ -274,7 +266,6 @@ const BatchListTab: React.FC<BatchListTabProps> = ({ onViewBatch }) => {
         loading={generating}
       />
 
-      {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

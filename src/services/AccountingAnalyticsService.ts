@@ -8,7 +8,6 @@ import type {
   ExportParams,
 } from '../types/AccountingAnalytics.types';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -17,7 +16,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -31,16 +29,7 @@ api.interceptors.request.use(
   }
 );
 
-/**
- * Accounting & Analytics Service
- * Provides financial reporting data for accounting teams
- */
 export const accountingAnalyticsService = {
-  /**
-   * Get accounting report for a specific date
-   * @param params - Report parameters including location_id, date, and optional filters
-   * @returns Accounting report with categorized sales data
-   */
   async getReport(params: AccountingReportParams): Promise<AccountingReportResponse> {
     const queryParams = new URLSearchParams();
     
@@ -75,11 +64,6 @@ export const accountingAnalyticsService = {
     return response.data;
   },
 
-  /**
-   * Get summary trend for a date range
-   * @param params - Trend parameters including location_id, start_date, end_date
-   * @returns Daily summary data for the date range
-   */
   async getSummaryTrend(params: SummaryTrendParams): Promise<SummaryTrendResponse> {
     const queryParams = new URLSearchParams();
     
@@ -97,11 +81,6 @@ export const accountingAnalyticsService = {
     return response.data;
   },
 
-  /**
-   * Export report data
-   * @param params - Export parameters including format (json or csv)
-   * @returns Export blob or JSON data
-   */
   async exportReport(params: ExportParams): Promise<Blob | object> {
     const queryParams = new URLSearchParams();
     
@@ -130,10 +109,6 @@ export const accountingAnalyticsService = {
     return response.data;
   },
 
-  /**
-   * Download CSV export directly
-   * Opens the download in a new window
-   */
   downloadCSV(locationId: number, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for'): void {
     const queryParams = new URLSearchParams({
       location_id: locationId.toString(),
@@ -145,7 +120,6 @@ export const accountingAnalyticsService = {
       queryParams.append('end_date', endDate);
     }
     
-    // Using fetch with blob and creating a download link
     api.get(`/accounting-analytics/export?${queryParams.toString()}`, {
       responseType: 'blob',
     }).then((response) => {

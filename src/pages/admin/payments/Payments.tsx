@@ -1,4 +1,3 @@
-// src/pages/admin/payments/Payments.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -68,11 +67,6 @@ import type { PaymentsPagePayment, PaymentsFilterOptions, PaymentsMetrics } from
 import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
 import type { PaymentPayableType } from '../../../types/Payment.types';
 
-/**
- * Normalize payable_type from API response.
- * The backend may return the full Laravel class name (e.g. "App\Models\Booking")
- * or the short morph alias ("booking"). This ensures we always use the short form.
- */
 const normalizePayableType = (type?: string | null): PaymentPayableType | undefined => {
   if (!type) return undefined;
   const lower = type.toLowerCase();
@@ -89,7 +83,6 @@ const Payments: React.FC = () => {
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const isLocationManager = currentUser?.role === 'location_manager';
   
-  // State
   const [payments, setPayments] = useState<PaymentsPagePayment[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<PaymentsPagePayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +105,6 @@ const Payments: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [totalPages, setTotalPages] = useState(1);
   
-  // View mode: active payments or trashed (soft-deleted) payments
   const [viewMode, setViewMode] = useState<'active' | 'trashed'>('active');
   const [trashedPayments, setTrashedPayments] = useState<PaymentsPagePayment[]>([]);
   const [loadingTrashed, setLoadingTrashed] = useState(false);
@@ -122,11 +114,9 @@ const Payments: React.FC = () => {
     payment: PaymentsPagePayment;
   } | null>(null);
 
-  // Selection state for bulk actions
   const [selectedPayments, setSelectedPayments] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
   
-  // Invoice Export Modal state
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<'custom' | 'today' | 'week' | 'current_week' | 'last_week'>('custom');
   const [exportFilters, setExportFilters] = useState<InvoiceExportFilters>({
@@ -134,7 +124,6 @@ const Payments: React.FC = () => {
   });
   const [exportDate, setExportDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
-  // Package Invoice Export Modal state
   const [showPackageInvoiceModal, setShowPackageInvoiceModal] = useState(false);
   const [packageInvoiceFilters, setPackageInvoiceFilters] = useState<PackageInvoiceFilters>({
     package_id: 0
@@ -142,7 +131,6 @@ const Payments: React.FC = () => {
   const [availablePackages, setAvailablePackages] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
 
-  // Status and method configuration
   const statusConfig = {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Completed' },
@@ -164,7 +152,6 @@ const Payments: React.FC = () => {
     event_purchase: { icon: Calendar, label: 'Event Purchase', color: 'bg-amber-100 text-amber-800' }
   };
 
-  // Calculate metrics
   const metrics: PaymentsMetrics = {
     totalPayments: payments.length,
     totalRevenue: payments.reduce((sum, p) => sum + p.amount, 0),
@@ -209,7 +196,6 @@ const Payments: React.FC = () => {
     }
   ];
 
-  // Load payments from backend
   const loadPayments = useCallback(async () => {
     try {
       setLoading(true);
@@ -218,7 +204,6 @@ const Payments: React.FC = () => {
         per_page: 1000, // Load all for client-side filtering
       };
       
-      // Apply location filter
       if (selectedLocation) {
         params.location_id = parseInt(selectedLocation);
       } else if (isLocationManager && currentUser?.location_id) {
@@ -231,15 +216,12 @@ const Payments: React.FC = () => {
       
       if (response.success && response.data) {
         const transformedPayments: PaymentsPagePayment[] = response.data.payments.map((payment: Payment) => {
-          // Normalize payable_type (handles full Laravel class names like "App\Models\Booking")
           const payableType = normalizePayableType(payment.payable_type as string);
           
-          // Get booking or attraction purchase details
           const booking = payment.booking;
           const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
           const eventPurchase = payment.eventPurchase || payment.event_purchase;
           
-          // Determine customer name from payment relationships or booking/purchase
           let customerName = 'Guest';
           let customerEmail = 'N/A';
           
@@ -257,7 +239,6 @@ const Payments: React.FC = () => {
             customerEmail = eventPurchase.guest_email || 'N/A';
           }
           
-          // Build reference string with more details
           let payableReference = 'N/A';
           let payableDescription = 'Unknown';
           
@@ -298,21 +279,17 @@ const Payments: React.FC = () => {
             refunded_at: payment.refunded_at,
             created_at: payment.created_at,
             updated_at: payment.updated_at,
-            // Relationships
             booking: booking,
             attractionPurchase: attractionPurchase,
-            // Display-friendly fields
             customerName,
             customerEmail,
             locationName: payment.location?.name || 'N/A',
             payableReference,
             payableDescription,
-            // Additional details
             bookingDate: booking?.booking_date,
             bookingTime: booking?.booking_time,
             participants: booking?.participants,
             guestName: booking?.guest_name || attractionPurchase?.guest_name,
-            // Signature & Terms
             signature_image: payment.signature_image || null,
             terms_accepted: payment.terms_accepted ?? null,
           };
@@ -328,11 +305,9 @@ const Payments: React.FC = () => {
     }
   }, [selectedLocation, isLocationManager, currentUser?.location_id]);
 
-  // Apply filters to payments
   const applyFilters = useCallback(() => {
     let result = [...payments];
 
-    // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(payment =>
@@ -344,22 +319,18 @@ const Payments: React.FC = () => {
       );
     }
 
-    // Apply status filter
     if (filters.status !== 'all') {
       result = result.filter(payment => payment.status === filters.status);
     }
 
-    // Apply method filter
     if (filters.method !== 'all') {
       result = result.filter(payment => payment.method === filters.method);
     }
 
-    // Apply payable type filter
     if (filters.payable_type !== 'all') {
       result = result.filter(payment => payment.payable_type === filters.payable_type);
     }
 
-    // Apply date range filter
     if (filters.dateRange !== 'all') {
       const now = new Date();
       let startDate: Date;
@@ -387,7 +358,6 @@ const Payments: React.FC = () => {
       result = result.filter(payment => new Date(payment.created_at) >= startDate);
     }
 
-    // Apply custom date range
     if (filters.startDate) {
       result = result.filter(payment => new Date(payment.created_at) >= new Date(filters.startDate));
     }
@@ -397,7 +367,6 @@ const Payments: React.FC = () => {
       result = result.filter(payment => new Date(payment.created_at) <= endDate);
     }
 
-    // Apply sorting
     result.sort((a, b) => {
       let aVal: string | number, bVal: string | number;
       switch (sortField) {
@@ -425,7 +394,6 @@ const Payments: React.FC = () => {
     setTotalPages(Math.ceil(result.length / itemsPerPage));
   }, [payments, filters, sortField, sortDirection, itemsPerPage]);
 
-  // Load locations for company admin
   const loadLocations = useCallback(async () => {
     if (isCompanyAdmin) {
       try {
@@ -443,7 +411,6 @@ const Payments: React.FC = () => {
     }
   }, [isCompanyAdmin]);
 
-  // Effects
   useEffect(() => {
     loadLocations();
   }, [loadLocations]);
@@ -456,12 +423,10 @@ const Payments: React.FC = () => {
     applyFilters();
   }, [applyFilters]);
 
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [filters]);
 
-  // Handlers
   const handleFilterChange = (key: keyof PaymentsFilterOptions, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -487,7 +452,6 @@ const Payments: React.FC = () => {
     }
   };
 
-  // Selection handlers
   const togglePaymentSelection = (paymentId: number) => {
     setSelectedPayments(prev => {
       const newSet = new Set(prev);
@@ -512,7 +476,6 @@ const Payments: React.FC = () => {
     setSelectedPayments(new Set());
   };
 
-  // Invoice handlers - using unified getInvoice function
   const handleInvoice = async (paymentId: number, stream: boolean = true) => {
     try {
       setToast({ message: stream ? 'Opening invoice...' : 'Downloading invoice...', type: 'info' });
@@ -546,9 +509,7 @@ const Payments: React.FC = () => {
     }
   };
 
-  // Open export modal
   const openExportModal = () => {
-    // Pre-fill export filters from current page filters
     const newExportFilters: InvoiceExportFilters = {
       view_mode: 'report'
     };
@@ -569,7 +530,6 @@ const Payments: React.FC = () => {
     setShowExportModal(true);
   };
 
-  // Handle export from modal
   const handleExportFromModal = async (stream: boolean = false) => {
     try {
       setIsExporting(true);
@@ -581,14 +541,12 @@ const Payments: React.FC = () => {
       } else if (exportMode === 'current_week') {
         await exportInvoicesForWeek('current', stream);
       } else if (exportMode === 'last_week') {
-        // Calculate a date from last week (7 days ago)
         const lastWeekDate = new Date();
         lastWeekDate.setDate(lastWeekDate.getDate() - 7);
         await exportInvoicesForWeek(lastWeekDate.toISOString().split('T')[0], stream);
       } else if (exportMode === 'week') {
         await exportInvoicesForWeek(exportDate, stream);
       } else {
-        // Custom mode - use all filters
         await exportInvoices(exportFilters, stream);
       }
       
@@ -603,13 +561,11 @@ const Payments: React.FC = () => {
     }
   };
 
-  // Open Package Invoice Modal
   const handleOpenPackageInvoiceModal = async () => {
     setShowPackageInvoiceModal(true);
     setLoadingPackages(true);
     
     try {
-      // Get location_id for filtering packages
       const locationId = selectedLocation 
         ? parseInt(selectedLocation) 
         : (isLocationManager && currentUser?.location_id ? currentUser.location_id : undefined);
@@ -635,13 +591,11 @@ const Payments: React.FC = () => {
       setLoadingPackages(false);
     }
     
-    // Reset filters
     setPackageInvoiceFilters({
       package_id: 0
     });
   };
 
-  // Handle Package Invoice Export
   const handlePackageInvoiceExport = async (stream: boolean = false) => {
     if (!packageInvoiceFilters.package_id) {
       setToast({ message: 'Please select a package', type: 'error' });
@@ -696,14 +650,12 @@ const Payments: React.FC = () => {
     setToast({ message: 'Payments exported successfully', type: 'success' });
   };
 
-  // Refund/Void state
   const [selectedPaymentForAction, setSelectedPaymentForAction] = useState<PaymentsPagePayment | null>(null);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showManualRefundModal, setShowManualRefundModal] = useState(false);
   const [openActionsMenu, setOpenActionsMenu] = useState<number | null>(null);
 
-  // Signature & Terms modal state
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureModalPayment, setSignatureModalPayment] = useState<PaymentsPagePayment | null>(null);
 
@@ -726,16 +678,12 @@ const Payments: React.FC = () => {
   };
 
   const handleRefundComplete = (response: RefundResponse) => {
-    // Update the payments list:
-    // 1. Update the original payment (notes changed)
-    // 2. Add the new refund payment record to the list
     setPayments((prev) => {
       const updated = prev.map((p) =>
         p.id === response.data.original_payment.id
           ? { ...p, notes: response.data.original_payment.notes ?? p.notes }
           : p
       );
-      // Create a new display-friendly refund record
       const refundPmt = response.data.refund_payment;
       const originalPayment = prev.find(p => p.id === response.data.original_payment.id);
       const refundRecord: PaymentsPagePayment = {
@@ -761,7 +709,6 @@ const Payments: React.FC = () => {
         payableReference: `Refund #${refundPmt.id}`,
         payableDescription: `Refund from Payment #${response.data.original_payment.id}`,
       };
-      // Insert the refund record right after the original
       const originalIndex = updated.findIndex(p => p.id === response.data.original_payment.id);
       if (originalIndex >= 0) {
         updated.splice(originalIndex + 1, 0, refundRecord);
@@ -773,16 +720,12 @@ const Payments: React.FC = () => {
   };
 
   const handleVoidComplete = (response: VoidResponse) => {
-    // Update the payments list:
-    // 1. Update the original payment (status → voided)
-    // 2. Add the new void payment record
     setPayments((prev) => {
       const updated = prev.map((p) =>
         p.id === response.data.original_payment.id
           ? { ...p, status: 'voided' as const, notes: response.data.original_payment.notes ?? p.notes }
           : p
       );
-      // Create a void audit record
       const voidPmt = response.data.void_payment;
       const originalPayment = prev.find(p => p.id === response.data.original_payment.id);
       const voidRecord: PaymentsPagePayment = {
@@ -819,7 +762,6 @@ const Payments: React.FC = () => {
   };
 
   const handleManualRefundComplete = (response: ManualRefundResponse) => {
-    // Same pattern as handleRefundComplete — update original + add refund record
     setPayments((prev) => {
       const updated = prev.map((p) =>
         p.id === response.data.original_payment.id
@@ -871,7 +813,6 @@ const Payments: React.FC = () => {
     });
   };
 
-  // --- Soft Delete / Restore / Force Delete handlers ---
   const loadTrashedPayments = useCallback(async () => {
     try {
       setLoadingTrashed(true);
@@ -889,7 +830,6 @@ const Payments: React.FC = () => {
           const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
           const eventPurchase = payment.eventPurchase || payment.event_purchase;
           
-          // Determine customer name — same logic as loadPayments
           let customerName = 'Guest';
           let customerEmail = 'N/A';
           
@@ -907,7 +847,6 @@ const Payments: React.FC = () => {
             customerEmail = eventPurchase.guest_email || 'N/A';
           }
           
-          // Build reference string with details — same logic as loadPayments
           let payableReference = 'N/A';
           let payableDescription = 'Unknown';
           
@@ -949,21 +888,17 @@ const Payments: React.FC = () => {
             created_at: payment.created_at,
             updated_at: payment.updated_at,
             deleted_at: payment.deleted_at,
-            // Relationships
             booking: booking,
             attractionPurchase: attractionPurchase,
-            // Display-friendly fields
             customerName,
             customerEmail,
             locationName: payment.location?.name || 'N/A',
             payableReference,
             payableDescription,
-            // Additional details
             bookingDate: booking?.booking_date,
             bookingTime: booking?.booking_time,
             participants: booking?.participants,
             guestName: booking?.guest_name || attractionPurchase?.guest_name,
-            // Signature & Terms
             signature_image: payment.signature_image || null,
             terms_accepted: payment.terms_accepted ?? null,
           };
@@ -1002,7 +937,6 @@ const Payments: React.FC = () => {
       if (response.success) {
         setTrashedPayments(prev => prev.filter(p => p.id !== payment.id));
         setToast({ message: 'Payment restored successfully. Linked totals recalculated.', type: 'success' });
-        // Reload active payments to include restored one
         loadPayments();
       } else {
         setToast({ message: 'Failed to restore payment', type: 'error' });
@@ -1030,14 +964,12 @@ const Payments: React.FC = () => {
     setConfirmDialog(null);
   };
 
-  // Load trashed payments when switching to trashed view
   useEffect(() => {
     if (viewMode === 'trashed') {
       loadTrashedPayments();
     }
   }, [viewMode, loadTrashedPayments]);
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPayments = filteredPayments.slice(indexOfFirstItem, indexOfLastItem);
@@ -1054,7 +986,6 @@ const Payments: React.FC = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
@@ -1113,7 +1044,6 @@ const Payments: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metricCards.map((metric, index) => {
           const Icon = metric.icon;
@@ -1137,7 +1067,6 @@ const Payments: React.FC = () => {
 
 
 
-      {/* Trashed Payments View */}
       {viewMode === 'trashed' ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1269,9 +1198,7 @@ const Payments: React.FC = () => {
         </div>
       ) : (
       <>
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        {/* Bulk Actions Bar - Shows when items are selected */}
         {selectedPayments.size > 0 && (
           <div className={`flex items-center justify-between p-3 mb-4 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
             <div className="flex items-center gap-3">
@@ -1341,7 +1268,6 @@ const Payments: React.FC = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1435,7 +1361,6 @@ const Payments: React.FC = () => {
         )}
       </div>
 
-      {/* Payments Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1638,7 +1563,6 @@ const Payments: React.FC = () => {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          {/* Actions dropdown for refund/void/manual-refund/delete */}
                           {(canRefund(payment) || canVoid(payment) || canManualRefund(payment) || payment.status === 'completed') && (
                             <div className="relative">
                               <button
@@ -1706,7 +1630,6 @@ const Payments: React.FC = () => {
                                         View Details
                                       </button>
                                     )}
-                                    {/* Soft Delete */}
                                     <button
                                       onClick={() => {
                                         setConfirmDialog({ type: 'soft-delete', payment });
@@ -1725,7 +1648,6 @@ const Payments: React.FC = () => {
                               )}
                             </div>
                           )}
-                          {/* Simple details button for non-actionable payments */}
                           {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.status !== 'completed' && payment.payable_id && (
                             <button
                               onClick={() => {
@@ -1753,7 +1675,6 @@ const Payments: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {filteredPayments.length > 0 && (
           <div className="px-6 py-4 border-t border-gray-100">
             <Pagination
@@ -1771,7 +1692,6 @@ const Payments: React.FC = () => {
       </>
       )}
 
-      {/* Confirmation Dialog for soft-delete / restore / force-delete */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1870,7 +1790,6 @@ const Payments: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast
@@ -1881,11 +1800,9 @@ const Payments: React.FC = () => {
         </div>
       )}
 
-      {/* Invoice Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
@@ -1901,9 +1818,7 @@ const Payments: React.FC = () => {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="px-6 py-4 space-y-4">
-              {/* Export Mode Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Export Mode</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1950,7 +1865,6 @@ const Payments: React.FC = () => {
                 </div>
               </div>
 
-              {/* Week by Date */}
               {exportMode === 'week' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1966,7 +1880,6 @@ const Payments: React.FC = () => {
                 </div>
               )}
 
-              {/* Custom Filters */}
               {exportMode === 'custom' && (
                 <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                   <div className="grid grid-cols-2 gap-3">
@@ -2044,7 +1957,6 @@ const Payments: React.FC = () => {
                 </div>
               )}
 
-              {/* View Mode Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Report Format</label>
                 <div className="flex gap-3">
@@ -2079,7 +1991,6 @@ const Payments: React.FC = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
               <StandardButton
                 variant="ghost"
@@ -2109,11 +2020,9 @@ const Payments: React.FC = () => {
         </div>
       )}
 
-      {/* Package Invoice Export Modal */}
       {showPackageInvoiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
@@ -2132,9 +2041,7 @@ const Payments: React.FC = () => {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="px-6 py-4 space-y-4">
-              {/* Package Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Package *</label>
                 {loadingPackages ? (
@@ -2158,7 +2065,6 @@ const Payments: React.FC = () => {
                 )}
               </div>
 
-              {/* Date Filters */}
               <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                 <p className="text-xs font-medium text-gray-600 uppercase">Optional Filters</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -2201,7 +2107,6 @@ const Payments: React.FC = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
               <StandardButton
                 variant="ghost"
@@ -2231,7 +2136,6 @@ const Payments: React.FC = () => {
         </div>
       )}
 
-      {/* Refund Modal */}
       <RefundModal
         payment={selectedPaymentForAction}
         open={showRefundModal}
@@ -2243,7 +2147,6 @@ const Payments: React.FC = () => {
         onToast={(message, type) => setToast({ message, type })}
       />
 
-      {/* Void Dialog */}
       <VoidDialog
         payment={selectedPaymentForAction}
         open={showVoidDialog}
@@ -2255,7 +2158,6 @@ const Payments: React.FC = () => {
         onToast={(message, type) => setToast({ message, type })}
       />
 
-      {/* Manual Refund Modal */}
       <ManualRefundModal
         payment={selectedPaymentForAction}
         open={showManualRefundModal}
@@ -2267,14 +2169,12 @@ const Payments: React.FC = () => {
         onToast={(message, type) => setToast({ message, type })}
       />
 
-      {/* Signature & Terms Modal */}
       {showSignatureModal && signatureModalPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSignatureModal(false)}>
           <div
             className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
@@ -2293,9 +2193,7 @@ const Payments: React.FC = () => {
               </button>
             </div>
 
-            {/* Body */}
             <div className="px-6 py-5 space-y-5">
-              {/* Terms Accepted */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Terms & Conditions</h3>
                 {signatureModalPayment.terms_accepted === true ? (
@@ -2316,7 +2214,6 @@ const Payments: React.FC = () => {
                 )}
               </div>
 
-              {/* Signature Image */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Signature</h3>
                 {signatureModalPayment.signature_image ? (
@@ -2336,7 +2233,6 @@ const Payments: React.FC = () => {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="flex items-center justify-end px-6 py-4 border-t border-gray-100 bg-gray-50">
               <StandardButton
                 variant="secondary"

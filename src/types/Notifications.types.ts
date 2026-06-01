@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/Notifications.tsx
 
 export interface NotificationsNotification {
   id: string;

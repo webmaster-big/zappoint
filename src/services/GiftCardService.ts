@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface GiftCard {
   id: number;
   code: string;
@@ -90,47 +87,31 @@ export interface PaginatedResponse<T> {
 }
 
 class GiftCardService {
-  /**
-   * Get all gift cards with optional filters
-   */
   async getGiftCards(filters?: GiftCardFilters): Promise<PaginatedResponse<GiftCard>> {
     const response = await api.get('/gift-cards', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get a specific gift card by ID
-   */
   async getGiftCard(id: number): Promise<ApiResponse<GiftCard>> {
     const response = await api.get(`/gift-cards/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new gift card
-   */
   async createGiftCard(data: CreateGiftCardData): Promise<ApiResponse<GiftCard>> {
     const response = await api.post('/gift-cards', data);
     return response.data;
   }
 
-  /**
-   * Update an existing gift card
-   */
   async updateGiftCard(id: number, data: UpdateGiftCardData): Promise<ApiResponse<GiftCard>> {
     const response = await api.put(`/gift-cards/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a gift card
-   */
   async deleteGiftCard(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/gift-cards/${id}`);
     return response.data;
   }
 }
 
-// Export a singleton instance
 export const giftCardService = new GiftCardService();
 export default giftCardService;

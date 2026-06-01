@@ -12,7 +12,6 @@ const CustomerProtectedRoute: React.FC<CustomerProtectedRouteProps> = ({
 }) => {
   const location = useLocation();
   
-  // Get customer data from localStorage
   const getCustomerData = () => {
     try {
       const stored = localStorage.getItem('zapzone_customer');
@@ -29,7 +28,6 @@ const CustomerProtectedRoute: React.FC<CustomerProtectedRouteProps> = ({
   const customer = getCustomerData();
   const isAuthenticated = customer && customer.token;
 
-  // If authentication is required and customer is not authenticated
   if (requireAuth && !isAuthenticated) {
     return <Navigate to="/customer/login" state={{ from: location }} replace />;
   }

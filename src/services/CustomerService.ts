@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface Customer {
   id: number;
   first_name: string;
@@ -84,7 +81,6 @@ export interface ApiResponse<T> {
   total?: number;
 }
 
-// Types for grouped attractions
 export interface GroupedAttractionLocation {
   location_id: number;
   location_name: string;
@@ -148,7 +144,6 @@ export interface GroupedAttraction {
   special_pricing?: SpecialPricing;
 }
 
-// Types for grouped packages
 export interface GroupedPackageLocation {
   location_id: number;
   location_name: string;
@@ -212,7 +207,6 @@ export interface GroupedPackage {
   special_pricing?: SpecialPricing;
 }
 
-// Types for grouped events
 export interface GroupedEventLocation {
   location_id: number;
   location_name: string;
@@ -255,14 +249,7 @@ export interface GroupedEvent {
   purchase_links: EventPurchaseLink[];
 }
 
-/**
- * Customer Service
- * Handles all customer-related API calls
- */
 class CustomerService {
-  /**
-   * Search customers by email or name
-   */
   async searchCustomers(query: string): Promise<ApiResponse<Customer[]>> {
     const response = await api.get('/customers/search', {
       params: { q: query },
@@ -270,9 +257,6 @@ class CustomerService {
     return response.data;
   }
 
-  /**
-   * Get attractions grouped by name with all available locations
-   */
   async getGroupedAttractions(search?: string, date?: string): Promise<ApiResponse<GroupedAttraction[]>> {
     const params: Record<string, string> = {};
     if (search) params.search = search;
@@ -281,17 +265,11 @@ class CustomerService {
     return response.data;
   }
 
-  /**
-   * Get single attraction details by ID
-   */
   async getAttraction(id: number): Promise<ApiResponse<any>> {
     const response = await api.get(`/attractions/${id}`);
     return response.data;
   }
 
-  /**
-   * Get packages grouped by name with all available locations
-   */
   async getGroupedPackages(search?: string, date?: string): Promise<ApiResponse<GroupedPackage[]>> {
     const params: Record<string, string> = {};
     if (search) params.search = search;
@@ -300,26 +278,17 @@ class CustomerService {
     return response.data;
   }
 
-  /**
-   * Get events grouped by name with all available locations
-   */
   async getGroupedEvents(search?: string): Promise<ApiResponse<GroupedEvent[]>> {
     const params = search ? { search } : {};
     const response = await api.get('/events/grouped-by-name', { params });
     return response.data;
   }
 
-  /**
-   * Get single package details by ID
-   */
   async getPackage(id: number): Promise<ApiResponse<any>> {
     const response = await api.get(`/packages/${id}`);
     return response.data;
   }
 
-  /**
-   * Register a new customer
-   */
   async register(data: {
     first_name: string;
     last_name: string;
@@ -327,7 +296,6 @@ class CustomerService {
     phone: string;
     password: string;
     password_confirmation: string;
-    // Nullable billing fields (max 2 chars for state/country codes)
     address?: string;
     address2?: string;
     city?: string;
@@ -339,9 +307,6 @@ class CustomerService {
     return response.data;
   }
 
-  /**
-   * Login customer
-   */
   async login(email: string, password: string): Promise<{
     user: any;
     role: string;
@@ -351,9 +316,6 @@ class CustomerService {
     return response.data;
   }
 
-  /**
-   * Logout customer
-   */
   async logout(token: string): Promise<{ message: string }> {
     const response = await api.post('/logout', {}, {
       headers: {
@@ -363,25 +325,16 @@ class CustomerService {
     return response.data;
   }
 
-  /**
-   * Get customer by ID
-   */
   async getCustomerById(id: number): Promise<ApiResponse<Customer>> {
     const response = await api.get(`/customers/${id}`);
     return response.data;
   }
 
-  /**
-   * Fetch customer list with filters and pagination
-   */
   async fetchCustomerList(userId: number, filters?: CustomerListFilters): Promise<PaginatedResponse<CustomerListItem>> {
     const response = await api.get(`/customers/list/${userId}`, { params: filters });
     return response.data;
   }
 
-  /**
-   * Get customer analytics with optional location filter
-   */
   async getAnalytics(params: {
     user_id?: number;
     date_range?: '7d' | '30d' | '90d' | '1y';
@@ -425,6 +378,5 @@ class CustomerService {
   }
 }
 
-// Export a singleton instance
 export const customerService = new CustomerService();
 export default customerService;

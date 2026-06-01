@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/bookings/CheckIn.tsx
 
 export interface CheckInBooking {
   id: string;

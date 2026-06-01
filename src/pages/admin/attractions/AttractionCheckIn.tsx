@@ -43,7 +43,6 @@ const AttractionCheckIn = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
 
-  // Get auth token from localStorage
   const getAuthToken = () => {
     const userData = localStorage.getItem('zapzone_user');
     if (userData) {
@@ -58,14 +57,12 @@ const AttractionCheckIn = () => {
     return null;
   };
 
-  // Start scanning
   const startScanning = async () => {
     try {
       setError(null);
       setScanResult(null);
       setShowModal(false);
       
-      // Stop any existing scanner first
       if (scannerRef.current) {
         try {
           const state = await scannerRef.current.getState();
@@ -78,7 +75,6 @@ const AttractionCheckIn = () => {
         }
       }
       
-      // Create new scanner instance
       scannerRef.current = new Html5Qrcode('qr-reader');
 
       const config = {
@@ -87,10 +83,8 @@ const AttractionCheckIn = () => {
         aspectRatio: 1.0,
       };
 
-      // Set scanning true before starting
       setScanning(true);
 
-      // Use environment camera (back camera on mobile)
       await scannerRef.current.start(
         { facingMode: "environment" },
         config,
@@ -106,11 +100,9 @@ const AttractionCheckIn = () => {
     }
   };
 
-  // Stop scanning
   const stopScanning = async () => {
     if (scannerRef.current) {
       try {
-        // Check if scanner is actually running before stopping
         const state = await scannerRef.current.getState();
         if (state === 2) { // 2 = SCANNING state
           await scannerRef.current.stop();
@@ -118,7 +110,6 @@ const AttractionCheckIn = () => {
         await scannerRef.current.clear();
       } catch (err) {
         console.log('Scanner already stopped or error:', err);
-        // Force clear if there's an error
         try {
           if (scannerRef.current) {
             await scannerRef.current.clear();
@@ -134,25 +125,20 @@ const AttractionCheckIn = () => {
     }
   };
 
-  // Handle successful scan
   const onScanSuccess = async (decodedText: string) => {
     if (processing) return;
 
     setProcessing(true);
     
     try {
-      // Stop scanning while processing
       await stopScanning();
 
-      // Parse QR code data
       let purchaseId: number;
       
       try {
-        // Try to parse as JSON first (our QR format)
         const qrData = JSON.parse(decodedText);
         purchaseId = qrData.purchaseId || qrData.purchase_id || qrData.id;
       } catch {
-        // If not JSON, try to extract ID from string
         const idMatch = decodedText.match(/\d+/);
         if (idMatch) {
           purchaseId = parseInt(idMatch[0]);
@@ -161,7 +147,6 @@ const AttractionCheckIn = () => {
         }
       }
 
-      // Verify purchase exists
       const authToken = getAuthToken();
       console.log('🔐 Auth Token:', authToken ? 'Present' : 'Missing');
       
@@ -176,13 +161,11 @@ const AttractionCheckIn = () => {
 
       const purchase = verifyResponse.data;
 
-      // If verify endpoint doesn't return schedule fields, fetch full purchase data
       if (!purchase.scheduled_date || !purchase.scheduled_time) {
         try {
           const fullPurchaseResponse = await attractionPurchaseService.getPurchase(purchaseId);
           if (fullPurchaseResponse.success && fullPurchaseResponse.data) {
             const raw = fullPurchaseResponse.data;
-            // Normalize scheduled_date — may come back as full ISO datetime, extract date part only
             purchase.scheduled_date = raw.scheduled_date
               ? raw.scheduled_date.split('T')[0]
               : purchase.scheduled_date;
@@ -193,7 +176,6 @@ const AttractionCheckIn = () => {
         }
       }
 
-      // Check if already checked in
       if (purchase.status === 'checked-in') {
         setScanResult({
           purchaseId,
@@ -207,7 +189,6 @@ const AttractionCheckIn = () => {
         return;
       }
 
-      // Check if cancelled
       if (purchase.status === 'cancelled') {
         setScanResult({
           purchaseId,
@@ -221,7 +202,6 @@ const AttractionCheckIn = () => {
         return;
       }
 
-      // Check if refunded
       if (purchase.status === 'refunded') {
         setScanResult({
           purchaseId,
@@ -235,7 +215,6 @@ const AttractionCheckIn = () => {
         return;
       }
 
-      // Check if pending (not fully paid)
       if (purchase.status === 'pending') {
         setScanResult({
           purchaseId,
@@ -249,7 +228,6 @@ const AttractionCheckIn = () => {
         return;
       }
 
-      // Only confirmed tickets can be checked in
       setVerifiedPurchase(purchase);
       setShowModal(true);
       setToast({ message: 'Ticket verified - Please confirm check-in', type: 'info' });
@@ -264,7 +242,6 @@ const AttractionCheckIn = () => {
     }
   };
 
-  // Handle check-in confirmation
   const handleConfirmCheckIn = async () => {
     if (!verifiedPurchase) return;
 
@@ -296,19 +273,15 @@ const AttractionCheckIn = () => {
     }
   };
 
-  // Handle cancel/close modal
   const handleCancelCheckIn = () => {
     setShowModal(false);
     setVerifiedPurchase(null);
     startScanning();
   };
 
-  // Handle scan failure (ignore - just means no QR detected)
   const onScanFailure = () => {
-    // Silently ignore - this fires constantly when no QR is detected
   };
 
-  // Scan from image file
   const scanFromFile = async (file: File) => {
     try {
       setProcessing(true);
@@ -331,7 +304,6 @@ const AttractionCheckIn = () => {
     }
   };
 
-  // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -339,15 +311,12 @@ const AttractionCheckIn = () => {
     }
   };
 
-  // Reset for new scan
   const resetScan = () => {
     setScanResult(null);
     setError(null);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
-    // Handle navigation/page unload while scanning
     const handleBeforeUnload = () => {
       if (scannerRef.current) {
         try {
@@ -364,7 +333,6 @@ const AttractionCheckIn = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Cleanup scanner on unmount/navigation
       const cleanup = async () => {
         if (scannerRef.current) {
           try {
@@ -376,7 +344,6 @@ const AttractionCheckIn = () => {
             scannerRef.current = null;
           } catch (err) {
             console.log('Cleanup:', err);
-            // Force clear even if there's an error
             try {
               if (scannerRef.current) {
                 await scannerRef.current.clear();
@@ -396,7 +363,6 @@ const AttractionCheckIn = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Camera className="h-6 w-6" />
@@ -404,7 +370,6 @@ const AttractionCheckIn = () => {
           </h1>
           <p className="text-gray-600 mt-1">Scan QR codes to check in customers and mark tickets as used</p>
           
-          {/* Mobile Device Recommendation */}
           <div className="mt-3 flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <Smartphone className="h-5 w-5 text-blue-600 flex-shrink-0" />
             <p className="text-sm text-blue-800">
@@ -413,7 +378,6 @@ const AttractionCheckIn = () => {
           </div>
         </div>
 
-        {/* Check-In Result Banner */}
         {scanResult && (
           <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex items-center justify-between ${
             scanResult.success 
@@ -458,9 +422,7 @@ const AttractionCheckIn = () => {
           </div>
         )}
 
-        {/* Scanner Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          {/* QR Scanner Container */}
           <div className="relative">
             <div 
               id="qr-reader" 
@@ -469,7 +431,6 @@ const AttractionCheckIn = () => {
               style={{ maxWidth: '500px' }}
             ></div>
 
-            {/* Scanner Placeholder */}
             {!scanning && !scanResult && (
               <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                 <Camera className="h-16 w-16 text-gray-400 mb-4" />
@@ -511,7 +472,6 @@ const AttractionCheckIn = () => {
               </div>
             )}
 
-            {/* Processing Indicator */}
             {processing && (
               <div className="flex flex-col items-center justify-center py-12">
                 <RefreshCw className={`h-12 w-12 text-${themeColor}-600 animate-spin mb-4`} />
@@ -520,7 +480,6 @@ const AttractionCheckIn = () => {
             )}
           </div>
 
-          {/* Scanner Controls */}
           {scanning && !processing && (
             <div className="mt-4 flex justify-center">
               <StandardButton
@@ -533,7 +492,6 @@ const AttractionCheckIn = () => {
             </div>
           )}
 
-          {/* Error Display */}
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -545,11 +503,9 @@ const AttractionCheckIn = () => {
           )}
         </div>
 
-        {/* Verification Modal */}
         {showModal && verifiedPurchase && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800">Verify Ticket Details</h2>
                 <StandardButton
@@ -562,9 +518,7 @@ const AttractionCheckIn = () => {
                 </StandardButton>
               </div>
 
-              {/* Modal Body */}
               <div className="p-6">
-                {/* Scheduled Time Prompt Banner */}
                 {(verifiedPurchase.scheduled_time || verifiedPurchase.scheduled_date) && (
                   <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl text-center">
                     <div className="flex items-center justify-center gap-2 mb-1">
@@ -584,7 +538,6 @@ const AttractionCheckIn = () => {
                   </div>
                 )}
 
-                {/* Status Alert */}
                 {verifiedPurchase.status === 'checked-in' && (
                   <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                     <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -635,7 +588,6 @@ const AttractionCheckIn = () => {
                   </div>
                 )}
 
-                {/* Ticket Details */}
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Ticket Information</h3>
                   
@@ -805,7 +757,6 @@ const AttractionCheckIn = () => {
                 </div>
               </div>
 
-              {/* Modal Footer - Action Buttons */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
                 {verifiedPurchase.status === 'confirmed' ? (
                   <>
@@ -846,7 +797,6 @@ const AttractionCheckIn = () => {
           </div>
         )}
 
-        {/* Instructions */}
         <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
           <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
@@ -877,7 +827,6 @@ const AttractionCheckIn = () => {
         </div>
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

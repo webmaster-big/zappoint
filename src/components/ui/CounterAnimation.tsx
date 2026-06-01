@@ -16,7 +16,6 @@ const CounterAnimation: React.FC<CounterAnimationProps> = ({
   const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Check if value is a number or contains a number
     const numericMatch = String(value).match(/[\d,\.]+/);
     if (!numericMatch) {
       setDisplayValue(String(value));
@@ -43,11 +42,9 @@ const CounterAnimation: React.FC<CounterAnimationProps> = ({
       const elapsed = currentTime - startTimeRef.current;
       const progress = Math.min(elapsed / duration, 1);
       
-      // Easing function for smooth animation
       const easeOutQuart = 1 - Math.pow(1 - progress, 4);
       const currentValue = startValue + (targetNumber - startValue) * easeOutQuart;
 
-      // Format the number with commas if original had them
       const formattedValue = numericMatch[0].includes(',') 
         ? currentValue.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
         : currentValue.toFixed(numericMatch[0].includes('.') ? 2 : 0);

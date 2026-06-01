@@ -9,14 +9,12 @@ import axios from 'axios';
 import { API_BASE_URL } from '../../utils/storage';
 import Toast from '../../components/ui/Toast';
 
-// Minimal location type for the filter dropdown
 interface LocationOption {
   id: number;
   name: string;
 }
 
 const CustomerGiftCards = () => {
-  // ── State ──────────────────────────────────────────────────────────
   const [tab, setTab] = useState<'available' | 'owned'>('available');
   const [search, setSearch] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState<number | ''>('');
@@ -24,24 +22,20 @@ const CustomerGiftCards = () => {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const navigate = useNavigate();
 
-  // Check if on production domain
   useEffect(() => {
     if (window.location.hostname === 'booking.zap-zone.com') {
       setShowComingSoon(true);
     }
   }, []);
 
-  // Available cards
   const [availableCards, setAvailableCards] = useState<CustomerGiftCard[]>([]);
   const [availableLoading, setAvailableLoading] = useState(true);
   const [availableError, setAvailableError] = useState<string | null>(null);
 
-  // Owned cards
   const [ownedCards, setOwnedCards] = useState<CustomerGiftCard[]>([]);
   const [ownedLoading, setOwnedLoading] = useState(true);
   const [ownedError, setOwnedError] = useState<string | null>(null);
 
-  // Modals
   const [showPaymentModal, setShowPaymentModal] = useState<CustomerGiftCard | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState<CustomerGiftCard | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -54,9 +48,7 @@ const CustomerGiftCards = () => {
     toastTimeout.current = setTimeout(() => setToast(null), 3000);
   };
 
-  // ── Data loading ───────────────────────────────────────────────────
 
-  // Fetch available locations for the filter dropdown
   useEffect(() => {
     const fetchLocations = async () => {
       try {
@@ -80,7 +72,6 @@ const CustomerGiftCards = () => {
           );
         }
       } catch {
-        // Silently fail — location filter just won't appear
       }
     };
     fetchLocations();
@@ -122,18 +113,15 @@ const CustomerGiftCards = () => {
     }
   }, []);
 
-  // Fetch available on mount & search change (debounced)
   useEffect(() => {
     const id = setTimeout(() => fetchAvailableCards(), 400);
     return () => clearTimeout(id);
   }, [fetchAvailableCards]);
 
-  // Fetch owned once
   useEffect(() => {
     fetchOwnedCards();
   }, [fetchOwnedCards]);
 
-  // ── Helpers ────────────────────────────────────────────────────────
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -165,7 +153,6 @@ const CustomerGiftCards = () => {
         [data-tooltip]:hover::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); border: 4px solid transparent; border-top-color: #1e293b; z-index: 50; pointer-events: none; animation: backdrop-fade 0.15s ease-out; }
       `}</style>
       <div className="min-h-screen bg-gray-50">
-        {/* Hero Header */}
         <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]"></div>
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 animate-slide-up">
@@ -189,7 +176,6 @@ const CustomerGiftCards = () => {
         </section>
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Tabs */}
           <div className="flex gap-2 mb-6 animate-slide-up">
             <button
               className={`px-4 py-2 font-medium text-sm rounded-full transition-all duration-200 ${tab === 'available' ? 'bg-blue-800 text-white shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}
@@ -205,10 +191,8 @@ const CustomerGiftCards = () => {
             </button>
           </div>
 
-          {/* Tab Content */}
           {tab === 'available' && (
             <>
-              {/* Search Bar & Location Filter */}
               <div className="bg-white p-3.5 rounded-xl border border-gray-100/80 shadow-sm mb-6 animate-slide-up">
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <input
@@ -236,7 +220,6 @@ const CustomerGiftCards = () => {
                 </div>
               </div>
 
-              {/* Loading Skeleton */}
               {availableLoading && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                   {[...Array(6)].map((_, i) => (
@@ -255,7 +238,6 @@ const CustomerGiftCards = () => {
                 </div>
               )}
 
-              {/* Error */}
               {!availableLoading && availableError && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
                   <p className="text-red-700 mb-3 text-sm">{availableError}</p>
@@ -268,7 +250,6 @@ const CustomerGiftCards = () => {
                 </div>
               )}
 
-              {/* Gift Cards List */}
               {!availableLoading && !availableError && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                   {availableCards.length === 0 ? (
@@ -323,7 +304,6 @@ const CustomerGiftCards = () => {
 
           {tab === 'owned' && (
             <>
-              {/* Loading Skeleton */}
               {ownedLoading && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                   {[...Array(3)].map((_, i) => (
@@ -342,7 +322,6 @@ const CustomerGiftCards = () => {
                 </div>
               )}
 
-              {/* Error */}
               {!ownedLoading && ownedError && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
                   <p className="text-red-700 mb-3 text-sm">{ownedError}</p>
@@ -432,7 +411,6 @@ const CustomerGiftCards = () => {
           )}
 
 
-          {/* Gift Card Details Modal */}
           {showDetailsModal && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowDetailsModal(null)}>
               <div className="rounded-xl max-w-lg w-full shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -496,7 +474,6 @@ const CustomerGiftCards = () => {
             </div>
           )}
 
-          {/* Payment Modal */}
           {showPaymentModal && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowPaymentModal(null)}>
               <div className="rounded-xl max-w-md w-full shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -573,7 +550,6 @@ const CustomerGiftCards = () => {
         </div>
       </div>
 
-      {/* Coming Soon Popup - only on production */}
       {showComingSoon && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-backdrop-fade">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>

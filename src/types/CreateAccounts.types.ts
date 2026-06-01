@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/users/CreateAccounts.tsx
 
 export interface CreateAccountsFormData {
   userType: 'attendant' | 'manager';

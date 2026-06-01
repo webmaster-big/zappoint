@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface Package {
   id: number;
   location_id: number;
@@ -134,12 +131,10 @@ export interface CreatePackageData {
   duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;
   price_per_additional_1hr?: number;
-  // Old format (deprecated but kept for backward compatibility)
   availability_type?: 'daily' | 'weekly' | 'monthly';
   available_days?: string[] | number[];
   available_week_days?: string[] | number[];
   available_month_days?: string[] | number[];
-  // New format
   availability_schedules?: AvailabilitySchedule[];
   image?: string;
   status?: 'active' | 'inactive';
@@ -184,89 +179,56 @@ export interface PaginatedResponse<T> {
 }
 
 class PackageService {
-  /**
-   * Get all packages with optional filters
-   */
   async getPackages(filters?: PackageFilters): Promise<PaginatedResponse<Package>> {
     const response = await api.get('/packages', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get a specific package by ID
-   */
   async getPackage(id: number): Promise<ApiResponse<Package>> {
     const response = await api.get(`/packages/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new package
-   */
   async createPackage(data: CreatePackageData): Promise<ApiResponse<Package>> {
     const response = await api.post('/packages', data);
     return response.data;
   }
 
-  /**
-   * Update an existing package
-   */
   async updatePackage(id: number, data: UpdatePackageData): Promise<ApiResponse<Package>> {
     const response = await api.put(`/packages/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a package (soft delete)
-   */
   async deletePackage(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/packages/${id}`);
     return response.data;
   }
 
-  /**
-   * Restore a soft-deleted package
-   */
   async restorePackage(id: number): Promise<ApiResponse<Package>> {
     const response = await api.post(`/packages/${id}/restore`);
     return response.data;
   }
 
-  /**
-   * Permanently delete a package (force delete)
-   */
   async forceDeletePackage(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/packages/${id}/force`);
     return response.data;
   }
 
-  /**
-   * Get packages by location
-   */
   async getPackagesByLocation(locationId: number): Promise<ApiResponse<Package[]>> {
     const response = await api.get(`/packages/location/${locationId}`);
     return response.data;
   }
 
-  /**
-   * Get packages by category
-   */
   async getPackagesByCategory(category: string): Promise<ApiResponse<Package[]>> {
     const response = await api.get(`/packages/category/${category}`);
     return response.data;
   }
 
-  /**
-   * Toggle package active status
-   */
   async toggleStatus(id: number): Promise<ApiResponse<Package>> {
     const response = await api.patch(`/packages/${id}/toggle-status`);
     return response.data;
   }
 
-  /**
-   * Attach attractions to package
-   */
   async attachAttractions(id: number, attractionIds: number[]): Promise<ApiResponse<null>> {
     const response = await api.post(`/packages/${id}/attractions/attach`, {
       attraction_ids: attractionIds,
@@ -274,9 +236,6 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Detach attractions from package
-   */
   async detachAttractions(id: number, attractionIds: number[]): Promise<ApiResponse<null>> {
     const response = await api.post(`/packages/${id}/attractions/detach`, {
       attraction_ids: attractionIds,
@@ -284,9 +243,6 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Attach add-ons to package
-   */
   async attachAddOns(id: number, addonIds: number[]): Promise<ApiResponse<null>> {
     const response = await api.post(`/packages/${id}/addons/attach`, {
       addon_ids: addonIds,
@@ -294,9 +250,6 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Detach add-ons from package
-   */
   async detachAddOns(id: number, addonIds: number[]): Promise<ApiResponse<null>> {
     const response = await api.post(`/packages/${id}/addons/detach`, {
       addon_ids: addonIds,
@@ -304,9 +257,6 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Bulk import packages
-   */
   async bulkImport(packages: Array<CreatePackageData & {
     attraction_ids?: number[];
     addon_ids?: number[];
@@ -331,25 +281,16 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Get availability schedules for a package
-   */
   async getAvailabilitySchedules(packageId: number): Promise<ApiResponse<AvailabilitySchedule[]>> {
     const response = await api.get(`/packages/${packageId}/availability-schedules`);
     return response.data;
   }
 
-  /**
-   * Create a single availability schedule for a package
-   */
   async storeAvailabilitySchedule(packageId: number, schedule: AvailabilitySchedule): Promise<ApiResponse<AvailabilitySchedule>> {
     const response = await api.post(`/packages/${packageId}/availability-schedules`, schedule);
     return response.data;
   }
 
-  /**
-   * Update availability schedules for a package (bulk replace)
-   */
   async updateAvailabilitySchedules(
     packageId: number,
     data: { schedules: AvailabilitySchedule[] }
@@ -358,17 +299,11 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Delete a specific availability schedule
-   */
   async deleteAvailabilitySchedule(packageId: number, scheduleId: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/packages/${packageId}/availability-schedules/${scheduleId}`);
     return response.data;
   }
 
-  /**
-   * Bulk update minimum booking notice hours for multiple packages
-   */
   async bulkUpdateMinNotice(packageIds: number[], minBookingNoticeHours: number | null): Promise<ApiResponse<Package[]>> {
     const response = await api.patch('/packages/bulk-update-min-notice', {
       package_ids: packageIds,
@@ -377,15 +312,11 @@ class PackageService {
     return response.data;
   }
 
-  /**
-   * Reorder packages (bulk update display_order)
-   */
   async reorderPackages(items: { id: number; display_order: number }[]): Promise<ApiResponse<null>> {
     const response = await api.post('/packages/reorder', { items });
     return response.data;
   }
 }
 
-// Export a singleton instance
 export const packageService = new PackageService();
 export default packageService;

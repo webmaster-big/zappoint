@@ -1,4 +1,3 @@
-// src/components/admin/email/HtmlCodeEditor.tsx
 import React, { useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { html } from '@codemirror/lang-html';
@@ -14,11 +13,6 @@ interface HtmlCodeEditorProps {
   placeholder?: string;
 }
 
-/**
- * HTML/code editor used for editing email notification bodies.
- * Powered by CodeMirror 6 with HTML syntax highlighting, word wrap,
- * and built-in find/replace (Ctrl/Cmd+F).
- */
 const HtmlCodeEditor: React.FC<HtmlCodeEditorProps> = ({
   value,
   onChange,

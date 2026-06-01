@@ -1,4 +1,3 @@
-// Types for Events & Event Purchases
 
 export interface Event {
   id: number;
@@ -119,6 +118,7 @@ export interface CreateEventPurchaseData {
   total_amount?: number;
   amount_paid?: number;
   discount_amount?: number;
+  membership_id?: number | null;
   payment_method?: string;
   payment_status?: string;
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';

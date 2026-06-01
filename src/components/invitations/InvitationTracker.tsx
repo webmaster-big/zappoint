@@ -1,4 +1,3 @@
-// src/components/invitations/InvitationTracker.tsx
 
 import { useState, useEffect } from 'react';
 import type { Invitation, InvitationSummary } from '../../types/invitation.types';
@@ -25,7 +24,6 @@ const InvitationTracker = ({ bookingId, participants, onToast }: Props) => {
       setInvitations(res.invitations);
       setSummary(res.summary);
     } catch {
-      // No invitations yet — that's fine
       setInvitations([]);
       setSummary(null);
     } finally {
@@ -93,7 +91,6 @@ const InvitationTracker = ({ bookingId, participants, onToast }: Props) => {
 
   return (
     <div className="border border-gray-100 rounded-xl overflow-hidden">
-      {/* Summary Header */}
       <div className="p-4 bg-white">
         <div className="flex items-center justify-between mb-3">
           <h4 className="font-semibold text-gray-900 text-sm">Invitation Tracker</h4>
@@ -105,7 +102,6 @@ const InvitationTracker = ({ bookingId, participants, onToast }: Props) => {
           </button>
         </div>
 
-        {/* Stats Row */}
         <div className="grid grid-cols-4 gap-2 text-center">
           <div className="bg-blue-50 rounded-lg p-2.5">
             <div className="text-lg font-bold text-blue-800">{summary.total_invited}</div>
@@ -125,13 +121,11 @@ const InvitationTracker = ({ bookingId, participants, onToast }: Props) => {
           </div>
         </div>
 
-        {/* Capacity */}
         <div className="mt-2.5 text-xs text-gray-400">
           {summary.remaining_slots} slot{summary.remaining_slots !== 1 ? 's' : ''} remaining of {participants} total
         </div>
       </div>
 
-      {/* Detailed List */}
       {expanded && (
         <div className="border-t border-gray-100">
           <div className="divide-y divide-gray-50">

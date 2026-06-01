@@ -1,4 +1,3 @@
-// src/components/invitations/SendInvitationsModal.tsx
 
 import { useState, useEffect } from 'react';
 import type { Booking } from '../../services/bookingService';
@@ -43,14 +42,12 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
 
   const maxGuests = booking.participants;
 
-  // Load existing invitation count
   useEffect(() => {
     const loadExisting = async () => {
       try {
         const res = await invitationService.getInvitations(booking.id);
         setExistingCount(res.summary.total_invited);
       } catch {
-        // First time — no invitations yet
         setExistingCount(0);
       }
     };
@@ -136,7 +133,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
       setSuccessMessage(res.message);
       onToast?.(res.message || `${guests.length} invitation${guests.length !== 1 ? 's' : ''} sent!`, 'success');
       onSuccess();
-      // Close after brief delay so user sees success message
       setTimeout(() => onClose(), 1500);
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.message || 'Failed to send invitations';
@@ -172,7 +168,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
         className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 rounded-t-xl text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -187,7 +182,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
           </div>
         </div>
 
-        {/* Capacity Bar */}
         <div className="px-6 py-4 bg-gray-50/80 border-b border-gray-100">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-gray-700">Invitation Capacity</span>
@@ -211,7 +205,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
           )}
         </div>
 
-        {/* Guest Entry Rows */}
         <div className="p-6 space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-700">{error}</div>
@@ -237,7 +230,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                {/* Name */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
                   <input
@@ -254,7 +246,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
                   )}
                 </div>
 
-                {/* Email */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Email {guest.send_via !== 'text' ? '*' : ''}
@@ -273,7 +264,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
                   )}
                 </div>
 
-                {/* Phone */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Phone {guest.send_via !== 'email' ? '*' : ''}
@@ -293,7 +283,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
                 </div>
               </div>
 
-              {/* Send Via */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-2">Send via</label>
                 <div className="flex gap-4">
@@ -315,7 +304,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
             </div>
           ))}
 
-          {/* Add Guest Button */}
           {guests.length < remainingSlots && (
             <button
               onClick={addGuestRow}
@@ -325,7 +313,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
             </button>
           )}
 
-          {/* Package Invitation Note */}
           {pkg?.invitation_file && (
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
               <span className="font-medium">Note:</span> This package has a designed invitation file that will be
@@ -334,7 +321,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
           )}
         </div>
 
-        {/* Footer Actions */}
         <div className="p-5 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
           <button
             onClick={onClose}
@@ -363,7 +349,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
           </button>
         </div>
 
-        {/* Preview Modal (nested) */}
         {showPreview && preview && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]" onClick={() => setShowPreview(false)}>
             <div className="bg-white max-w-2xl w-full max-h-[80vh] overflow-y-auto rounded-xl shadow-xl" onClick={e => e.stopPropagation()}>
@@ -375,7 +360,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Email Preview */}
                 <div>
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Email Preview</h5>
                   <div className="border border-gray-100 rounded-lg overflow-hidden">
@@ -394,7 +378,6 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
                   )}
                 </div>
 
-                {/* Invitation Download Link */}
                 {preview.has_invitation_download_link && (
                   <p className="text-xs text-gray-500">
                     The RSVP page will include a "Download Party Invitation" button.

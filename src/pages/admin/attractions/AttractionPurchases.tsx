@@ -59,7 +59,6 @@ const ManagePurchases = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   
-  // Soft delete (trash) states
   const [showTrashed, setShowTrashed] = useState(false);
   const [trashedPurchases, setTrashedPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [trashedLoading, setTrashedLoading] = useState(false);
@@ -68,7 +67,6 @@ const ManagePurchases = () => {
   const [trashedTotal, setTrashedTotal] = useState(0);
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
 
-  // Status colors and icons
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: `bg-blue-100 text-blue-800`, icon: CheckCircle },
     'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -78,7 +76,6 @@ const ManagePurchases = () => {
     voided: { color: 'bg-red-100 text-red-800', icon: XCircle }
   };
 
-  // Calculate metrics data
   const metrics = [
     {
       title: 'Total Purchases',
@@ -112,7 +109,6 @@ const ManagePurchases = () => {
     }
   ];
 
-  // Helper to convert raw API purchases to component format
   const convertPurchases = (rawPurchases: any[]): AttractionPurchasesPurchase[] => {
     return rawPurchases.map((purchase: any) => ({
       id: purchase.id.toString(),
@@ -147,7 +143,6 @@ const ManagePurchases = () => {
     try {
       setLoading(true);
 
-      // 1. Try cache first for instant rendering (filtered by current location)
       if (!skipCache) {
         const cacheFilters: any = {};
         if (selectedLocation) cacheFilters.location_id = Number(selectedLocation);
@@ -157,25 +152,20 @@ const ManagePurchases = () => {
         if (cached && cached.length > 0) {
           setPurchases(convertPurchases(cached));
           setLoading(false);
-          // Continue to fetch fresh data in background
         }
       }
 
-      // 2. Fetch from API
       const response = await attractionPurchaseService.getPurchases(filters);
       const rawPurchases = response.data.purchases || [];
 
-      // 3. Update cache
       await attractionPurchaseCacheService.cachePurchases(rawPurchases, {
         locationId: selectedLocation ? Number(selectedLocation) : undefined,
         userId: getStoredUser()?.id,
       });
 
-      // 4. Update state
       setPurchases(convertPurchases(rawPurchases));
     } catch (error) {
       console.error('Error loading purchases:', error);
-      // Fallback to cache on error
       const cached = await attractionPurchaseCacheService.getCachedPurchases();
       if (cached && cached.length > 0) {
         setPurchases(convertPurchases(cached));
@@ -203,7 +193,6 @@ const ManagePurchases = () => {
   const applyFilters = useCallback(() => {
     let result = [...purchases];
 
-    // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(purchase =>
@@ -214,17 +203,14 @@ const ManagePurchases = () => {
       );
     }
 
-    // Apply status filter
     if (filters.status !== 'all') {
       result = result.filter(purchase => purchase.status === filters.status);
     }
 
-    // Apply payment method filter
     if (filters.paymentMethod !== 'all') {
       result = result.filter(purchase => purchase.paymentMethod === filters.paymentMethod);
     }
 
-    // Apply date range filter
     if (filters.dateRange !== 'all') {
       const now = new Date();
       const startDate = new Date();
@@ -252,20 +238,16 @@ const ManagePurchases = () => {
     setFilteredPurchases(result);
   }, [purchases, filters]);
 
-  // Load purchases from backend (cache-first)
   useEffect(() => {
     loadPurchases();
   }, [selectedLocation]);
 
-  // Fetch locations on mount
   useEffect(() => {
     fetchLocations();
   }, []);
 
-  // Listen for cache updates from other parts of the app (e.g. AdminSidebar notification refresh)
   useEffect(() => {
     const unsubscribe = attractionPurchaseCacheService.onCacheUpdate(async () => {
-      // Use filtered cache to respect current location selection
       const cacheFilters: any = {};
       if (selectedLocation) cacheFilters.location_id = Number(selectedLocation);
       const cached = Object.keys(cacheFilters).length > 0
@@ -278,7 +260,6 @@ const ManagePurchases = () => {
     return unsubscribe;
   }, [selectedLocation]);
 
-  // Apply filters when purchases or filters change
   useEffect(() => {
     applyFilters();
   }, [applyFilters]);
@@ -317,12 +298,10 @@ const ManagePurchases = () => {
 
   const handleStatusChange = async (id: string, newStatus: AttractionPurchasesPurchase['status']) => {
     try {
-      // Send status directly — backend now accepts: pending, confirmed, checked-in, cancelled, refunded
       const updateResponse = await attractionPurchaseService.updatePurchase(Number(id), {
         status: newStatus as any,
       });
 
-      // Update cache
       if (updateResponse.data) {
         await attractionPurchaseCacheService.updatePurchaseInCache(updateResponse.data);
       }
@@ -354,11 +333,9 @@ const ManagePurchases = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedPurchases.length} purchase record(s)?`)) {
       try {
-        // Delete each purchase
         await Promise.all(
           selectedPurchases.map(id => attractionPurchaseService.deletePurchase(Number(id)))
         );
-        // Remove from cache
         await Promise.all(
           selectedPurchases.map(id => attractionPurchaseCacheService.removePurchaseFromCache(Number(id)))
         );
@@ -376,9 +353,7 @@ const ManagePurchases = () => {
     if (selectedPurchases.length === 0) return;
     
     try {
-      // Send status directly — backend now accepts: pending, confirmed, checked-in, cancelled, refunded
 
-      // Update each purchase's status
       await Promise.all(
         selectedPurchases.map(id => 
           attractionPurchaseService.updatePurchase(Number(id), {
@@ -457,7 +432,6 @@ const ManagePurchases = () => {
     try {
       setProcessingPayment(true);
 
-      // Get purchase details to find customer_id and location_id
       const purchaseResponse = await attractionPurchaseService.getPurchaseById(Number(selectedPurchaseForPayment.id));
       if (!purchaseResponse.success || !purchaseResponse.data) {
         throw new Error('Failed to get purchase details');
@@ -465,7 +439,6 @@ const ManagePurchases = () => {
 
       const purchase = purchaseResponse.data;
       const customerId = purchase.customer_id || null;
-      // Use purchase location_id, or fallback to selected location, or user's location_id
       const locationId = purchase.location_id || 
                         (selectedLocation ? Number(selectedLocation) : null) || 
                         currentUser?.location_id;
@@ -474,7 +447,6 @@ const ManagePurchases = () => {
         throw new Error('Location ID not found. Please select a location or contact support.');
       }
 
-      // Create payment record using PaymentService
       const paymentResponse = await createPayment({
         payable_id: Number(selectedPurchaseForPayment.id),
         payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
@@ -493,7 +465,6 @@ const ManagePurchases = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update purchase amount paid and payment method — backend auto-determines status
       await attractionPurchaseService.updatePurchase(Number(selectedPurchaseForPayment.id), {
         amount_paid: amount,
         payment_method: paymentMethod,
@@ -510,9 +481,7 @@ const ManagePurchases = () => {
     }
   };
 
-  // ========== SOFT DELETE (TRASH) FUNCTIONS ==========
 
-  // Convert trashed API response to component format
   const convertTrashedPurchases = (rawPurchases: any[]): AttractionPurchasesPurchase[] => {
     return rawPurchases.map((purchase: any) => ({
       id: purchase.id.toString(),
@@ -538,7 +507,6 @@ const ManagePurchases = () => {
     }));
   };
 
-  // Load trashed (soft-deleted) purchases
   const loadTrashedPurchases = async (page: number = 1) => {
     try {
       setTrashedLoading(true);
@@ -564,14 +532,12 @@ const ManagePurchases = () => {
     }
   };
 
-  // Restore a single soft-deleted purchase
   const handleRestorePurchase = async (id: string) => {
     try {
       const response = await attractionPurchaseService.restorePurchase(Number(id));
       if (response.success) {
         setToast({ message: 'Purchase restored successfully', type: 'success' });
         loadTrashedPurchases(trashedCurrentPage);
-        // Also update active purchases cache
         if (response.data) {
           await attractionPurchaseCacheService.updatePurchaseInCache(response.data);
         }
@@ -582,7 +548,6 @@ const ManagePurchases = () => {
     }
   };
 
-  // Bulk restore selected trashed purchases
   const handleBulkRestore = async () => {
     if (selectedTrashed.length === 0) return;
 
@@ -600,7 +565,6 @@ const ManagePurchases = () => {
     }
   };
 
-  // Permanently delete a trashed purchase
   const handleForceDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to PERMANENTLY delete this purchase? This action cannot be undone.')) {
       return;
@@ -616,7 +580,6 @@ const ManagePurchases = () => {
     }
   };
 
-  // Toggle trashed view
   const toggleTrashedView = () => {
     setShowTrashed(!showTrashed);
     if (!showTrashed) {
@@ -625,7 +588,6 @@ const ManagePurchases = () => {
     setSelectedTrashed([]);
   };
 
-  // Handle select trashed purchase
   const handleSelectTrashed = (id: string) => {
     setSelectedTrashed(prev =>
       prev.includes(id)
@@ -634,7 +596,6 @@ const ManagePurchases = () => {
     );
   };
 
-  // Handle select all trashed
   const handleSelectAllTrashed = () => {
     if (selectedTrashed.length === trashedPurchases.length) {
       setSelectedTrashed([]);
@@ -643,13 +604,7 @@ const ManagePurchases = () => {
     }
   };
 
-//   // Get unique statuses and payment methods
-//   const getUniqueValues = (key: keyof Purchase) => {
-//     const values = purchases.map(purchase => purchase[key]);
-//     return [...new Set(values)];
-//   };
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPurchases = filteredPurchases.slice(indexOfFirstItem, indexOfLastItem);
@@ -677,7 +632,6 @@ const ManagePurchases = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Manage Purchases</h1>
@@ -716,7 +670,6 @@ const ManagePurchases = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -740,7 +693,6 @@ const ManagePurchases = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -775,7 +727,6 @@ const ManagePurchases = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -835,7 +786,6 @@ const ManagePurchases = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {!showTrashed && selectedPurchases.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -864,7 +814,6 @@ const ManagePurchases = () => {
         </div>
       )}
 
-      {/* Purchases Table - Active Purchases */}
       {!showTrashed && (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -998,7 +947,6 @@ const ManagePurchases = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-4 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -1012,10 +960,8 @@ const ManagePurchases = () => {
       </div>
       )}
 
-      {/* Trashed Purchases View */}
       {showTrashed && (
         <>
-          {/* Bulk Actions for Trashed */}
           {selectedTrashed.length > 0 && (
             <div className="bg-orange-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
               <span className="text-orange-700 font-medium">
@@ -1032,7 +978,6 @@ const ManagePurchases = () => {
             </div>
           )}
 
-          {/* Trashed Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {trashedLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -1125,7 +1070,6 @@ const ManagePurchases = () => {
               </div>
             )}
 
-            {/* Trashed Pagination */}
             <div className="bg-white px-4 py-4 border-t border-gray-100">
               <Pagination
                 currentPage={trashedCurrentPage}
@@ -1139,7 +1083,6 @@ const ManagePurchases = () => {
         </>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast
@@ -1150,7 +1093,6 @@ const ManagePurchases = () => {
         </div>
       )}
 
-      {/* Payment Modal */}
       {showPaymentModal && selectedPurchaseForPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedPurchaseForPayment(null); }}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1162,7 +1104,6 @@ const ManagePurchases = () => {
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Payment Summary */}
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Customer:</span>
@@ -1184,7 +1125,6 @@ const ManagePurchases = () => {
                 </div>
               </div>
 
-              {/* Payment Amount */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Payment Amount *
@@ -1204,7 +1144,6 @@ const ManagePurchases = () => {
                 </div>
               </div>
 
-              {/* Payment Method */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Payment Method
@@ -1214,7 +1153,6 @@ const ManagePurchases = () => {
                 </div>
               </div>
 
-              {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Notes (Optional)

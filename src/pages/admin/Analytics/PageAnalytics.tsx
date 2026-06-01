@@ -61,9 +61,6 @@ import PageAnalyticsService, {
 } from '../../../services/PageAnalyticsService';
 import EntityAnalyticsModal from './EntityAnalyticsModal';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899'];
 
@@ -77,7 +74,6 @@ const fmtDuration = (ms: number) => {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-// Human-readable timestamp: "Today at 3:45 PM", "Yesterday at 9:00 AM", "May 21 at 3:45 PM"
 const fmtDate = (iso: string): string => {
   try {
     const d = new Date(iso);
@@ -97,13 +93,11 @@ const fmtDate = (iso: string): string => {
   } catch { return iso; }
 };
 
-// Convert snake_case event names to readable labels: "booking_completed" → "Booking Completed"
 const fmtEventName = (name: string): string => {
   if (!name) return '—';
   return name.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 };
 
-// Readable entity type labels
 const fmtEntityLabel = (type: string): string => {
   const labels: Record<string, string> = {
     package:             'Package',
@@ -137,15 +131,10 @@ const presetToRange = (p: RangePreset): { from: string; to: string } => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 const PageAnalytics: React.FC = () => {
   const { themeColor } = useThemeColor();
   const user = getStoredUser();
-  // location_manager and attendant scope is enforced by the backend; we still
-  // surface the Locations input as a hint when present.
   const userLocationId: number | undefined = user?.location_id ?? undefined;
 
   const [preset, setPreset] = useState<RangePreset>('30d');
@@ -153,7 +142,6 @@ const PageAnalytics: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [locations, setLocations] = useState<Array<{ id: string | number; name: string }>>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>(userLocationId?.toString() ?? '');
-  // Derived numeric value — used in filter and live queries
   const locationOverride: number | undefined = selectedLocationId ? Number(selectedLocationId) : undefined;
 
   const [entityTypeForLeaderboard, setEntityTypeForLeaderboard] = useState<AnalyticsEntityType>('package');
@@ -167,7 +155,6 @@ const PageAnalytics: React.FC = () => {
 
   const [drillEntity, setDrillEntity] = useState<{ type: AnalyticsEntityType; id: number; name?: string } | null>(null);
 
-  // Loading + data state for each section ----------------------------------
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
   const [timeseries, setTimeseries] = useState<TimeseriesResponse | null>(null);
   const [topPages, setTopPages] = useState<TopPageRow[]>([]);
@@ -185,7 +172,6 @@ const PageAnalytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Build the active filter from preset / custom dates ---------------------
   const filter: DateRangeFilter = useMemo(() => {
     if (preset === 'custom') {
       return {
@@ -198,9 +184,6 @@ const PageAnalytics: React.FC = () => {
     return { from: r.from, to: r.to, location_id: locationOverride };
   }, [preset, startDate, endDate, locationOverride]);
 
-  // ------------------------------------------------------------------------
-  // Master fetch
-  // ------------------------------------------------------------------------
   const fetchAll = useCallback(async () => {
     if (preset === 'custom' && (!startDate || !endDate)) return;
     setIsLoading(true);
@@ -251,7 +234,6 @@ const PageAnalytics: React.FC = () => {
     fetchAll();
   }, [fetchAll]);
 
-  // Fetch locations for the location selector (company_admin only) ---------
   useEffect(() => {
     if (userLocationId) return; // location_managers have a fixed location
     const load = async () => {
@@ -272,7 +254,6 @@ const PageAnalytics: React.FC = () => {
     load();
   }, [userLocationId]);
 
-  // Live widget — poll every 15s ------------------------------------------
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
@@ -280,7 +261,6 @@ const PageAnalytics: React.FC = () => {
         const l = await PageAnalyticsService.getLive(5, locationOverride);
         if (!cancelled) setLive(l);
       } catch {
-        // Ignore live errors silently.
       }
     };
     tick();
@@ -288,9 +268,6 @@ const PageAnalytics: React.FC = () => {
     return () => { cancelled = true; window.clearInterval(id); };
   }, [locationOverride]);
 
-  // ------------------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------------------
   if (isLoading && !overview) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -328,7 +305,6 @@ const PageAnalytics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
-      {/* ============ Header ============ */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
@@ -376,7 +352,6 @@ const PageAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* ============ Live widget ============ */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="relative flex h-3 w-3">
@@ -403,7 +378,6 @@ const PageAnalytics: React.FC = () => {
         )}
       </div>
 
-      {/* ============ KPI cards ============ */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
         <KpiCard label="Page views" value={ov.page_views} icon={Eye} themeColor={themeColor}
           tooltip="Total number of page loads across all tracked booking pages in the selected period." />
@@ -431,7 +405,6 @@ const PageAnalytics: React.FC = () => {
         )}
       </div>
 
-      {/* ============ Trend ============ */}
       {timeseries && timeseries.series?.length > 0 && (
         <Section title="Traffic & conversions" subtitle={`Bucket: ${timeseries.bucket}`}>
           <ResponsiveContainer width="100%" height={300}>
@@ -450,7 +423,6 @@ const PageAnalytics: React.FC = () => {
         </Section>
       )}
 
-      {/* ============ Top pages + Top entities ============ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="Top pages">
           <SimpleTable
@@ -505,8 +477,6 @@ const PageAnalytics: React.FC = () => {
               fmtCurrency(r.revenue),
               <button
                 onClick={() => setDrillEntity({
-                  // Backend sometimes omits `entity_type` on leaderboard rows;
-                  // fall back to the active filter so the API path is valid.
                   type: r.entity_type || entityTypeForLeaderboard,
                   id: r.entity_id,
                   name: r.name || undefined,
@@ -521,7 +491,6 @@ const PageAnalytics: React.FC = () => {
         </Section>
       </div>
 
-      {/* ============ Funnel + Devices ============ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="Funnel" subtitle="View → engage → convert">
           {funnel.length === 0 ? (
@@ -584,7 +553,6 @@ const PageAnalytics: React.FC = () => {
         </Section>
       </div>
 
-      {/* ============ Sources + Landing pages ============ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="Traffic sources" icon={Globe}>
           <SimpleTable
@@ -629,7 +597,6 @@ const PageAnalytics: React.FC = () => {
         </Section>
       </div>
 
-      {/* ============ Promo + Searches ============ */}
       {(promos.length > 0 || (Array.isArray(searches?.top_queries) && searches!.top_queries.length > 0)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {promos.length > 0 && (
@@ -673,7 +640,6 @@ const PageAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* ============ Attribution ============ */}
       {attribution.length > 0 && (
         <Section title="Attribution" subtitle="First-touch vs last-touch revenue" icon={Sparkles}>
           <ResponsiveContainer width="100%" height={300}>
@@ -693,7 +659,6 @@ const PageAnalytics: React.FC = () => {
         </Section>
       )}
 
-      {/* ============ Conversions table ============ */}
       <Section title="Recent Conversions">
         <div className="mb-3">
           <input
@@ -711,6 +676,7 @@ const PageAnalytics: React.FC = () => {
             const q = convSearch.toLowerCase();
             return (
               fmtEventName(c.event_name).toLowerCase().includes(q) ||
+              (c.entity_name || '').toLowerCase().includes(q) ||
               (c.entity_type || '').toLowerCase().includes(q) ||
               (c.utm_source || '').toLowerCase().includes(q) ||
               (c.utm_campaign || '').toLowerCase().includes(q)
@@ -718,8 +684,10 @@ const PageAnalytics: React.FC = () => {
           }).map((c) => [
             fmtDate(c.created_at),
             fmtEventName(c.event_name),
-            c.entity_type ? `${fmtEntityLabel(c.entity_type)} #${c.entity_id ?? '—'}` : '—',
-            fmtCurrency(c.value),
+            c.entity_type
+              ? (c.entity_name || `${fmtEntityLabel(c.entity_type)} #${c.entity_id ?? '—'}`)
+              : '—',
+            fmtCurrency(c.conversion_value),
             c.utm_source || '—',
             c.utm_campaign || '—',
           ])}
@@ -738,7 +706,6 @@ const PageAnalytics: React.FC = () => {
         )}
       </Section>
 
-      {/* ============ Drill-down modal ============ */}
       {drillEntity && (
         <EntityAnalyticsModal
           open={!!drillEntity}
@@ -754,9 +721,6 @@ const PageAnalytics: React.FC = () => {
   );
 };
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 const KpiCard: React.FC<{
   label: string;

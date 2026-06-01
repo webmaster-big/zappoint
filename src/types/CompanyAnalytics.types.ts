@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/Analytics/CompanyAnalytics.tsx
 
 export interface CompanyAnalyticsBooking {
   id: string;

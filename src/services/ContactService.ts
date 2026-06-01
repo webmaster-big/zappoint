@@ -1,8 +1,6 @@
-// src/services/ContactService.ts
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -11,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -25,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Contact type matching backend
 export interface Contact {
   id: number;
   company_id: number;
@@ -49,10 +45,8 @@ export interface Contact {
   sms_consent: boolean;
   created_at: string;
   updated_at: string;
-  // Computed/Accessor fields from Laravel model
   full_name?: string;
   full_address?: string | null;
-  // Relationships
   company?: {
     id: number;
     name: string;
@@ -243,9 +237,6 @@ export interface ExportForCampaignResponse {
 class ContactService {
   private baseUrl = '/contacts';
 
-  /**
-   * Get paginated list of contacts with filtering
-   */
   async getContacts(filters: ContactFilters = {}): Promise<ContactListResponse> {
     const params = new URLSearchParams();
     
@@ -263,65 +254,41 @@ class ContactService {
     return response.data;
   }
 
-  /**
-   * Get a single contact by ID
-   */
   async getContact(id: number): Promise<ContactResponse> {
     const response = await api.get(`${this.baseUrl}/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new contact
-   */
   async createContact(data: ContactCreateData): Promise<ContactResponse> {
     const response = await api.post(this.baseUrl, data);
     return response.data;
   }
 
-  /**
-   * Update an existing contact
-   */
   async updateContact(id: number, data: ContactUpdateData): Promise<ContactResponse> {
     const response = await api.put(`${this.baseUrl}/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a contact
-   */
   async deleteContact(id: number): Promise<{ success: boolean; message: string }> {
     const response = await api.delete(`${this.baseUrl}/${id}`);
     return response.data;
   }
 
-  /**
-   * Bulk import contacts
-   */
   async bulkImport(data: BulkImportData): Promise<BulkImportResponse> {
     const response = await api.post(`${this.baseUrl}/bulk-import`, data);
     return response.data;
   }
 
-  /**
-   * Bulk delete contacts
-   */
   async bulkDelete(ids: number[]): Promise<BulkDeleteResponse> {
     const response = await api.post(`${this.baseUrl}/bulk-delete`, { ids });
     return response.data;
   }
 
-  /**
-   * Bulk update contacts (add/remove tags, change status, set location)
-   */
   async bulkUpdate(data: BulkUpdateData): Promise<BulkUpdateResponse> {
     const response = await api.post(`${this.baseUrl}/bulk-update`, data);
     return response.data;
   }
 
-  /**
-   * Get all unique tags
-   */
   async getTags(filters: { company_id?: number; location_id?: number } = {}): Promise<TagsResponse> {
     const params = new URLSearchParams();
     
@@ -332,9 +299,6 @@ class ContactService {
     return response.data;
   }
 
-  /**
-   * Get contact statistics
-   */
   async getStatistics(filters: { company_id?: number; location_id?: number } = {}): Promise<StatisticsResponse> {
     const params = new URLSearchParams();
     
@@ -345,25 +309,16 @@ class ContactService {
     return response.data;
   }
 
-  /**
-   * Export contacts for email campaign
-   */
   async exportForCampaign(data: ExportForCampaignData): Promise<ExportForCampaignResponse> {
     const response = await api.post(`${this.baseUrl}/export-for-campaign`, data);
     return response.data;
   }
 
-  /**
-   * Add a tag to a contact
-   */
   async addTag(contactId: number, tag: string): Promise<ContactResponse> {
     const response = await api.post(`${this.baseUrl}/${contactId}/add-tag`, { tag });
     return response.data;
   }
 
-  /**
-   * Remove a tag from a contact
-   */
   async removeTag(contactId: number, tag: string): Promise<ContactResponse> {
     const response = await api.post(`${this.baseUrl}/${contactId}/remove-tag`, { tag });
     return response.data;

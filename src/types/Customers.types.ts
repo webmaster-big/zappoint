@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/customer/Customers.tsx
 
 export interface CustomersCustomer {
   id: string;

@@ -55,14 +55,10 @@ const CompanyAnalytics: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<CompanyAnalyticsResponse | null>(null);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
 
-  // Resolve the admin's company_id from the authenticated user record.
-  // The backend will 403 cross-company requests, so the previous hardcoded
-  // `companyId = 1` made the page hang for any admin not in company 1.
   const currentUser = getStoredUser();
   const companyId: number | null = currentUser?.company_id ?? null;
 
   const fetchAnalytics = useCallback(async () => {
-    // Don't fetch if custom range is selected but dates are not set
     if (dateRange === 'custom' && (!startDate || !endDate)) {
       return;
     }
@@ -113,7 +109,6 @@ const CompanyAnalytics: React.FC = () => {
   const handleExport = async () => {
     if (!analyticsData) return;
     
-    // Validate custom date range
     if (dateRange === 'custom' && (!startDate || !endDate)) {
       alert('Please select both start and end dates for custom range.');
       return;
@@ -183,7 +178,6 @@ const CompanyAnalytics: React.FC = () => {
 
   const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions, available_locations, top_events } = analyticsData;
   
-  // All available locations for filter (from API response)
   const allLocations = available_locations || location_performance.map(loc => ({
     id: loc.location_id,
     name: loc.location,
@@ -191,7 +185,6 @@ const CompanyAnalytics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
@@ -252,7 +245,6 @@ const CompanyAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Location Filter */}
       {showFilters && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex items-center justify-between mb-3">
@@ -280,7 +272,6 @@ const CompanyAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Key Metrics - 6 columns like CustomerAnalytics */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
@@ -448,9 +439,7 @@ const CompanyAnalytics: React.FC = () => {
         )}
       </div>
 
-      {/* Charts Grid - 2 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Revenue & Bookings Trend */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -478,7 +467,6 @@ const CompanyAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Top Locations Performance */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -503,7 +491,6 @@ const CompanyAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Package Distribution */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -538,7 +525,6 @@ const CompanyAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Peak Hours */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -578,7 +564,6 @@ const CompanyAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Daily Performance */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -605,7 +590,6 @@ const CompanyAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Booking Status */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -641,9 +625,7 @@ const CompanyAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Tables - 2 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Top Locations Table */}
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className={`w-5 h-5 text-${themeColor}-600`} />
@@ -669,7 +651,6 @@ const CompanyAnalytics: React.FC = () => {
           </table>
         </div>
 
-        {/* Top Attractions Table */}
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
             <Ticket className={`w-5 h-5 text-${themeColor}-600`} />
@@ -696,7 +677,6 @@ const CompanyAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Events Table */}
       {top_events && top_events.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
@@ -726,7 +706,6 @@ const CompanyAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 p-6">
@@ -740,7 +719,6 @@ const CompanyAnalytics: React.FC = () => {
               />
             </div>
             <div className="space-y-6">
-              {/* Date Range Filter */}
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Time Period</label>
                 <select
@@ -769,7 +747,6 @@ const CompanyAnalytics: React.FC = () => {
                 )}
               </div>
 
-              {/* Location Filter */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">Locations</label>
@@ -801,7 +778,6 @@ const CompanyAnalytics: React.FC = () => {
                 </p>
               </div>
 
-              {/* Export Format */}
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Export Format</label>
                 <select
@@ -814,7 +790,6 @@ const CompanyAnalytics: React.FC = () => {
                 </select>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <StandardButton
                   onClick={() => setShowExportModal(false)}

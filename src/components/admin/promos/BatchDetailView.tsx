@@ -45,7 +45,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         setSummary(data.summary);
         setPagination(data.pagination);
 
-        // Extract batch name & meta from first promo if available
         if (data.promos.length > 0) {
           const first = data.promos[0];
           setBatchName(first.name);
@@ -143,14 +142,12 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>;
   };
 
-  // Client-side search filtering (on top of server-side filtering)
   const displayedPromos = searchCode
     ? promos.filter((p) => p.code.toLowerCase().includes(searchCode.toLowerCase()))
     : promos;
 
   return (
     <div>
-      {/* Back + Header */}
       <div className="mb-6">
         <StandardButton variant="ghost" size="sm" icon={ArrowLeft} onClick={onBack} className="mb-3">
           Back to Batches
@@ -170,7 +167,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         </div>
       </div>
 
-      {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           {[
@@ -188,7 +184,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         </div>
       )}
 
-      {/* Actions Bar */}
       <div className="flex flex-wrap gap-2 mb-6">
         <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleExportCsv}>
           Export CSV
@@ -206,7 +201,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         </StandardButton>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 max-w-xs">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -247,7 +241,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         </select>
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -299,7 +292,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         </div>
       )}
 
-      {/* Pagination */}
       {pagination.last_page > 1 && (
         <div className="mt-4">
           <Pagination
@@ -315,7 +307,6 @@ const BatchDetailView: React.FC<BatchDetailViewProps> = ({ batchId, onBack }) =>
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

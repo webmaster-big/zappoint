@@ -194,7 +194,6 @@ const CustomerReservations = () => {
       `}</style>
 
       <div className="min-h-screen bg-gray-50/80">
-        {/* Compact Hero */}
         <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 slide-up">
@@ -218,9 +217,7 @@ const CustomerReservations = () => {
           </div>
         </section>
 
-        {/* Main Content */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Search, Filter & Sort Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-5 slide-up">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="flex-1 relative max-w-md w-full">
@@ -260,7 +257,6 @@ const CustomerReservations = () => {
               </div>
             </div>
 
-            {/* Status Filter Tabs */}
             <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-100 overflow-x-auto no-scrollbar">
               {[
                 { key: 'all', label: 'All' },
@@ -285,7 +281,6 @@ const CustomerReservations = () => {
             </div>
           </div>
 
-          {/* Loading Skeleton */}
           {loading && (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
@@ -313,7 +308,6 @@ const CustomerReservations = () => {
             </div>
           )}
 
-          {/* Error */}
           {error && !loading && (
             <div className="bg-white rounded-xl shadow-sm border border-red-100 p-5 mb-5 flex items-start gap-3">
               <div className="p-2 rounded-lg bg-red-50">
@@ -332,7 +326,6 @@ const CustomerReservations = () => {
             </div>
           )}
 
-          {/* Booking Cards */}
           {!loading && !error && (
             <div className="space-y-3">
               {bookings.length === 0 ? (
@@ -367,12 +360,9 @@ const CustomerReservations = () => {
                     className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow slide-up"
                     style={{ animationDelay: `${idx * 0.04}s` }}
                   >
-                    {/* Card Header */}
                     <div className="p-4 sm:p-5">
                       <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                        {/* Left: Info */}
                         <div className="flex-1 min-w-0">
-                          {/* Row 1: Package + Status */}
                           <div className="flex items-center gap-2.5 mb-2">
                             <h3 className="text-base font-semibold text-gray-900 truncate">
                               {getPackageName(booking)}
@@ -383,7 +373,6 @@ const CustomerReservations = () => {
                             </span>
                           </div>
 
-                          {/* Row 2: Meta info */}
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-gray-500">
                             <span className="inline-flex items-center gap-1.5">
                               <MapPin size={13} className="text-gray-400" />
@@ -399,7 +388,6 @@ const CustomerReservations = () => {
                             </span>
                           </div>
 
-                          {/* Row 3: Amount */}
                           <div className="flex items-center gap-3 mt-2">
                             <span className="inline-flex items-center gap-1 text-sm font-semibold text-gray-900">
                               <DollarSign size={13} className="text-emerald-500" />
@@ -411,7 +399,6 @@ const CustomerReservations = () => {
                           </div>
                         </div>
 
-                        {/* Right: Actions */}
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             onClick={() => handleViewDetails(booking)}
@@ -432,7 +419,6 @@ const CustomerReservations = () => {
                       </div>
                     </div>
 
-                    {/* Expand Toggle */}
                     <button
                       onClick={() => toggleReservationExpand(booking.id.toString())}
                       className="w-full flex items-center justify-between px-5 py-2.5 bg-gray-50 hover:bg-gray-100 transition text-sm border-t border-gray-100"
@@ -443,11 +429,9 @@ const CustomerReservations = () => {
                       {expandedReservation === booking.id.toString() ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
                     </button>
 
-                    {/* Expanded Content */}
                     {expandedReservation === booking.id.toString() && (
                       <div className="p-4 sm:p-5 bg-gray-50/50 fade-in">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Booking Info Card */}
                           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                             <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Booking Info</h4>
                             <div className="space-y-2.5 text-sm">
@@ -472,7 +456,6 @@ const CustomerReservations = () => {
                             </div>
                           </div>
 
-                          {/* QR Code Card */}
                           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                             <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">QR Code</h4>
                             <button
@@ -486,7 +469,6 @@ const CustomerReservations = () => {
                           </div>
                         </div>
 
-                        {/* Invitation Tracker */}
                         {booking.package && (booking.status === 'confirmed' || booking.status === 'pending') && (
                           <div className="mt-4">
                             <InvitationTracker bookingId={booking.id} participants={booking.participants} onToast={showToast} />
@@ -500,7 +482,6 @@ const CustomerReservations = () => {
             </div>
           )}
 
-          {/* Pagination */}
           {!loading && bookings.length > 0 && totalPages > 1 && (
             <div className="mt-3 pt-3 border-t border-gray-100">
               <Pagination
@@ -516,12 +497,10 @@ const CustomerReservations = () => {
         </div>
       </div>
 
-      {/* Booking Details Modal */}
       {showDetailsModal && selectedBooking && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 fade-in" onClick={() => setShowDetailsModal(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden scale-in shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="max-h-[85vh] overflow-y-auto no-scrollbar">
-              {/* Modal Header */}
               <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-5 py-4 text-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -537,9 +516,7 @@ const CustomerReservations = () => {
                 </div>
               </div>
 
-              {/* Modal Body */}
               <div className="p-5 space-y-5 bg-white">
-                {/* Status + Amount Hero */}
                 <div className="flex items-center justify-between bg-gray-50 rounded-xl p-4">
                   <div>
                     <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Status</span>
@@ -558,7 +535,6 @@ const CustomerReservations = () => {
                   </div>
                 </div>
 
-                {/* Package Info */}
                 {selectedBooking.package && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Package</h4>
@@ -579,7 +555,6 @@ const CustomerReservations = () => {
                   </div>
                 )}
 
-                {/* Schedule & Location */}
                 <div>
                   <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Schedule</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -602,7 +577,6 @@ const CustomerReservations = () => {
                   </div>
                 </div>
 
-                {/* Attractions */}
                 {selectedBooking.attractions && (selectedBooking.attractions as any[]).length > 0 && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Attractions</h4>
@@ -617,7 +591,6 @@ const CustomerReservations = () => {
                   </div>
                 )}
 
-                {/* Add-ons */}
                 {selectedBooking.add_ons && (selectedBooking.add_ons as any[]).length > 0 && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Add-ons</h4>
@@ -632,7 +605,6 @@ const CustomerReservations = () => {
                   </div>
                 )}
 
-                {/* Payment */}
                 <div>
                   <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Payment</h4>
                   <div className="bg-gray-50 p-4 rounded-xl space-y-2.5 text-sm">
@@ -667,7 +639,6 @@ const CustomerReservations = () => {
                   </div>
                 </div>
 
-                {/* Guest of Honor */}
                 {(selectedBooking as any).guest_of_honor_name && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Guest of Honor</h4>
@@ -692,7 +663,6 @@ const CustomerReservations = () => {
                   </div>
                 )}
 
-                {/* Special Requests */}
                 {selectedBooking.special_requests && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Special Requests</h4>
@@ -702,7 +672,6 @@ const CustomerReservations = () => {
                   </div>
                 )}
 
-                {/* Scheduled Time Highlight */}
                 <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Clock size={18} className="text-blue-600" />
@@ -716,7 +685,6 @@ const CustomerReservations = () => {
                 </div>
               </div>
 
-              {/* Modal Footer */}
               <div className="sticky bottom-0 px-5 py-3.5 border-t border-gray-100 bg-white">
                 <button
                   onClick={() => handleDownloadQRCode(selectedBooking)}
@@ -731,7 +699,6 @@ const CustomerReservations = () => {
         </div>
       )}
 
-      {/* Send Invitations Modal */}
       {showInvitationModal && invitationBooking && (
         <SendInvitationsModal
           booking={invitationBooking}

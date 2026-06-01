@@ -29,7 +29,6 @@ const TrashedPackages: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [showForceDeleteModal, setShowForceDeleteModal] = useState<Package | null>(null);
 
-  // Load user data from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('zapzone_user');
     if (stored) {
@@ -37,12 +36,10 @@ const TrashedPackages: React.FC = () => {
     }
   }, []);
 
-  // Fetch trashed packages from backend
   useEffect(() => {
     fetchTrashedPackages();
   }, []);
 
-  // Listen for cache updates from background sync
   useEffect(() => {
     const unsubscribe = packageCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -63,7 +60,6 @@ const TrashedPackages: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Check cache first for faster loading
       const hasCachedData = await packageCacheService.hasCachedData();
       
       if (hasCachedData) {
@@ -71,7 +67,6 @@ const TrashedPackages: React.FC = () => {
         const cachedPackages = await packageCacheService.getCachedPackages();
         
         if (cachedPackages && cachedPackages.length > 0) {
-          // Filter only packages with deleted_at set (soft-deleted)
           const deletedFromCache = cachedPackages.filter(
             (pkg: Package) => pkg.deleted_at !== null && pkg.deleted_at !== undefined
           );
@@ -80,14 +75,12 @@ const TrashedPackages: React.FC = () => {
             console.log('[TrashedPackages] Found', deletedFromCache.length, 'deleted packages in cache');
             setTrashedPackages(deletedFromCache);
             setLoading(false);
-            // Trigger background sync for freshness
             packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
             return;
           }
         }
       }
       
-      // No cached deleted packages, fetch from API with trashed filter
       console.log('[TrashedPackages] Fetching from API...');
       const response = await packageService.getPackages({ 
         per_page: 50,
@@ -98,7 +91,6 @@ const TrashedPackages: React.FC = () => {
       });
       
       const packagesData = response.data.packages || [];
-      // Extra safety: filter only packages with deleted_at set (not null)
       const deletedPackages = packagesData.filter((pkg: Package) => pkg.deleted_at !== null && pkg.deleted_at !== undefined);
       setTrashedPackages(deletedPackages);
       
@@ -124,17 +116,14 @@ const TrashedPackages: React.FC = () => {
     }
   };
 
-  // Search and filter effect
   useEffect(() => {
     let result = [...trashedPackages];
 
-    // Filter by location
     if (filterLocation !== "all") {
       const locationId = parseInt(filterLocation);
       result = result.filter(pkg => pkg.location_id === locationId);
     }
 
-    // Filter by search term
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       result = result.filter(pkg => {
@@ -147,7 +136,6 @@ const TrashedPackages: React.FC = () => {
     setFilteredPackages(result);
   }, [trashedPackages, filterLocation, searchTerm]);
 
-  // Get unique locations for filtering
   const uniqueLocations = trashedPackages
     .filter(pkg => pkg.location)
     .reduce((acc, pkg) => {
@@ -159,16 +147,13 @@ const TrashedPackages: React.FC = () => {
 
   const isCompanyAdmin = userData?.role === 'company_admin';
 
-  // Restore a soft-deleted package
   const handleRestore = async (pkg: Package) => {
     try {
       setActionLoading(pkg.id);
       await packageService.restorePackage(pkg.id);
       
-      // Remove from local state
       setTrashedPackages(prev => prev.filter(p => p.id !== pkg.id));
       
-      // Update cache - add the restored package back
       const restoredPkg = { ...pkg, deleted_at: null };
       await packageCacheService.updatePackageInCache(restoredPkg);
       
@@ -181,16 +166,13 @@ const TrashedPackages: React.FC = () => {
     }
   };
 
-  // Permanently delete a package
   const handleForceDelete = async (pkg: Package) => {
     try {
       setActionLoading(pkg.id);
       await packageService.forceDeletePackage(pkg.id);
       
-      // Remove from local state
       setTrashedPackages(prev => prev.filter(p => p.id !== pkg.id));
       
-      // Remove from cache permanently
       await packageCacheService.removePackageFromCache(pkg.id);
       
       setToast({ message: `Package "${pkg.name}" permanently deleted!`, type: 'success' });
@@ -203,7 +185,6 @@ const TrashedPackages: React.FC = () => {
     }
   };
 
-  // Format deleted date
   const formatDeletedDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
@@ -229,7 +210,6 @@ const TrashedPackages: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}
@@ -238,7 +218,6 @@ const TrashedPackages: React.FC = () => {
         />
       )}
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -256,7 +235,6 @@ const TrashedPackages: React.FC = () => {
         </Link>
       </div>
 
-      {/* Warning Banner */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
         <div>
@@ -267,17 +245,14 @@ const TrashedPackages: React.FC = () => {
         </div>
       </div>
 
-      {/* Error Display */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
           {error}
         </div>
       )}
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -291,7 +266,6 @@ const TrashedPackages: React.FC = () => {
             </div>
           </div>
 
-          {/* Location Filter (for company admin) */}
           {isCompanyAdmin && uniqueLocations.length > 0 && (
             <div className="sm:w-48">
               <select
@@ -309,7 +283,6 @@ const TrashedPackages: React.FC = () => {
         </div>
       </div>
 
-      {/* Packages Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {filteredPackages.length === 0 ? (
           <div className="p-12 text-center">
@@ -421,14 +394,12 @@ const TrashedPackages: React.FC = () => {
         )}
       </div>
 
-      {/* Summary */}
       {filteredPackages.length > 0 && (
         <div className="mt-4 text-sm text-gray-500 text-center">
           Showing {filteredPackages.length} deleted package{filteredPackages.length !== 1 ? 's' : ''}
         </div>
       )}
 
-      {/* Force Delete Confirmation Modal */}
       {showForceDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">

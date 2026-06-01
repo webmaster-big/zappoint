@@ -42,7 +42,6 @@ const Events = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<number[]>([]);
 
-  // Filter state
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateTypeFilter, setDateTypeFilter] = useState<string>('all');
 
@@ -67,26 +66,22 @@ const Events = () => {
         setLocations(res.data.map(l => ({ id: l.id, name: l.name })));
       }
     } catch {
-      // ignore
     }
   };
 
   const fetchEvents = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      // Use cache for faster initial load
       const cached = !forceRefresh ? await eventCacheService.getCachedEvents() : null;
       if (cached && cached.length > 0) {
         let list = cached;
         if (selectedLocation) list = list.filter(e => e.location_id === selectedLocation);
         setEvents(list);
         setLoading(false);
-        // Sync in background
         eventCacheService.syncInBackground({ user_id: currentUser?.id });
         return;
       }
 
-      // No cache — fetch from API
       const filters: Record<string, unknown> = {};
       if (selectedLocation) filters.location_id = selectedLocation;
       const res = await eventService.getEvents(filters);
@@ -102,7 +97,6 @@ const Events = () => {
         list = res as unknown as Event[];
       }
       setEvents(list);
-      // Cache the full list
       await eventCacheService.cacheEvents(list);
     } catch (err: unknown) {
       setToast({ message: (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to load events', type: 'error' });
@@ -198,7 +192,6 @@ const Events = () => {
     return `${hour % 12 || 12}:${m} ${ampm}`;
   };
 
-  // Metrics
   const metrics = [
     {
       title: 'Total Events',
@@ -232,13 +225,11 @@ const Events = () => {
     },
   ];
 
-  // Pagination
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const indexOfFirst = (currentPage - 1) * itemsPerPage;
   const indexOfLast = indexOfFirst + itemsPerPage;
   const paginatedEvents = filteredEvents.slice(indexOfFirst, indexOfLast);
 
-  // Status colors
   const statusColors: Record<string, string> = {
     active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800',
@@ -258,7 +249,6 @@ const Events = () => {
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Events</h1>
@@ -286,7 +276,6 @@ const Events = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -310,7 +299,6 @@ const Events = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -345,7 +333,6 @@ const Events = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -387,7 +374,6 @@ const Events = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {selectedEvents.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -406,7 +392,6 @@ const Events = () => {
         </div>
       )}
 
-      {/* Events Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -505,7 +490,6 @@ const Events = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-6 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}

@@ -48,7 +48,6 @@ const AttendantViewModal = ({ isOpen, onClose, attendant }: AttendantViewModalPr
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
@@ -75,9 +74,7 @@ const AttendantViewModal = ({ isOpen, onClose, attendant }: AttendantViewModalPr
           />
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5 space-y-6">
-          {/* Contact */}
           <section>
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Contact
@@ -88,7 +85,6 @@ const AttendantViewModal = ({ isOpen, onClose, attendant }: AttendantViewModalPr
             </div>
           </section>
 
-          {/* Role & Department */}
           <section>
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Role & Department
@@ -101,7 +97,6 @@ const AttendantViewModal = ({ isOpen, onClose, attendant }: AttendantViewModalPr
             </div>
           </section>
 
-          {/* Dates */}
           <section>
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Dates
@@ -129,7 +124,6 @@ const AttendantViewModal = ({ isOpen, onClose, attendant }: AttendantViewModalPr
           </section>
         </div>
 
-        {/* Footer */}
         <div className="flex justify-end px-6 py-4 border-t border-gray-100">
           <StandardButton onClick={onClose} variant="primary" size="md">
             Close

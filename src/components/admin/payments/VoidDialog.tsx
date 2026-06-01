@@ -48,7 +48,6 @@ const VoidDialog: React.FC<VoidDialogProps> = ({
       const errorData = axiosErr.response?.data;
       let message = errorData?.message || 'Void failed. Please try again.';
 
-      // If the transaction is already settled, suggest refund instead
       if (errorData?.error_code === '310') {
         message = 'This transaction has already been settled. Use "Refund" instead of "Void".';
       }
@@ -69,7 +68,6 @@ const VoidDialog: React.FC<VoidDialogProps> = ({
         className="bg-white rounded-xl shadow-2xl max-w-md w-full relative animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-100">
@@ -90,7 +88,6 @@ const VoidDialog: React.FC<VoidDialogProps> = ({
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Payment Summary */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
@@ -114,14 +111,12 @@ const VoidDialog: React.FC<VoidDialogProps> = ({
             </div>
           </div>
 
-          {/* Description */}
           <p className="text-sm text-gray-600">
             This will void the entire transaction of{' '}
             <strong className="text-gray-900">${paymentAmount.toFixed(2)}</strong>{' '}
             and <strong className="text-red-600">cancel the related booking</strong>.
           </p>
 
-          {/* Warning */}
           <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
             <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-yellow-800">
@@ -134,7 +129,6 @@ const VoidDialog: React.FC<VoidDialogProps> = ({
             </div>
           </div>
 
-          {/* Error */}
           {error && (
             <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
               <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -143,7 +137,6 @@ const VoidDialog: React.FC<VoidDialogProps> = ({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
           <StandardButton
             variant="secondary"

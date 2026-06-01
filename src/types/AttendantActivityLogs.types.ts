@@ -1,6 +1,4 @@
-// Types for: src/pages/admin/Attendants/AttendantActivityLogs.tsx
 
-// Import shared types from LocationActivityLogs
 import type { 
   UserReference, 
   LoginLogoutInfo,
@@ -16,7 +14,6 @@ import type {
   BulkDeleteMetadata 
 } from './LocationActivityLogs.types';
 
-// Re-export for convenience
 export type { 
   UserReference, 
   LoginLogoutInfo,
@@ -32,7 +29,6 @@ export type {
   BulkDeleteMetadata 
 };
 
-// Union type for all metadata variants
 export type ActivityLogMetadata =
   | BookingCreatedMetadata
   | BookingEditedMetadata

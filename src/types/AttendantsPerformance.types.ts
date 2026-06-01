@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/Attendants/AttendantsPerformance.tsx
 
 export interface AttendantsPerformanceAttendant {
   id: string;

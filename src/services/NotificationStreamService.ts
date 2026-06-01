@@ -44,12 +44,6 @@ class NotificationStreamService {
   private onNotificationCallback: NotificationCallback | null = null;
   private onErrorCallback: ErrorCallback | null = null;
 
-  /**
-   * Initialize the SSE connection for real-time notifications
-   * @param locationId - The location ID to filter notifications
-   * @param onNotification - Callback when a new notification is received
-   * @param onError - Callback when an error occurs
-   */
   connect(
     locationId: number,
     onNotification: NotificationCallback,
@@ -66,7 +60,6 @@ class NotificationStreamService {
 
     this.eventSource = new EventSource(url);
 
-    // Listen for 'notification' events
     this.eventSource.addEventListener('notification', (event: MessageEvent) => {
       try {
         const data: StreamNotificationData = JSON.parse(event.data);
@@ -80,11 +73,9 @@ class NotificationStreamService {
       }
     });
 
-    // Listen for connection open
     this.eventSource.addEventListener('open', () => {
     });
 
-    // Listen for errors
     this.eventSource.addEventListener('error', (event: Event) => {
       console.error('[NotificationStream] Connection error:', event);
       
@@ -97,15 +88,10 @@ class NotificationStreamService {
       }
     });
 
-    // Listen for heartbeat
     this.eventSource.addEventListener('message', (_event: MessageEvent) => {
-      // Heartbeat received - no action needed
     });
   }
 
-  /**
-   * Format booking date to readable format (e.g., "February 20, 2026")
-   */
   private formatBookingDate(dateString: string): string {
     try {
       const date = new Date(dateString);
@@ -119,9 +105,6 @@ class NotificationStreamService {
     }
   }
 
-  /**
-   * Transform stream data to notification object
-   */
   private transformToNotification(data: StreamNotificationData): NotificationObject {
     const title = data.type === 'booking' 
       ? 'New Booking' 
@@ -152,9 +135,6 @@ class NotificationStreamService {
     };
   }
 
-  /**
-   * Disconnect from the SSE stream
-   */
   disconnect(): void {
     if (this.eventSource) {
       this.eventSource.close();
@@ -164,20 +144,13 @@ class NotificationStreamService {
     }
   }
 
-  /**
-   * Get the current connection state
-   */
   getConnectionState(): number | null {
     return this.eventSource?.readyState ?? null;
   }
 
-  /**
-   * Check if currently connected
-   */
   isConnected(): boolean {
     return this.eventSource?.readyState === EventSource.OPEN;
   }
 }
 
-// Export a singleton instance
 export const notificationStreamService = new NotificationStreamService();

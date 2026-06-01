@@ -1,11 +1,3 @@
-/**
- * Customer-side page-view + engagement event tracking.
- *
- * Server-side conversions (booking_completed, purchase_completed, signup,
- * rsvp_submitted, refund_issued, …) are fired automatically by the backend,
- * so the FE only has to send page_view + the few engagement events the
- * backend can't infer (form_started, login, promo_validated, search_performed).
- */
 import axios from 'axios';
 import { API_BASE_URL } from './storage';
 import { isAnalyticsDnt } from './analyticsHeaders';
@@ -67,10 +59,6 @@ const readUtmFromQuery = (): Partial<TrackPayload> => {
   return out;
 };
 
-/**
- * Fire a page_view (default) or any other analytics event. Safe to await or
- * fire-and-forget — failures never throw.
- */
 export async function trackPageView(p: TrackPayload = {}): Promise<void> {
   if (isAnalyticsDnt() || typeof window === 'undefined') return;
   const utm = readUtmFromQuery();
@@ -87,8 +75,6 @@ export async function trackPageView(p: TrackPayload = {}): Promise<void> {
 
   try {
     const r = await axios.post(TRACK_URL, body);
-    // Only retain the id when this was an actual page_view — engagement
-    // events shouldn't overwrite the duration/scroll target.
     if ((body.event_type ?? 'page_view') === 'page_view') {
       const id = r?.data?.data?.id;
       if (typeof id === 'number') {
@@ -98,16 +84,11 @@ export async function trackPageView(p: TrackPayload = {}): Promise<void> {
       }
     }
   } catch {
-    /* swallow — analytics must never break the app */
   }
 }
 
 let listenersInstalled = false;
 
-/**
- * Install the global scroll-depth + pagehide-duration listeners. Idempotent —
- * safe to call multiple times. Call once from `main.tsx`.
- */
 export function setupAnalytics(): void {
   if (listenersInstalled || typeof window === 'undefined') return;
   listenersInstalled = true;
@@ -120,7 +101,6 @@ export function setupAnalytics(): void {
         const s = Math.round(((window.scrollY + window.innerHeight) / docHeight) * 100);
         if (s > maxScroll) maxScroll = Math.min(s, 100);
       } catch {
-        /* ignore */
       }
     },
     { passive: true }
@@ -136,9 +116,7 @@ export function setupAnalytics(): void {
       });
       const blob = new Blob([body], { type: 'application/json' });
       if (navigator.sendBeacon && navigator.sendBeacon(DURATION_URL, blob)) {
-        // sent
       } else {
-        // Fallback — best-effort fetch with keepalive.
         void fetch(DURATION_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -147,22 +125,15 @@ export function setupAnalytics(): void {
         }).catch(() => undefined);
       }
     } catch {
-      /* ignore */
     }
   };
 
   window.addEventListener('pagehide', flushDuration);
-  // Some browsers don't fire `pagehide` reliably; visibility-change is a
-  // safety net for mobile tab-switch scenarios.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushDuration();
   });
 }
 
-/**
- * Batch-send queued events. Currently exposed for parity with the backend
- * spec; the FE doesn't queue events by default.
- */
 export function sendAnalyticsBatch(events: TrackPayload[]): void {
   if (!events?.length || isAnalyticsDnt() || typeof navigator === 'undefined') return;
   try {
@@ -176,6 +147,5 @@ export function sendAnalyticsBatch(events: TrackPayload[]): void {
       }).catch(() => undefined);
     }
   } catch {
-    /* ignore */
   }
 }

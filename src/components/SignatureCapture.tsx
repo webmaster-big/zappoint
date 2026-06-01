@@ -14,10 +14,8 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
 }) => {
   const sigCanvasRef = useRef<SignatureCanvas | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-  // Stroke history for undo support
   const [strokeHistory, setStrokeHistory] = useState<string[]>([]);
 
-  // --- CANVAS RESIZE (fixes alignment) ---
   const resizeCanvas = useCallback(() => {
     const canvas = sigCanvasRef.current;
     const container = canvasContainerRef.current;
@@ -27,7 +25,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     const rect = container.getBoundingClientRect();
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
 
-    // Save current drawing
     const data = canvas.toDataURL();
     const wasEmpty = canvas.isEmpty();
 
@@ -39,14 +36,12 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     const ctx = canvasEl.getContext("2d");
     if (ctx) ctx.scale(ratio, ratio);
 
-    // Restore drawing if there was one
     if (!wasEmpty) {
       canvas.fromDataURL(data, { width: rect.width, height: 200 });
     }
   }, []);
 
   useEffect(() => {
-    // Initial resize after mount
     const timer = setTimeout(resizeCanvas, 50);
 
     const container = canvasContainerRef.current;
@@ -62,11 +57,9 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     };
   }, [resizeCanvas]);
 
-  // --- DRAW MODE ---
 
   const handleDrawEnd = () => {
     if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
-      // Save snapshot for undo
       const snapshot = sigCanvasRef.current.toDataURL("image/png");
       setStrokeHistory((prev) => [...prev, snapshot]);
       const base64 = sigCanvasRef.current.getTrimmedCanvas().toDataURL("image/png");
@@ -81,7 +74,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     if (!canvas) return;
 
     if (strokeHistory.length === 1) {
-      // Only one stroke recorded — clear everything
       handleClearDraw();
       return;
     }
@@ -91,7 +83,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
 
     const previousSnapshot = newHistory[newHistory.length - 1];
 
-    // Clear then re-apply scaling before restoring
     canvas.clear();
     resizeCanvas();
 
@@ -99,8 +90,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     const width = container ? container.getBoundingClientRect().width : 500;
     canvas.fromDataURL(previousSnapshot, { width, height: 200 });
 
-    // Use the stored snapshot directly — fromDataURL is async so
-    // getTrimmedCanvas() would return blank if called immediately
     onSignatureChange(previousSnapshot);
   };
 
@@ -111,7 +100,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     }
     setStrokeHistory([]);
     onSignatureChange(null);
-    // Re-apply canvas scaling so the next drawing session works correctly
     setTimeout(resizeCanvas, 20);
   };
 
@@ -121,7 +109,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
         Signature {required && <span className="text-red-500">*</span>}
       </label>
 
-      {/* Draw Signature */}
       <div>
           <div
             ref={canvasContainerRef}
@@ -161,7 +148,6 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
           </div>
         </div>
 
-      {/* Validation Error */}
       {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
     </div>
   );

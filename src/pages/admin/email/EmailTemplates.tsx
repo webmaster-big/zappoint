@@ -1,4 +1,3 @@
-// src/pages/admin/email/EmailTemplates.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -31,7 +30,6 @@ const EmailTemplates: React.FC = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
-  // State
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
@@ -54,7 +52,6 @@ const EmailTemplates: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
 
-  // Template statistics (calculated from loaded templates)
   const templateStats = {
     total: totalItems,
     active: templates.filter(t => t.status === 'active').length,
@@ -62,14 +59,12 @@ const EmailTemplates: React.FC = () => {
     archived: templates.filter(t => t.status === 'archived').length
   };
 
-  // Status configuration
   const statusConfig: Record<EmailTemplateStatus, { color: string; icon: React.ElementType; label: string }> = {
     draft: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Draft' },
     active: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Active' },
     archived: { color: 'bg-gray-100 text-gray-600', icon: Archive, label: 'Archived' }
   };
 
-  // Categories for filtering
   const categories = [
     { value: 'all', label: 'All Categories' },
     { value: 'onboarding', label: 'Onboarding' },
@@ -81,7 +76,6 @@ const EmailTemplates: React.FC = () => {
     { value: 'other', label: 'Other' }
   ];
 
-  // Fetch locations for company admin
   useEffect(() => {
     const fetchLocations = async () => {
       if (isCompanyAdmin) {
@@ -98,7 +92,6 @@ const EmailTemplates: React.FC = () => {
     fetchLocations();
   }, [isCompanyAdmin]);
 
-  // Fetch templates
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
@@ -140,7 +133,6 @@ const EmailTemplates: React.FC = () => {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // Handle delete template
   const handleDelete = async (id: number) => {
     try {
       const response = await emailCampaignService.deleteTemplate(id);
@@ -156,7 +148,6 @@ const EmailTemplates: React.FC = () => {
     }
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -167,7 +158,6 @@ const EmailTemplates: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Email Templates</h1>
@@ -190,7 +180,6 @@ const EmailTemplates: React.FC = () => {
         </div>
       </div>
 
-      {/* Statistics Cards - Dashboard Style */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
           <div className="flex items-center gap-2">
@@ -281,7 +270,6 @@ const EmailTemplates: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -319,11 +307,9 @@ const EmailTemplates: React.FC = () => {
           </div>
         </div>
         
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className={`grid grid-cols-1 ${isCompanyAdmin && locations.length > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-3`}>
-              {/* Location Filter (Company Admin only) */}
               {isCompanyAdmin && locations.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
@@ -345,7 +331,6 @@ const EmailTemplates: React.FC = () => {
                 </div>
               )}
 
-              {/* Status Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                 <select
@@ -363,7 +348,6 @@ const EmailTemplates: React.FC = () => {
                 </select>
               </div>
 
-              {/* Category Filter */}
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Category</label>
                 <select
@@ -399,7 +383,6 @@ const EmailTemplates: React.FC = () => {
         )}
       </div>
 
-      {/* Templates Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
@@ -427,7 +410,6 @@ const EmailTemplates: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -496,7 +478,6 @@ const EmailTemplates: React.FC = () => {
               </table>
             </div>
 
-            {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-gray-100">
               {templates.map((template) => {
                 const StatusIcon = statusConfig[template.status]?.icon || Clock;
@@ -543,7 +524,6 @@ const EmailTemplates: React.FC = () => {
               })}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <Pagination
@@ -560,7 +540,6 @@ const EmailTemplates: React.FC = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -588,7 +567,6 @@ const EmailTemplates: React.FC = () => {
         </div>
       )}
 
-      {/* Preview Modal */}
       {previewTemplate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -631,7 +609,6 @@ const EmailTemplates: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}

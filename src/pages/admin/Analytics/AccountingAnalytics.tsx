@@ -31,7 +31,6 @@ import type {
   CategoryItem,
 } from '../../../types/AccountingAnalytics.types';
 
-// Format currency helper
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -40,7 +39,6 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
-// Calculate percentage change
 const calculateChange = (primary: number, compare: number): { value: number; display: string; direction: 'up' | 'down' | 'neutral' } => {
   if (compare === 0 && primary === 0) return { value: 0, display: '0%', direction: 'neutral' };
   if (compare === 0) return { value: 100, display: '+100%', direction: 'up' };
@@ -50,7 +48,6 @@ const calculateChange = (primary: number, compare: number): { value: number; dis
   return { value: change, display: `${sign}${change.toFixed(1)}%`, direction };
 };
 
-// Format date range for display
 const formatDateRange = (start: string, end: string): string => {
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
@@ -66,14 +63,12 @@ const AccountingAnalytics: React.FC = () => {
   const isCompanyAdmin = user?.role === 'company_admin';
   const isLocationManager = user?.role === 'location_manager';
 
-  // State
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reportData, setReportData] = useState<AccountingReportResponse['data'] | null>(null);
   const [showCompare, setShowCompare] = useState(false);
 
   
-  // Date range selection
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -82,26 +77,20 @@ const AccountingAnalytics: React.FC = () => {
   const [compareStartDate, setCompareStartDate] = useState<string>('');
   const [compareEndDate, setCompareEndDate] = useState<string>('');
   
-  // View mode
   const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_on');
   
-  // Location
   const [locations, setLocations] = useState<Array<{ id: string | number; name: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   
-  // Categories
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['Parties', 'Attractions', 'Events', 'Add-ons'])
   );
   
-  // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Fetch locations — use localStorage cache for instant load
   useEffect(() => {
     const fetchLocations = async () => {
       try {
-        // Try localStorage cache first for instant UI
         const cached = localStorage.getItem('zapzone_locations');
         if (cached) {
           try {
@@ -123,7 +112,6 @@ const AccountingAnalytics: React.FC = () => {
           } catch { /* ignore */ }
         }
 
-        // Always refresh from API in background
         const response = await locationService.getLocations();
         const locs = response.data || response;
         
@@ -150,14 +138,11 @@ const AccountingAnalytics: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocationManager, user?.location_id]);
 
-  // Fetch report — plain function so it always reads latest state values
   const fetchReport = async (showRefreshing = false) => {
     if (!selectedLocation || !startDate) return;
 
-    // Build cache key from params
     const cacheKey = `zapzone_acct_report_${selectedLocation}_${startDate}_${endDate || ''}_${viewMode}`;
 
-    // Show cached data instantly if available (don't block on loading)
     if (!showRefreshing && !reportData) {
       try {
         const cached = sessionStorage.getItem(cacheKey);
@@ -165,7 +150,6 @@ const AccountingAnalytics: React.FC = () => {
           const parsed = JSON.parse(cached);
           setReportData(parsed);
           setLoading(false);
-          // Continue to refresh in background
           setRefreshing(true);
         } else {
           setLoading(true);
@@ -191,7 +175,6 @@ const AccountingAnalytics: React.FC = () => {
 
       if (response.success) {
         setReportData(response.data);
-        // Cache the result for instant load next time
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
         } catch { /* sessionStorage full — ignore */ }
@@ -211,7 +194,6 @@ const AccountingAnalytics: React.FC = () => {
     }
   };
 
-  // Only auto-fetch on initial load / location change
   useEffect(() => {
     if (selectedLocation) {
       fetchReport();
@@ -221,7 +203,6 @@ const AccountingAnalytics: React.FC = () => {
 
 
 
-  // Toggle category
   const toggleCategory = (name: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
@@ -231,7 +212,6 @@ const AccountingAnalytics: React.FC = () => {
     });
   };
 
-  // Export
   const handleExport = async () => {
     if (!selectedLocation || !startDate) return;
     try {
@@ -242,7 +222,6 @@ const AccountingAnalytics: React.FC = () => {
     }
   };
 
-  // Loading
   if (loading && !reportData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -260,7 +239,6 @@ const AccountingAnalytics: React.FC = () => {
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
 
-      {/* Background refresh indicator */}
       {refreshing && (
         <div className={`mb-4 flex items-center gap-2 rounded-lg border border-${themeColor}-200 bg-${themeColor}-50 px-4 py-2.5 text-sm text-${themeColor}-700`}>
           <RefreshCcw className="h-4 w-4 animate-spin" />
@@ -268,7 +246,6 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Accounting & Analytics</h1>
@@ -291,7 +268,6 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Action Buttons Row */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <div className="w-56">
           <DateRangeCalendar
@@ -331,7 +307,6 @@ const AccountingAnalytics: React.FC = () => {
         </StandardButton>
       </div>
 
-      {/* Compare Date Row */}
       {showCompare && (
         <div className="mb-6 flex flex-wrap items-center gap-2 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
           <span className="text-sm font-medium text-gray-700">Compare with:</span>
@@ -350,7 +325,6 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Comparison Banner */}
       {reportData?.comparison && reportData.compare_start_date && (
         <div className={`mb-6 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4 flex items-center gap-3`}>
           <div>
@@ -362,7 +336,6 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Key Metrics */}
       {reportData?.primary?.summary && (() => {
         const summary = reportData.primary.summary;
         const comparison = reportData.comparison?.summary;
@@ -417,7 +390,6 @@ const AccountingAnalytics: React.FC = () => {
                       <Icon className={`w-3.5 h-3.5 text-${themeColor}-600`} />
                     </div>
                   </div>
-                  {/* Tooltip */}
                   <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 px-2.5 py-1.5 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50 text-center pointer-events-none">
                     {metric.tooltip}
                     <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
@@ -430,7 +402,6 @@ const AccountingAnalytics: React.FC = () => {
         );
       })()}
 
-      {/* Categories */}
       {reportData?.primary?.categories && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
@@ -469,7 +440,6 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* No Data */}
       {!reportData && !loading && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <p className="text-gray-500">No data available for the selected date range.</p>
@@ -479,7 +449,6 @@ const AccountingAnalytics: React.FC = () => {
   );
 };
 
-// Category Section
 interface CategorySectionProps {
   category: CategoryData;
   comparisonCategory: CategoryData | null;
@@ -495,7 +464,6 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   onToggle,
   themeColor,
 }) => {
-  // Build a lookup of comparison items by name
   const comparisonItemMap = new Map<string, CategoryItem>();
   if (comparisonCategory) {
     comparisonCategory.items.forEach(item => comparisonItemMap.set(item.name, item));

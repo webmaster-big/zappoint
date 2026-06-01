@@ -1,4 +1,3 @@
-// Types for: src/pages/customer/CustomerHome.tsx
 
 export interface CustomerHomePackage {
   id: string;

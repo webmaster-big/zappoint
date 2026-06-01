@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/profile/LocationManagerProfile.tsx
 
 export interface LocationManagerProfilePersonal {
   firstName: string;

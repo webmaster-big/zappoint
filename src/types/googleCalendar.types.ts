@@ -1,4 +1,3 @@
-// Types for Google Calendar Integration
 
 export interface GoogleCalendarStatus {
   location_id: number;

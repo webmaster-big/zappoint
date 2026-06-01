@@ -55,7 +55,6 @@ const ViewPayment: React.FC = () => {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Refund/Void modal state
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showManualRefundModal, setShowManualRefundModal] = useState(false);
@@ -82,7 +81,6 @@ const ViewPayment: React.FC = () => {
     }
   };
 
-  // Convert Payment to PaymentsPagePayment for modal compatibility
   const toPaymentsPagePayment = (p: Payment): PaymentsPagePayment => ({
     id: p.id,
     payable_id: p.payable_id,
@@ -138,7 +136,6 @@ const ViewPayment: React.FC = () => {
     }
   };
 
-  // Load payment data
   useEffect(() => {
     const loadPayment = async () => {
       if (!id) {
@@ -217,7 +214,6 @@ const ViewPayment: React.FC = () => {
     minute: '2-digit'
   });
 
-  // Determine payable type and details
   const payableType = payment.payable_type || (payment.booking_id ? 'App\\Models\\Booking' : null);
   const isBooking = payableType?.includes('Booking') && !payableType?.includes('Event');
   const isPurchase = payableType?.includes('AttractionPurchase');
@@ -242,7 +238,6 @@ const ViewPayment: React.FC = () => {
         }
       `}</style>
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <StandardButton
@@ -289,7 +284,6 @@ const ViewPayment: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Alerts */}
         {payment.status === 'refunded' && (
           <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-3">
             <RefreshCw className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
@@ -332,13 +326,10 @@ const ViewPayment: React.FC = () => {
           </div>
         )}
 
-        {/* Main Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Payment Information */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Amount */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
@@ -351,7 +342,6 @@ const ViewPayment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Status */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
@@ -364,7 +354,6 @@ const ViewPayment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Payment Method */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <CreditCard className={`h-5 w-5 text-${fullColor}`} />
@@ -375,7 +364,6 @@ const ViewPayment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Transaction ID */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <FileText className={`h-5 w-5 text-${fullColor}`} />
@@ -386,7 +374,6 @@ const ViewPayment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Payment ID (if different from transaction_id) */}
               {payment.payment_id && payment.payment_id !== payment.transaction_id && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -399,7 +386,6 @@ const ViewPayment: React.FC = () => {
                 </div>
               )}
 
-              {/* Date */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                   <Calendar className={`h-5 w-5 text-${fullColor}`} />
@@ -410,7 +396,6 @@ const ViewPayment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Location */}
               {payment.location && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -425,9 +410,7 @@ const ViewPayment: React.FC = () => {
             </div>
           </div>
 
-          {/* Customer Information */}
           {(() => {
-            // Get customer info from payment.customer, booking guest, or purchase guest
             const customerName = payment.customer 
               ? `${payment.customer.first_name} ${payment.customer.last_name}`
               : payment.booking?.guest_name || (payment.attractionPurchase || payment.attraction_purchase)?.guest_name;
@@ -466,7 +449,6 @@ const ViewPayment: React.FC = () => {
             );
           })()}
 
-          {/* Related Booking/Purchase Information */}
           {payableData && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -605,7 +587,6 @@ const ViewPayment: React.FC = () => {
             </div>
           )}
 
-          {/* Notes */}
           {payment.notes && (
             <div className="p-6 border-b border-gray-100 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
@@ -613,7 +594,6 @@ const ViewPayment: React.FC = () => {
             </div>
           )}
 
-          {/* Signature & Terms */}
           {(payment.signature_image || payment.terms_accepted) && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Signature & Terms</h2>
@@ -640,7 +620,6 @@ const ViewPayment: React.FC = () => {
             </div>
           )}
 
-          {/* Actions */}
           <div className="p-6 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Actions</h2>
             <div className="flex flex-wrap gap-3">
@@ -674,7 +653,6 @@ const ViewPayment: React.FC = () => {
             </div>
           </div>
 
-          {/* Timestamps */}
           <div className="p-6 bg-gray-100 border-t border-gray-200">
             <div className="flex items-center gap-6 text-sm text-gray-500">
               <div className="flex items-center gap-2">
@@ -690,7 +668,6 @@ const ViewPayment: React.FC = () => {
         </div>
       </div>
 
-      {/* Refund Modal */}
       <RefundModal
         payment={toPaymentsPagePayment(payment)}
         open={showRefundModal}
@@ -699,7 +676,6 @@ const ViewPayment: React.FC = () => {
         onToast={(message, type) => setToast({ message, type })}
       />
 
-      {/* Void Dialog */}
       <VoidDialog
         payment={toPaymentsPagePayment(payment)}
         open={showVoidDialog}
@@ -708,7 +684,6 @@ const ViewPayment: React.FC = () => {
         onToast={(message, type) => setToast({ message, type })}
       />
 
-      {/* Manual Refund Modal */}
       <ManualRefundModal
         payment={toPaymentsPagePayment(payment)}
         open={showManualRefundModal}
@@ -717,7 +692,6 @@ const ViewPayment: React.FC = () => {
         onToast={(message, type) => setToast({ message, type })}
       />
 
-      {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
@@ -789,7 +763,6 @@ const ViewPayment: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

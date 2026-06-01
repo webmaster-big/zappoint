@@ -1,28 +1,3 @@
-/**
- * Cache Storage tenant guard.
- *
- * The `*CacheService.ts` files use the browser Cache Storage API with
- * GLOBAL cache names (e.g. `zapzone-events-cache-v1`). That cache is shared
- * across users on the same browser. If user A populates it and then user B
- * logs in, B's first paint can be served A's records — a cross-tenant leak.
- *
- * The proper logout flow already clears these caches, but there are several
- * holes:
- *   - Browser closed / crashed before sign-out.
- *   - User switches accounts on the same device.
- *   - Token expiry handled by the 401 interceptor.
- *
- * This guard runs in three places:
- *   1. App boot (from `apiInterceptors.ts`).
- *   2. Whenever `setStoredUser` is called with a different user id.
- *   3. From the 401 response interceptor.
- *
- * Strategy: enumerate every Cache Storage entry whose name matches a known
- * Zapzone prefix; open it; read its `metadata` Response (if any); if the
- * recorded `userId` does not match the currently stored user, delete the
- * cache outright. Caches without resolvable metadata are also purged on
- * user-change to be safe.
- */
 
 const ZAPZONE_CACHE_PREFIXES = ['zapzone-', 'metrics-cache-'] as const;
 
@@ -37,6 +12,7 @@ const METADATA_KEY_CANDIDATES = [
   '/api/customer-data/metadata',
   '/api/rooms/metadata',
   '/api/metrics/metadata',
+  '/api/memberships/metadata',
 ] as const;
 
 const isCacheStorageAvailable = (): boolean =>
@@ -64,13 +40,11 @@ const readCacheUserId = async (cache: Cache): Promise<number | undefined> => {
       const data = await res.json();
       if (typeof data?.userId === 'number') return data.userId;
     } catch {
-      // try next candidate
     }
   }
   return undefined;
 };
 
-/** Delete every Zapzone-owned cache entry. Used on login / 401 / explicit purge. */
 export const purgeAllZapzoneCaches = async (): Promise<void> => {
   if (!isCacheStorageAvailable()) return;
   try {
@@ -81,24 +55,15 @@ export const purgeAllZapzoneCaches = async (): Promise<void> => {
         .map((name) => caches.delete(name).catch(() => false)),
     );
   } catch {
-    /* ignore */
   }
 };
 
-/**
- * Delete any Zapzone cache whose recorded owner doesn't match the current
- * stored user. Safe to call on every page load.
- *
- * If `strict` is true, caches with no resolvable owner metadata are also
- * deleted (use during user-change to be extra safe).
- */
 export const enforceCacheOwnership = async (
   options: { strict?: boolean } = {},
 ): Promise<void> => {
   if (!isCacheStorageAvailable()) return;
   const currentUserId = getCurrentUserId();
 
-  // No user signed in → nothing legitimately needs cached data; purge all.
   if (currentUserId === null) {
     await purgeAllZapzoneCaches();
     return;
@@ -119,7 +84,6 @@ export const enforceCacheOwnership = async (
             await caches.delete(name);
           }
         } catch {
-          // If we can't even inspect it, drop it on strict mode.
           if (options.strict) {
             try { await caches.delete(name); } catch { /* ignore */ }
           }
@@ -127,6 +91,5 @@ export const enforceCacheOwnership = async (
       }),
     );
   } catch {
-    /* ignore */
   }
 };

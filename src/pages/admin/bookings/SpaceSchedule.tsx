@@ -13,8 +13,6 @@ import { formatDurationDisplay } from '../../../utils/timeFormat';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 
-// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
-// Avoids UTC offset issues that cause date to show as previous day
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -45,21 +43,18 @@ const SpaceSchedule = () => {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const spacesLoadedRef = useRef(false); // Track if spaces have been loaded
 
-  // Quick action states for booking detail modal
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  // Memoize time slots to avoid regenerating on every render
   const timeSlots = useMemo(() => {
     const slots: TimeSlot[] = [];
     const startHour = 12; // 12 PM
@@ -83,7 +78,6 @@ const SpaceSchedule = () => {
     return slots;
   }, [timeInterval]);
 
-  // Format time to 12-hour format
   const formatTime12Hour = (time: string): string => {
     const [hourStr, minuteStr] = time.split(':');
     let hour = parseInt(hourStr);
@@ -93,13 +87,11 @@ const SpaceSchedule = () => {
     return `${hour}:${minute} ${ampm}`;
   };
 
-  // Calculate end time based on start time and duration
   const calculateEndTime = (startTime: string, duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): string => {
     const [hourStr, minuteStr] = startTime.split(':');
     let hour = parseInt(hourStr);
     let minute = parseInt(minuteStr);
     
-    // For 'hours and minutes', duration is a decimal (e.g., 1.75 = 1 hr 45 min)
     let durationInMinutes: number;
     if (unit === 'hours and minutes') {
       const hours = Math.floor(duration);
@@ -117,26 +109,21 @@ const SpaceSchedule = () => {
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
-  // Format duration based on unit
   const formatDuration = (duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): string => {
     return formatDurationDisplay(duration, unit);
   };
 
-  // Get day name from date (e.g., 'monday', 'tuesday')
   const getDayName = (date: Date): string => {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     return days[date.getDay()];
   };
 
-  // Memoize the current day name to avoid recalculating
   const currentDayName = useMemo(() => getDayName(selectedDate), [selectedDate]);
 
-  // Natural sort function: alphabetical first, then numerical
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
     const nameB = b.name;
     
-    // Split into chunks of text and numbers
     const chunksA = nameA.match(/(\d+|\D+)/g) || [];
     const chunksB = nameB.match(/(\d+|\D+)/g) || [];
     
@@ -146,16 +133,13 @@ const SpaceSchedule = () => {
       const chunkA = chunksA[i] || '';
       const chunkB = chunksB[i] || '';
       
-      // Check if both chunks are numeric
       const isNumA = /^\d+$/.test(chunkA);
       const isNumB = /^\d+$/.test(chunkB);
       
       if (isNumA && isNumB) {
-        // Both are numbers, compare numerically
         const diff = parseInt(chunkA) - parseInt(chunkB);
         if (diff !== 0) return diff;
       } else {
-        // At least one is text, compare as strings (case-insensitive)
         const comparison = chunkA.toLowerCase().localeCompare(chunkB.toLowerCase());
         if (comparison !== 0) return comparison;
       }
@@ -164,35 +148,29 @@ const SpaceSchedule = () => {
     return 0;
   };
 
-  // Load spaces only once on mount (they don't change with date) - with cache support
   const loadSpaces = useCallback(async () => {
     if (spacesLoadedRef.current) return; // Already loaded
     try {
       const user = getStoredUser();
 
-      // Check if cache has any data first
       const hasCachedRooms = await roomCacheService.hasCachedData();
       
       if (hasCachedRooms) {
-        // Use cached data immediately for instant loading
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms) {
           const sortedSpaces = [...cachedRooms].sort(naturalSort);
           setSpaces(sortedSpaces);
           spacesLoadedRef.current = true;
-          // Trigger background sync for freshness
           roomCacheService.syncInBackground({ user_id: user?.id });
           return;
         }
       }
       
-      // No cache available, fetch from API
       const spacesResponse = await roomService.getRooms({
         user_id: user?.id,
         per_page: 100
       });
       const fetchedSpaces = Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || [];
-      // Cache for next time
       await roomCacheService.cacheRooms(fetchedSpaces);
       const sortedSpaces = [...fetchedSpaces].sort(naturalSort);
       setSpaces(sortedSpaces);
@@ -202,12 +180,10 @@ const SpaceSchedule = () => {
     }
   }, []);
 
-  // Load bookings for the selected date with cache support
   const loadBookings = useCallback(async () => {
     try {
       setBookingsLoading(true);
       
-      // Format date as YYYY-MM-DD for booking_date filter
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
@@ -215,11 +191,9 @@ const SpaceSchedule = () => {
 
       let fetchedBookings: Booking[];
       
-      // Check if cache has any data first
       const hasCachedBookings = await bookingCacheService.hasCachedData();
       
       if (hasCachedBookings) {
-        // Cache exists - use filtered results immediately (even if empty for this date)
         console.log('[SpaceSchedule] Cache exists, filtering for date:', dateStr);
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
           booking_date: dateStr,
@@ -227,10 +201,8 @@ const SpaceSchedule = () => {
         console.log('[SpaceSchedule] Filtered bookings from cache:', cachedBookings?.length || 0);
         fetchedBookings = (cachedBookings || []) as Booking[];
         setBookings(fetchedBookings);
-        // Trigger background sync for freshness
         bookingCacheService.syncInBackground();
       } else {
-        // No cache available, fetch from API
         const bookingsResponse = await bookingService.getBookings({
           booking_date: dateStr,
           user_id: getStoredUser()?.id
@@ -238,11 +210,9 @@ const SpaceSchedule = () => {
         
         fetchedBookings = bookingsResponse.data.bookings || [];
         setBookings(fetchedBookings);
-        // Cache for next time
         await bookingCacheService.cacheBookings(fetchedBookings);
       }
 
-      // Extract time interval from the first booking's package
       if (fetchedBookings.length > 0 && fetchedBookings[0].package) {
         const packageInterval = fetchedBookings[0].package.time_slot_interval;
         if (packageInterval && packageInterval > 0) {
@@ -256,7 +226,6 @@ const SpaceSchedule = () => {
     }
   }, [selectedDate]);
 
-  // Initial load: fetch spaces and bookings in parallel for faster loading
   useEffect(() => {
     const init = async () => {
       await Promise.all([loadSpaces(), loadBookings()]);
@@ -265,14 +234,12 @@ const SpaceSchedule = () => {
     init();
   }, []); // Only run once on mount
 
-  // Fetch bookings when date changes (fast - only one API call)
   useEffect(() => {
     if (!initialLoading) {
       loadBookings();
     }
   }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for cache updates from background sync
   useEffect(() => {
     const unsubRoom = roomCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -291,7 +258,6 @@ const SpaceSchedule = () => {
     return () => { unsubRoom(); unsubBooking(); };
   }, [loadBookings]);
 
-  // Navigate dates
   const goToPreviousDay = () => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() - 1);
@@ -312,7 +278,6 @@ const SpaceSchedule = () => {
     setCalendarMonth(today);
   };
 
-  // Calendar navigation
   const goToPreviousMonth = () => {
     const newMonth = new Date(calendarMonth);
     newMonth.setMonth(newMonth.getMonth() - 1);
@@ -330,30 +295,23 @@ const SpaceSchedule = () => {
     setShowCalendar(false);
   };
 
-  // Generate calendar days for the current month view
   const getCalendarDays = (): (Date | null)[] => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
     
-    // First day of the month
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    // Days in month
     const daysInMonth = lastDay.getDate();
     
-    // Starting day of week (0 = Sunday)
     const startingDayOfWeek = firstDay.getDay();
     
-    // Build calendar array
     const days: (Date | null)[] = [];
     
-    // Add empty slots for days before the month starts
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
     
-    // Add all days in the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
     }
@@ -371,7 +329,6 @@ const SpaceSchedule = () => {
     return isSameDay(date, new Date());
   };
 
-  // Pre-compute booking map for O(1) lookups - grouped by room_id
   const bookingsByRoom = useMemo(() => {
     const map = new Map<number, Booking[]>();
     for (const booking of bookings) {
@@ -384,8 +341,6 @@ const SpaceSchedule = () => {
     return map;
   }, [bookings]);
 
-  // Pre-compute ALL cell data once to avoid recalculating during render
-  // This is the key optimization - compute once, use everywhere
   const cellDataCache = useMemo(() => {
     const cache = new Map<string, BookingCell | null>();
     const breakCache = new Map<string, { isStart: boolean; rowSpan: number; breakTime: BreakTime | null }>();
@@ -395,7 +350,6 @@ const SpaceSchedule = () => {
       for (const space of spaces) {
         const key = `${space.id}-${slot.hour}-${slot.minute}`;
         
-        // Calculate booking for cell
         const spaceBookings = bookingsByRoom.get(space.id) || [];
         let cellData: BookingCell | null = null;
         
@@ -440,7 +394,6 @@ const SpaceSchedule = () => {
         }
         cache.set(key, cellData);
         
-        // Calculate break time
         let isInBreak = false;
         let breakStart: { isStart: boolean; rowSpan: number; breakTime: BreakTime | null } = { isStart: false, rowSpan: 0, breakTime: null };
         
@@ -475,7 +428,6 @@ const SpaceSchedule = () => {
     return { cache, breakCache, isBreakCache };
   }, [timeSlots, spaces, bookingsByRoom, currentDayName, timeInterval]);
 
-  // Fast lookups from cache
   const getCellData = useCallback((spaceId: number, slot: TimeSlot): BookingCell | null => {
     return cellDataCache.cache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || null;
   }, [cellDataCache]);
@@ -488,7 +440,6 @@ const SpaceSchedule = () => {
     return cellDataCache.isBreakCache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || false;
   }, [cellDataCache]);
 
-  // Memoize visible time slots using cached data - much faster now
   const visibleTimeSlots = useMemo(() => {
     return timeSlots.filter(slot => {
       return spaces.some(space => {
@@ -508,7 +459,6 @@ const SpaceSchedule = () => {
     );
   }
 
-  // Payment modal handlers
   const handleOpenPaymentModal = () => {
     if (!selectedBooking) return;
     const remainingAmount = Math.max(0, Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0));
@@ -575,13 +525,11 @@ const SpaceSchedule = () => {
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Space Schedule</h1>
         <p className="text-gray-600">Daily space allocation and booking timeline</p>
       </div>
 
-      {/* Date Navigation */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -594,7 +542,6 @@ const SpaceSchedule = () => {
               {''}
             </StandardButton>
             
-            {/* Calendar Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowCalendar(!showCalendar)}
@@ -611,18 +558,14 @@ const SpaceSchedule = () => {
                 </h2>
               </button>
 
-              {/* Calendar Dropdown */}
               {showCalendar && (
                 <>
-                  {/* Backdrop */}
                   <div 
                     className="fixed inset-0 z-30"
                     onClick={() => setShowCalendar(false)}
                   />
                   
-                  {/* Calendar Popover */}
                   <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-40 animate-scale-in">
-                    {/* Month Navigation */}
                     <div className="flex items-center justify-between mb-4">
                       <button
                         onClick={goToPreviousMonth}
@@ -641,7 +584,6 @@ const SpaceSchedule = () => {
                       </button>
                     </div>
 
-                    {/* Day Labels */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
                       {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
                         <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
@@ -650,7 +592,6 @@ const SpaceSchedule = () => {
                       ))}
                     </div>
 
-                    {/* Calendar Grid */}
                     <div className="grid grid-cols-7 gap-1">
                       {getCalendarDays().map((day, index) => {
                         if (!day) {
@@ -683,7 +624,6 @@ const SpaceSchedule = () => {
                       })}
                     </div>
 
-                    {/* Quick Actions */}
                     <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
                       <button
                         onClick={goToToday}
@@ -713,7 +653,6 @@ const SpaceSchedule = () => {
             </StandardButton>
           </div>
 
-          {/* Right Side Controls */}
           <div className="flex items-center gap-2">
             <div className="relative">
               <StandardButton
@@ -722,13 +661,11 @@ const SpaceSchedule = () => {
               >
                 Today
               </StandardButton>
-              {/* Loading indicator - absolutely positioned, always mounted, fades in/out */}
               <div className={`absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm transition-opacity duration-300 ${bookingsLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
               </div>
             </div>
 
-            {/* Legend Tooltip */}
             <div className="relative group">
               <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
                 <Info className="w-5 h-5" />
@@ -736,7 +673,6 @@ const SpaceSchedule = () => {
               <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
                 <div className="text-xs font-semibold text-gray-800 mb-3">Legend</div>
                 
-                {/* Status Indicators */}
                 <div className="mb-3">
                   <div className="text-xs font-medium text-gray-600 mb-2">Booking Status</div>
                   <div className="space-y-2 text-xs">
@@ -758,7 +694,6 @@ const SpaceSchedule = () => {
                   </div>
                 </div>
                 
-                {/* Color Coding */}
                 <div className="pt-3 border-t border-gray-200">
                   <div className="text-xs font-medium text-gray-600 mb-2">Color Coding</div>
                   <p className="text-xs text-gray-500 mb-2">Each package has a unique color</p>
@@ -775,10 +710,8 @@ const SpaceSchedule = () => {
         </div>
       </div>
 
-      {/* Schedule Grid */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         {bookings.length === 0 ? (
-          // Empty State
           <div className="flex flex-col items-center justify-center py-16 px-4">
             <div className={`w-20 h-20 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
               <Calendar className={`w-10 h-10 text-${fullColor}`} />
@@ -832,22 +765,18 @@ const SpaceSchedule = () => {
                     {slot.time}
                   </td>
                   {spaces.map(space => {
-                    // Use cached data - no recalculation needed
                     const cellData = getCellData(space.id, slot);
                     const breakTimeData = getBreakStart(space.id, slot);
                     const isInBreak = getIsBreak(space.id, slot);
                     
-                    // Skip if this slot is occupied by a booking that started earlier
                     if (cellData && cellData.rowSpan === 0) {
                       return null;
                     }
 
-                    // Skip if this slot is occupied by a break that started earlier (not the start slot)
                     if (isInBreak && !breakTimeData.isStart) {
                       return null;
                     }
 
-                    // Render break time cell
                     if (breakTimeData.isStart && breakTimeData.breakTime) {
                       return (
                         <td
@@ -867,12 +796,10 @@ const SpaceSchedule = () => {
                       );
                     }
 
-                    // Render booking cell
                     if (cellData && cellData.rowSpan > 0) {
                       const { booking, rowSpan } = cellData;
                       const totalAmount = parseFloat(String(booking.total_amount));
                       
-                      // Package color palette (same as CalendarView for consistency)
                       const packageColors = [
                         { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
                         { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
@@ -888,7 +815,6 @@ const SpaceSchedule = () => {
                         { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200' },
                       ];
                       
-                      // Generate consistent hash from package name for fixed colors
                       const getPackageNameHash = (packageName: string): number => {
                         if (!packageName) return 0;
                         let hash = 0;
@@ -900,7 +826,6 @@ const SpaceSchedule = () => {
                         return Math.abs(hash);
                       };
                       
-                      // Get color based on package name (fixed, consistent across views)
                       const packageName = booking.package?.name || '';
                       const colorIndex = getPackageNameHash(packageName) % packageColors.length;
                       const packageColor = packageColors[colorIndex];
@@ -914,7 +839,6 @@ const SpaceSchedule = () => {
                           onClick={() => setSelectedBooking(booking)}
                         >
                           <div className="h-full min-h-full flex flex-col p-2">
-                            {/* Status Badge - Prominent at top */}
                             <div className="flex items-center justify-between mb-2">
                               <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
                                 booking.status === 'confirmed' ? 'bg-green-500 text-white' :
@@ -931,28 +855,23 @@ const SpaceSchedule = () => {
                               </span>
                             </div>
                             
-                            {/* Time Range */}
                             <div className={`font-bold text-sm ${packageColor.text} mb-1`}>
                               {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}
                             </div>
 
-                            {/* Customer Name */}
                             <div className={`font-semibold text-sm ${packageColor.text} mb-1 line-clamp-1`}>
                               {booking.guest_name || 'Walk-in'}
                             </div>
 
-                            {/* Package */}
                             <div className={`text-xs ${packageColor.text} opacity-80 mb-1 line-clamp-1`}>
                               {booking.package?.name || 'N/A'}
                             </div>
 
-                            {/* Guests */}
                             <div className={`text-xs ${packageColor.text} opacity-70 mb-1`}>
                               <Users className="w-3 h-3 inline mr-1" />
                               {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
                             </div>
 
-                            {/* Payment Info */}
                             <div className={`mt-auto pt-2 border-t ${packageColor.border} flex items-center justify-between text-xs`}>
                               <span className={`font-bold ${packageColor.text}`}>
                                 ${totalAmount.toFixed(2)}
@@ -970,7 +889,6 @@ const SpaceSchedule = () => {
                       );
                     }
 
-                    // Empty cell
                     return (
                       <td
                         key={space.id}
@@ -989,7 +907,6 @@ const SpaceSchedule = () => {
         )}
       </div>
 
-      {/* Booking Details Modal */}
       {selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedBooking(null)}>
           <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1006,7 +923,6 @@ const SpaceSchedule = () => {
                 </StandardButton>
               </div>
 
-              {/* Customer Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -1023,7 +939,6 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Booking Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1046,7 +961,6 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Date & Time */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1071,7 +985,6 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Package Details */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -1090,7 +1003,6 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Guest of Honor Section - Only show if data exists */}
               {(selectedBooking as any).guest_of_honor_name && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Guest of Honor</h4>
@@ -1115,7 +1027,6 @@ const SpaceSchedule = () => {
                 </div>
               )}
 
-              {/* Special Requests & Notes */}
               {(selectedBooking.special_requests || selectedBooking.notes) && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Notes & Requests</h4>
@@ -1136,7 +1047,6 @@ const SpaceSchedule = () => {
                 </div>
               )}
 
-              {/* Payment Information */}
               <div className="border-t pt-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment Details</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1191,7 +1101,6 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Internal Notes */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
                   <FileText size={14} /> Internal Notes
@@ -1252,7 +1161,6 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex gap-2">
                   <Link
@@ -1299,7 +1207,6 @@ const SpaceSchedule = () => {
                   )}
                 </div>
 
-                {/* Check In Confirmation */}
                 {showCheckInConfirm && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
@@ -1348,7 +1255,6 @@ const SpaceSchedule = () => {
         </div>
       )}
 
-      {/* Payment Modal */}
       {showPaymentModal && selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>

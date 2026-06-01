@@ -59,37 +59,30 @@ const LocationManagerDashboard: React.FC = () => {
   const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
-  // Timeframe selector for metrics
   const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_24h');
   const [timeframeDescription, setTimeframeDescription] = useState('Last 24 Hours');
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
   
-  // Rooms for daily view
   const [rooms, setRooms] = useState<Room[]>([]);
   
-  // New bookings tracking
   const [newBookings, setNewBookings] = useState<any[]>([]);
 
-  // Quick action states for booking detail modal
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Data states
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings for this location
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
@@ -112,7 +105,6 @@ const LocationManagerDashboard: React.FC = () => {
     totalEventTickets: 0,
   });
 
-  // Get dates for the current week
   const getWeekDates = (date: Date): Date[] => {
     const start = new Date(date);
     const day = start.getDay();
@@ -130,7 +122,6 @@ const LocationManagerDashboard: React.FC = () => {
 
   const weekDates = getWeekDates(currentWeek);
 
-  // Get user location on mount
   useEffect(() => {
     const user = getStoredUser();
     if (user?.location_id) {
@@ -138,8 +129,6 @@ const LocationManagerDashboard: React.FC = () => {
     }
   }, []);
 
-  // Load ALL bookings for this location (cache-first, then background sync)
-  // This is the primary data source for the table and calendar views
   useEffect(() => {
     if (!locationId) return;
     
@@ -147,7 +136,6 @@ const LocationManagerDashboard: React.FC = () => {
       try {
         console.log('📦 [ManagerDashboard] Loading all bookings for location:', locationId);
         
-        // Step 1: Try cache first for instant loading
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
           location_id: locationId,
         });
@@ -158,7 +146,6 @@ const LocationManagerDashboard: React.FC = () => {
           setLoading(false);
         }
         
-        // Step 2: Fetch fresh data from API in background (ALL bookings for location, no date filter)
         console.log('🔄 [ManagerDashboard] Background sync: Fetching fresh bookings...');
         const bookingsResponse = await bookingService.getBookings({
           location_id: locationId,
@@ -168,7 +155,6 @@ const LocationManagerDashboard: React.FC = () => {
         const bookings = bookingsResponse.data.bookings || [];
         console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings from API');
         
-        // Update state and cache
         setAllBookings(bookings);
         if (bookings.length > 0) {
           await bookingCacheService.cacheBookings(bookings, { locationId });
@@ -184,28 +170,23 @@ const LocationManagerDashboard: React.FC = () => {
     loadAllBookings();
   }, [locationId]);
 
-  // Fetch rooms/spaces for daily view - use cache for faster loading
   useEffect(() => {
     const fetchRooms = async () => {
       if (!locationId) return;
       try {
-        // Try cache first for instant loading
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms && cachedRooms.length > 0) {
           const filteredRooms = cachedRooms.filter(r => r.location_id === locationId);
           if (filteredRooms.length > 0) {
             setRooms(filteredRooms);
             console.log('📦 [ManagerDashboard] Loaded', filteredRooms.length, 'spaces from cache');
-            // Trigger background sync for freshness
             roomCacheService.syncInBackground({ location_id: locationId });
             return;
           }
         }
-        // Fallback to API if cache empty
         const response = await roomService.getRooms({ location_id: locationId, per_page: 100 });
         const fetchedRooms = response.data.rooms || [];
         setRooms(fetchedRooms);
-        // Update cache with fetched rooms
         if (fetchedRooms.length > 0) {
           await roomCacheService.cacheRooms(fetchedRooms);
         }
@@ -216,7 +197,6 @@ const LocationManagerDashboard: React.FC = () => {
     fetchRooms();
   }, [locationId]);
 
-  // Helper: get cutoff date based on current metrics timeframe
   const getTimeframeCutoffDate = (): Date | null => {
     const now = new Date();
     switch (metricsTimeframe) {
@@ -245,7 +225,6 @@ const LocationManagerDashboard: React.FC = () => {
     }
   };
 
-  // Derive new bookings from allBookings based on selected timeframe
   useEffect(() => {
     if (allBookings.length === 0) {
       setNewBookings([]);
@@ -255,7 +234,6 @@ const LocationManagerDashboard: React.FC = () => {
     const cutoff = getTimeframeCutoffDate();
     
     if (!cutoff) {
-      // all_time — every booking is "new"
       setNewBookings(allBookings);
       console.log('📅 [ManagerDashboard] New bookings (all time):', allBookings.length);
       return;
@@ -271,11 +249,6 @@ const LocationManagerDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allBookings, metricsTimeframe, customDateFrom, customDateTo]);
 
-  // Fetch metrics data (when location or timeframe changes)
-  // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
-  // - Display cached metrics instantly
-  // - Fetch fresh data in background
-  // - Smooth update when new data arrives
   useEffect(() => {
     const fetchMetricsData = async () => {
       if (!locationId) return;
@@ -285,7 +258,6 @@ const LocationManagerDashboard: React.FC = () => {
       try {
         console.log('🔄 Starting metrics fetch for location:', locationId);
         
-        // Step 1: Try to load from cache first for instant display (with timeframe)
         const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('manager', locationId, metricsTimeframe);
         
         if (cachedData) {
@@ -300,23 +272,15 @@ const LocationManagerDashboard: React.FC = () => {
           setLoading(false);
         }
 
-        // Note: We no longer fall back to the unfiltered purchase cache here.
-        // The unfiltered cache contains ALL purchases (up to 500) which would incorrectly
-        // display as "recent" purchases. Instead, we wait for the API response below
-        // which returns properly filtered recent purchases.
         
-        // Step 2: Fetch fresh data from API in background with timeframe
         console.log('📊 Fetching metrics from API with timeframe:', metricsTimeframe);
         
-        // Fetch location details
         await locationService.getLocation(locationId);
         
-        // Fetch metrics with timeframe filter
         const metricsParams: any = {
           timeframe: metricsTimeframe,
         };
         
-        // Add custom dates if timeframe is custom
         if (metricsTimeframe === 'custom' && customDateFrom && customDateTo) {
           metricsParams.date_from = customDateFrom;
           metricsParams.date_to = customDateTo;
@@ -328,21 +292,17 @@ const LocationManagerDashboard: React.FC = () => {
         console.log('📊 Metrics:', metricsResponse.metrics);
         console.log('🎫 Recent purchases:', metricsResponse.recentPurchases?.length || 0);
         
-        // Step 3: Update state with fresh data (smooth transition)
         if (metricsResponse.metrics) {
           setMetrics(metricsResponse.metrics);
         } else {
           console.error('⚠️ No metrics in API response');
         }
         
-        // Set recent purchases from API response
         if (metricsResponse.recentPurchases) {
           setTicketPurchases(metricsResponse.recentPurchases as any);
-          // Also update the purchase cache
           await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
         }
 
-        // Set recent event purchases from API response
         if (metricsResponse.recentEventPurchases) {
           setRecentEventPurchases(metricsResponse.recentEventPurchases as any);
         }
@@ -351,14 +311,12 @@ const LocationManagerDashboard: React.FC = () => {
           console.log('📍 Location details from API:', metricsResponse.locationDetails.name);
         }
         
-        // Step 4: Cache the fresh data for next time (with timeframe)
         await metricsCacheService.cacheMetrics('manager', {
           metrics: metricsResponse.metrics,
           recentPurchases: metricsResponse.recentPurchases || [],
           recentEventPurchases: metricsResponse.recentEventPurchases || [],
         }, locationId, metricsTimeframe);
         
-        // Update timeframe description from API
         if (metricsResponse.timeframe) {
           setTimeframeDescription(metricsResponse.timeframe.description);
         }
@@ -377,7 +335,6 @@ const LocationManagerDashboard: React.FC = () => {
     fetchMetricsData();
   }, [locationId, metricsTimeframe, customDateFrom, customDateTo]);
 
-  // Weekly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
     if (allBookings.length === 0) return;
     
@@ -393,8 +350,6 @@ const LocationManagerDashboard: React.FC = () => {
     console.log('📅 [ManagerDashboard] Weekly bookings filtered:', weekly.length);
   }, [allBookings, currentWeek]);
   
-  // Daily calendar data - derived from allBookings (no API call needed)
-  // Matches SpaceSchedule: only show confirmed, pending, and checked-in bookings
   useEffect(() => {
     if (calendarView !== 'day' || allBookings.length === 0) return;
     
@@ -414,7 +369,6 @@ const LocationManagerDashboard: React.FC = () => {
     console.log('📅 [ManagerDashboard] Daily bookings filtered for', dateStr, ':', daily.length);
   }, [allBookings, currentDay, calendarView]);
   
-  // Navigate to previous/next day
   const goToPreviousDay = () => {
     const newDate = new Date(currentDay);
     newDate.setDate(newDate.getDate() - 1);
@@ -427,7 +381,6 @@ const LocationManagerDashboard: React.FC = () => {
     setCurrentDay(newDate);
   };
 
-  // Navigate to previous/next week
   const goToPreviousWeek = () => {
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() - 7);
@@ -440,7 +393,6 @@ const LocationManagerDashboard: React.FC = () => {
     setCurrentWeek(newDate);
   };
 
-  // Navigate to previous/next month
   const goToPreviousMonth = () => {
     const newDate = new Date(currentMonth);
     newDate.setDate(1); // Set to first day to avoid month overflow
@@ -455,7 +407,6 @@ const LocationManagerDashboard: React.FC = () => {
     setCurrentMonth(newDate);
   };
 
-  // Get all days in the current month for calendar grid
   const getMonthDays = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -466,12 +417,10 @@ const LocationManagerDashboard: React.FC = () => {
     
     const days: (Date | null)[] = [];
     
-    // Add empty slots for days before the first of the month
     for (let i = 0; i < startDayOfWeek; i++) {
       days.push(null);
     }
     
-    // Add all days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(new Date(year, month, i));
     }
@@ -481,7 +430,6 @@ const LocationManagerDashboard: React.FC = () => {
 
   const monthDays = getMonthDays(currentMonth);
 
-  // Monthly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
     if (calendarView !== 'month' || allBookings.length === 0) return;
     
@@ -499,12 +447,10 @@ const LocationManagerDashboard: React.FC = () => {
     console.log('📅 [ManagerDashboard] Monthly bookings filtered:', monthly.length);
   }, [allBookings, currentMonth, calendarView]);
 
-  // Reset pagination when filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus]);
 
-  // Get bookings for a specific day
   const getBookingsForDay = (date: Date) => {
     return monthlyBookings.filter(booking => {
       const bookingDate = parseLocalDate(booking.booking_date);
@@ -512,7 +458,6 @@ const LocationManagerDashboard: React.FC = () => {
     });
   };
 
-  // Natural sort function: alphabetical first, then numerical (Table 1, 2, 3 not 1, 10, 2)
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
     const nameB = b.name;
@@ -535,10 +480,8 @@ const LocationManagerDashboard: React.FC = () => {
     return 0;
   };
 
-  // Sorted rooms for display
   const sortedRooms = [...rooms].sort(naturalSort);
 
-  // Generate time slots for daily view (matching SpaceSchedule)
   const generateTimeSlots = () => {
     const slots: { time: string; hour: number; minute: number }[] = [];
     const startHour = 8; // 8 AM
@@ -559,12 +502,9 @@ const LocationManagerDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
-  // Check if there are any bookings without a room assigned
   const unassignedBookings = dailyBookings.filter(b => !b.room_id);
 
-  // Filter to show time slots that have bookings (including unassigned bookings)
   const visibleTimeSlots = dailyTimeSlots.filter(slot => {
-    // Check if any booking (with or without room) covers this slot
     return dailyBookings.some(booking => {
       const [bookingHour, bookingMin] = (booking.booking_time || '00:00').split(':').map(Number);
       const startInMinutes = bookingHour * 60 + bookingMin;
@@ -580,10 +520,8 @@ const LocationManagerDashboard: React.FC = () => {
     });
   });
 
-  // Get booking for a specific space and time slot (spaceId = 0 means unassigned)
   const getBookingForSlot = (spaceId: number, slot: { hour: number; minute: number }) => {
     return dailyBookings.find(booking => {
-      // For unassigned column (spaceId = 0), check for bookings without room
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -594,10 +532,8 @@ const LocationManagerDashboard: React.FC = () => {
     });
   };
 
-  // Check if a slot is occupied by a booking that started earlier (spaceId = 0 means unassigned)
   const isSlotOccupied = (spaceId: number, slot: { hour: number; minute: number }) => {
     return dailyBookings.some(booking => {
-      // For unassigned column (spaceId = 0), check for bookings without room
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -619,7 +555,6 @@ const LocationManagerDashboard: React.FC = () => {
     });
   };
 
-  // Calculate row span for a booking (based on 15-minute intervals)
   const getBookingRowSpan = (booking: any) => {
     let durationMinutes = 60;
     if (booking.duration && booking.duration_unit) {
@@ -630,7 +565,6 @@ const LocationManagerDashboard: React.FC = () => {
     return Math.max(1, Math.ceil(durationMinutes / 15));
   };
 
-  // Format time for display
   const formatTime12Hour = (time: string): string => {
     const [hourStr, minuteStr] = time.split(':');
     let hour = parseInt(hourStr);
@@ -640,7 +574,6 @@ const LocationManagerDashboard: React.FC = () => {
     return `${hour}:${minute} ${ampm}`;
   };
 
-  // Calculate end time
   const calculateEndTime = (startTime: string, duration: number, unit: string): string => {
     const [hourStr, minuteStr] = startTime.split(':');
     let hour = parseInt(hourStr);
@@ -656,7 +589,6 @@ const LocationManagerDashboard: React.FC = () => {
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
-  // Dynamic metrics cards
   const metricsCards = [
     {
       title: 'Total Bookings',
@@ -702,13 +634,11 @@ const LocationManagerDashboard: React.FC = () => {
     },
   ];
 
-  // Filter bookings for the current week
   const bookingsThisWeek = weeklyBookings.filter(booking => {
     const bookingDate = parseLocalDate(booking.booking_date);
     return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
   });
 
-  // Quick actions for Location Manager - 8 items for clean grid
   const quickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
     { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
@@ -720,7 +650,6 @@ const LocationManagerDashboard: React.FC = () => {
     { title: 'Payments', icon: DollarSign, link: '/manager/payments' },
   ];
 
-  // Status colors (for bookings)
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       Confirmed: 'bg-emerald-100 text-emerald-800',
@@ -737,7 +666,6 @@ const LocationManagerDashboard: React.FC = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  // Payment status colors
   const getPaymentColor = (payment: string) => {
     const colors: Record<string, string> = {
       paid: 'bg-emerald-100 text-emerald-800',
@@ -748,19 +676,15 @@ const LocationManagerDashboard: React.FC = () => {
     return colors[payment?.toLowerCase()] || 'bg-gray-100 text-gray-800';
   };
 
-  // Filter all bookings by status for the table (shows ALL bookings for this location, not just this week)
   const filteredBookings = selectedStatus === 'all' 
     ? allBookings 
     : allBookings.filter(booking => booking.status.toLowerCase() === selectedStatus.toLowerCase());
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
   const currentBookings = filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Pagination functions
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
-  // Payment modal handlers
   const handleOpenPaymentModal = () => {
     if (!selectedBooking) return;
     const remainingAmount = Math.max(0, Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0));
@@ -827,7 +751,6 @@ const LocationManagerDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-8">
-      {/* Header with Timeframe Selector */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
@@ -838,7 +761,6 @@ const LocationManagerDashboard: React.FC = () => {
           </p>
         </div>
         
-        {/* Timeframe Selector */}
         <div className="flex flex-col md:flex-row items-start md:items-center gap-2 mt-4 md:mt-0">
           <div className="flex items-center gap-2">
             <Clock size={16} className="text-gray-500" />
@@ -858,7 +780,6 @@ const LocationManagerDashboard: React.FC = () => {
             )}
           </div>
           
-          {/* Custom Date Range Inputs */}
           {metricsTimeframe === 'custom' && (
             <div className="flex items-center gap-2">
               <input
@@ -881,7 +802,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metricsCards.map((metric, index) => {
           const Icon = metric.icon;
@@ -912,7 +832,6 @@ const LocationManagerDashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Quick Actions Card */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <Zap className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
@@ -934,14 +853,12 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Calendar */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <Calendar className={`w-5 h-5 text-${fullColor}`} /> Calendar
             </h2>
-            {/* View Toggle */}
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setCalendarView('day')}
@@ -1018,7 +935,6 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         </div>
         
-        {/* Day View - Space Schedule Style (Time on left, Spaces as columns) */}
         {calendarView === 'day' && (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             {sortedRooms.length === 0 ? (
@@ -1054,7 +970,6 @@ const LocationManagerDashboard: React.FC = () => {
                         </div>
                       </th>
                     ))}
-                    {/* Unassigned bookings column */}
                     {unassignedBookings.length > 0 && (
                       <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 border-r border-gray-200 min-w-[200px] bg-amber-50">
                         <div className="flex flex-col items-center gap-1">
@@ -1131,7 +1046,6 @@ const LocationManagerDashboard: React.FC = () => {
                           </td>
                         );
                       })}
-                      {/* Unassigned bookings column */}
                       {unassignedBookings.length > 0 && (() => {
                         const booking = getBookingForSlot(0, slot);
                         const isOccupied = isSlotOccupied(0, slot);
@@ -1190,7 +1104,6 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Week View */}
         {calendarView === 'week' && (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full">
@@ -1208,23 +1121,19 @@ const LocationManagerDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {/* Generate time slots based on actual bookings */}
               {(() => {
-                // Get all unique time slots (hour:minute) from bookings
                 const bookingTimes = new Set<string>();
                 bookingsThisWeek.forEach(booking => {
                   const [hour, minute] = booking.booking_time.split(':');
                   bookingTimes.add(`${hour}:${minute}`);
                 });
                 
-                // Sort times chronologically
                 const sortedTimes = Array.from(bookingTimes).sort((a, b) => {
                   const [hourA, minA] = a.split(':').map(Number);
                   const [hourB, minB] = b.split(':').map(Number);
                   return (hourA * 60 + minA) - (hourB * 60 + minB);
                 });
                 
-                // If no bookings, show message
                 if (sortedTimes.length === 0) {
                   return (
                     <tr>
@@ -1271,7 +1180,6 @@ const LocationManagerDashboard: React.FC = () => {
                                     : 'bg-rose-50 border-rose-200'
                                 }`}
                               >
-                                {/* First booking preview */}
                                 <div className="text-xs space-y-1">
                                   <div className="font-semibold text-gray-900 truncate">
                                     {bookingsForCell[0].guest_name || (bookingsForCell[0].customer ? `${bookingsForCell[0].customer.first_name} ${bookingsForCell[0].customer.last_name}` : 'Guest')}
@@ -1285,7 +1193,6 @@ const LocationManagerDashboard: React.FC = () => {
                                   </div>
                                 </div>
                                 
-                                {/* View more button */}
                                 {bookingsForCell.length > 1 && (
                                   <StandardButton
                                     onClick={() => setSelectedTimeSlot({ date, hour, minute, bookings: bookingsForCell })}
@@ -1303,7 +1210,6 @@ const LocationManagerDashboard: React.FC = () => {
                                   </StandardButton>
                                 )}
                                 
-                                {/* Single booking - click to view details */}
                                 {bookingsForCell.length === 1 && (
                                   <StandardButton
                                     onClick={() => setSelectedBooking(bookingsForCell[0])}
@@ -1336,10 +1242,8 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
         )}
 
-        {/* Month View */}
         {calendarView === 'month' && (
           <div className="rounded-lg border border-gray-200">
-            {/* Days of week header */}
             <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                 <div key={day} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1348,7 +1252,6 @@ const LocationManagerDashboard: React.FC = () => {
               ))}
             </div>
             
-            {/* Calendar grid */}
             <div className="grid grid-cols-7">
               {monthDays.map((day, index) => {
                 if (!day) {
@@ -1361,7 +1264,6 @@ const LocationManagerDashboard: React.FC = () => {
                 const isToday = day.toDateString() === new Date().toDateString();
                 const hasBookings = dayBookings.length > 0;
                 
-                // Count by status
                 const confirmedCount = dayBookings.filter(b => b.status === 'confirmed' || b.status === 'Confirmed').length;
                 const pendingCount = dayBookings.filter(b => b.status === 'pending' || b.status === 'Pending').length;
                 const cancelledCount = dayBookings.filter(b => b.status === 'cancelled' || b.status === 'Cancelled').length;
@@ -1411,7 +1313,6 @@ const LocationManagerDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* New Bookings Table - Below Calendar */}
       {newBookings.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -1480,7 +1381,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Ticket Purchases Table */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1561,7 +1461,6 @@ const LocationManagerDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Recent Event Purchases Table */}
       {recentEventPurchases.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -1612,7 +1511,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* All Bookings table removed — use Manage Bookings page instead */}
       {false && <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900">All Bookings</h2>
@@ -1650,12 +1548,10 @@ const LocationManagerDashboard: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {currentBookings.map(booking => {
-                  // Calculate actual payment status based on amounts
                   const totalAmount = parseFloat(String(booking.total_amount || 0));
                   const amountPaid = parseFloat(String(booking.amount_paid || 0));
                   let actualPaymentStatus = booking.payment_status || 'pending';
                   
-                  // Override with calculated status if amounts suggest otherwise
                   if (totalAmount > 0) {
                     if (amountPaid >= totalAmount) {
                       actualPaymentStatus = 'paid';
@@ -1718,7 +1614,6 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination */}
         {filteredBookings.length > 0 && (
           <div className="flex items-center justify-between mt-6">
             <Pagination
@@ -1732,7 +1627,6 @@ const LocationManagerDashboard: React.FC = () => {
         )}
       </div>}
 
-      {/* Time Slot Modal - Shows all bookings for a specific date/time */}
       {selectedTimeSlot && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setSelectedTimeSlot(null)}>
           <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -1746,7 +1640,6 @@ const LocationManagerDashboard: React.FC = () => {
                     {(() => {
                       const isPM = selectedTimeSlot.hour >= 12;
                       const displayHour = selectedTimeSlot.hour > 12 ? selectedTimeSlot.hour - 12 : selectedTimeSlot.hour === 0 ? 12 : selectedTimeSlot.hour;
-                      // Get the first booking's minutes to display accurate time
                       const firstBooking = selectedTimeSlot.bookings[0];
                       const minutes = firstBooking.booking_time.split(':')[1];
                       return `${displayHour}:${minutes} ${isPM ? 'PM' : 'AM'}`;
@@ -1780,7 +1673,6 @@ const LocationManagerDashboard: React.FC = () => {
                           {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
                         </p>
                         <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                          {/* selected room */}
                           <span className="flex items-center gap-1">
                             <House size={14} />
                             {booking.room ? booking.room.name : 'N/A'}
@@ -1823,7 +1715,6 @@ const LocationManagerDashboard: React.FC = () => {
                 ))}
               </div>
 
-              {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <StandardButton
                   onClick={() => setSelectedTimeSlot(null)}
@@ -1839,7 +1730,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Day Bookings Modal - Shows all bookings for a specific day (Month View) */}
       {selectedDayBookings && (
         <div 
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" 
@@ -1944,7 +1834,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Booking Detail Modal */}
       {selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setSelectedBooking(null)}>
           <div className="bg-white rounded-xl shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -1961,7 +1850,6 @@ const LocationManagerDashboard: React.FC = () => {
                 />
               </div>
 
-              {/* Customer Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -1976,7 +1864,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Booking Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -2007,7 +1894,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Date & Time */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -2034,7 +1920,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Package Details */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -2053,7 +1938,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Location */}
               {selectedBooking.location && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Location</h4>
@@ -2066,7 +1950,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Room */}
               {selectedBooking.room && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
@@ -2081,7 +1964,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Guest of Honor Section - Only show if data exists */}
               {selectedBooking.guest_of_honor_name && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Guest of Honor</h4>
@@ -2106,7 +1988,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Attractions */}
               {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Additional Attractions</h4>
@@ -2133,7 +2014,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Add-Ons */}
               {((selectedBooking.addOns || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.addOns || (selectedBooking as any).add_ons) && (selectedBooking.addOns || (selectedBooking as any).add_ons).length > 0) && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
@@ -2160,7 +2040,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Payment Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -2211,7 +2090,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Special Requests */}
               {selectedBooking.special_requests && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Special Requests</h4>
@@ -2221,7 +2099,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Internal Notes */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
                   <FileText size={14} /> Internal Notes
@@ -2254,7 +2131,6 @@ const LocationManagerDashboard: React.FC = () => {
                             try {
                               await bookingService.updateInternalNotes(selectedBooking.id, tempNotes);
                               setSelectedBooking({ ...selectedBooking, internal_notes: tempNotes });
-                              // Update in allBookings too
                               setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, internal_notes: tempNotes } : b));
                               setEditingNotes(false);
                             } catch (err) {
@@ -2283,7 +2159,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex gap-2">
                   <Link
@@ -2330,7 +2205,6 @@ const LocationManagerDashboard: React.FC = () => {
                   )}
                 </div>
 
-                {/* Check In Confirmation */}
                 {showCheckInConfirm && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
@@ -2379,7 +2253,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Payment Modal */}
       {showPaymentModal && selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>

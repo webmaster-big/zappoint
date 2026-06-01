@@ -1,4 +1,3 @@
-// src/pages/admin/email/CreateEmailNotification.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -74,7 +73,6 @@ const CreateEmailNotification: React.FC = () => {
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
   const [formData, setFormData] = useState<CreateEmailNotificationData>({
     name: '',
     trigger_type: 'booking_created',
@@ -92,7 +90,6 @@ const CreateEmailNotification: React.FC = () => {
     send_after_hours: undefined
   });
 
-  // UI state
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [entities, setEntities] = useState<Array<{ id: number; name: string }>>([]);
@@ -109,12 +106,10 @@ const CreateEmailNotification: React.FC = () => {
   const [linkText, setLinkText] = useState('');
   const [editorMode, setEditorMode] = useState<'wysiwyg' | 'code'>('wysiwyg');
   
-  // Variables panel state
   const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
 
-  // Trigger type configurations
   const bookingTriggers = [
     { value: 'booking_created', label: 'Booking Created' },
     { value: 'booking_confirmed', label: 'Booking Confirmed' },
@@ -147,7 +142,6 @@ const CreateEmailNotification: React.FC = () => {
     { value: 'payment_pending', label: 'Payment Pending' },
   ];
 
-  // Get available triggers based on entity type
   const getAvailableTriggers = () => {
     const entityType = formData.entity_type;
     if (entityType === 'package') {
@@ -169,7 +163,6 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Recipient type options
   const recipientTypeOptions: Array<{ value: RecipientType; label: string }> = [
     { value: 'customer', label: 'Customer' },
     { value: 'staff', label: 'Staff' },
@@ -181,7 +174,6 @@ const CreateEmailNotification: React.FC = () => {
   const isReminderTrigger = formData.trigger_type.endsWith('_reminder');
   const isFollowupTrigger = formData.trigger_type.endsWith('_followup');
 
-  // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -202,7 +194,6 @@ const CreateEmailNotification: React.FC = () => {
     fetchData();
   }, [isCompanyAdmin]);
 
-  // Reset trigger when entity type changes
   useEffect(() => {
     const availableTriggers = getAvailableTriggers();
     const allOptions = availableTriggers.flatMap(g => g.options.map(o => o.value));
@@ -213,7 +204,6 @@ const CreateEmailNotification: React.FC = () => {
     }
   }, [formData.entity_type]);
 
-  // Fetch variables when trigger type changes
   useEffect(() => {
     const fetchVariables = async () => {
       try {
@@ -247,7 +237,6 @@ const CreateEmailNotification: React.FC = () => {
             });
           }
           setVariableGroups(groups);
-          // Expand first group by default
           if (groups.length > 0) {
             setExpandedGroups({ [groups[0].name]: true });
           }
@@ -259,7 +248,6 @@ const CreateEmailNotification: React.FC = () => {
     fetchVariables();
   }, [formData.trigger_type]);
 
-  // Fetch entities when entity type changes
   useEffect(() => {
     if (formData.entity_type === 'all') {
       setEntities([]);
@@ -279,7 +267,6 @@ const CreateEmailNotification: React.FC = () => {
     fetchEntities();
   }, [formData.entity_type, formData.location_id]);
 
-  // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
@@ -292,12 +279,10 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Handle entity type change
   const handleEntityTypeChange = (entityType: EntityType) => {
     setFormData(prev => ({ ...prev, entity_type: entityType, entity_ids: [] }));
   };
 
-  // Handle recipient type toggle
   const handleRecipientTypeToggle = (type: RecipientType) => {
     setFormData(prev => {
       const types = prev.recipient_types?.includes(type)
@@ -310,7 +295,6 @@ const CreateEmailNotification: React.FC = () => {
     });
   };
 
-  // Add custom email
   const addCustomEmail = () => {
     const email = customEmail.trim().toLowerCase();
     if (!email) return;
@@ -327,24 +311,20 @@ const CreateEmailNotification: React.FC = () => {
     setCustomEmail('');
   };
 
-  // Remove custom email
   const removeCustomEmail = (email: string) => {
     setFormData(prev => ({ ...prev, custom_emails: prev.custom_emails?.filter(e => e !== email) || [] }));
   };
 
-  // Handle body content change
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || '' }));
     }
   };
 
-  // Handle CodeMirror code-editor body changes
   const handleCodeBodyChange = (value: string) => {
     setFormData(prev => ({ ...prev, body: value }));
   };
 
-  // Switch editor mode and keep both editors in sync
   const switchEditorMode = (mode: 'wysiwyg' | 'code') => {
     if (mode === editorMode) return;
     if (mode === 'code') {
@@ -362,7 +342,6 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Toolbar click handler
   const handleToolbarClick = (e: React.MouseEvent, command: string, value?: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -370,7 +349,6 @@ const CreateEmailNotification: React.FC = () => {
     handleBodyChange();
   };
 
-  // Apply text color
   const applyTextColor = (color: string) => {
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
@@ -379,7 +357,6 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Apply highlight
   const applyHighlight = (color: string) => {
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
@@ -388,7 +365,6 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Insert link
   const insertLink = () => {
     if (!linkUrl.trim()) {
       setToast({ message: 'Please enter a URL', type: 'error' });
@@ -407,12 +383,10 @@ const CreateEmailNotification: React.FC = () => {
     setLinkText('');
   };
 
-  // Handle image file selection - show size modal
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       setToast({ message: 'Please select a valid image file (PNG, JPG, GIF, WebP)', type: 'error' });
@@ -420,19 +394,16 @@ const CreateEmailNotification: React.FC = () => {
       return;
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setToast({ message: 'Image must be less than 5MB', type: 'error' });
       if (imageInputRef.current) imageInputRef.current.value = '';
       return;
     }
 
-    // Store file and show size picker modal
     setPendingImageFile(file);
     setShowImageSizeModal(true);
   };
 
-  // Upload and insert image with selected size
   const handleImageUpload = async (maxWidth: string) => {
     if (!pendingImageFile) return;
 
@@ -443,7 +414,6 @@ const CreateEmailNotification: React.FC = () => {
       const response = await emailCampaignService.uploadImage(pendingImageFile);
       
       if (response.success) {
-        // Insert image at cursor position with chosen size
         if (bodyEditorRef.current) {
           bodyEditorRef.current.focus();
           const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
@@ -462,7 +432,6 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Insert variable
   const insertVariable = (variable: string) => {
     const variableText = `{{ ${variable} }}`;
     if (bodyEditorRef.current) {
@@ -483,29 +452,24 @@ const CreateEmailNotification: React.FC = () => {
     }
   };
 
-  // Copy variable
   const copyVariable = (variable: string) => {
     navigator.clipboard.writeText(`{{ ${variable} }}`);
     setCopiedVariable(variable);
     setTimeout(() => setCopiedVariable(null), 2000);
   };
 
-  // Toggle variable group - only one open at a time
   const toggleGroup = (groupName: string) => {
     setExpandedGroups(prev => {
       const isCurrentlyOpen = prev[groupName];
-      // Close all groups, then toggle the clicked one
       const allClosed = Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {} as Record<string, boolean>);
       return { ...allClosed, [groupName]: !isCurrentlyOpen };
     });
   };
 
-  // Format group name
   const formatGroupName = (name: string) => {
     return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ') + ' Variables';
   };
 
-  // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -563,7 +527,6 @@ const CreateEmailNotification: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -606,9 +569,7 @@ const CreateEmailNotification: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Basic Info & Trigger Config */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Notification Settings</h2>
               
@@ -683,7 +644,6 @@ const CreateEmailNotification: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Timing for Reminder/Follow-up */}
                 {(isReminderTrigger || isFollowupTrigger) && (
                   <div className="md:col-span-2">
                     <div className={`flex items-center gap-3 p-3 rounded-lg border bg-${themeColor}-50 border-${themeColor}-200`}>
@@ -705,7 +665,6 @@ const CreateEmailNotification: React.FC = () => {
                   </div>
                 )}
 
-                {/* Entity Selection */}
                 {formData.entity_type !== 'all' && entities.length > 0 && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -750,7 +709,6 @@ const CreateEmailNotification: React.FC = () => {
               </div>
             </div>
 
-            {/* Recipients */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Recipients</h2>
               
@@ -820,7 +778,6 @@ const CreateEmailNotification: React.FC = () => {
               </div>
             </div>
 
-            {/* Email Content */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Email Content</h2>
@@ -909,7 +866,6 @@ const CreateEmailNotification: React.FC = () => {
                       />
                     ) : (
                     <>
-                    {/* Toolbar */}
                     <div className="flex flex-wrap items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
                       <button type="button" onMouseDown={(e) => handleToolbarClick(e, 'undo')} className="p-1.5 hover:bg-gray-200 rounded text-gray-600" title="Undo">
                         <Undo2 className="w-4 h-4" />
@@ -985,7 +941,6 @@ const CreateEmailNotification: React.FC = () => {
                       </button>
                     </div>
                     
-                    {/* Editor */}
                     <div className="relative">
                       {!formData.body && (
                         <div className="absolute top-3 left-4 text-gray-400 pointer-events-none select-none z-0">
@@ -1013,7 +968,6 @@ const CreateEmailNotification: React.FC = () => {
             </div>
           </div>
 
-          {/* Variables Panel - Right Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
@@ -1101,7 +1055,6 @@ const CreateEmailNotification: React.FC = () => {
         </div>
       </div>
 
-      {/* Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1142,7 +1095,6 @@ const CreateEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Image Size Picker Modal */}
       {showImageSizeModal && pendingImageFile && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -1156,7 +1108,6 @@ const CreateEmailNotification: React.FC = () => {
               </div>
             </div>
             
-            {/* Image Preview */}
             <div className="mb-4 p-4 bg-gray-50 rounded-lg flex justify-center">
               <img 
                 src={URL.createObjectURL(pendingImageFile)} 
@@ -1217,7 +1168,6 @@ const CreateEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Link Modal */}
       {showLinkModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -1264,7 +1214,6 @@ const CreateEmailNotification: React.FC = () => {
         </div>
       )}
 
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );

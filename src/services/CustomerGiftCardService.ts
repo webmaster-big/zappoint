@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../utils/storage';
 
-// Helper to get customer token from localStorage
 const getCustomerToken = (): string | null => {
   try {
     const stored = localStorage.getItem('zapzone_customer');
@@ -10,12 +9,10 @@ const getCustomerToken = (): string | null => {
       return customer?.token || null;
     }
   } catch {
-    // ignore parse errors
   }
   return null;
 };
 
-// Helper to get customer ID from localStorage
 const getCustomerId = (): number | null => {
   try {
     const stored = localStorage.getItem('zapzone_customer');
@@ -24,12 +21,10 @@ const getCustomerId = (): number | null => {
       return customer?.id || customer?.user?.id || null;
     }
   } catch {
-    // ignore parse errors
   }
   return null;
 };
 
-// Authenticated axios instance (customer token)
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -46,7 +41,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Types ──────────────────────────────────────────────────────────────
 
 export interface CustomerGiftCard {
   id: number;
@@ -114,22 +108,14 @@ export interface ValidateCodeResponse {
   };
 }
 
-// ── Service ────────────────────────────────────────────────────────────
 
 class CustomerGiftCardService {
-  /**
-   * Get all available (active) gift cards — the "browse" tab
-   */
   async getAvailableGiftCards(filters?: GiftCardFilters): Promise<GiftCardsResponse> {
     const params: Record<string, unknown> = { status: 'active', ...filters };
     const response = await api.get('/gift-cards', { params });
     return response.data;
   }
 
-  /**
-   * Get gift cards owned by the current customer — "My Gift Cards" tab.
-   * Requires backend to support `customer_id` filter or a dedicated endpoint.
-   */
   async getMyGiftCards(filters?: GiftCardFilters): Promise<GiftCardsResponse> {
     const customerId = getCustomerId();
     const params: Record<string, unknown> = { customer_id: customerId, ...filters };
@@ -137,25 +123,16 @@ class CustomerGiftCardService {
     return response.data;
   }
 
-  /**
-   * Get a single gift card by ID
-   */
   async getGiftCard(id: number): Promise<SingleGiftCardResponse> {
     const response = await api.get(`/gift-cards/${id}`);
     return response.data;
   }
 
-  /**
-   * Validate a gift card by code
-   */
   async validateCode(code: string): Promise<ValidateCodeResponse> {
     const response = await api.post('/gift-cards/validate-code', { code });
     return response.data;
   }
 
-  /**
-   * Redeem a gift card
-   */
   async redeemGiftCard(
     id: number,
     amount: number,

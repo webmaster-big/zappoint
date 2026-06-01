@@ -1,6 +1,4 @@
-// src/types/EmailCampaign.types.ts
 
-// Email Template Types
 export interface EmailTemplate {
   id: number;
   name: string;
@@ -64,7 +62,6 @@ export interface EmailTemplateVariable {
   description: string;
 }
 
-// Backend returns variables as flat key-value pairs (variable_name => sample_value)
 export interface EmailTemplateVariablesData {
   default: Record<string, string>;
   customer: Record<string, string>;
@@ -89,7 +86,6 @@ export interface PreviewTemplateResponse {
   };
 }
 
-// Email Campaign Types
 export interface EmailCampaign {
   id: number;
   name: string;
@@ -139,7 +135,6 @@ export interface RecipientFilters {
   [key: string]: string | number | boolean | undefined;
 }
 
-// Attachment stored on backend
 export interface StoredAttachment {
   original_name: string;
   path: string;
@@ -147,7 +142,6 @@ export interface StoredAttachment {
   size: number;
 }
 
-// Image upload response from backend
 export interface ImageUploadResponse {
   success: boolean;
   data: {
@@ -244,7 +238,6 @@ export interface EmailCampaignStatisticsFilters {
   end_date?: string;
 }
 
-// API Response Types
 export interface EmailTemplateApiResponse<T = EmailTemplate> {
   success: boolean;
   message?: string;

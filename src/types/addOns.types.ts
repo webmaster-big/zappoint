@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/packages/AddOns.tsx
 
 export interface PackageSpecificPrice {
   package_id: number;

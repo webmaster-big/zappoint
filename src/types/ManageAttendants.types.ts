@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/Attendants/ManageAttendants.tsx
 
 export interface ManageAttendantsAttendant {
   id: string;

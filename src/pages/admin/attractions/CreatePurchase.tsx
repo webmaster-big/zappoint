@@ -63,7 +63,6 @@ const CreatePurchase = () => {
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   
-  // Card payment details
   const [useAuthorizeNet, setUseAuthorizeNet] = useState(true); // Toggle for Authorize.Net vs manual card
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
@@ -80,13 +79,11 @@ const CreatePurchase = () => {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   
-  // Schedule state
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   
-  // Add-on state
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<CreatePurchaseAddOn | null>(null);
@@ -96,7 +93,6 @@ const CreatePurchase = () => {
   const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
-  // Fetch locations for company admin
   useEffect(() => {
     if (isCompanyAdmin) {
       const fetchLocations = async () => {
@@ -106,31 +102,26 @@ const CreatePurchase = () => {
             setLocations(Array.isArray(response.data) ? response.data : []);
           }
         } catch {
-          // Error fetching locations - handled silently
         }
       };
       fetchLocations();
     }
   }, [isCompanyAdmin]);
 
-  // Load attractions from backend
   useEffect(() => {
     const loadAttractions = async () => {
       try {
         setLoading(true);
         
-        // Check cache first for instant loading
         const cachedAttractions = await attractionCacheService.getCachedAttractions();
         
         if (cachedAttractions && cachedAttractions.length > 0) {
-          // Filter to active attractions only and apply location filter
           const filteredCached = cachedAttractions.filter((attr: Attraction) => {
             if (!attr.is_active) return false;
             if (selectedLocation !== null && attr.location_id !== selectedLocation) return false;
             return true;
           });
           
-          // Convert cached API format to component format
           const convertedAttractions: CreatePurchaseAttraction[] = filteredCached.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
             id: attr.id.toString(),
             name: attr.name,
@@ -167,12 +158,10 @@ const CreatePurchase = () => {
             setShowEmptyModal(true);
           }
           setLoading(false);
-          // Trigger background sync for freshness
           attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         
-        // If no cache, fetch from API
         const params: any = {
           is_active: true,
           per_page: 100,
@@ -183,10 +172,8 @@ const CreatePurchase = () => {
         }
         const response = await attractionService.getAttractions(params);
         
-        // Cache the fetched attractions
         await attractionCacheService.cacheAttractions(response.data.attractions);
         
-        // Convert API format to component format
         const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
           id: attr.id.toString(),
           name: attr.name,
@@ -219,7 +206,6 @@ const CreatePurchase = () => {
         setAttractions(convertedAttractions);
         setFilteredAttractions(convertedAttractions);
         
-        // Show modal if no attractions available
         if (convertedAttractions.length === 0) {
           setShowEmptyModal(true);
         }
@@ -234,7 +220,6 @@ const CreatePurchase = () => {
     loadAttractions();
   }, [selectedLocation]);
 
-  // Filter attractions based on search term
   useEffect(() => {
     if (searchTerm) {
       const filtered = attractions.filter(attraction =>
@@ -247,7 +232,6 @@ const CreatePurchase = () => {
     }
   }, [searchTerm, attractions]);
 
-  // Debounced customer search by email
   useEffect(() => {
     const searchCustomer = async () => {
       const email = customerInfo.email.trim();
@@ -265,7 +249,6 @@ const CreatePurchase = () => {
         setFoundCustomers(response.data);
         setShowCustomerDropdown(response.data.length > 0);
         
-        // Auto-select if exact email match
         const exactMatch = response.data.find(c => c.email.toLowerCase() === email.toLowerCase());
         if (exactMatch) {
           setSelectedCustomerId(exactMatch.id);
@@ -286,14 +269,11 @@ const CreatePurchase = () => {
       }
     };
 
-    // Debounce search by 500ms
     const timeoutId = setTimeout(searchCustomer, 500);
     return () => clearTimeout(timeoutId);
   }, [customerInfo.email]);
 
-  // Initialize Authorize.Net only when needed
   useEffect(() => {
-    // Only initialize if Authorize.Net payment is selected
     if (paymentMethod !== 'authorize.net') {
       return;
     }
@@ -308,7 +288,6 @@ const CreatePurchase = () => {
           setAuthorizeEnvironment((response.environment || 'sandbox') as 'sandbox' | 'production');
           setShowNoAuthAccountModal(false);
           
-          // Load Accept.js with the correct environment from API response
           await loadAcceptJS((response.environment || 'sandbox') as 'sandbox' | 'production');
         } else {
           setShowNoAuthAccountModal(true);
@@ -329,7 +308,6 @@ const CreatePurchase = () => {
       [name]: value
     }));
     
-    // Reset customer selection when email changes
     if (name === 'email') {
       setSelectedCustomerId(null);
     }
@@ -380,13 +358,11 @@ const CreatePurchase = () => {
     setSelectedAddOns(prev => ({ ...prev, [addOnId]: clamped }));
   };
   
-  // Use dynamic fee breakdown if available - no fallback to hardcoded rate
   const currentTotal = calculateTotal();
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
   const totalAfterSpecialPricing = Math.max(0, currentTotal - specialPricingDiscount);
   const finalTotal = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
 
-  // Fetch fee breakdown when attraction or pricing changes (debounced to prevent rapid API calls)
   useEffect(() => {
     if (!selectedAttraction) {
       setFeeBreakdown(null);
@@ -412,7 +388,6 @@ const CreatePurchase = () => {
     return () => clearTimeout(timeoutId);
   }, [selectedAttraction, quantity, discount, selectedLocation, selectedAddOns]);
 
-  // Fetch special pricing breakdown for attraction (debounced, use scheduled/visit date for pricing)
   useEffect(() => {
     if (!selectedAttraction) {
       setSpecialPricingBreakdown(null);
@@ -420,7 +395,6 @@ const CreatePurchase = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        // Use the scheduled visit date if set, otherwise fall back to today
         const pricingDate = scheduledDate || new Date().toISOString().split('T')[0];
         const basePrice = selectedAttraction.price * quantity;
         const breakdown = await specialPricingService.getPriceBreakdown({
@@ -451,7 +425,6 @@ const CreatePurchase = () => {
     setSelectedAddOns({});
   };
 
-  // --- Schedule picker helpers ---
   const dayNumberToName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   const getAttractionAvailability = (): Array<{ days: string[]; start_time: string; end_time: string }> => {
@@ -481,7 +454,6 @@ const CreatePurchase = () => {
     return slots;
   };
 
-  // Fetch day-offs for the selected attraction's location
   useEffect(() => {
     const fetchDayOffs = async () => {
       if (!selectedAttraction) {
@@ -512,13 +484,11 @@ const CreatePurchase = () => {
           setDayOffDates(blocked);
         }
       } catch {
-        // Day-off fetch failed — proceed without blocking
       }
     };
     fetchDayOffs();
   }, [selectedAttraction, selectedLocation]);
 
-  // Update available time slots when date changes
   useEffect(() => {
     if (!scheduledDate || !selectedAttraction) {
       setAvailableTimeSlots([]);
@@ -538,22 +508,18 @@ const CreatePurchase = () => {
     }
   }, [scheduledDate, selectedAttraction]);
 
-  // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
   const handleCompletePurchase = async (e?: React.MouseEvent) => {
-    // Prevent event bubbling and default behavior
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
     if (!selectedAttraction) return;
-    // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
 
-    // Cooldown: reject if last submission was less than 3 seconds ago
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < 3000) {
       console.warn('⚠️ Purchase submission blocked (cooldown)');
@@ -563,14 +529,12 @@ const CreatePurchase = () => {
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
 
-    // Validate scheduled visit date/time
     if (!scheduledDate || !scheduledTime) {
       setToast({ message: 'Please select a visit date and time before purchasing.', type: 'error' });
       isSubmittingRef.current = false;
       return;
     }
 
-    // Validate card information if payment method is authorize.net
     if (paymentMethod === 'authorize.net') {
       if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
         setPaymentError('Please fill in all card details');
@@ -602,14 +566,10 @@ const CreatePurchase = () => {
       const totalAmount = finalTotal;
       let transactionId: string | undefined;
       
-      // Determine if this is a card payment
       const isCardPayment = paymentMethod === 'authorize.net';
 
-      // For cash payments, use amountPaid if explicitly set, otherwise default to full payment
       const cashAmountPaid = amountPaid > 0 ? amountPaid : totalAmount;
 
-      // Step 1: Create purchase FIRST (so we have the purchase ID for payment)
-      // Build additional_addons array from selected add-ons
       const additionalAddons = Object.entries(selectedAddOns)
         .filter(([, qty]) => qty > 0)
         .map(([idStr, qty]) => {
@@ -654,7 +614,6 @@ const CreatePurchase = () => {
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
 
-      // Step 2: Process card payment if using Authorize.Net (now we have purchase ID)
       if (isCardPayment) {
         const cardData = {
           cardNumber: cardNumber.replace(/\s/g, ''),
@@ -663,7 +622,6 @@ const CreatePurchase = () => {
           cardCode: cardCVV,
         };
         
-        // Customer billing data for Authorize.Net
         const customerData = {
           first_name: customerInfo.name?.split(' ')[0] || '',
           last_name: customerInfo.name?.split(' ').slice(1).join(' ') || '',
@@ -671,7 +629,6 @@ const CreatePurchase = () => {
           phone: customerInfo.phone || '',
         };
         
-        // Generate QR code BEFORE charge so it can be sent with the charge request
         let qrCodeData = '';
         try {
           qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
@@ -679,7 +636,6 @@ const CreatePurchase = () => {
           console.error('⚠️ QR code generation failed:', qrError);
         }
         
-        // Charge WITH payable_id — backend links payment + sends email + stores QR
         const paymentData = {
           location_id: selectedAttraction.locationId || 1,
           amount: totalAmount,
@@ -702,8 +658,6 @@ const CreatePurchase = () => {
             customerData
           );
         } catch (paymentErr) {
-          // processCardPayment threw (tokenization or network error)
-          // Clean up the purchase since payment was not completed
           try {
             await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
             console.log('🗑️ Purchase force deleted due to payment processing error');
@@ -714,14 +668,12 @@ const CreatePurchase = () => {
         }
         
         if (!paymentResponse.success) {
-          // Payment failed - force delete the purchase we just created
           try {
             await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
             console.log('🗑️ Purchase force deleted due to payment failure');
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
           }
-          // Show customer-friendly error message
           const rawMsg = (paymentResponse.message || '').toLowerCase();
           let friendlyMsg = 'Payment could not be processed. The purchase has been cancelled and no charges were made. Please check your card details and try again.';
           if (rawMsg.includes('declined') || rawMsg.includes('decline')) {
@@ -745,7 +697,6 @@ const CreatePurchase = () => {
           setToast({ message: 'Purchase confirmed! (Email not sent per request)', type: 'info' });
         }
       } else if (cashAmountPaid > 0 && paymentMethod !== 'paylater') {
-        // Step 2b: For non-card payments (in-store/cash), create payment record
         try {
           const paymentData = {
             payable_id: createdPurchase.id,
@@ -761,12 +712,9 @@ const CreatePurchase = () => {
           
           await createPayment(paymentData);
         } catch (paymentError) {
-          // Non-critical - purchase succeeded
         }
       }
 
-      // For non-card payments: Generate QR code and send email via qrcode endpoint
-      // (Card payments already handled QR + email via charge endpoint)
       if (!isCardPayment) {
         let qrCodeData = '';
         try {
@@ -795,7 +743,6 @@ const CreatePurchase = () => {
         }
       }
 
-      // Reset form immediately
       setSelectedAttraction(null);
       setQuantity(1);
       setCustomerInfo({ name: '', email: '', phone: '' });
@@ -865,9 +812,7 @@ const CreatePurchase = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - All Form Sections */}
           <div className="lg:col-span-2 space-y-6">
-            {/* 1. Select Attraction */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Attraction</h2>
 
@@ -907,7 +852,6 @@ const CreatePurchase = () => {
                 </div>
               ) : (
                 <>
-                  {/* Search */}
                   <div className="relative mb-4">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Search className="h-5 w-5 text-gray-400" />
@@ -921,7 +865,6 @@ const CreatePurchase = () => {
                     />
                   </div>
 
-                  {/* Attractions Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
                     {filteredAttractions.filter(a => a.status === 'active').map(attraction => (
                       <div
@@ -929,7 +872,6 @@ const CreatePurchase = () => {
                         className={`border rounded-lg p-4 cursor-pointer transition-colors flex gap-4 border-gray-200 hover:border-${themeColor}-300`}
                         onClick={() => handleAddToCart(attraction)}
                       >
-                        {/* Attraction Image */}
                         <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                           {attraction.images && attraction.images.length > 0 ? (
                             <img src={ASSET_URL + attraction.images[0]} alt={attraction.name} className="object-cover w-full h-full" />
@@ -961,7 +903,6 @@ const CreatePurchase = () => {
               )}
             </div>
 
-            {/* 2. Customer Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -985,7 +926,6 @@ const CreatePurchase = () => {
                     </div>
                   )}
                   
-                  {/* Customer Dropdown */}
                   {showCustomerDropdown && foundCustomers.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {foundCustomers.map((customer) => (
@@ -1038,7 +978,6 @@ const CreatePurchase = () => {
               </div>
             </div>
 
-            {/* 3. Purchase Details — only when attraction is selected */}
             {selectedAttraction && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -1047,7 +986,6 @@ const CreatePurchase = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Quantity */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
                     <div className="flex items-center gap-2">
@@ -1074,7 +1012,6 @@ const CreatePurchase = () => {
                     </div>
                   </div>
 
-                  {/* Discount */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Discount ($)</label>
                     <input
@@ -1088,7 +1025,6 @@ const CreatePurchase = () => {
                     />
                   </div>
 
-                  {/* Amount Paid */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Amount Paid {paymentMethod === 'paylater' && <span className="text-gray-500 text-xs">(Auto: $0.00)</span>}
@@ -1106,7 +1042,6 @@ const CreatePurchase = () => {
                     />
                   </div>
 
-                  {/* Notes */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
                     <textarea
@@ -1119,7 +1054,6 @@ const CreatePurchase = () => {
                   </div>
                 </div>
 
-                {/* Add-ons Selection */}
                 {selectedAttraction.addOns && selectedAttraction.addOns.length > 0 && (
                   <div className="mt-6 pt-5 border-t border-gray-100">
                     <div className="flex items-center gap-2 mb-3">
@@ -1141,7 +1075,6 @@ const CreatePurchase = () => {
 
                         return (
                           <div key={addOn.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                            {/* Add-on Image */}
                             <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
                               {addOn.image ? (
                                 <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
@@ -1191,7 +1124,6 @@ const CreatePurchase = () => {
                   </div>
                 )}
 
-                {/* Schedule Selection (full width below grid) */}
                 {getAttractionAvailability().length > 0 && (
                   <div className="mt-6 pt-5 border-t border-gray-100">
                     <div className="flex items-center gap-2 mb-3">
@@ -1214,7 +1146,6 @@ const CreatePurchase = () => {
               </div>
             )}
 
-            {/* 4. Payment Method — only when attraction is selected */}
             {selectedAttraction && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -1259,7 +1190,6 @@ const CreatePurchase = () => {
                   </button>
                 </div>
 
-                {/* Pay Later Notice */}
                 {paymentMethod === 'paylater' && (
                   <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                     <div className="flex items-start gap-2">
@@ -1274,12 +1204,10 @@ const CreatePurchase = () => {
                   </div>
                 )}
 
-                {/* Card Payment Form */}
                 {paymentMethod === 'authorize.net' && (
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
                     
-                    {/* Card Number */}
                     <div className="mb-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
                       <div className="relative">
@@ -1311,7 +1239,6 @@ const CreatePurchase = () => {
                       )}
                     </div>
                     
-                    {/* Expiration and CVV */}
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
@@ -1362,14 +1289,12 @@ const CreatePurchase = () => {
                       </div>
                     </div>
                     
-                    {/* Error Message */}
                     {paymentError && (
                       <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
                         {paymentError}
                       </div>
                     )}
                     
-                    {/* Security Notice */}
                     <div className="mt-3 flex items-start gap-2 text-xs text-gray-600">
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
@@ -1382,14 +1307,12 @@ const CreatePurchase = () => {
             )}
           </div>
 
-          {/* Right Column - Compact Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
               
               {selectedAttraction ? (
                 <>
-                  {/* Selected Attraction Compact Card */}
                   <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
                       {selectedAttraction.images && selectedAttraction.images.length > 0 ? (
@@ -1417,13 +1340,11 @@ const CreatePurchase = () => {
                     </div>
                   </div>
 
-                  {/* Line Items */}
                   <div className="space-y-2 text-sm mb-4">
                     <div className="flex justify-between text-gray-600">
                       <span>Qty: {quantity} × ${selectedAttraction.price}</span>
                       <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
                     </div>
-                    {/* Selected Add-ons */}
                     {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                       const addOn = selectedAttraction.addOns?.find(a => a.id === Number(idStr));
                       if (!addOn) return null;
@@ -1455,7 +1376,6 @@ const CreatePurchase = () => {
                     )}
                   </div>
 
-                  {/* Total */}
                   <div className="border-t border-gray-200 pt-3 mb-4">
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
@@ -1469,7 +1389,6 @@ const CreatePurchase = () => {
                     )}
                   </div>
 
-                  {/* Send Email Receipt */}
                   <div className="mb-4">
                     <label className="flex items-center gap-2 cursor-pointer group">
                       <input
@@ -1485,7 +1404,6 @@ const CreatePurchase = () => {
                     </label>
                   </div>
 
-                  {/* Complete Purchase */}
                   <StandardButton
                     variant="primary"
                     size="lg"
@@ -1509,7 +1427,6 @@ const CreatePurchase = () => {
         </div>
       </div>
 
-      {/* Add-On Details Modal */}
       {showAddOnDetailsModal && selectedAddOnForDetails && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -1553,7 +1470,6 @@ const CreatePurchase = () => {
         </div>
       )}
 
-      {/* No Authorize.Net Account Modal */}
       {showNoAuthAccountModal && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade" onClick={() => setShowNoAuthAccountModal(false)}>
           <div className="bg-white rounded-xl max-w-md w-full p-6 border-4 border-yellow-400 shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1592,7 +1508,6 @@ const CreatePurchase = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast
@@ -1603,7 +1518,6 @@ const CreatePurchase = () => {
         </div>
       )}
 
-      {/* Empty State Modal */}
       <EmptyStateModal
         type="attractions"
         isOpen={showEmptyModal}

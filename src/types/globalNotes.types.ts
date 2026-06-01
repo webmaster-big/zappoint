@@ -1,4 +1,3 @@
-// Types for Global Notes
 
 export interface GlobalNote {
   id: number;

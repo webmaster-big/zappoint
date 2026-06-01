@@ -18,13 +18,11 @@ import { formatTimeTo12Hour } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 
-// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
-// Interface for day offs with time info for partial closures
 interface DayOffWithTime {
   date: Date;
   time_start?: string | null;
@@ -87,7 +85,6 @@ const EditBooking: React.FC = () => {
     guestOfHonorGender: '',
   });
 
-  // Date/time slot selection state
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
@@ -96,7 +93,6 @@ const EditBooking: React.FC = () => {
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
 
-  // Load booking data and package details - try cache first for faster load
   useEffect(() => {
     const loadBookingAndPackage = async () => {
       if (!id && !referenceNumber) {
@@ -108,14 +104,12 @@ const EditBooking: React.FC = () => {
       try {
         let bookingData: Booking | null = null;
         
-        // Try cache first for faster load
         if (id) {
           bookingData = await bookingCacheService.getBookingFromCache(Number(id));
           if (bookingData) {
             console.log('Loaded booking from cache by ID:', bookingData.id);
           }
         } else if (referenceNumber) {
-          // Search cache by reference number
           const cachedBookings = await bookingCacheService.getCachedBookings();
           if (cachedBookings) {
             bookingData = cachedBookings.find(b => b.reference_number === referenceNumber) || null;
@@ -125,14 +119,12 @@ const EditBooking: React.FC = () => {
           }
         }
         
-        // If not in cache, fetch from API
         if (!bookingData) {
           if (referenceNumber) {
             const response = await bookingService.getBookings({ reference_number: referenceNumber });
             if (response.success && response.data && response.data.bookings.length > 0) {
               bookingData = response.data.bookings[0];
               console.log('Loaded booking from API by reference number:', bookingData);
-              // Update cache with fetched booking
               await bookingCacheService.updateBookingInCache(bookingData);
             }
           } else if (id) {
@@ -140,7 +132,6 @@ const EditBooking: React.FC = () => {
             if (response.success && response.data) {
               bookingData = response.data;
               console.log('Loaded booking from API by ID:', bookingData.id);
-              // Update cache with fetched booking
               await bookingCacheService.updateBookingInCache(bookingData);
             }
           }
@@ -152,11 +143,9 @@ const EditBooking: React.FC = () => {
           return;
         }
 
-        // Set booking data immediately so form renders faster
         setOriginalBooking(bookingData);
         setOriginalAmountPaid(Number(bookingData.amount_paid || 0));
         
-        // Set form data immediately
         setFormData({
           customerName: bookingData.guest_name || '',
           email: bookingData.guest_email || '',
@@ -175,67 +164,53 @@ const EditBooking: React.FC = () => {
           guestOfHonorGender: bookingData.guest_of_honor_gender || '',
         });
 
-        // Load applied fees from booking
         if (bookingData.applied_fees && Array.isArray(bookingData.applied_fees)) {
           setAppliedFees(bookingData.applied_fees);
         }
 
-        // Load applied discounts from booking
         if ((bookingData as any).applied_discounts && Array.isArray((bookingData as any).applied_discounts)) {
           setAppliedDiscounts((bookingData as any).applied_discounts);
         }
         
-        // End loading state early - form can render while we load dropdown data
         setLoading(false);
 
-        // Load packages, rooms, and package details in parallel using cache first
         const locationId = bookingData.location_id;
         const packageId = bookingData.package_id;
 
-        // Use Promise.all to load all data in parallel
         const [packagesResult, roomsResult, packageDetailResult] = await Promise.all([
-          // Load packages - try cache first
           (async () => {
             const cachedPackages = await packageCacheService.getCachedPackages();
             if (cachedPackages && cachedPackages.length > 0) {
-              // Filter by location
               packageCacheService.syncInBackground();
               return cachedPackages.filter((pkg: PackageType) => pkg.location_id === locationId);
             }
-            // Fallback to API
             const response = await packageService.getPackages({ location_id: locationId });
             return response.success && response.data ? (response.data.packages || []) : [];
           })(),
           
-          // Load rooms - try cache first
           (async () => {
             const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
             if (cachedRooms && cachedRooms.length > 0) {
               roomCacheService.syncInBackground();
               return cachedRooms.map(room => ({ id: room.id, name: room.name }));
             }
-            // Fallback to API
             const response = await roomService.getRooms({ location_id: locationId });
             if (response.success && response.data) {
               const rooms = response.data.rooms || response.data;
               const roomsArray = Array.isArray(rooms) ? rooms : [];
-              // Cache for next time
               roomCacheService.cacheRooms(roomsArray);
               return roomsArray.map((room: any) => ({ id: room.id, name: room.name }));
             }
             return [];
           })(),
           
-          // Load package details - try cache first
           (async () => {
             if (!packageId) return null;
-            // Try to find in cached packages first
             const cachedPackages = await packageCacheService.getCachedPackages();
             if (cachedPackages) {
               const found = cachedPackages.find((pkg: PackageType) => pkg.id === packageId);
               if (found) return found;
             }
-            // Fallback to API
             const response = await packageService.getPackage(packageId);
             return response.success && response.data ? response.data : null;
           })()
@@ -257,20 +232,17 @@ const EditBooking: React.FC = () => {
     loadBookingAndPackage();
   }, [id, referenceNumber]);
 
-  // Handle package change
   const handlePackageChange = async (packageId: number) => {
     setFormData(prev => ({ ...prev, packageId, date: '', time: '' }));
     setAvailableTimeSlots([]);
     
     try {
-      // Try to find in cached packages first (already loaded in availablePackages)
       const cachedPackage = availablePackages.find(pkg => pkg.id === packageId);
       if (cachedPackage) {
         setPackageDetails(cachedPackage);
         return;
       }
       
-      // Fallback to API if not in available packages
       const packageResponse = await packageService.getPackage(packageId);
       if (packageResponse.success && packageResponse.data) {
         setPackageDetails(packageResponse.data);
@@ -280,7 +252,6 @@ const EditBooking: React.FC = () => {
     }
   };
 
-  // Fetch day offs for the package's location
   useEffect(() => {
     const fetchDayOffs = async () => {
       if (!packageDetails?.location_id) return;
@@ -329,14 +300,12 @@ const EditBooking: React.FC = () => {
           setDayOffsWithTime(partialOrSpecificDayOffs);
         }
       } catch {
-        // Error fetching day offs - calendar will work without day off restrictions
       }
     };
 
     fetchDayOffs();
   }, [packageDetails?.location_id]);
 
-  // Helper: check if a time slot conflicts with a partial day off
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
     if (!formData.date || dayOffsWithTime.length === 0 || !packageDetails) return false;
 
@@ -375,19 +344,16 @@ const EditBooking: React.FC = () => {
     return false;
   };
 
-  // Helper: check if a day off applies to the selected package
   const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
     if (!dayOff.package_ids || dayOff.package_ids.length === 0) return true;
     return dayOff.package_ids.includes(packageId);
   };
 
-  // Filtered day offs for the current package
   const filteredDayOffsWithTime = useMemo(() => {
     if (!packageDetails) return dayOffsWithTime;
     return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, packageDetails.id));
   }, [dayOffsWithTime, packageDetails]);
 
-  // Filter available time slots based on partial day offs and min booking notice hours
   const filteredTimeSlots = availableTimeSlots.filter(slot => {
     if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
 
@@ -407,7 +373,6 @@ const EditBooking: React.FC = () => {
     return true;
   });
 
-  // Helper: get week of month (1-5)
   const getWeekOfMonth = (date: Date): number => {
     const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const dayOfMonth = date.getDate();
@@ -415,14 +380,12 @@ const EditBooking: React.FC = () => {
     return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
   };
 
-  // Helper: check if date is in last week of month
   const isLastWeekOfMonth = (date: Date): boolean => {
     const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
     return daysUntilEndOfMonth < 7;
   };
 
-  // Calculate available dates based on package availability schedules
   useEffect(() => {
     if (!packageDetails) return;
 
@@ -491,8 +454,6 @@ const EditBooking: React.FC = () => {
       }
     }
 
-    // Also include the booking's current date if it's not already in the list
-    // This ensures staff can keep the existing date even if it's in the past
     if (formData.date) {
       const currentDate = parseLocalDate(formData.date);
       const alreadyIncluded = dates.some(d => d.toDateString() === currentDate.toDateString());
@@ -504,7 +465,6 @@ const EditBooking: React.FC = () => {
     setAvailableDates(dates);
   }, [packageDetails, formData.date]);
 
-  // Fetch available time slots via SSE when date changes
   useEffect(() => {
     if (!packageDetails || !formData.date) {
       setAvailableTimeSlots([]);
@@ -524,7 +484,6 @@ const EditBooking: React.FC = () => {
         setAvailableTimeSlots(data.available_slots);
         setLoadingTimeSlots(false);
       } catch {
-        // SSE parsing error
       }
     };
 
@@ -563,12 +522,10 @@ const EditBooking: React.FC = () => {
     setSubmitting(true);
 
     try {
-      // Calculate updated total if participants, package, or fees changed
       let updatedTotal: number | undefined = undefined;
       const isPackageChanged = formData.packageId !== originalBooking.package_id;
       const isParticipantsChanged = formData.participants !== originalBooking.participants;
       
-      // Check if fees have changed
       const originalFees = originalBooking.applied_fees || [];
       const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
       
@@ -620,12 +577,10 @@ const EditBooking: React.FC = () => {
       });
 
       if (response.success) {
-        // Sync the updated booking to cache
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
         }
 
-        // Save internal notes via dedicated PATCH endpoint
         try {
           const notesValue = formData.internalNotes || null;
           const notesRes = await bookingService.updateInternalNotes(
@@ -633,7 +588,6 @@ const EditBooking: React.FC = () => {
             notesValue ?? ''
           );
           if (notesRes.success && notesRes.data) {
-            // Patch cache with updated internal notes
             const cachedBooking = await bookingCacheService.getBookingFromCache(Number(originalBooking.id));
             if (cachedBooking) {
               await bookingCacheService.updateBookingInCache({
@@ -646,7 +600,6 @@ const EditBooking: React.FC = () => {
           console.error('⚠️ Failed to save internal notes:', notesError);
         }
 
-        // If send notification is enabled, generate QR and send via qrcode endpoint
         if (formData.sendNotification) {
           try {
             const refNumber = response.data?.reference_number || originalBooking.reference_number;
@@ -675,7 +628,6 @@ const EditBooking: React.FC = () => {
     }
   };
 
-  // Status badge colors
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800';
@@ -712,7 +664,6 @@ const EditBooking: React.FC = () => {
 
   return (
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
-      {/* Form Section */}
       <div className="flex-1 mx-auto">
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
           <div className="flex items-center gap-3 mb-6">
@@ -734,7 +685,6 @@ const EditBooking: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Package Selection */}
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Package className={`w-5 h-5 text-${themeColor}-600`} /> Package / Party
@@ -764,7 +714,6 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
-            {/* Space Assignment */}
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Home className={`w-5 h-5 text-${themeColor}-600`} /> Space Assignment
@@ -790,7 +739,6 @@ const EditBooking: React.FC = () => {
               )}
             </div>
 
-            {/* Customer Information */}
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <User className={`w-5 h-5 text-${themeColor}-600`} /> Customer Information
@@ -841,13 +789,11 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
-            {/* Booking Details */}
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Booking Details
               </h3>
               <div className="space-y-5">
-                {/* Date Selection via DatePicker */}
                 <div>
                   <label className="block font-semibold mb-2 text-base text-neutral-800">Date</label>
                   {packageDetails?.availability_schedules && packageDetails.availability_schedules.length > 0 ? (
@@ -873,7 +819,6 @@ const EditBooking: React.FC = () => {
                   )}
                 </div>
 
-                {/* Time Slot Selection */}
                 <div>
                   <label className="block font-semibold mb-2 text-base text-neutral-800">Time</label>
                   {!formData.date ? (
@@ -918,7 +863,6 @@ const EditBooking: React.FC = () => {
                   ) : (
                     <p className="text-sm text-gray-400 py-2">No available times for the selected date.</p>
                   )}
-                  {/* Show currently selected time for clarity */}
                   {formData.time && (
                     <p className="text-xs text-gray-500 mt-2">
                       Selected: <span className="font-medium text-gray-700">{formatTimeTo12Hour(formData.time)}</span>
@@ -962,7 +906,6 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
-            {/* Guest of Honor */}
             {packageDetails?.has_guest_of_honor && (
               <div>
                 <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
@@ -1011,7 +954,6 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
-            {/* Notes */}
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900`}>Customer Notes</h3>
               <textarea
@@ -1024,7 +966,6 @@ const EditBooking: React.FC = () => {
               />
             </div>
 
-            {/* Internal Staff Notes */}
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <AlertCircle className={`w-5 h-5 text-amber-600`} />
@@ -1044,7 +985,6 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
-            {/* Email Notification Toggle */}
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900`}>Email Notification</h3>
               <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
@@ -1085,7 +1025,6 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-4">
               <StandardButton
                 variant="secondary"
@@ -1110,13 +1049,11 @@ const EditBooking: React.FC = () => {
         </div>
       </div>
 
-      {/* Live Preview Section */}
       <div className="w-full md:w-96 md:sticky md:top-8 md:self-start">
         <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
           <h2 className={`text-xl font-bold mb-4 text-${fullColor} pb-2`}>Booking Summary</h2>
           
           <div className="space-y-4">
-            {/* Package Info */}
             {packageDetails && (
               <div className="pb-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500 mb-1">Package</p>
@@ -1125,7 +1062,6 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
-            {/* Space Info */}
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Space</p>
               <p className="font-medium text-gray-900">
@@ -1135,7 +1071,6 @@ const EditBooking: React.FC = () => {
               </p>
             </div>
 
-            {/* Customer */}
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Customer</p>
               <p className="font-medium text-gray-900">{formData.customerName || 'Not specified'}</p>
@@ -1143,7 +1078,6 @@ const EditBooking: React.FC = () => {
               <p className="text-sm text-gray-600">{formData.phone || 'No phone'}</p>
             </div>
 
-            {/* Date & Time */}
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Date & Time</p>
               <p className="font-medium text-gray-900">
@@ -1163,13 +1097,11 @@ const EditBooking: React.FC = () => {
               </p>
             </div>
 
-            {/* Participants */}
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Participants</p>
               <p className="font-medium text-gray-900">{formData.participants || 0} people</p>
             </div>
 
-            {/* Status */}
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Status</p>
               <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(formData.status)}`}>
@@ -1177,7 +1109,6 @@ const EditBooking: React.FC = () => {
               </span>
             </div>
 
-            {/* Customer Notes */}
             {formData.notes && (
               <div className="pb-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500 mb-1">Customer Notes</p>
@@ -1185,7 +1116,6 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
-            {/* Internal Notes */}
             {formData.internalNotes && (
               <div className="pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-2 mb-1">
@@ -1196,7 +1126,6 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
-            {/* Applied Fees Editor */}
             <div>
               <p className="text-sm text-gray-500 mb-3">Applied Fees</p>
               <div className="space-y-3 mb-4">
@@ -1271,7 +1200,6 @@ const EditBooking: React.FC = () => {
 
               <p className="text-sm text-gray-500 mb-3">Payment Breakdown</p>
               <div className="space-y-2">
-                {/* Package Price */}
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">
                     Package
@@ -1284,7 +1212,6 @@ const EditBooking: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* Attractions List */}
                 {originalBooking?.attractions && originalBooking.attractions.length > 0 && (
                   <div className="pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500 mb-2">Attractions</p>
@@ -1303,7 +1230,6 @@ const EditBooking: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Add-ons List */}
                 {originalBooking?.add_ons && originalBooking.add_ons.length > 0 && (
                   <div className="pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500 mb-2">Add-ons</p>
@@ -1322,7 +1248,6 @@ const EditBooking: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Calculated Totals */}
                 {(() => {
                   const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
                   const minParticipants = packageDetails?.min_participants || 1;
@@ -1345,27 +1270,22 @@ const EditBooking: React.FC = () => {
                   
                   const originalTotal = Number(originalBooking?.total_amount || 0);
                   
-                  // Sum additive fees
                   const additiveFeeTotal = appliedFees
                     .filter(f => f.fee_application_type === 'additive')
                     .reduce((sum, f) => sum + f.fee_amount, 0);
                   
-                  // Recalculate if package, participants, or fees changed
                   const isPackageChanged = formData.packageId !== originalBooking?.package_id;
                   const isParticipantsChanged = formData.participants !== originalBooking?.participants;
                   const originalFees = originalBooking?.applied_fees || [];
                   const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
                   const needsRecalc = isPackageChanged || isParticipantsChanged || feesChanged;
                   
-                  // When recalculating: build total from components + fees
-                  // When NOT recalculating: originalTotal already includes fees, don't add again
                   const calculatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
                   const displayTotal = needsRecalc ? calculatedTotal : originalTotal;
                   const balance = displayTotal - originalAmountPaid;
                   
                   return (
                     <>
-                      {/* Additional Participants Line Item */}
                       {additionalCount > 0 && pricePerAdditional > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">
@@ -1375,7 +1295,6 @@ const EditBooking: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Additive Fees Line Item */}
                       {additiveFeeTotal > 0 && (
                         <div className="flex justify-between pt-2 border-t border-gray-100">
                           <span className="text-sm text-gray-600">Additive Fees</span>
@@ -1383,7 +1302,6 @@ const EditBooking: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Total */}
                       <div className="flex justify-between pt-3 border-t border-gray-200">
                         <span className="text-sm font-semibold text-gray-900">Total Amount</span>
                         <span className="font-bold text-gray-900">
@@ -1394,13 +1312,11 @@ const EditBooking: React.FC = () => {
                         </span>
                       </div>
                       
-                      {/* Amount Paid */}
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Amount Paid</span>
                         <span className="font-semibold text-green-600">${originalAmountPaid.toFixed(2)}</span>
                       </div>
                       
-                      {/* Balance Due */}
                       {balance > 0 && (
                         <div className="flex justify-between pt-2 border-t border-gray-100">
                           <span className="text-sm font-medium text-red-700">Balance Due</span>

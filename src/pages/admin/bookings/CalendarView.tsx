@@ -1,4 +1,3 @@
-// src/pages/admin/bookings/CalendarView.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -37,7 +36,6 @@ import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, parseLocalDate } from '../../../utils/timeFormat';
 
-// Convert 24-hour time to 12-hour format with AM/PM
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
   const [hours24, minutes] = time24.split(':');
@@ -82,21 +80,18 @@ const CalendarView: React.FC = () => {
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [showColorLegend, setShowColorLegend] = useState(false);
 
-  // Quick action states for booking detail modal
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  // Load user data from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('zapzone_user');
     if (stored) {
@@ -104,7 +99,6 @@ const CalendarView: React.FC = () => {
     }
   }, []);
   
-  // Fetch locations for company_admin
   useEffect(() => {
     const fetchLocations = async () => {
       if (userData?.role === 'company_admin') {
@@ -121,10 +115,8 @@ const CalendarView: React.FC = () => {
     fetchLocations();
   }, [userData]);
 
-  // Load bookings from API with cache support
   const loadBookings = useCallback(async (silent = false) => {
     try {
-      // Calculate date range based on current view
       const startDate = new Date(currentDate);
       let endDate = new Date(currentDate);
 
@@ -147,7 +139,6 @@ const CalendarView: React.FC = () => {
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
       } else if (filters.view === 'range' && filters.dateRange.start && filters.dateRange.end) {
-        // Use custom range - check if cache has data first
         const hasCache = await bookingCacheService.hasCachedData();
         
         if (hasCache) {
@@ -160,7 +151,6 @@ const CalendarView: React.FC = () => {
           return;
         }
         
-        // No cache, fetch from API - show loading
         if (!silent && !initialLoading) setDataLoading(true);
         const response = await bookingService.getBookings({
           date_from: filters.dateRange.start,
@@ -180,17 +170,14 @@ const CalendarView: React.FC = () => {
         date_to: endDate.toISOString().split('T')[0],
       };
 
-      // Check if cache has data first
       const hasCache = await bookingCacheService.hasCachedData();
       
       if (hasCache) {
-        // Cache reads are fast - no loading indicator needed
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
         console.log('Using cached bookings:', (cachedBookings || []).length);
         setBookings((cachedBookings || []) as Booking[]);
         bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       } else {
-        // No cache, fetch from API - show loading
         if (!silent && !initialLoading) setDataLoading(true);
         const response = await bookingService.getBookings({
           ...dateParams,
@@ -223,7 +210,6 @@ const CalendarView: React.FC = () => {
     loadBookings();
   }, [loadBookings]);
 
-  // Listen for cache updates from background sync - refresh silently
   useEffect(() => {
     const unsubscribe = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -233,17 +219,14 @@ const CalendarView: React.FC = () => {
     return () => unsubscribe();
   }, [loadBookings]);
 
-  // Apply filters when bookings or filters change
   useEffect(() => {
     let result = [...bookings];
 
-    // Filter by location (for company-admin users)
     if (filterLocation !== 'all') {
       const locationId = parseInt(filterLocation);
       result = result.filter(booking => booking.location_id === locationId);
     }
 
-    // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(booking =>
@@ -255,7 +238,6 @@ const CalendarView: React.FC = () => {
       );
     }
 
-    // Apply packages filter
     if (filters.packages.length > 0) {
       result = result.filter(booking => 
         booking.package?.name && filters.packages.includes(booking.package.name)
@@ -326,7 +308,6 @@ const CalendarView: React.FC = () => {
     setPickerMonth(today);
   };
 
-  // Calendar picker helpers
   const getPickerCalendarDays = (): (Date | null)[] => {
     const year = pickerMonth.getFullYear();
     const month = pickerMonth.getMonth();
@@ -422,14 +403,12 @@ const CalendarView: React.FC = () => {
   };
 
   const getBookingsForDate = (date: Date) => {
-    // Use local date string to avoid timezone issues
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateString = `${year}-${month}-${day}`;
     
     const bookingsForDate = filteredBookings.filter(booking => {
-      // Extract date part from booking_date (handles both "2025-11-29" and "2025-11-29T00:00:00.000000Z" formats)
       const bookingDatePart = booking.booking_date.split('T')[0];
       return bookingDatePart === dateString;
     });
@@ -445,8 +424,6 @@ const CalendarView: React.FC = () => {
     return [...new Set(packages)];
   };
 
-  // Get unique locations for filtering (for company-admin)
-  // Use fetched locations instead of extracting from bookings
   const getUniqueLocations = () => {
     return locations;
   };
@@ -457,7 +434,6 @@ const CalendarView: React.FC = () => {
     return booking.package?.name || 'Package Booking';
   };
 
-  // Bookly-style color palette for different packages
   const packageColors = [
     { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
     { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
@@ -473,10 +449,8 @@ const CalendarView: React.FC = () => {
     { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200' },
   ];
 
-  // Generate a consistent hash from package name for fixed colors
   const getPackageNameHash = (packageName: string): number => {
     if (!packageName) return 0;
-    // Use a simple but consistent hash algorithm based on package name
     let hash = 0;
     for (let i = 0; i < packageName.length; i++) {
       const char = packageName.charCodeAt(i);
@@ -486,7 +460,6 @@ const CalendarView: React.FC = () => {
     return Math.abs(hash);
   };
 
-  // Get consistent color for a package based on its name (fixed, never changes)
   const getPackageColor = (booking: Booking) => {
     const packageName = booking.package?.name || '';
     const colorIndex = getPackageNameHash(packageName) % packageColors.length;
@@ -494,14 +467,12 @@ const CalendarView: React.FC = () => {
     return `${color.bg} ${color.text}`;
   };
 
-  // Get color for a package by its name (for legend display)
   const getPackageColorByPackage = (_packageId: number, packageName: string) => {
     const colorIndex = getPackageNameHash(packageName) % packageColors.length;
     const color = packageColors[colorIndex];
     return `${color.bg} ${color.text}`;
   };
 
-  // Get unique packages with their IDs for the color legend
   const getPackagesWithColors = () => {
     const packagesMap = new Map<number, { id: number; name: string }>();
     bookings.forEach(booking => {
@@ -619,12 +590,10 @@ const CalendarView: React.FC = () => {
     
     const days = [];
     
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfMonth; i++) {
       days.push(null);
     }
     
-    // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       days.push(date);
@@ -680,11 +649,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 ))}
                 
-                {/* {dayBookings.length > 2 && (
-                  <div className="text-xs text-gray-500 text-center">
-                    +{dayBookings.length - 2} more
-                  </div>
-                )} */}
               </div>
             );
           })}
@@ -788,7 +752,6 @@ const CalendarView: React.FC = () => {
     );
   }
 
-  // Payment modal handlers
   const handleOpenPaymentModal = () => {
     if (!selectedBooking) return;
     const remainingAmount = Math.max(0, Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0));
@@ -855,7 +818,6 @@ const CalendarView: React.FC = () => {
 
   return (
       <div className="px-6 py-8 h-full flex flex-col">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Booking Calendar</h1>
@@ -894,7 +856,6 @@ const CalendarView: React.FC = () => {
           </div>
         </div>
 
-        {/* Calendar Controls */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex items-center gap-2">
@@ -907,7 +868,6 @@ const CalendarView: React.FC = () => {
                 {''}
               </StandardButton>
               
-              {/* Clickable Date with Calendar Dropdown */}
               <div className="relative">
                 <button
                   onClick={() => {
@@ -920,7 +880,6 @@ const CalendarView: React.FC = () => {
                   {getHeaderText()}
                 </button>
 
-                {/* Calendar Dropdown Picker */}
                 {showDatePicker && (
                   <>
                     <div 
@@ -928,7 +887,6 @@ const CalendarView: React.FC = () => {
                       onClick={() => setShowDatePicker(false)}
                     />
                     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-40 animate-scale-in">
-                      {/* Month Navigation */}
                       <div className="flex items-center justify-between mb-4">
                         <button
                           onClick={goToPreviousPickerMonth}
@@ -947,7 +905,6 @@ const CalendarView: React.FC = () => {
                         </button>
                       </div>
 
-                      {/* Day Labels */}
                       <div className="grid grid-cols-7 gap-1 mb-2">
                         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
                           <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
@@ -956,7 +913,6 @@ const CalendarView: React.FC = () => {
                         ))}
                       </div>
 
-                      {/* Calendar Grid */}
                       <div className="grid grid-cols-7 gap-1">
                         {getPickerCalendarDays().map((day, index) => {
                           if (!day) {
@@ -989,7 +945,6 @@ const CalendarView: React.FC = () => {
                         })}
                       </div>
 
-                      {/* Quick Actions */}
                       <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
                         <button
                           onClick={() => {
@@ -1030,7 +985,6 @@ const CalendarView: React.FC = () => {
                 Today
               </StandardButton>
 
-              {/* Inline loading indicator */}
               {dataLoading && (
                 <div className="flex items-center gap-2 ml-2 text-gray-500">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1051,7 +1005,6 @@ const CalendarView: React.FC = () => {
                 <option value="range">Date Range</option>
               </select>
               
-              {/* Color Legend Info Button */}
               <div className="relative">
                 <button
                   onMouseEnter={() => setShowColorLegend(true)}
@@ -1063,7 +1016,6 @@ const CalendarView: React.FC = () => {
                   <Info className="w-4 h-4" />
                 </button>
                 
-                {/* Color Legend Dropdown */}
                 {showColorLegend && (
                   <div 
                     className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-50 min-w-[220px] animate-scale-in"
@@ -1102,7 +1054,6 @@ const CalendarView: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters Panel */}
         {showFilters && (
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -1118,7 +1069,6 @@ const CalendarView: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Location Filter (Company Admin only) */}
               {isCompanyAdmin && getUniqueLocations().length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-800 mb-2">
@@ -1140,7 +1090,6 @@ const CalendarView: React.FC = () => {
                 </div>
               )}
 
-              {/* Search */}
               <div>
                 <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
                 <div className="relative">
@@ -1209,7 +1158,6 @@ const CalendarView: React.FC = () => {
           </div>
         )}
 
-        {/* Calendar View */}
         <div className="flex-1 overflow-hidden">
           {bookings.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -1246,7 +1194,6 @@ const CalendarView: React.FC = () => {
           )}
         </div>
 
-        {/* Day Detail Modal (month view) */}
         {selectedDate && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedDate(null)}>
             <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1331,7 +1278,7 @@ const CalendarView: React.FC = () => {
                                 </span>
                               )}
                               {(booking.add_ons || (booking as any).add_ons) && (booking.add_ons || (booking as any).add_ons).length > 0 && (
-                                <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                                <span className={`bg-${themeColor}-50 text-${themeColor}-700 px-2 py-1 rounded`}>
                                   {(booking.add_ons || (booking as any).add_ons).length} add-on{(booking.add_ons || (booking as any).add_ons).length !== 1 ? 's' : ''}
                                 </span>
                               )}
@@ -1366,7 +1313,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Bottom Close Button */}
                 <div className="mt-6 pt-4 border-t border-gray-200">
                   <StandardButton
                     variant="secondary"
@@ -1380,7 +1326,6 @@ const CalendarView: React.FC = () => {
             </div>
           </div>
         )}
-        {/* Booking Detail Modal for daily/weekly view */}
         {selectedBooking && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedBooking(null)}>
             <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1399,7 +1344,6 @@ const CalendarView: React.FC = () => {
                   </StandardButton>
                 </div>
 
-                {/* Customer Information */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -1412,7 +1356,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Booking Information */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1441,7 +1384,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Date & Time */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1464,7 +1406,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Package Details */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
                   <div className="bg-gray-50 rounded-lg p-4">
@@ -1483,7 +1424,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Location */}
                 {selectedBooking.location ? (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Location</h4>
@@ -1496,7 +1436,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 ) : null}
 
-                {/* Room */}
                 {selectedBooking.room ? (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
@@ -1511,7 +1450,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 ) : null}
 
-                {/* Attractions */}
                 {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Additional Attractions</h4>
@@ -1538,7 +1476,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Add-Ons */}
                 {((selectedBooking.add_ons || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.add_ons || (selectedBooking as any).add_ons) && (selectedBooking.add_ons || (selectedBooking as any).add_ons).length > 0) && (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
@@ -1565,7 +1502,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Guest of Honor Section - Only show if data exists */}
                 {(selectedBooking as any).guest_of_honor_name && (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Guest of Honor</h4>
@@ -1590,7 +1526,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Special Requests & Notes */}
                 {(selectedBooking.special_requests || selectedBooking.notes) && (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Notes & Requests</h4>
@@ -1611,7 +1546,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Payment Information */}
                 <div className="border-t pt-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment Details</h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1683,7 +1617,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Internal Notes */}
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
                     <FileText size={14} /> Internal Notes
@@ -1694,7 +1627,7 @@ const CalendarView: React.FC = () => {
                         <textarea
                           value={tempNotes}
                           onChange={(e) => setTempNotes(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                          className={`w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600 resize-none`}
                           rows={3}
                           placeholder="Add internal notes..."
                         />
@@ -1744,7 +1677,6 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                   <div className="flex gap-2">
                     <Link
@@ -1791,7 +1723,6 @@ const CalendarView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Check In Confirmation */}
                   {showCheckInConfirm && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                       <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
@@ -1840,7 +1771,6 @@ const CalendarView: React.FC = () => {
           </div>
         )}
 
-        {/* Payment Modal */}
         {showPaymentModal && selectedBooking && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1899,7 +1829,6 @@ const CalendarView: React.FC = () => {
           </div>
         )}
         
-        {/* Toast Notification */}
         {toast && (
           <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
             <Toast

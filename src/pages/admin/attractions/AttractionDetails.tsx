@@ -75,7 +75,6 @@ const AttractionDetails = () => {
     try {
       setLoading(true);
       
-      // Check cache first for instant loading
       const cachedAttraction = await attractionCacheService.getAttractionFromCache(attractionId);
       
       if (cachedAttraction) {
@@ -84,11 +83,9 @@ const AttractionDetails = () => {
         return;
       }
       
-      // If not in cache, fetch from API
       const response = await attractionService.getAttraction(attractionId);
       setAttraction(response.data as Attraction);
       
-      // Update cache with fetched data
       if (response.data) {
         await attractionCacheService.updateAttractionInCache(response.data);
       }
@@ -106,7 +103,6 @@ const AttractionDetails = () => {
       try {
         await attractionService.deleteAttraction(attractionId);
         
-        // Remove from cache
         await attractionCacheService.removeAttractionFromCache(attractionId);
         
         setToast({ message: 'Attraction deleted successfully', type: 'success' });
@@ -147,7 +143,6 @@ const AttractionDetails = () => {
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <StandardButton
@@ -192,7 +187,6 @@ const AttractionDetails = () => {
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          {/* Images */}
           {attraction.image && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Images</h2>
@@ -217,13 +211,11 @@ const AttractionDetails = () => {
             </div>
           )}
 
-          {/* Description */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
             <p className="text-gray-700 leading-relaxed">{attraction.description}</p>
           </div>
 
-          {/* Details */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Attraction Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -293,7 +285,6 @@ const AttractionDetails = () => {
             </div>
           </div>
 
-          {/* Add-ons */}
           {attraction.add_ons && attraction.add_ons.length > 0 && (
             <div className="p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Add-ons</h2>
@@ -337,7 +328,6 @@ const AttractionDetails = () => {
             </div>
           )}
 
-          {/* Availability */}
           <div className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Availability Schedule</h2>
             {attraction.availability && Array.isArray(attraction.availability) && attraction.availability.length > 0 ? (
@@ -372,7 +362,6 @@ const AttractionDetails = () => {
         </div>
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

@@ -1,6 +1,4 @@
-// src/types/EmailNotification.types.ts
 
-// Trigger Types - Categorized by event type
 export type BookingTriggerType =
   | 'booking_created'
   | 'booking_confirmed'
@@ -32,16 +30,12 @@ export type PurchaseTriggerType =
 
 export type TriggerType = BookingTriggerType | PaymentTriggerType | PurchaseTriggerType;
 
-// Entity Types
 export type EntityType = 'all' | 'package' | 'attraction';
 
-// Recipient Types
 export type RecipientType = 'customer' | 'staff' | 'company_admin' | 'location_manager' | 'custom';
 
-// Notification Log Status
 export type NotificationLogStatus = 'pending' | 'sent' | 'failed';
 
-// Default notification keys (per-company auto-seeded templates)
 export type DefaultNotificationKey =
   | 'booking_confirmation_customer'
   | 'booking_confirmation_staff'
@@ -53,7 +47,6 @@ export type DefaultNotificationKey =
   | 'payment_received_customer'
   | 'payment_refunded_customer';
 
-// Main Email Notification Interface
 export interface EmailNotification {
   id: number;
   company_id: number;
@@ -66,12 +59,10 @@ export interface EmailNotification {
   email_template_id: number | null;
   subject: string | null;
   body: string | null;
-  // Default-template support
   is_default?: boolean;
   default_key?: DefaultNotificationKey | string | null;
   default_subject?: string | null;
   default_body?: string | null;
-  // Effective values resolved by backend (priority chain)
   effective_subject?: string;
   effective_body?: string;
   is_subject_customized?: boolean;
@@ -84,7 +75,6 @@ export interface EmailNotification {
   send_after_hours: number | null;
   created_at: string;
   updated_at: string;
-  // Relations
   location?: {
     id: number;
     name: string;
@@ -98,7 +88,6 @@ export interface EmailNotification {
   logs_count?: number;
 }
 
-// Email Notification Log Interface
 export interface EmailNotificationLog {
   id: number;
   email_notification_id: number;
@@ -110,14 +99,11 @@ export interface EmailNotificationLog {
   error_message: string | null;
   sent_at: string | null;
   created_at: string;
-  // Polymorphic relations
   notifiable_type: string;
   notifiable_id: number;
-  // Optional expanded relations
   email_notification?: EmailNotification;
 }
 
-// Create/Update Data Interfaces
 export interface CreateEmailNotificationData {
   name: string;
   description?: string | null;
@@ -138,7 +124,6 @@ export interface CreateEmailNotificationData {
 
 export interface UpdateEmailNotificationData extends Partial<CreateEmailNotificationData> {}
 
-// Send Test Email Data
 export interface SendTestEmailData {
   test_email: string;
   booking_id?: number;
@@ -148,7 +133,6 @@ export interface SendTestEmailData {
   attraction_id?: number;
 }
 
-// Filter Interface
 export interface EmailNotificationFilters {
   page?: number;
   per_page?: number;
@@ -160,7 +144,6 @@ export interface EmailNotificationFilters {
   search?: string;
 }
 
-// Preview request body (subject + body for live preview while editing)
 export interface PreviewEmailNotificationData {
   subject?: string;
   body?: string;
@@ -174,14 +157,12 @@ export interface PreviewEmailNotificationResponse {
   };
 }
 
-// Reset-to-default response
 export interface ResetDefaultResponse {
   success: boolean;
   data: EmailNotification;
   message?: string;
 }
 
-// API Response Types
 export interface TriggerTypesResponse {
   success: boolean;
   data: {
@@ -219,7 +200,6 @@ export interface EntitiesResponse {
   }>;
 }
 
-// Paginated Response
 export interface PaginatedEmailNotificationsResponse {
   success: boolean;
   data: {
@@ -262,7 +242,6 @@ export interface EmailNotificationApiResponse<T> {
   message?: string;
 }
 
-// Trigger Type Configuration for UI
 export interface TriggerTypeConfig {
   value: TriggerType;
   label: string;
@@ -272,14 +251,12 @@ export interface TriggerTypeConfig {
   showSendAfter?: boolean;
 }
 
-// Recipient Type Configuration for UI
 export interface RecipientTypeConfig {
   value: RecipientType;
   label: string;
   description: string;
 }
 
-// Entity Type Configuration for UI
 export interface EntityTypeConfig {
   value: EntityType;
   label: string;

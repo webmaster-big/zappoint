@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/packages/Packages.tsx
 
 export interface PackagesPackage {
   id: string;

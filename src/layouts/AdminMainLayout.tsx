@@ -25,14 +25,12 @@ const MainLayout: React.FC = () => {
   const [isSidebarMinimized, setIsSidebarMinimized] = useState<boolean>(false);
   const [showLoader, setShowLoader] = useState<boolean>(false);
 
-  // Load user data from localStorage if available
   const [userData, setUserData] = useState<UserData | null>(null);
 
   const loadUserData = useCallback(() => {
     const stored = localStorage.getItem('zapzone_user');
     if (stored) {
       const user = JSON.parse(stored);
-      // Handle company field - if it's an object, extract the company_name
       const companyName = typeof user.company === 'object' && user.company !== null
         ? user.company.company_name || user.company.name || 'Unknown Company'
         : (user.company || 'Zap Zone');
@@ -47,7 +45,6 @@ const MainLayout: React.FC = () => {
         profile_path: user.profile_path || ''
       });
     } else {
-      // Default mock data if not logged in
       setUserData({
         name: "John Doe",
         company: "Zap Zone",
@@ -60,10 +57,8 @@ const MainLayout: React.FC = () => {
   useEffect(() => {
     loadUserData();
     
-    // Warmup caches on layout mount for faster page loads
     const warmupCaches = async () => {
       console.log('[AdminMainLayout] Warming up caches...');
-      // Warmup all caches in parallel
       await Promise.all([
         bookingCacheService.warmupCache(),
         roomCacheService.warmupCache(),
@@ -76,7 +71,6 @@ const MainLayout: React.FC = () => {
     };
     warmupCaches();
     
-    // Listen for profile updates
     const handleProfileUpdate = () => {
       loadUserData();
     };
@@ -91,7 +85,6 @@ const MainLayout: React.FC = () => {
   }, [loadUserData]);
 
   const navigate = useNavigate();
-  // Handler for sign out: call backend logout API and erase user from localStorage
   const handleSignOut = useCallback(async () => {
     setShowLoader(true);
     try {
@@ -99,7 +92,6 @@ const MainLayout: React.FC = () => {
       if (stored) {
         const user = JSON.parse(stored);
         if (user.token) {
-          // Call backend logout endpoint
           await fetch(`${API_BASE_URL}/logout`, {
             method: 'POST',
             headers: {
@@ -111,9 +103,7 @@ const MainLayout: React.FC = () => {
       }
     } catch (error) {
       console.error('Logout error:', error);
-      // Continue with logout even if API call fails
     } finally {
-      // Clear all caches on logout
       await bookingCacheService.clearCache();
       await roomCacheService.clearCache();
       await packageCacheService.clearCache();
@@ -121,7 +111,6 @@ const MainLayout: React.FC = () => {
       await attractionCacheService.clearCache();
       await eventCacheService.clearCache();
       
-      // Clear local storage and redirect
       localStorage.removeItem('zapzone_user');
       setUserData(null);
       
@@ -134,7 +123,6 @@ const MainLayout: React.FC = () => {
 
   return (
     <>
-      {/* Loader Overlay */}
       {showLoader && <LoadingSpinner fullScreen message="Signing out..." />}
 
       <div className="flex h-screen bg-gray-50">
@@ -149,13 +137,6 @@ const MainLayout: React.FC = () => {
       
       <div className="flex-1 flex flex-col overflow-hidden bg-white shadow-xl">
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur px-8 flex items-center gap-4 ">
-          {/* <button
-            className="lg:hidden p-2 rounded-lg border border-gray-200 bg-white shadow hover:bg-gray-100 transition"
-            onClick={() => setIsSidebarOpen(true)}
-            aria-label="Open sidebar"
-          >
-            <Menu size={24} />
-          </button> */}
          
         </header>
         <main className="bg-gray-50 flex-1 overflow-y-auto sm:p-6 p-2">

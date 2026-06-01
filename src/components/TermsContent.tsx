@@ -3,7 +3,6 @@ import React from "react";
 const TermsContent: React.FC = () => {
   return (
     <div className="terms-content space-y-6">
-      {/* ===== GENERAL POLICIES ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           General Policies
@@ -89,7 +88,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== PARTY AND GROUP EVENTS ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Party and Group Events
@@ -146,7 +144,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== DAY PASS DETAILS ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Day Pass Details
@@ -217,7 +214,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== HALF-OFF TUESDAYS DETAILS ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Half-Off Tuesdays Details
@@ -288,7 +284,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== DOUBLE TICKET DAYS DETAILS ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Double Ticket Days Details
@@ -312,7 +307,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== UNLIMITED NIGHT & FAMILY FUN DAY DETAILS ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Unlimited Night &amp; Family Fun Day Details
@@ -364,7 +358,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== MEDIA POLICIES ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Media Policies
@@ -402,7 +395,6 @@ const TermsContent: React.FC = () => {
         </ul>
       </section>
 
-      {/* ===== HEALTH AND SAFETY ===== */}
       <section>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">
           Health and Safety

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from 'qrcode';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
@@ -7,7 +7,6 @@ import timeSlotService, { type TimeSlot } from '../../../services/timeSlotServic
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
 
-// Interface for day offs with time info for partial closures
 interface DayOffWithTime {
   date: Date;
   time_start?: string | null;
@@ -35,15 +34,14 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
+import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 
-// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
-// Avoids UTC offset issues that cause date to show as previous day
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
-// Country codes (ISO 3166-1 alpha-2) with display names
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
   { code: 'CA', name: 'Canada' },
@@ -88,58 +86,47 @@ const countries: { code: string; name: string }[] = [
   { code: 'PE', name: 'Peru' },
 ];
 
-// Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
   const responseMessage = error?.response?.data?.message?.toLowerCase() || '';
   const combinedMessage = `${errorMessage} ${responseMessage}`;
   
-  // Card declined errors
   if (combinedMessage.includes('declined') || combinedMessage.includes('decline')) {
     return 'Your card was declined. Please check your card details or try a different payment method.';
   }
   
-  // Insufficient funds
   if (combinedMessage.includes('insufficient') || combinedMessage.includes('nsf')) {
     return 'Insufficient funds. Please try a different card or payment method.';
   }
   
-  // Invalid card number
   if (combinedMessage.includes('invalid card') || combinedMessage.includes('card number')) {
     return 'Invalid card number. Please check and re-enter your card details.';
   }
   
-  // Expired card
   if (combinedMessage.includes('expired') || combinedMessage.includes('expiration')) {
     return 'Your card has expired. Please use a different card.';
   }
   
-  // CVV/Security code errors
   if (combinedMessage.includes('cvv') || combinedMessage.includes('security code') || combinedMessage.includes('cvc')) {
     return 'Invalid security code (CVV). Please check the 3 or 4 digit code on your card.';
   }
   
-  // Authentication errors
   if (combinedMessage.includes('authentication') || combinedMessage.includes('3d secure')) {
     return 'Card authentication failed. Please try again or use a different card.';
   }
   
-  // Network/connection errors
   if (combinedMessage.includes('network') || combinedMessage.includes('connection') || combinedMessage.includes('timeout')) {
     return 'Connection error. Please check your internet and try again.';
   }
   
-  // Fraud detection
   if (combinedMessage.includes('fraud') || combinedMessage.includes('suspicious')) {
     return 'Transaction blocked for security reasons. Please contact your bank or try a different card.';
   }
   
-  // Rate limiting
   if (combinedMessage.includes('too many') || combinedMessage.includes('rate limit')) {
     return 'Too many attempts. Please wait a moment and try again.';
   }
   
-  // Default fallback
   return error?.message || 'Payment could not be processed. Please check your card details and try again.';
 };
 
@@ -164,14 +151,12 @@ const BookPackage: React.FC = () => {
     email: "",
     phone: "",
     notes: "",
-    // Billing Information (optional)
     address: "",
     address2: "",
     city: "",
     state: "", // 2-letter state code
     zip: "",
     country: "", // 2-letter country code
-    // Guest of Honor
     guestOfHonorName: "",
     guestOfHonorAge: "",
     guestOfHonorGender: ""
@@ -180,7 +165,6 @@ const BookPackage: React.FC = () => {
   const [customPaymentAmount, setCustomPaymentAmount] = useState<number>(0);
   const [currentStep, setCurrentStep] = useState(1);
   
-  // Payment card details
   const [cardNumber, setCardNumber] = useState("");
   const [cardMonth, setCardMonth] = useState("");
   const [cardYear, setCardYear] = useState("");
@@ -191,7 +175,6 @@ const BookPackage: React.FC = () => {
   const [authorizeClientKey, setAuthorizeClientKey] = useState("");
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   
-  // Date and time selection
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
@@ -201,7 +184,6 @@ const BookPackage: React.FC = () => {
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   
-  // Confirmation modal state
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{
     referenceNumber: string;
@@ -212,7 +194,6 @@ const BookPackage: React.FC = () => {
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
   
-  // Add-on details modal state
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<{
     id: number;
@@ -224,17 +205,14 @@ const BookPackage: React.FC = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showMobileOrderSummary, setShowMobileOrderSummary] = useState(false);
 
-  // Signature & Terms state
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
-  // SMS consent state
   const [smsConsent, setSmsConsent] = useState<boolean>(false);
 
-  // Show account modal for non-logged-in users
   useEffect(() => {
     const customerData = localStorage.getItem('zapzone_customer');
     if (!customerData) {
@@ -242,7 +220,6 @@ const BookPackage: React.FC = () => {
     }
   }, []);
 
-  // Load package from backend
   useEffect(() => {
     const fetchPackage = async () => {
       if (!packageId) return;
@@ -251,8 +228,17 @@ const BookPackage: React.FC = () => {
         setLoadingPackage(true);
         const response = await bookingService.getPackageById(Number(packageId));
         setPkg(response.data);
-        
-        // Fetch global notes for this package
+
+        if (!pageViewFiredRef.current) {
+          pageViewFiredRef.current = true;
+          void trackPageView({
+            page_type: 'package_book',
+            entity_type: 'package',
+            entity_id: response.data.id,
+            location_id: response.data.location_id ?? undefined,
+          });
+        }
+
         try {
           const notesResponse = await globalNoteService.getNotesForPackage(response.data.id);
           setGlobalNotes(notesResponse.data || []);
@@ -260,12 +246,10 @@ const BookPackage: React.FC = () => {
           console.error('Failed to load global notes');
         }
         
-        // Set default participants to min_participants
         if (response.data.min_participants) {
           setParticipants(response.data.min_participants);
         }
         
-        // Auto-add force add-ons that apply to this package
         const forceAddOns: { [id: number]: number } = {};
         response.data.add_ons?.forEach((addOn: any) => {
           if (addOn.is_force_add_on && addOn.price_each_packages?.length > 0) {
@@ -290,7 +274,6 @@ const BookPackage: React.FC = () => {
     fetchPackage();
   }, [packageId]);
 
-  // Fetch fee breakdown when package or pricing inputs change (debounced to prevent rapid API calls)
   useEffect(() => {
     if (!pkg) {
       setFeeBreakdown(null);
@@ -298,7 +281,6 @@ const BookPackage: React.FC = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        // Calculate base price with proper min_participants / price_per_additional logic
         const pkgPrice = Number(pkg.price ?? 0);
         const minPart = Number(pkg.min_participants || 1);
         const perAdditional = Number(pkg.price_per_additional || 0);
@@ -336,7 +318,6 @@ const BookPackage: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [pkg, participants, selectedAddOns, selectedAttractions]);
 
-  // Fetch special pricing breakdown when package and date are selected (debounced)
   useEffect(() => {
     if (!pkg || !selectedDate) {
       setSpecialPricingBreakdown(null);
@@ -364,7 +345,6 @@ const BookPackage: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [pkg, selectedDate]);
   
-  // Auto-fill form if customer is logged in
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
@@ -372,7 +352,6 @@ const BookPackage: React.FC = () => {
         if (customerData) {
           const customer: any = JSON.parse(customerData);
           
-          // Immediately autofill from localStorage (instant feedback)
           setForm(prev => ({
             ...prev,
             firstName: customer.firstName || customer.first_name || prev.firstName,
@@ -390,7 +369,6 @@ const BookPackage: React.FC = () => {
           if (customer.id) {
             setCustomerId(customer.id);
             
-            // Optionally refresh from API for latest data
             try {
               const response = await customerService.getCustomerById(customer.id);
               if (response.success && response.data) {
@@ -410,28 +388,23 @@ const BookPackage: React.FC = () => {
                 }));
               }
             } catch {
-              // API refresh skipped, using localStorage data
             }
           }
         }
       } catch {
-        // Error loading customer data - silent fail
       }
     };
     
     fetchCustomerData();
   }, []);
   
-  // Initialize Authorize.Net
   useEffect(() => {
     const initializeAuthorizeNet = async () => {
       try {
         const locationId = pkg?.location_id || 1;
         
-        // Fetch public key from backend
         const response = await getAuthorizeNetPublicKey(locationId);
         
-        // API returns data directly: { api_login_id, client_key, environment }
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
@@ -441,18 +414,15 @@ const BookPackage: React.FC = () => {
           setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
           
-          // Load Accept.js with the correct environment from API response
           await loadAcceptJS(environment as 'sandbox' | 'production');
         }
       } catch {
-        // Payment system initialization failed - will show error when user tries to pay
       }
     };
     
     initializeAuthorizeNet();
   }, [pkg?.location_id]);
 
-  // Fetch day offs for the package's location
   useEffect(() => {
     const fetchDayOffs = async () => {
       if (!pkg?.location_id) return;
@@ -460,9 +430,6 @@ const BookPackage: React.FC = () => {
       try {
         const response = await dayOffService.getDayOffsByLocation(pkg.location_id);
         if (response.success && response.data) {
-          // Convert day off dates to Date objects
-          // Also handle recurring day offs (same month/day each year)
-          // Store all day offs with their package_ids for filtering
           const allDayOffs: DayOffWithTime[] = [];
           const today = new Date();
           const futureLimit = new Date();
@@ -472,7 +439,6 @@ const BookPackage: React.FC = () => {
             const offDate = new Date(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
-            // Common day off data
             const dayOffData = {
               time_start: hasTimeRestriction ? dayOff.time_start : null,
               time_end: hasTimeRestriction ? dayOff.time_end : null,
@@ -482,7 +448,6 @@ const BookPackage: React.FC = () => {
             };
             
             if (dayOff.is_recurring) {
-              // For recurring, add for current year and next year
               const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
               
@@ -491,20 +456,16 @@ const BookPackage: React.FC = () => {
               }
               allDayOffs.push({ ...dayOffData, date: nextYearDate });
             } else {
-              // Non-recurring, just add the date if it's not in the past
               if (offDate >= today) {
                 allDayOffs.push({ ...dayOffData, date: offDate });
               }
             }
           });
           
-          // Separate full day offs (for calendar blocking) and partial day offs (for time slot filtering)
-          // Full day offs are those without time restrictions AND apply to all packages (location-wide)
           const fullDayOffDates = allDayOffs
             .filter(d => !d.time_start && !d.time_end && !d.package_ids && !d.room_ids)
             .map(d => d.date);
           
-          // Partial or resource-specific day offs need full info for filtering
           const partialOrSpecificDayOffs = allDayOffs.filter(d => 
             d.time_start || d.time_end || d.package_ids || d.room_ids
           );
@@ -513,29 +474,23 @@ const BookPackage: React.FC = () => {
           setDayOffsWithTime(partialOrSpecificDayOffs);
         }
       } catch {
-        // Error fetching day offs - calendar will work without day off restrictions
       }
     };
     
     fetchDayOffs();
   }, [pkg?.location_id]);
 
-  // Helper function to check if a time slot conflicts with a partial day off
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
     if (!selectedDate || dayOffsWithTime.length === 0 || !pkg) return false;
     
-    // Find partial day off for the selected date that applies to this package
     const selectedDateObj = parseLocalDate(selectedDate);
     const partialDayOff = dayOffsWithTime.find(dayOff => {
-      // Check date match
       if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
           dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
           dayOff.date.getDate() !== selectedDateObj.getDate()) {
         return false;
       }
       
-      // Check if this day off applies to the selected package
-      // If package_ids is null/empty, it applies to all packages
       if (dayOff.package_ids && dayOff.package_ids.length > 0) {
         if (!dayOff.package_ids.includes(pkg.id)) {
           return false; // This day off doesn't apply to the selected package
@@ -547,7 +502,6 @@ const BookPackage: React.FC = () => {
     
     if (!partialDayOff) return false;
     
-    // Convert times to comparable format (minutes since midnight)
     const toMinutes = (timeStr: string): number => {
       const [hours, minutes] = timeStr.split(':').map(Number);
       return hours * 60 + minutes;
@@ -556,15 +510,12 @@ const BookPackage: React.FC = () => {
     const slotStart = toMinutes(slotStartTime);
     const slotEnd = toMinutes(slotEndTime);
     
-    // If time_start is set (closes at this time), any slot that starts at or after this time is restricted
     if (partialDayOff.time_start) {
       const closesAt = toMinutes(partialDayOff.time_start);
       if (slotStart >= closesAt) return true;
-      // Also restrict if slot ends after closing time
       if (slotEnd > closesAt) return true;
     }
     
-    // If time_end is set (opens at this time), any slot that starts before this time is restricted
     if (partialDayOff.time_end) {
       const opensAt = toMinutes(partialDayOff.time_end);
       if (slotStart < opensAt) return true;
@@ -573,100 +524,73 @@ const BookPackage: React.FC = () => {
     return false;
   };
 
-  // Helper function to check if a day off applies to the selected package
   const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
-    // If package_ids is null or empty, it applies to all packages (location-wide)
     if (!dayOff.package_ids || dayOff.package_ids.length === 0) {
       return true;
     }
-    // Otherwise, check if the package is in the list
     return dayOff.package_ids.includes(packageId);
   };
 
-  // Compute filtered day offs based on selected package
-  // dayOffs array only contains location-wide full day offs, so no filtering needed
-  // dayOffsWithTime needs to be filtered for package-specific blocks
   const filteredDayOffsWithTime = React.useMemo(() => {
     if (!pkg) return dayOffsWithTime;
-    // Filter day offs that apply to the selected package
     return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, pkg.id));
   }, [dayOffsWithTime, pkg]);
 
-  // Filter available time slots based on partial day offs and min booking notice hours
   const filteredTimeSlots = availableTimeSlots.filter(slot => {
-    // First check partial day off restrictions
     if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
     
-    // Then check min_booking_notice_hours restriction
-    // e.g., if notice = 48 hours and now is Monday 2pm, slots before Wednesday 2pm are blocked
     const noticeHoursValue = Number(pkg?.min_booking_notice_hours) || 0;
     if (noticeHoursValue > 0 && selectedDate) {
       const now = new Date();
       const noticeMs = noticeHoursValue * 60 * 60 * 1000;
       const earliestBookableTime = new Date(now.getTime() + noticeMs);
       
-      // Build the full datetime of this slot's start
       const [slotHours, slotMinutes] = slot.start_time.split(':').map(Number);
       const slotDate = parseLocalDate(selectedDate);
       slotDate.setHours(slotHours, slotMinutes, 0, 0);
       
-      // If the slot's datetime is before the earliest bookable time, filter it out
       if (slotDate < earliestBookableTime) return false;
     }
     
     return true;
   });
 
-  // Helper function to get week of month (1-5, where 5 is last week)
   const getWeekOfMonth = (date: Date): number => {
     const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const dayOfMonth = date.getDate();
     const firstDayWeekday = firstDayOfMonth.getDay();
     
-    // Calculate which week this day falls into
     return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
   };
 
-  // Helper function to check if date is in last week of month
   const isLastWeekOfMonth = (date: Date): boolean => {
     const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
     return daysUntilEndOfMonth < 7;
   };
 
-  // Calculate available dates based on package availability
   useEffect(() => {
     if (!pkg) return;
     
     const today = new Date();
     const dates: Date[] = [];
     
-    // Determine booking window: package-specific > location-specific > unlimited
-    // If both are null/undefined, allow unlimited date selection (730 days = 2 years)
     const packageWindow = pkg.booking_window_days;
     const locationWindow = pkg.location?.booking_window_days;
     const bookingWindowDays = packageWindow ?? locationWindow ?? null;
-    // If null, allow unlimited (730 days); otherwise use the configured value
     const maxDays = bookingWindowDays === null ? 730 : Math.max(1, bookingWindowDays);
     
-    // Calculate the earliest bookable time based on min_booking_notice_hours
-    // e.g., if notice = 48 hours and now is Monday 2pm, earliest = Wednesday 2pm
     const noticeHours = Number(pkg.min_booking_notice_hours) || 0;
     const earliestBookableTime = new Date(today.getTime() + noticeHours * 60 * 60 * 1000);
-    // The earliest date that could have any valid time slots
     const earliestBookableDate = new Date(earliestBookableTime.getFullYear(), earliestBookableTime.getMonth(), earliestBookableTime.getDate());
     
-    // Generate available dates for the booking window
     for (let i = 0; i < maxDays; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
       
-      // Skip dates that are entirely before the earliest bookable date
-      // (the boundary date is included — time slot filtering handles the specific slots)
       const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       if (dateOnly < earliestBookableDate) continue;
       
-      // Check if date matches any availability schedule
       let isAvailable = false;
       
       if (pkg.availability_schedules && pkg.availability_schedules.length > 0) {
@@ -685,7 +609,6 @@ const BookPackage: React.FC = () => {
             }
           } 
           else if (schedule.availability_type === "monthly") {
-            // For monthly, day_configuration contains patterns like "sunday-first", "monday-last", etc.
             const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
             const weekOfMonth = getWeekOfMonth(date);
             const isInLastWeek = isLastWeekOfMonth(date);
@@ -728,8 +651,6 @@ const BookPackage: React.FC = () => {
     setAvailableDates(dates);
   }, [pkg]);
 
-  // Fetch available time slots via SSE when date changes
-  // Backend automatically finds available rooms for each time slot
   useEffect(() => {
     if (!pkg || !selectedDate) {
       setAvailableTimeSlots([]);
@@ -738,44 +659,36 @@ const BookPackage: React.FC = () => {
     
     setLoadingTimeSlots(true);
     
-    // Create SSE connection
     const eventSource = timeSlotService.getAvailableSlotsSSE({
       package_id: pkg.id,
       date: selectedDate,
     });
     
-    // Track if first update has been received
     let isFirstUpdate = true;
     
-    // Handle incoming messages
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         setAvailableTimeSlots(data.available_slots);
         setLoadingTimeSlots(false);
         
-        // Mark first update as complete (no auto-selection)
         if (isFirstUpdate) {
           isFirstUpdate = false;
         }
       } catch (err) {
-        // SSE parsing error - handled silently in production
       }
     };
     
-    // Handle errors
     eventSource.onerror = () => {
       setLoadingTimeSlots(false);
       eventSource.close();
     };
     
-    // Cleanup: close SSE connection when component unmounts or dependencies change
     return () => {
       eventSource.close();
     };
   }, [selectedDate, pkg]);
 
-  // Handle add-on/attraction quantity change with min/max validation
   const handleAddOnQty = (id: number, qty: number) => {
     const addOn = pkg?.add_ons.find(a => a.id === id);
     if (!addOn || !pkg) return;
@@ -784,21 +697,17 @@ const BookPackage: React.FC = () => {
     const minQty = isForcedAddOn ? getAddOnMinQuantity(addOn, pkg.id) : (addOn?.min_quantity ?? 0);
     const maxQty = addOn?.max_quantity ?? 99;
     
-    // Enforce max limit
     if (qty > maxQty) qty = maxQty;
     
-    // For force add-ons, don't allow going below minimum
     if (isForcedAddOn && qty < minQty) {
       qty = minQty;
     }
     
-    // If going from 0 to positive and min_quantity is set, use min_quantity
     const currentQty = selectedAddOns[id] || 0;
     if (currentQty === 0 && qty > 0 && minQty > 1) {
       qty = minQty;
     }
     
-    // For forced add-ons, use minimum; for others, allow 0
     const finalQty = isForcedAddOn ? Math.max(minQty, qty) : Math.max(0, qty);
     setSelectedAddOns((prev) => ({ ...prev, [id]: finalQty }));
   };
@@ -808,10 +717,8 @@ const BookPackage: React.FC = () => {
     const minQty = attraction?.min_quantity ?? 0;
     const maxQty = attraction?.max_quantity ?? 99;
     
-    // Enforce max limit
     if (qty > maxQty) qty = maxQty;
     
-    // If going from 0 to positive and min_quantity is set, use min_quantity
     const currentQty = selectedAttractions[id] || 0;
     if (currentQty === 0 && qty > 0 && minQty > 1) {
       qty = minQty;
@@ -820,7 +727,6 @@ const BookPackage: React.FC = () => {
     setSelectedAttractions((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
 
-  // Handle promo/gift card code apply
   const handleApplyCode = (type: "promo" | "giftcard") => {
     if (!pkg) return;
     if (type === "promo") {
@@ -832,7 +738,6 @@ const BookPackage: React.FC = () => {
     }
   };
   
-  // Reset form for new booking
   const resetForm = () => {
     setSelectedAddOns({});
     setSelectedAttractions({});
@@ -875,54 +780,45 @@ const BookPackage: React.FC = () => {
     setSmsConsent(false);
   };
 
-  // Helper function to get the correct add-on price based on package
   const getAddOnPrice = (addOn: { 
     price: string | null; 
     is_force_add_on?: boolean; 
     price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
   }, packageId: number): number => {
-    // Check for package-specific pricing
     if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
       const packagePrice = addOn.price_each_packages.find(p => p.package_id === packageId);
       if (packagePrice) {
         return packagePrice.price;
       }
     }
-    // Fall back to default price
     return Number(addOn.price) || 0;
   };
 
-  // Helper function to get the minimum quantity for an add-on based on package
   const getAddOnMinQuantity = (addOn: { 
     min_quantity?: number; 
     is_force_add_on?: boolean; 
     price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
   }, packageId: number): number => {
-    // Check for package-specific minimum quantity
     if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
       const packagePrice = addOn.price_each_packages.find(p => p.package_id === packageId);
       if (packagePrice) {
         return packagePrice.minimum_quantity;
       }
     }
-    // Fall back to default min_quantity
     return addOn.min_quantity || 1;
   };
 
-  // Check if an add-on is a force add-on for this package
   const isForceAddOn = (addOn: { 
     is_force_add_on?: boolean; 
     price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
   }, packageId: number): boolean => {
     if (!addOn.is_force_add_on) return false;
-    // Check if this add-on has package-specific pricing for this package
     if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
       return addOn.price_each_packages.some(p => p.package_id === packageId);
     }
     return false;
   };
   
-  // Handle card number input with formatting
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCardNumber(e.target.value);
     if (formatted.replace(/\s/g, '').length <= 16) {
@@ -931,7 +827,6 @@ const BookPackage: React.FC = () => {
     }
   };
 
-  // Calculate base price with additional participants
   const calculateBasePrice = () => {
     if (!pkg) return 0;
     const basePrice = Number(pkg.price);
@@ -946,13 +841,11 @@ const BookPackage: React.FC = () => {
     }
   };
 
-  // Calculate totals first (moved before calculatePartialAmount)
   const basePrice = calculateBasePrice();
   const addOnsTotal = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
     const id = Number(idStr);
     const found = pkg && pkg.add_ons.find((a) => a.id === id);
     if (!found || !pkg) return sum;
-    // Use package-specific price if available
     const price = getAddOnPrice(found, pkg.id);
     return sum + price * qty;
   }, 0);
@@ -965,46 +858,59 @@ const BookPackage: React.FC = () => {
     return sum + price * qty * (isPerPerson ? participants : 1);
   }, 0);
   
-  // Promo and gift card discounts
   const promoDiscount = appliedPromo ? Number(appliedPromo.discount_value || 0) : 0;
   const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_value || 0) : 0;
-  
-  // Calculate subtotal and total
+
+  const benefitItems = useMemo<MembershipBenefitQuoteItem[]>(() => {
+    if (!pkg) return [];
+    const list: MembershipBenefitQuoteItem[] = [];
+    list.push({ type: 'package', id: pkg.id, category: (pkg as any).category ?? null, unit_price: basePrice, quantity: 1 });
+    Object.entries(selectedAddOns).forEach(([idStr, qty]) => {
+      const id = Number(idStr);
+      const found = pkg.add_ons.find((a) => a.id === id);
+      if (found && qty > 0) list.push({ type: 'addon', id, unit_price: getAddOnPrice(found, pkg.id), quantity: qty });
+    });
+    Object.entries(selectedAttractions).forEach(([idStr, qty]) => {
+      const id = Number(idStr);
+      const found = pkg.attractions.find((a) => a.id === id);
+      if (found && qty > 0) {
+        const isPerPerson = (found as any).pricing_type === 'per_person';
+        list.push({ type: 'attraction', id, unit_price: Number(found.price), quantity: qty * (isPerPerson ? participants : 1) });
+      }
+    });
+    return list;
+  }, [pkg, basePrice, selectedAddOns, selectedAttractions, participants]);
+
+  const membershipBenefits = useMembershipBenefits(customerId, pkg?.location_id ?? null, benefitItems);
+  const membershipDiscount = membershipBenefits.discount;
+
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
-  const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
+  const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount - membershipDiscount);
   const total = discountedSubtotal;
   
-  // Apply special pricing discount if available
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
   const totalAfterSpecialPricing = Math.max(0, total - specialPricingDiscount);
   
-  // Use dynamic fee breakdown if available - no fallback to hardcoded rate
   const finalTotal = feeBreakdown ? feeBreakdown.total : totalAfterSpecialPricing;
 
-  // Calculate partial payment amount based on package settings
   const calculatePartialAmount = () => {
     if (!pkg) return 0;
     
     let baseDeposit = 0;
     
-    // Check if package has partial payment percentage (priority)
     if (pkg.partial_payment_percentage != null && pkg.partial_payment_percentage > 0) {
       baseDeposit = Math.round(total * (pkg.partial_payment_percentage / 100) * 100) / 100;
     }
     
-    // Check if package has partial payment fixed amount
     else if (pkg.partial_payment_fixed != null && pkg.partial_payment_fixed > 0) {
       baseDeposit = Math.min(pkg.partial_payment_fixed, total);
     }
     
-    // If no partial payment configured, return 0
     if (baseDeposit <= 0) return 0;
     
-    // Ensure deposit never exceeds the total
     return Math.min(baseDeposit, total);
   };
 
-  // Format duration for display
   const formatDuration = () => {
     if (!pkg || !pkg.duration) return "Not specified";
     return formatDurationDisplay(pkg.duration, pkg.duration_unit);
@@ -1012,11 +918,11 @@ const BookPackage: React.FC = () => {
 
   const partialAmount = calculatePartialAmount();
 
-  // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
-  // Fire `form_started` engagement exactly once per offer-page mount.
+  const pageViewFiredRef = useRef(false);
+
   const formStartedRef = useRef(false);
   const handleFormStarted = () => {
     if (formStartedRef.current) return;
@@ -1030,19 +936,15 @@ const BookPackage: React.FC = () => {
     });
   };
 
-  // Handle booking submission with payment processing
   const handlePayNow = async (e?: React.MouseEvent) => {
-    // Prevent event bubbling and default behavior
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
     if (!pkg) return;
-    // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
 
-    // Cooldown: reject if last submission was less than 3 seconds ago
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < 3000) {
       console.warn('⚠️ Booking submission blocked (cooldown)');
@@ -1052,14 +954,12 @@ const BookPackage: React.FC = () => {
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
 
-    // Validate Guest of Honor name if package requires it
     if (pkg.has_guest_of_honor && !form.guestOfHonorName.trim()) {
       setSignatureTermsErrors({ guestOfHonor: 'Guest of Honor name is required.' });
       isSubmittingRef.current = false;
       return;
     }
 
-    // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
     if (!signatureImage) {
       stErrors.signature = 'Please provide your signature before proceeding.';
@@ -1074,7 +974,6 @@ const BookPackage: React.FC = () => {
     }
     setSignatureTermsErrors({});
     
-    // Validate min_booking_notice_hours - prevent bookings within the notice window
     const noticeHoursCheck = Number(pkg.min_booking_notice_hours) || 0;
     if (noticeHoursCheck > 0 && selectedDate && selectedTime) {
       const now = new Date();
@@ -1091,7 +990,6 @@ const BookPackage: React.FC = () => {
       }
     }
     
-    // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
       setPaymentError('Please fill in all card details');
       isSubmittingRef.current = false;
@@ -1119,10 +1017,8 @@ const BookPackage: React.FC = () => {
     setPaymentError('');
     
     try {
-      // Calculate payment amount - customers pay deposit if available, otherwise full
       const amountToPay = partialAmount > 0 ? partialAmount : finalTotal;
       
-      // Prepare card data
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -1130,7 +1026,6 @@ const BookPackage: React.FC = () => {
         cardCode: cardCVV,
       };
       
-      // Customer billing data for Authorize.Net
       const customerData = {
         first_name: form.firstName,
         last_name: form.lastName,
@@ -1144,8 +1039,6 @@ const BookPackage: React.FC = () => {
         country: form.country,
       };
       
-      // ===== CREATE-FIRST FLOW =====
-      // Step 1: Prepare and create booking FIRST (no charge yet)
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
@@ -1200,6 +1093,7 @@ const BookPackage: React.FC = () => {
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
         promo_code: appliedPromo ? appliedPromo.code : undefined,
         gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
+        membership_id: membershipBenefits.membershipId ?? undefined,
         notes: form.notes || undefined,
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
@@ -1215,8 +1109,6 @@ const BookPackage: React.FC = () => {
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
       };
       
-      // Per-conversion dedupe ID — backend uses this to avoid double-writing
-      // a conversion if the request is retried (e.g. user double-clicks Pay).
       setNextTrackingId();
       const response = await bookingService.createBooking(bookingData);
       
@@ -1228,7 +1120,6 @@ const BookPackage: React.FC = () => {
       const referenceNumber = response.data.reference_number;
       console.log('✅ Booking created, ID:', bookingId, 'Ref:', referenceNumber);
       
-      // Step 2: Generate QR code
       let qrCodeBase64: string;
       try {
         qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
@@ -1240,7 +1131,6 @@ const BookPackage: React.FC = () => {
           }
         });
       } catch {
-        // QR generation failed — clean up the booking before it becomes orphaned
         console.error('❌ QR generation failed, force deleting booking:', bookingId);
         try {
           await bookingService.forceDeleteBooking(bookingId);
@@ -1251,7 +1141,6 @@ const BookPackage: React.FC = () => {
         throw new Error('Failed to prepare your booking confirmation. No charges were made. Please try again.');
       }
       
-      // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
       const paymentData = {
         location_id: pkg.location_id || 1,
         amount: amountToPay,
@@ -1276,8 +1165,6 @@ const BookPackage: React.FC = () => {
           customerData
         );
       } catch (paymentErr) {
-        // processCardPayment threw (tokenization or network error)
-        // Clean up the booking since payment was not completed
         console.error('❌ Payment processing error, force deleting booking:', bookingId);
         try {
           await bookingService.forceDeleteBooking(bookingId);
@@ -1289,7 +1176,6 @@ const BookPackage: React.FC = () => {
       }
       
       if (!paymentResponse.success) {
-        // Payment failed — clean up the booking we created
         console.error('❌ Payment failed, force deleting booking:', bookingId);
         try {
           await bookingService.forceDeleteBooking(bookingId);
@@ -1297,14 +1183,12 @@ const BookPackage: React.FC = () => {
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
         }
-        // Throw with the raw message — getPaymentErrorMessage in catch will make it friendly
         const rawMsg = paymentResponse.message || '';
         throw new Error(rawMsg || 'Your payment could not be processed. No charges were made to your card. Please check your card details and try again.');
       }
       
       console.log('✅ Payment charged successfully, txn:', paymentResponse.transaction_id);
       
-      // Show confirmation modal
       setConfirmationData({
         referenceNumber,
         qrCode: qrCodeBase64,
@@ -1320,14 +1204,12 @@ const BookPackage: React.FC = () => {
     }
   };
 
-  // Add-on Details Modal Component
   const AddOnDetailsModal = () => {
     if (!showAddOnDetailsModal || !selectedAddOnForDetails) return null;
     
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
         <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-          {/* Close button */}
           <div className="sticky top-0 bg-white p-4 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-800">{selectedAddOnForDetails.name}</h3>
             <button
@@ -1341,7 +1223,6 @@ const BookPackage: React.FC = () => {
           </div>
           
           <div className="p-6">
-            {/* Large Image */}
             <div className="mb-6 flex justify-center">
               {selectedAddOnForDetails.image ? (
                 <img 
@@ -1356,13 +1237,11 @@ const BookPackage: React.FC = () => {
               )}
             </div>
             
-            {/* Price */}
             <div className="mb-4 flex items-center justify-between">
               <span className="text-gray-600 text-sm">Price:</span>
               <span className="text-lg font-semibold text-blue-800">${selectedAddOnForDetails.price.toFixed(2)}</span>
             </div>
             
-            {/* Description */}
             <div className="pt-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
               {selectedAddOnForDetails.description ? (
@@ -1377,7 +1256,6 @@ const BookPackage: React.FC = () => {
     );
   };
   
-  // Confirmation Modal Component
   const ConfirmationModal = () => {
     if (!showConfirmation || !confirmationData) return null;
     
@@ -1385,7 +1263,6 @@ const BookPackage: React.FC = () => {
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade">
         <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="p-4 sm:p-8">
-            {/* Success Header */}
             <div className="text-center mb-4 sm:mb-6">
               <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 shadow-lg">
                 <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1396,7 +1273,6 @@ const BookPackage: React.FC = () => {
               <p className="text-sm sm:text-base text-gray-500">Your booking has been successfully created</p>
             </div>
             
-            {/* QR Code Display */}
             <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <div className="flex flex-col items-center">
                 <img src={confirmationData.qrCode} alt="Booking QR Code" className="w-48 h-48 sm:w-64 sm:h-64 mb-3 sm:mb-4" />
@@ -1407,7 +1283,6 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {/* Booking Details */}
             <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <h3 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4 text-gray-800">Booking Details</h3>
               <div className="space-y-2 sm:space-y-3">
@@ -1452,7 +1327,6 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {/* Billing Address */}
             <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Billing Address</h3>
               <div className="text-sm text-gray-700 space-y-1">
@@ -1464,7 +1338,6 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {/* Additional Items */}
             {(Object.entries(selectedAttractions).some(([, qty]) => qty > 0) || Object.entries(selectedAddOns).some(([, qty]) => qty > 0)) && (
               <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
                 <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Additional Items</h3>
@@ -1493,7 +1366,6 @@ const BookPackage: React.FC = () => {
               </div>
             )}
             
-            {/* Payment Summary */}
             <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Payment Summary</h3>
               <div className="space-y-2">
@@ -1525,6 +1397,14 @@ const BookPackage: React.FC = () => {
                     <span className="font-medium text-green-600">-${giftCardDiscount.toFixed(2)}</span>
                   </div>
                 )}
+                {membershipDiscount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      Member Savings{membershipBenefits.planName ? ` (${membershipBenefits.planName})` : ''}:
+                    </span>
+                    <span className="font-medium text-green-600">-${membershipDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Amount:</span>
                   <span className="font-bold text-blue-800 text-lg sm:text-xl">${finalTotal.toFixed(2)}</span>
@@ -1552,7 +1432,6 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {/* Information Notice */}
             <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
               <div className="flex">
                 <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -1569,7 +1448,6 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {/* Invitation Download */}
             {(pkg?.invitation_download_link || pkg?.invitation_file) && (
               <div className="bg-purple-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
                 <div className="flex items-center justify-between">
@@ -1592,7 +1470,6 @@ const BookPackage: React.FC = () => {
               </div>
             )}
             
-            {/* Action Button */}
             <div className="flex justify-center">
               <StandardButton
                 variant="primary"
@@ -1645,7 +1522,6 @@ const BookPackage: React.FC = () => {
       <ConfirmationModal />
       <AddOnDetailsModal />
       
-      {/* Account Modal */}
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
           <div 
@@ -1729,7 +1605,6 @@ const BookPackage: React.FC = () => {
 
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40 flex flex-col items-center justify-center py-8 px-4">
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
-        {/* Left: Booking Form */}
         <div className="flex-1 min-w-0">
           <div className={`mb-6 md:mb-8 bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-hidden relative${currentStep >= 2 ? ' hidden md:block' : ''}`}>
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-700 to-violet-600"></div>
@@ -1764,7 +1639,6 @@ const BookPackage: React.FC = () => {
             )}
           </div>
           
-          {/* Step Navigation */}
           <div className="flex items-center mb-4 md:mb-6 bg-white rounded-2xl p-3 md:p-4 shadow-md">
             <div className="flex items-center">
               <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all ${currentStep >= 1 ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
@@ -1793,8 +1667,6 @@ const BookPackage: React.FC = () => {
           <div className="space-y-4 md:space-y-6 bg-white rounded-2xl shadow-md p-4 md:p-6">
             {currentStep === 1 ? (
               <>
-                {/* Date and Time Selection */}
-                {/* Room will be automatically assigned by backend */}
                 <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
                   <h3 className="font-medium mb-3 md:mb-4 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
@@ -1913,7 +1785,6 @@ const BookPackage: React.FC = () => {
                             <span className="block text-xs text-gray-500 mt-0.5">
                               ${Number(attraction.price).toFixed(2)}
                             </span>
-                            {/* Show quantity limits */}
                             {(minQty > 1 || maxQty < 99) && (
                               <span className="block text-xs text-gray-400 mt-0.5">
                                 {minQty > 1 && `Min: ${minQty}`}
@@ -1961,11 +1832,9 @@ const BookPackage: React.FC = () => {
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {[...pkg.add_ons].sort((a, b) => {
-                        // Sort by add_ons_order if available, otherwise keep original order
                         if (!pkg.add_ons_order || pkg.add_ons_order.length === 0) return 0;
                         const indexA = pkg.add_ons_order.indexOf(a.name);
                         const indexB = pkg.add_ons_order.indexOf(b.name);
-                        // Items not in order array go to the end
                         if (indexA === -1 && indexB === -1) return 0;
                         if (indexA === -1) return 1;
                         if (indexB === -1) return -1;
@@ -1981,7 +1850,6 @@ const BookPackage: React.FC = () => {
                         <div key={addOn.id} className={`flex items-center justify-between p-2 md:p-3 rounded-lg gap-2 md:gap-4 ${
                           isForcedAddOn ? 'bg-amber-50' : 'bg-white'
                         }`}>
-                          {/* Add-on Image */}
                           <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
                             {addOn.image ? (
                               <img src={getImageUrl(addOn.image)} alt={addOn.name} className="object-cover w-full h-full" />
@@ -1997,7 +1865,6 @@ const BookPackage: React.FC = () => {
                                   Required
                                 </span>
                               )}
-                              {/* Details Button */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2061,7 +1928,6 @@ const BookPackage: React.FC = () => {
                 )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Promo Code Section: Only show if promos exist */}
                   {pkg.promos && pkg.promos.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Promo Code</label>
@@ -2089,7 +1955,6 @@ const BookPackage: React.FC = () => {
                       )}
                     </div>
                   )}
-                  {/* Gift Card Section: Only show if gift cards exist */}
                   {pkg.gift_cards && pkg.gift_cards.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Gift Card</label>
@@ -2180,7 +2045,6 @@ const BookPackage: React.FC = () => {
                       value={form.phone} 
                       onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} 
                     />
-                    {/* SMS Consent */}
                     <label className="flex items-start gap-2 cursor-pointer mt-2">
                       <input
                         type="checkbox"
@@ -2197,7 +2061,6 @@ const BookPackage: React.FC = () => {
                       </span>
                     </label>
                   </div>
-                  {/* Additional Notes */}
                   <div className="md:col-span-2">
                     <label className="block font-medium mb-2 text-gray-800 text-sm">Additional Notes <span className="text-gray-400 font-normal">(Optional)</span></label>
                     <textarea
@@ -2210,7 +2073,6 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Guest of Honor Section - Only show if package has guest of honor enabled */}
                 {pkg?.has_guest_of_honor && (
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h4 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -2262,7 +2124,6 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Billing Information Section */}
                 <div className="mt-6 pt-6">
                   <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -2326,14 +2187,12 @@ const BookPackage: React.FC = () => {
                           setCountrySearch(value);
                           setShowCountrySuggestions(true);
                           
-                          // If exact match by name, auto-select it
                           const exactMatch = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
                           if (exactMatch) {
                             setForm(f => ({ ...f, country: exactMatch.code }));
                           }
                         }}
                         onFocus={() => {
-                          // If input is empty but country is selected, show the country name
                           if (!countrySearch && form.country) {
                             const selectedCountry = countries.find(c => c.code === form.country);
                             if (selectedCountry) setCountrySearch(selectedCountry.name);
@@ -2343,7 +2202,6 @@ const BookPackage: React.FC = () => {
                         onBlur={() => {
                           setTimeout(() => {
                             setShowCountrySuggestions(false);
-                            // If the typed value doesn't match any country, reset to selected country
                             const matchedCountry = countries.find(c => c.name.toLowerCase() === countrySearch.toLowerCase());
                             if (matchedCountry) {
                               setForm(f => ({ ...f, country: matchedCountry.code }));
@@ -2358,7 +2216,6 @@ const BookPackage: React.FC = () => {
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                         autoComplete="off"
                       />
-                      {/* Country Suggestions Dropdown */}
                       {showCountrySuggestions && countrySearch && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {countries
@@ -2452,10 +2309,8 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Card Information Form */}
                 <div className="space-y-4 mb-6">
                   
-                  {/* Card Number */}
                   <div>
                     <label className="block font-medium mb-2 text-gray-800 text-sm">Card Number</label>
                     <div className="relative">
@@ -2487,7 +2342,6 @@ const BookPackage: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* Expiration Date and CVV */}
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Exp Month</label>
@@ -2538,7 +2392,6 @@ const BookPackage: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* Error Message */}
                   {paymentError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-start gap-2">
                       <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -2548,7 +2401,6 @@ const BookPackage: React.FC = () => {
                     </div>
                   )}
                   
-                  {/* Security Notice */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                     <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
@@ -2560,7 +2412,6 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Payment Type Selection - Customer only sees required deposit */}
                 <div className="mt-4 md:mt-6 mb-4 border border-gray-200 rounded-xl p-4 md:p-5">
                   <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm">Payment</label>
                   {partialAmount > 0 ? (
@@ -2603,7 +2454,6 @@ const BookPackage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Signature & Terms Section */}
                 <div className="space-y-4 mt-6 pt-6">
                   <h3 className="text-lg font-semibold">Signature & Agreement</h3>
 
@@ -2672,12 +2522,10 @@ const BookPackage: React.FC = () => {
           </div>
         </div>
         
-        {/* Right: Order Summary - Hidden on mobile */}
         <div className="w-full md:w-80 flex-shrink-0 hidden md:block">
             <div className="bg-white rounded-2xl shadow-md p-4 md:p-6 sticky top-6 overflow-hidden relative">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-violet-600"></div>
               <h3 className="font-bold text-base md:text-lg mb-4 md:mb-5 text-gray-900">Order Summary</h3>
-              {/* Package Image in Order Summary */}
               {pkg.image && (
                 <div className="mb-4 w-full flex justify-center">
                   <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-xl object-contain" />
@@ -2713,7 +2561,6 @@ const BookPackage: React.FC = () => {
               </div>
             
             <div className="space-y-3 text-sm">
-              {/* Package Base Price - Detailed */}
               <div className="bg-blue-50/70 rounded-xl p-3">
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-semibold text-gray-800">Base Package</span>
@@ -2728,7 +2575,6 @@ const BookPackage: React.FC = () => {
                 </p>
               </div>
               
-              {/* Additional Participants */}
               {participants > (pkg.min_participants || 1) && pkg.price_per_additional && Number(pkg.price_per_additional) > 0 && (
                 <div className="bg-gray-50 rounded-xl p-3">
                   <div className="flex justify-between items-start">
@@ -2748,13 +2594,11 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {/* Room Info */}
               <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
                 <span>Room Assignment</span>
                 <span className="text-gray-500">Auto-assigned at booking</span>
               </div>
               
-              {/* Attractions */}
               {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
                 <div>
                   <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Attractions</div>
@@ -2781,7 +2625,6 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {/* Add-ons */}
               {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
                 <div>
                   <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
@@ -2818,7 +2661,6 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {/* Special pricing discount */}
               {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
                 <div className="space-y-1">
                   {specialPricingBreakdown.discounts_applied.map((discount, index) => (
@@ -2830,12 +2672,10 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {/* Fee breakdown */}
               {feeBreakdown && feeBreakdown.fees.length > 0 && (
                 <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="pt-1" />
               )}
               
-              {/* Total */}
               <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-2">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-white text-sm">Total</span>
@@ -2843,12 +2683,10 @@ const BookPackage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Package Notes */}
               {pkg.customer_notes && (
                 <p className="mt-2 text-xs text-gray-400 whitespace-pre-wrap">{pkg.customer_notes}</p>
               )}
 
-              {/* Global Notes */}
               {globalNotes.length > 0 && (
                 <div className="mt-1 space-y-1">
                   {globalNotes.map((note) => (
@@ -2872,7 +2710,6 @@ const BookPackage: React.FC = () => {
       </div>
     </div>
 
-      {/* Mobile Floating Order Summary Button - only visible on mobile */}
       <button
         onClick={() => setShowMobileOrderSummary(true)}
         className="fixed top-4 left-4 z-40 md:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
@@ -2884,17 +2721,13 @@ const BookPackage: React.FC = () => {
         <span className="text-sm font-medium">${finalTotal.toFixed(2)}</span>
       </button>
 
-      {/* Mobile Order Summary Popup */}
       {showMobileOrderSummary && (
         <div className="fixed inset-0 z-50 md:hidden">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 animate-mobile-summary-fade-in"
             onClick={() => setShowMobileOrderSummary(false)}
           />
-          {/* Slide-in Panel */}
           <div className="absolute top-0 left-0 h-full w-[85vw] max-w-sm bg-white shadow-2xl animate-mobile-summary-slide-in overflow-y-auto rounded-r-2xl">
-            {/* Header */}
             <div className="sticky top-0 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-4 flex items-center justify-between z-10 rounded-tr-2xl">
               <h3 className="font-bold text-lg text-white">Order Summary</h3>
               <button
@@ -2908,9 +2741,7 @@ const BookPackage: React.FC = () => {
               </button>
             </div>
 
-            {/* Order Summary Content - same as sidebar */}
             <div className="p-4 bg-white">
-              {/* Package Image */}
               {pkg.image && (
                 <div className="mb-4 w-full flex justify-center">
                   <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-xl object-contain" />
@@ -2946,7 +2777,6 @@ const BookPackage: React.FC = () => {
               </div>
 
               <div className="space-y-3 text-sm">
-                {/* Base Package */}
                 <div className="bg-blue-50/70 rounded-xl p-3">
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-semibold text-gray-800">Base Package</span>
@@ -2961,7 +2791,6 @@ const BookPackage: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Additional Participants */}
                 {participants > (pkg.min_participants || 1) && pkg.price_per_additional && Number(pkg.price_per_additional) > 0 && (
                   <div className="bg-gray-50 rounded-xl p-3">
                     <div className="flex justify-between items-start">
@@ -2981,13 +2810,11 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Room Info */}
                 <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
                   <span>Room Assignment</span>
                   <span className="text-gray-500">Auto-assigned at booking</span>
                 </div>
 
-                {/* Attractions */}
                 {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
                   <div>
                     <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Attractions</div>
@@ -3013,7 +2840,6 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Add-ons */}
                 {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
                   <div>
                     <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
@@ -3049,7 +2875,6 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Special pricing discount */}
                 {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
                   <div className="space-y-1">
                     {specialPricingBreakdown.discounts_applied.map((discount, index) => (
@@ -3061,12 +2886,10 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Fee breakdown */}
                 {feeBreakdown && feeBreakdown.fees.length > 0 && (
                   <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="pt-1" />
                 )}
 
-                {/* Total */}
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-2">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-white text-sm">Total</span>
@@ -3074,12 +2897,10 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Package Notes */}
                 {pkg.customer_notes && (
                   <p className="mt-2 text-xs text-gray-400 whitespace-pre-wrap">{pkg.customer_notes}</p>
                 )}
 
-                {/* Global Notes */}
                 {globalNotes.length > 0 && (
                   <div className="mt-1 space-y-1">
                     {globalNotes.map((note) => (

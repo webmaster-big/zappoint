@@ -41,7 +41,6 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
   const { themeColor } = useThemeColor();
   const [form, setForm] = useState<GenerateBulkForm>(initialForm);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) setForm(initialForm);
   }, [open]);
@@ -73,7 +72,6 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
         <h3 className="text-xl font-semibold mb-6 text-gray-900">Generate Bulk Promo Codes</h3>
 
         <form onSubmit={handleSubmit}>
-          {/* Campaign Info */}
           <div className="mb-5">
             <label className="block text-sm font-medium text-gray-800 mb-1">Campaign Name *</label>
             <input
@@ -99,7 +97,6 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
             />
           </div>
 
-          {/* Discount Settings */}
           <div className="border-t border-gray-200 pt-4 mb-4">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Discount Settings</h4>
             <div className="grid grid-cols-2 gap-4">
@@ -135,7 +132,6 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
             </div>
           </div>
 
-          {/* Validity Period */}
           <div className="border-t border-gray-200 pt-4 mb-4">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Validity Period</h4>
             <div className="grid grid-cols-2 gap-4">
@@ -164,7 +160,6 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
             </div>
           </div>
 
-          {/* Code Generation Settings */}
           <div className="border-t border-gray-200 pt-4 mb-6">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Code Generation Settings</h4>
             <div className="grid grid-cols-2 gap-4">

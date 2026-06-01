@@ -1,4 +1,3 @@
-// src/pages/checkin/CheckIn.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { 
@@ -63,12 +62,10 @@ const CheckIn: React.FC = () => {
   const [processingPayment, setProcessingPayment] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
-  // Load bookings function
   const loadBookings = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Check cache first for faster loading
       const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
         booking_date: selectedDate,
         user_id: getStoredUser()?.id,
@@ -77,12 +74,10 @@ const CheckIn: React.FC = () => {
       if (cachedBookings && cachedBookings.length > 0) {
         setBookings(cachedBookings);
         setLoading(false);
-        // Trigger background sync for freshness
         bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
       
-      // If no cache, fetch from API
       const response = await bookingService.getBookings({
         booking_date: selectedDate,
         per_page: 100,
@@ -91,7 +86,6 @@ const CheckIn: React.FC = () => {
       
       if (response.success && response.data) {
         setBookings(response.data.bookings);
-        // Cache the fetched bookings
         await bookingCacheService.cacheBookings(response.data.bookings);
       }
     } catch (error) {
@@ -102,12 +96,10 @@ const CheckIn: React.FC = () => {
     }
   }, [selectedDate]);
 
-  // Load bookings from API
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);
 
-  // Listen for cache updates from background sync
   useEffect(() => {
     const unsubscribe = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -123,9 +115,7 @@ const CheckIn: React.FC = () => {
     return () => unsubscribe();
   }, [selectedDate]);
 
-  // Filter bookings based on search term
   useEffect(() => {
-    // Start with all bookings that match confirmed or checked-in status
     let result = bookings.filter(booking => 
       booking.status === 'confirmed' || booking.status === 'checked-in'
     );
@@ -147,14 +137,12 @@ const CheckIn: React.FC = () => {
     setFilteredBookings(result);
   }, [bookings, searchTerm, selectedDate]);
 
-  // Start scanning
   const startScanning = async () => {
     try {
       setError(null);
       setScanResult(null);
       setShowVerificationModal(false);
       
-      // Stop any existing scanner first
       if (scannerRef.current) {
         try {
           const state = await scannerRef.current.getState();
@@ -167,7 +155,6 @@ const CheckIn: React.FC = () => {
         }
       }
       
-      // Create new scanner instance
       scannerRef.current = new Html5Qrcode('qr-reader');
 
       const config = {
@@ -176,10 +163,8 @@ const CheckIn: React.FC = () => {
         aspectRatio: 1.0,
       };
 
-      // Set scanning true before starting
       setScanning(true);
 
-      // Use environment camera (back camera on mobile)
       await scannerRef.current.start(
         { facingMode: "environment" },
         config,
@@ -195,7 +180,6 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Stop scanning
   const stopScanning = async () => {
     if (scannerRef.current) {
       try {
@@ -206,7 +190,6 @@ const CheckIn: React.FC = () => {
         await scannerRef.current.clear();
       } catch (err) {
         console.log('Scanner already stopped or error:', err);
-        // Force clear if there's an error
         try {
           if (scannerRef.current) {
             await scannerRef.current.clear();
@@ -222,39 +205,31 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Handle successful scan
   const onScanSuccess = async (decodedText: string) => {
     if (processing) return;
 
     setProcessing(true);
     
     try {
-      // Stop scanning while processing
       await stopScanning();
 
-      // Parse QR code data - now expecting reference number as plain text
       let referenceNumber: string;
       let bookingId: number | undefined;
       
       try {
-        // Try to parse as JSON first (for backward compatibility)
         const qrData = JSON.parse(decodedText);
         bookingId = qrData.bookingId || qrData.booking_id || qrData.id;
         referenceNumber = qrData.reference_number || qrData.referenceNumber;
       } catch {
-        // Not JSON, treat the entire decoded text as reference number
         referenceNumber = decodedText.trim();
         console.log('Scanned reference number:', referenceNumber);
       }
 
-      // Find booking by reference number first (primary method)
       let booking: Booking | undefined;
       
       if (referenceNumber) {
-        // Search in current bookings by reference number
         booking = bookings.find(b => b.reference_number === referenceNumber);
         
-        // If not found in current bookings, try API search
         if (!booking) {
           try {
             const searchResponse = await bookingService.getBookings({reference_number: referenceNumber});
@@ -266,7 +241,6 @@ const CheckIn: React.FC = () => {
           }
         }
       } else if (bookingId) {
-        // Fallback: Fetch booking by ID
         const response = await bookingService.getBookingById(bookingId);
         if (response.success) {
           booking = response.data;
@@ -280,7 +254,6 @@ const CheckIn: React.FC = () => {
         return;
       }
 
-      // Check if already checked in
       if (booking.status === 'checked-in') {
         setScanResult({
           bookingId: booking.id,
@@ -294,7 +267,6 @@ const CheckIn: React.FC = () => {
         return;
       }
 
-      // Check if completed
       if (booking.status === 'completed') {
         setScanResult({
           bookingId: booking.id,
@@ -308,7 +280,6 @@ const CheckIn: React.FC = () => {
         return;
       }
 
-      // Check if cancelled
       if (booking.status === 'cancelled') {
         setScanResult({
           bookingId: booking.id,
@@ -322,7 +293,6 @@ const CheckIn: React.FC = () => {
         return;
       }
 
-      // Show modal for confirmation before check-in
       setVerifiedBooking(booking);
       setShowVerificationModal(true);
       setToast({ message: 'Booking verified - Please confirm check-in', type: 'info' });
@@ -337,12 +307,9 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Handle scan failure (ignore - just means no QR detected)
   const onScanFailure = () => {
-    // Silently ignore - this fires constantly when no QR is detected
   };
 
-  // Scan from image file
   const scanFromFile = async (file: File) => {
     try {
       setProcessing(true);
@@ -365,7 +332,6 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -373,7 +339,6 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Handle check-in confirmation
   const handleConfirmCheckIn = async () => {
     if (!verifiedBooking) return;
 
@@ -383,7 +348,6 @@ const CheckIn: React.FC = () => {
       const checkInResponse = await bookingService.checkInBooking(verifiedBooking.reference_number, userId);
       
       if (checkInResponse.success) {
-        // Sync the updated booking to cache
         if (checkInResponse.data) {
           await bookingCacheService.updateBookingInCache(checkInResponse.data);
         }
@@ -397,7 +361,6 @@ const CheckIn: React.FC = () => {
         setToast({ message: 'Check-in successful!', type: 'success' });
         setShowVerificationModal(false);
         setVerifiedBooking(null);
-        // Reload bookings
         loadBookings();
       } else {
         setToast({ message: 'Check-in failed. Please try again.', type: 'error' });
@@ -410,7 +373,6 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Handle cancel/close modal
   const handleCancelCheckIn = () => {
     setShowVerificationModal(false);
     setVerifiedBooking(null);
@@ -423,13 +385,11 @@ const CheckIn: React.FC = () => {
       const response = await bookingService.checkInBooking(booking.reference_number, userId);
       
       if (response.success) {
-        // Sync the updated booking to cache
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
         setToast({ message: 'Check-in successful!', type: 'success' });
-        // Reload bookings
         loadBookings();
       } else {
         setToast({ message: 'Check-in failed. Please try again.', type: 'error' });
@@ -457,7 +417,6 @@ const CheckIn: React.FC = () => {
     setError(null);
   };
 
-  // Payment modal handlers
   const handleOpenPaymentModal = (booking: Booking) => {
     setSelectedBookingForPayment(booking);
     const remainingAmount = Math.max(0, Number(booking.total_amount) - Number(booking.amount_paid || 0));
@@ -496,7 +455,6 @@ const CheckIn: React.FC = () => {
     try {
       setProcessingPayment(true);
 
-      // Get booking details to find customer_id and location_id
       const bookingResponse = await bookingService.getBookingById(selectedBookingForPayment.id);
       if (!bookingResponse.success || !bookingResponse.data) {
         throw new Error('Failed to get booking details');
@@ -510,7 +468,6 @@ const CheckIn: React.FC = () => {
         throw new Error('Location ID not found for this booking');
       }
 
-      // Create payment record using PaymentService
       const paymentResponse = await createPayment({
         payable_id: selectedBookingForPayment.id,
         payable_type: PAYMENT_TYPE.BOOKING,
@@ -529,7 +486,6 @@ const CheckIn: React.FC = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update booking's amount_paid and status
       const newAmountPaid = Number(selectedBookingForPayment.amount_paid || 0) + amount;
       const newPaymentStatus = newAmountPaid >= Number(selectedBookingForPayment.total_amount) ? 'paid' : 'partial';
 
@@ -539,7 +495,6 @@ const CheckIn: React.FC = () => {
         status: 'confirmed', // Set status to confirmed when payment is made
       });
 
-      // Update cache with the new payment information
       if (updateResponse.success && updateResponse.data) {
         await bookingCacheService.updateBookingInCache(updateResponse.data);
       }
@@ -547,19 +502,15 @@ const CheckIn: React.FC = () => {
       setToast({ message: 'Payment processed successfully!', type: 'success' });
       handleClosePaymentModal();
       
-      // Reload bookings from cache (much faster)
       await loadBookings();
       
-      // Reopen verification modal with updated booking if it was from there
       if (verifiedBooking && verifiedBooking.id === selectedBookingForPayment.id) {
-        // Get updated booking from cache first
         const cachedBooking = await bookingCacheService.getBookingFromCache(selectedBookingForPayment.id);
         
         if (cachedBooking) {
           setVerifiedBooking(cachedBooking);
           setShowVerificationModal(true);
         } else {
-          // Fallback to API if not in cache
           const updatedBookingResponse = await bookingService.getBookingById(selectedBookingForPayment.id);
           if (updatedBookingResponse.success) {
             await bookingCacheService.updateBookingInCache(updatedBookingResponse.data);
@@ -576,9 +527,7 @@ const CheckIn: React.FC = () => {
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => {
-    // Handle navigation/page unload while scanning
     const handleBeforeUnload = () => {
       if (scannerRef.current) {
         try {
@@ -595,7 +544,6 @@ const CheckIn: React.FC = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
-      // Cleanup scanner on unmount/navigation
       const cleanup = async () => {
         if (scannerRef.current) {
           try {
@@ -607,7 +555,6 @@ const CheckIn: React.FC = () => {
             scannerRef.current = null;
           } catch (err) {
             console.log('Cleanup:', err);
-            // Force clear even if there's an error
             try {
               if (scannerRef.current) {
                 await scannerRef.current.clear();
@@ -631,7 +578,6 @@ const CheckIn: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Camera className="h-6 w-6" />
@@ -639,7 +585,6 @@ const CheckIn: React.FC = () => {
           </h1>
           <p className="text-gray-600 mt-1">Scan QR codes or manually check in customers for their package bookings</p>
           
-          {/* Mobile Device Recommendation */}
           <div className="mt-3 flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <Smartphone className="h-5 w-5 text-blue-600 flex-shrink-0" />
             <p className="text-sm text-blue-800">
@@ -648,7 +593,6 @@ const CheckIn: React.FC = () => {
           </div>
         </div>
 
-        {/* Check-In Result Banner */}
         {scanResult && (
           <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex items-center justify-between ${
             scanResult.success 
@@ -693,9 +637,7 @@ const CheckIn: React.FC = () => {
           </div>
         )}
 
-        {/* Scanner Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          {/* QR Scanner Container */}
           <div className="relative">
             <div 
               id="qr-reader"
@@ -703,7 +645,6 @@ const CheckIn: React.FC = () => {
               style={{ maxWidth: '500px' }}
             ></div>
 
-            {/* Scanner Placeholder */}
             {!scanning && !scanResult && (
               <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                 <Camera className="h-16 w-16 text-gray-400 mb-4" />
@@ -745,7 +686,6 @@ const CheckIn: React.FC = () => {
               </div>
             )}
 
-            {/* Processing Indicator */}
             {processing && !scanning && (
               <div className="flex flex-col items-center justify-center py-12">
                 <RefreshCw className={`h-12 w-12 text-${themeColor}-600 animate-spin mb-4`} />
@@ -754,7 +694,6 @@ const CheckIn: React.FC = () => {
             )}
           </div>
 
-          {/* Scanner Controls */}
           {scanning && !processing && (
             <div className="mt-4 flex justify-center">
               <StandardButton
@@ -767,7 +706,6 @@ const CheckIn: React.FC = () => {
             </div>
           )}
 
-          {/* Error Display */}
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -779,7 +717,6 @@ const CheckIn: React.FC = () => {
           )}
         </div>
 
-        {/* Search and Filters */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -813,7 +750,6 @@ const CheckIn: React.FC = () => {
           </div>
         </div>
 
-        {/* Bookings Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -917,11 +853,9 @@ const CheckIn: React.FC = () => {
           )}
         </div>
 
-        {/* Verification Modal (before check-in) */}
         {showVerificationModal && verifiedBooking && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50" onClick={handleCancelCheckIn}>
             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
                 <h2 className="text-base sm:text-xl font-bold text-gray-800">Verify Booking Details</h2>
                 <StandardButton
@@ -934,9 +868,7 @@ const CheckIn: React.FC = () => {
                 </StandardButton>
               </div>
 
-              {/* Modal Body */}
               <div className="p-6">
-                {/* Scheduled Time Prompt Banner */}
                 <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Clock className="h-6 w-6 text-blue-600" />
@@ -952,7 +884,6 @@ const CheckIn: React.FC = () => {
                   )}
                 </div>
 
-                {/* Status Alerts */}
                 {(() => {
                   console.log('Verified Booking Status:', verifiedBooking.status);
                   console.log('Verified Booking Payment Status:', verifiedBooking.payment_status);
@@ -1000,7 +931,6 @@ const CheckIn: React.FC = () => {
                   </div>
                 )}
 
-                {/* Booking Details */}
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Booking Information</h3>
                   
@@ -1101,14 +1031,12 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Applied Fees */}
                     {verifiedBooking.applied_fees && verifiedBooking.applied_fees.length > 0 && (
                       <div className="col-span-full">
                         <AppliedFeesDisplay appliedFees={verifiedBooking.applied_fees} />
                       </div>
                     )}
 
-                    {/* Applied Discounts */}
                     {(verifiedBooking as any).applied_discounts && (verifiedBooking as any).applied_discounts.length > 0 && (
                       <div className="col-span-full">
                         <AppliedDiscountsDisplay appliedDiscounts={(verifiedBooking as any).applied_discounts} />
@@ -1240,7 +1168,6 @@ const CheckIn: React.FC = () => {
                       </div>
                     ) : null}
 
-                    {/* Guest of Honor Section - Only show if data exists */}
                     {(verifiedBooking as any).guest_of_honor_name && (
                       <>
                         <div className="col-span-full border-t border-gray-200 my-2"></div>
@@ -1338,7 +1265,6 @@ const CheckIn: React.FC = () => {
                 </div>
               </div>
 
-              {/* Modal Footer */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 sm:p-6 flex gap-2 sm:gap-3">
                 {verifiedBooking.status === 'confirmed' ? (
                   <>
@@ -1352,7 +1278,6 @@ const CheckIn: React.FC = () => {
                       Deny
                     </StandardButton>
                     
-                    {/* Show payment button if not fully paid */}
                     {verifiedBooking.payment_status !== 'paid' && (
                       <StandardButton
                         variant="primary"
@@ -1366,7 +1291,6 @@ const CheckIn: React.FC = () => {
                       </StandardButton>
                     )}
                     
-                    {/* Approve button - staff decides to check in */}
                     <StandardButton
                       variant="success"
                       size="sm"
@@ -1390,7 +1314,6 @@ const CheckIn: React.FC = () => {
                       Cancel
                     </StandardButton>
                     
-                    {/* Show payment button if not fully paid */}
                     {verifiedBooking.payment_status !== 'paid' && (
                       <StandardButton
                         variant="primary"
@@ -1410,11 +1333,9 @@ const CheckIn: React.FC = () => {
           </div>
         )}
 
-        {/* Booking Details Modal */}
         {showDetailsModal && selectedBooking && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeModal}>
             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
                 <h2 className="text-base sm:text-xl font-bold text-gray-800">Booking Details</h2>
                 <StandardButton
@@ -1427,9 +1348,7 @@ const CheckIn: React.FC = () => {
                 </StandardButton>
               </div>
 
-              {/* Modal Body */}
               <div className="p-3 sm:p-6">
-                {/* Status Alerts */}
                 {selectedBooking.status === 'checked-in' && (
                   <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2 sm:gap-3">
                     <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -1480,7 +1399,6 @@ const CheckIn: React.FC = () => {
                   </div>
                 )}
 
-                {/* Booking Details */}
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Booking Information</h3>
                   
@@ -1581,14 +1499,12 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Applied Fees */}
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="col-span-full">
                         <AppliedFeesDisplay appliedFees={selectedBooking.applied_fees} />
                       </div>
                     )}
 
-                    {/* Applied Discounts */}
                     {(selectedBooking as any).applied_discounts && (selectedBooking as any).applied_discounts.length > 0 && (
                       <div className="col-span-full">
                         <AppliedDiscountsDisplay appliedDiscounts={(selectedBooking as any).applied_discounts} />
@@ -1799,7 +1715,6 @@ const CheckIn: React.FC = () => {
                 </div>
               </div>
 
-              {/* Modal Footer */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-3 sm:p-6 flex gap-2 sm:gap-4">
                 <StandardButton
                   variant="secondary"
@@ -1809,7 +1724,6 @@ const CheckIn: React.FC = () => {
                   Close
                 </StandardButton>
                 
-                {/* Payment button - shown if not fully paid */}
                 {selectedBooking.payment_status !== 'paid' && (
                   <StandardButton
                     variant="primary"
@@ -1825,7 +1739,6 @@ const CheckIn: React.FC = () => {
                   </StandardButton>
                 )}
                 
-                {/* Check-in button - only show if paid */}
                 {selectedBooking.payment_status === 'paid' && (
                   <StandardButton
                     variant="success"
@@ -1846,7 +1759,6 @@ const CheckIn: React.FC = () => {
           </div>
         )}
 
-        {/* Instructions */}
         <div className="bg-blue-50 rounded-lg p-6 border border-blue-200 mt-6">
           <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
@@ -1876,7 +1788,6 @@ const CheckIn: React.FC = () => {
           </ul>
         </div>
 
-        {/* Payment Modal */}
         {showPaymentModal && selectedBookingForPayment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedBookingForPayment(null); }}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1888,7 +1799,6 @@ const CheckIn: React.FC = () => {
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Payment Summary */}
                 <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Total Amount:</span>
@@ -1906,7 +1816,6 @@ const CheckIn: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Payment Amount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Amount *
@@ -1926,7 +1835,6 @@ const CheckIn: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Payment Method */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Method *
@@ -1941,7 +1849,6 @@ const CheckIn: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Notes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Notes (Optional)
@@ -1978,7 +1885,6 @@ const CheckIn: React.FC = () => {
         )}
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

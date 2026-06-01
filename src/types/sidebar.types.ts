@@ -1,4 +1,3 @@
-// Types for AdminSidebar component
 
 export interface NavItem {
   label: string;

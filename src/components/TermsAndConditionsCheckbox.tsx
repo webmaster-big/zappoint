@@ -17,7 +17,6 @@ const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
 }) => {
   return (
     <>
-      {/* Checkbox */}
       <div className="flex items-center gap-3">
         <input
           type="checkbox"

@@ -20,7 +20,6 @@ const EditAttraction = () => {
   const { id } = useParams<{ id: string }>();
   const { themeColor, fullColor } = useThemeColor();
 
-  // Get auth token from localStorage
   const getAuthToken = () => {
     const userData = localStorage.getItem('zapzone_user');
     if (userData) {
@@ -66,12 +65,10 @@ const EditAttraction = () => {
   const [displayCapacityToCustomers, setDisplayCapacityToCustomers] = useState(true);
   const [displayOrder, setDisplayOrder] = useState<string>('0');
 
-  // Add-on state
   const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
 
-  // Drag and drop handlers for add-ons
   const handleAddOnDragStart = (index: number) => {
     setDraggedAddOnIndex(index);
   };
@@ -100,7 +97,6 @@ const EditAttraction = () => {
     );
   };
 
-  // Load attraction data
   useEffect(() => {
     if (!id) {
       setNotFound(true);
@@ -138,17 +134,14 @@ const EditAttraction = () => {
         setDisplayCapacityToCustomers(attraction.display_capacity_to_customers ?? true);
         setDisplayOrder(attraction.display_order?.toString() || '0');
         
-        // Preserve the current active status
         setIsActive(attraction.is_active ?? true);
 
-        // Pre-populate selected add-ons from the attraction's add_ons_order
         if (attraction.add_ons_order && Array.isArray(attraction.add_ons_order)) {
           setSelectedAddOns(attraction.add_ons_order);
         } else if (attraction.add_ons && Array.isArray(attraction.add_ons)) {
           setSelectedAddOns(attraction.add_ons.map((a: any) => a.name));
         }
 
-        // Set image previews if images exist (handle both string and array)
         if (attraction.image) {
           const images = Array.isArray(attraction.image) ? attraction.image : [attraction.image];
           console.log("ASSET_URL + attraction.image", images.map(img => ASSET_URL + img));
@@ -165,7 +158,6 @@ const EditAttraction = () => {
 
     loadAttraction();
     
-    // Fetch categories
     const fetchCategories = async () => {
       try {
         const response = await categoryService.getCategories();
@@ -178,7 +170,6 @@ const EditAttraction = () => {
       }
     };
     
-    // Fetch add-ons
     const fetchAddOns = async () => {
       try {
         const params: { user_id?: number } = { user_id: getStoredUser()?.id };
@@ -276,11 +267,9 @@ const EditAttraction = () => {
       return;
     }
 
-    // Create previews using object URLs
     const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newImagePreviews]);
 
-    // Convert files to base64 for backend
     const base64Promises = fileArray.map(file => {
       return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -366,8 +355,6 @@ const EditAttraction = () => {
     try {
       setIsSubmitting(true);
 
-      // Convert form data to API format
-      // Include location_id from the currently stored user (if available)
       const attractionData: UpdateAttractionData = {
         location_id: getStoredUser()?.location_id || undefined,
         name: formData.name,
@@ -393,14 +380,12 @@ const EditAttraction = () => {
       
       console.log('Attraction updated:', response);
       
-      // Update cache with the updated attraction
       if (response.success && response.data) {
         await attractionCacheService.updateAttractionInCache(response.data);
       }
       
       setToast({ message: 'Attraction updated successfully!', type: 'success' });
       
-      // Navigate after a short delay to show success message
       setTimeout(() => {
         navigate('/attractions');
       }, 1500);
@@ -429,7 +414,6 @@ const EditAttraction = () => {
     { key: 'sunday', label: 'Sun' }
   ] as const;
 
-  // LivePreview component
   const LivePreview: React.FC<{ formData: CreateAttractionsFormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
@@ -529,7 +513,6 @@ const EditAttraction = () => {
 
   return (
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
-      {/* Form Section */}
       <div className="flex-1 mx-auto">
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
           <div className="mb-6">
@@ -538,7 +521,6 @@ const EditAttraction = () => {
           </div>
           
           <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
-            {/* Basic Information Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Info className="w-5 h-5 text-primary" /> Basic Information
@@ -634,7 +616,6 @@ const EditAttraction = () => {
               </div>
             </div>
 
-            {/* Pricing & Capacity Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Tag className="w-5 h-5 text-primary" /> Pricing & Capacity
@@ -727,7 +708,6 @@ const EditAttraction = () => {
               </div>
             </div>
 
-            {/* Availability Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Availability Schedules
@@ -822,7 +802,6 @@ const EditAttraction = () => {
               </div>
             </div>
 
-            {/* Add-ons Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -847,7 +826,6 @@ const EditAttraction = () => {
                 </StandardButton>
               </div>
 
-              {/* Selected Add-ons - Draggable list */}
               {selectedAddOns.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
@@ -882,7 +860,6 @@ const EditAttraction = () => {
                 </div>
               )}
 
-              {/* Available Add-ons to select */}
               <div className="flex flex-wrap gap-2 mb-2">
                 {addOns.filter(add => !selectedAddOns.includes(add.name)).map((add) => (
                   <StandardButton
@@ -901,7 +878,6 @@ const EditAttraction = () => {
               </div>
             </div>
 
-            {/* Images Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900">Images</h3>
               <div className="space-y-5">
@@ -947,7 +923,6 @@ const EditAttraction = () => {
               </div>
             </div>
 
-            {/* Display Order */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Display Order</h3>
               <div>
@@ -964,7 +939,6 @@ const EditAttraction = () => {
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className="flex gap-3 pt-6 border-t border-gray-200">
               <StandardButton
                 variant="secondary"
@@ -990,12 +964,10 @@ const EditAttraction = () => {
         </div>
       </div>
 
-      {/* Live Preview Section */}
       <div className="w-full md:w-[420px] md:max-w-sm md:sticky md:top-1 h-fit">
         <LivePreview formData={formData} imagePreviews={imagePreviews} />
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast

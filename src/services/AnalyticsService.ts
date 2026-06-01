@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -281,25 +279,16 @@ export interface CompanyAnalyticsResponse {
 }
 
 class AnalyticsService {
-  /**
-   * Get location analytics data
-   */
   async getLocationAnalytics(params: LocationAnalyticsParams): Promise<LocationAnalyticsResponse> {
     const response = await api.get('/analytics/location', { params });
     return response.data;
   }
 
-  /**
-   * Get company-wide analytics data
-   */
   async getCompanyAnalytics(params: CompanyAnalyticsParams): Promise<CompanyAnalyticsResponse> {
     const response = await api.get('/analytics/company', { params });
     return response.data;
   }
 
-  /**
-   * Export location analytics
-   */
   async exportAnalytics(params: ExportAnalyticsParams): Promise<Blob | any> {
     const response = await api.post('/analytics/location/export', params, {
       responseType: params.format === 'csv' ? 'blob' : 'json',
@@ -307,9 +296,6 @@ class AnalyticsService {
     return response.data;
   }
 
-  /**
-   * Export company analytics
-   */
   async exportCompanyAnalytics(params: ExportCompanyAnalyticsParams): Promise<Blob | any> {
     const response = await api.post('/analytics/company/export', params, {
       responseType: params.format === 'csv' ? 'blob' : 'json',
@@ -317,9 +303,6 @@ class AnalyticsService {
     return response.data;
   }
 
-  /**
-   * Download exported analytics file
-   */
   downloadExportedFile(data: Blob | any, format: 'json' | 'csv', locationName: string) {
     const blob = format === 'csv' 
       ? data 

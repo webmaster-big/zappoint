@@ -1,4 +1,3 @@
-// Types for Fee Support feature
 
 export interface FeeSupport {
   id: number;

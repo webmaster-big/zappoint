@@ -1,6 +1,4 @@
-// Customer-related type definitions
 
-// Availability Schedule types
 export interface AttractionAvailabilitySchedule {
   days: string[];
   start_time: string;
@@ -19,7 +17,6 @@ export interface PackageAvailabilitySchedule {
   is_active?: boolean;
 }
 
-// User types
 export interface Customer {
   id: string;
   firstName: string;
@@ -49,7 +46,6 @@ export interface CustomerDemographic {
   percentage: number;
 }
 
-// Attraction types
 export interface AttractionPurchaseLink {
   location: string;
   url: string;
@@ -76,7 +72,6 @@ export interface Attraction {
   special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 
-// Package types
 export interface PackageBookingLink {
   location: string;
   url: string;
@@ -105,7 +100,6 @@ export interface Package {
   special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 
-// Reservation types
 export type ReservationStatus = 'confirmed' | 'pending' | 'cancelled' | 'refunded';
 
 export interface ReservationPackage {
@@ -132,7 +126,6 @@ export interface Reservation {
   createdAt: string;
 }
 
-// Gift Card types
 export type GiftCardType = 'fixed' | 'percentage';
 export type GiftCardStatus = 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
 
@@ -161,7 +154,6 @@ export interface OwnedGiftCard extends GiftCard {
   };
 }
 
-// Notification types
 export type NotificationType = 'booking' | 'payment' | 'promotion' | 'gift_card' | 'reminder' | 'general' | 'attraction';
 export type NotificationStatus = 'unread' | 'read' | 'archived';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -193,7 +185,6 @@ export interface Notification {
   metadata?: NotificationMetadata;
 }
 
-// Booking types
 export type BookingType = 'attraction' | 'package' | 'event';
 
 export interface BookingData {
@@ -203,15 +194,12 @@ export interface BookingData {
   timestamp: string;
 }
 
-// Location types
 export type Location = string;
 
-// Filter and sorting types
 export type SortBy = 'date' | 'status' | 'amount';
 export type SortOrder = 'asc' | 'desc';
 export type FilterStatus = 'all' | 'unread' | 'read';
 
-// Form types
 export interface LoginFormData {
   email: string;
   password: string;
@@ -225,7 +213,6 @@ export interface RegisterFormData {
   phone: string;
   password: string;
   confirmPassword: string;
-  // Billing Information
   address: string;
   address2?: string; // Apartment, suite, unit number (optional)
   city: string;
@@ -235,11 +222,9 @@ export interface RegisterFormData {
   agreeToTerms: boolean;
 }
 
-// Legacy form data for backward compatibility
 export type CustomerRegistrationForm = RegisterFormData;
 export type CustomerLoginForm = LoginFormData;
 
-// API Response types
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

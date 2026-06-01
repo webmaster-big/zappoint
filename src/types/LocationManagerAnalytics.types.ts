@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/Analytics/LocationManagerAnalytics.tsx
 
 export interface LocationManagerAnalyticsBooking {
   id: string;

@@ -1,4 +1,3 @@
-// src/pages/admin/email/EmailCampaignDetails.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -33,7 +32,6 @@ const EmailCampaignDetails: React.FC = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
 
-  // State
   const [campaign, setCampaign] = useState<EmailCampaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -41,11 +39,9 @@ const EmailCampaignDetails: React.FC = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   
-  // Logs pagination
   const [logsPage, setLogsPage] = useState(1);
   const logsPerPage = 10;
 
-  // Status configuration
   const statusConfig: Record<EmailCampaignStatus, { color: string; bgColor: string; icon: React.ElementType; label: string }> = {
     pending: { color: 'text-yellow-800', bgColor: 'bg-yellow-100', icon: Clock, label: 'Pending' },
     sending: { color: 'text-blue-800', bgColor: 'bg-blue-100', icon: Send, label: 'Sending' },
@@ -54,7 +50,6 @@ const EmailCampaignDetails: React.FC = () => {
     cancelled: { color: 'text-gray-600', bgColor: 'bg-gray-100', icon: Ban, label: 'Cancelled' }
   };
 
-  // Fetch campaign details
   const fetchCampaign = useCallback(async () => {
     if (!id) {
       navigate('/admin/email/campaigns');
@@ -83,7 +78,6 @@ const EmailCampaignDetails: React.FC = () => {
     fetchCampaign();
   }, [fetchCampaign]);
 
-  // Handle delete
   const handleDelete = async () => {
     if (!campaign) return;
 
@@ -103,7 +97,6 @@ const EmailCampaignDetails: React.FC = () => {
     }
   };
 
-  // Handle cancel
   const handleCancel = async () => {
     if (!campaign) return;
 
@@ -123,7 +116,6 @@ const EmailCampaignDetails: React.FC = () => {
     }
   };
 
-  // Handle resend
   const handleResend = async (type: 'failed' | 'all') => {
     if (!campaign) return;
 
@@ -142,7 +134,6 @@ const EmailCampaignDetails: React.FC = () => {
     }
   };
 
-  // Format date
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -154,7 +145,6 @@ const EmailCampaignDetails: React.FC = () => {
     });
   };
 
-  // Get paginated logs
   const getPaginatedLogs = () => {
     if (!campaign?.logs) return [];
     const start = (logsPage - 1) * logsPerPage;
@@ -197,7 +187,6 @@ const EmailCampaignDetails: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -249,7 +238,6 @@ const EmailCampaignDetails: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Status and Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <p className="text-sm text-gray-500 mb-1">Status</p>
@@ -282,9 +270,7 @@ const EmailCampaignDetails: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Campaign Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Email Content */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Content</h2>
               
@@ -302,7 +288,6 @@ const EmailCampaignDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Logs */}
             {campaign.logs && campaign.logs.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-4 border-b border-gray-200">
@@ -356,7 +341,6 @@ const EmailCampaignDetails: React.FC = () => {
                   </table>
                 </div>
 
-                {/* Logs Pagination */}
                 {totalLogsPages > 1 && (
                   <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                     <Pagination
@@ -373,9 +357,7 @@ const EmailCampaignDetails: React.FC = () => {
             )}
           </div>
 
-          {/* Sidebar Info */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Campaign Details */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Campaign Details</h3>
               
@@ -432,7 +414,6 @@ const EmailCampaignDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Recipients Summary */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Recipients</h3>
               
@@ -465,7 +446,6 @@ const EmailCampaignDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Success Rate */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Success Rate</h3>
               <div className="relative pt-1">
@@ -482,7 +462,6 @@ const EmailCampaignDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Actions */}
             {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Actions</h3>
@@ -514,7 +493,6 @@ const EmailCampaignDetails: React.FC = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -547,7 +525,6 @@ const EmailCampaignDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Cancel Confirmation Modal */}
       {showCancelConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -580,7 +557,6 @@ const EmailCampaignDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}

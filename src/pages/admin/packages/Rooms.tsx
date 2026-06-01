@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X, Clock, Layers, Timer, Filter, RefreshCcw } from 'lucide-react';
 
-// Break time type
 interface BreakTime {
     days: string[];
     start_time: string;
@@ -31,7 +30,6 @@ import { getStoredUser } from '../../../utils/storage';
 const Rooms: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
     
-    // State management
     const [rooms, setRooms] = useState<Room[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -48,21 +46,17 @@ const Rooms: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     
-    // Bulk selection state
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedRoomIds, setSelectedRoomIds] = useState<Set<number>>(new Set());
     
-    // Advanced filters toggle state
     const [showFilters, setShowFilters] = useState(false);
     
-    // Location filtering for company_admin
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
     const [locations, setLocations] = useState<Location[]>([]);
     const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
     const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
-    // Form state for create/edit
     const [formData, setFormData] = useState({
         name: '',
         capacity: '',
@@ -72,7 +66,6 @@ const Rooms: React.FC = () => {
         booking_interval: '15'
     });
 
-    // Bulk creation state
     const [creationMode, setCreationMode] = useState<'single' | 'multiple'>('single');
     const [bulkFormData, setBulkFormData] = useState({
         baseName: '',
@@ -87,7 +80,6 @@ const Rooms: React.FC = () => {
         booking_interval: '15'
     });
 
-    // Break time form state
     const [showBreakTimeForm, setShowBreakTimeForm] = useState(false);
     const [newBreakTime, setNewBreakTime] = useState<BreakTime>({
         days: [],
@@ -95,12 +87,10 @@ const Rooms: React.FC = () => {
         end_time: '13:00'
     });
 
-    // Area group interval update modal state
     const [showAreaGroupModal, setShowAreaGroupModal] = useState(false);
     const [selectedAreaGroup, setSelectedAreaGroup] = useState<string>('');
     const [areaGroupInterval, setAreaGroupInterval] = useState<string>('15');
 
-    // Generate preview of rooms to be created
     const generateRoomPreview = (): string[] => {
         const { baseName, suffixType, count, startNumber, startLetter } = bulkFormData;
         if (!baseName || count < 1) return [];
@@ -119,14 +109,12 @@ const Rooms: React.FC = () => {
         return rooms;
     };
 
-    // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
     const showToast = (message: string, type?: "success" | "error" | "info") => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     };
 
-    // Fetch locations for company_admin
     useEffect(() => {
         const fetchLocations = async () => {
             if (isCompanyAdmin) {
@@ -136,7 +124,6 @@ const Rooms: React.FC = () => {
                     if (response.success && response.data) {
                         const locationsArray = Array.isArray(response.data) ? response.data : [];
                         setLocations(locationsArray);
-                        // Set first location as default if available
                         if (locationsArray.length > 0 && selectedLocationId === null) {
                             setSelectedLocationId(locationsArray[0].id);
                         }
@@ -150,7 +137,6 @@ const Rooms: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Fetch rooms
     const fetchRooms = React.useCallback(async () => {
         try {
             setLoading(true);
@@ -162,7 +148,6 @@ const Rooms: React.FC = () => {
                 location_id: isCompanyAdmin && selectedLocationId ? selectedLocationId : undefined
             };
             
-            // Try cache first for faster loading (only for first page with no search/filters)
             if (currentPage === 1 && !searchTerm && !filters.is_available) {
                 const cachedRooms = await roomCacheService.getFilteredRoomsFromCache(
                     isCompanyAdmin && selectedLocationId ? { location_id: selectedLocationId } : {}
@@ -172,13 +157,11 @@ const Rooms: React.FC = () => {
                     setRooms(cachedRooms);
                     setTotalPages(1); // Cache doesn't have pagination info
                     setLoading(false);
-                    // Trigger background sync for freshness
                     roomCacheService.syncInBackground({ user_id: getStoredUser()?.id });
                     return;
                 }
             }
             
-            // Fall back to API for filtered/paginated results
             const response = await roomService.getRooms(searchFilters);
             
             if (response.data) {
@@ -186,7 +169,6 @@ const Rooms: React.FC = () => {
                 const pagination = response.data.pagination;
                 setTotalPages(pagination?.last_page || 1);
                 
-                // Cache the rooms for next time (only first page without filters)
                 if (currentPage === 1 && !searchTerm && response.data.rooms) {
                     await roomCacheService.cacheRooms(response.data.rooms);
                 }
@@ -203,7 +185,6 @@ const Rooms: React.FC = () => {
         fetchRooms();
     }, [fetchRooms]);
 
-    // Listen for cache updates from background sync
     useEffect(() => {
         const unsubscribe = roomCacheService.onCacheUpdate(async (event: CustomEvent) => {
             if (event.detail?.source === 'api') {
@@ -217,7 +198,6 @@ const Rooms: React.FC = () => {
         return () => unsubscribe();
     }, [selectedLocationId, isCompanyAdmin]);
 
-    // Handle form input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
@@ -228,7 +208,6 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Reset form
     const resetForm = () => {
         setFormData({
             name: '',
@@ -256,7 +235,6 @@ const Rooms: React.FC = () => {
         setNewBreakTime({ days: [], start_time: '12:00', end_time: '13:00' });
     };
 
-    // Break time helpers
     const addBreakTime = (isBulk: boolean = false) => {
         if (newBreakTime.days.length === 0) {
             showToast('Please select at least one day', 'error');
@@ -325,12 +303,10 @@ const Rooms: React.FC = () => {
         return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
     };
 
-    // Handle create room (single or bulk)
     const handleCreateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
         
         try {
-            // Use modal location for company_admin, default to 1 otherwise
             const locationId = isCompanyAdmin && modalLocationId ? modalLocationId : 1;
             
             if (creationMode === 'single') {
@@ -343,17 +319,14 @@ const Rooms: React.FC = () => {
                     area_group: formData.area_group || undefined,
                     booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
                 });
-                // Sync cache with newly created room
                 if (createResponse.data) {
                     await roomCacheService.addRoomToCache(createResponse.data);
                 }
                 showToast('Space created successfully!', 'success');
             } else {
-                // Bulk creation
                 const roomsToCreate = generateRoomPreview();
                 const capacity = bulkFormData.capacity ? parseInt(bulkFormData.capacity) : undefined;
                 
-                // Create rooms sequentially and collect created rooms
                 const createdRooms = [];
                 for (const roomName of roomsToCreate) {
                     const createRes = await roomService.createRoom({
@@ -370,7 +343,6 @@ const Rooms: React.FC = () => {
                     }
                 }
                 
-                // Sync cache with all newly created rooms
                 if (createdRooms.length > 0) {
                     await roomCacheService.addRoomsToCache(createdRooms);
                 }
@@ -387,7 +359,6 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Handle update room
     const handleUpdateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRoom) return;
@@ -402,7 +373,6 @@ const Rooms: React.FC = () => {
                 booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
             });
             
-            // Sync cache with updated room
             if (updateResponse.data) {
                 await roomCacheService.updateRoomInCache(updateResponse.data);
             }
@@ -417,7 +387,6 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Handle delete room
     const handleDeleteRoom = async (roomId: number, roomName: string) => {
         if (!window.confirm(`Are you sure you want to delete "${roomName}" Space?`)) {
             return;
@@ -425,7 +394,6 @@ const Rooms: React.FC = () => {
 
         try {
             await roomService.deleteRoom(roomId);
-            // Remove from cache
             await roomCacheService.removeRoomFromCache(roomId);
             showToast('Space deleted successfully!', 'success');
             fetchRooms();
@@ -435,13 +403,11 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Toggle selection mode
     const toggleSelectionMode = () => {
         setSelectionMode(!selectionMode);
         setSelectedRoomIds(new Set());
     };
 
-    // Toggle room selection
     const toggleRoomSelection = (roomId: number) => {
         const newSelected = new Set(selectedRoomIds);
         if (newSelected.has(roomId)) {
@@ -452,7 +418,6 @@ const Rooms: React.FC = () => {
         setSelectedRoomIds(newSelected);
     };
 
-    // Select all rooms
     const selectAllRooms = () => {
         if (selectedRoomIds.size === rooms.length) {
             setSelectedRoomIds(new Set());
@@ -461,7 +426,6 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Handle bulk delete
     const handleBulkDelete = async () => {
         if (selectedRoomIds.size === 0) {
             showToast('Please select Spaces to delete', 'info');
@@ -475,7 +439,6 @@ const Rooms: React.FC = () => {
         try {
             const roomIdsToDelete = Array.from(selectedRoomIds);
             await roomService.bulkDeleteRooms(roomIdsToDelete);
-            // Remove from cache
             await roomCacheService.removeRoomsFromCache(roomIdsToDelete);
             showToast(`${selectedRoomIds.size} Space(s) deleted successfully!`, 'success');
             setSelectedRoomIds(new Set());
@@ -487,7 +450,6 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Get unique area groups from rooms
     const getUniqueAreaGroups = (): string[] => {
         const groups = rooms
             .map(room => room.area_group)
@@ -495,7 +457,6 @@ const Rooms: React.FC = () => {
         return [...new Set(groups)].sort();
     };
 
-    // Handle area group interval update
     const handleAreaGroupIntervalUpdate = async () => {
         if (!selectedAreaGroup) {
             showToast('Please select an area group', 'error');
@@ -521,7 +482,6 @@ const Rooms: React.FC = () => {
         }
     };
 
-    // Handle edit click
     const handleEditClick = (room: Room) => {
         setSelectedRoom(room);
         setFormData({
@@ -536,19 +496,16 @@ const Rooms: React.FC = () => {
         setShowEditModal(true);
     };
 
-    // Handle filter changes
     const handleFilterChange = (key: keyof RoomFilters, value: string | number | boolean | undefined) => {
         setFilters(prev => ({ ...prev, [key]: value }));
         setCurrentPage(1);
     };
 
-    // Handle search
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
 
-    // Clear filters function
     const clearFilters = () => {
         setFilters({
             is_available: undefined,
@@ -560,14 +517,12 @@ const Rooms: React.FC = () => {
         setSearchTerm('');
     };
 
-    // Pagination
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
     };
 
     return (
         <div className="px-6 py-8">
-            {/* Page Header with Action Buttons */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Spaces</h1>
@@ -608,9 +563,7 @@ const Rooms: React.FC = () => {
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                {/* Selection Info Bar */}
                 {selectionMode && rooms.length > 0 && (
                     <div className={`mb-4 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
                         <div className="flex items-center gap-3 flex-wrap">
@@ -619,7 +572,7 @@ const Rooms: React.FC = () => {
                                     type="checkbox"
                                     checked={selectedRoomIds.size === rooms.length}
                                     onChange={selectAllRooms}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    className={`w-4 h-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                                 />
                                 <span className="text-sm font-medium text-gray-700">
                                     Select All
@@ -642,10 +595,8 @@ const Rooms: React.FC = () => {
                     </div>
                 )}
 
-                {/* Search and Filter Section */}
                 {!loading && (
                     <div className="mb-6">
-                        {/* Search Row */}
                         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                             <div className="relative flex-1 max-w-lg">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -679,7 +630,6 @@ const Rooms: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Advanced Filters */}
                         {showFilters && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -721,7 +671,6 @@ const Rooms: React.FC = () => {
                                             <option value="desc">Descending</option>
                                         </select>
                                     </div>
-                                    {/* Location Filter for Company Admin */}
                                     {isCompanyAdmin && locations.length > 0 && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
@@ -758,14 +707,12 @@ const Rooms: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Results count */}
                         <div className="text-sm text-gray-500 mt-3">
                             Showing {rooms.length} room{rooms.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                 )}
 
-                {/* Rooms Grid */}
                 {loading ? (
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
@@ -793,7 +740,6 @@ const Rooms: React.FC = () => {
                                         }`}
                                         onClick={() => selectionMode && toggleRoomSelection(room.id)}
                                     >
-                                        {/* Selection Checkbox */}
                                         {selectionMode && (
                                             <div className="absolute top-3 right-3">
                                                 {selectedRoomIds.has(room.id) ? (
@@ -889,7 +835,6 @@ const Rooms: React.FC = () => {
                     </div>
                 )}
 
-                {/* Pagination */}
                 {!loading && totalPages > 1 && (
                     <div className="flex items-center justify-center mt-6">
                         <Pagination
@@ -901,14 +846,12 @@ const Rooms: React.FC = () => {
                 )}
             </div>
 
-            {/* Create Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowCreateModal(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6 overflow-y-auto flex-1">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Space</h2>
                             
-                            {/* Creation Mode Toggle */}
                             <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
                                 <StandardButton
                                     type="button"
@@ -931,7 +874,6 @@ const Rooms: React.FC = () => {
                             </div>
 
                             <form onSubmit={handleCreateRoom} className="space-y-4">
-                                {/* Location Selector */}
                                 {isCompanyAdmin && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -960,7 +902,6 @@ const Rooms: React.FC = () => {
 
                                 {creationMode === 'single' ? (
                                     <>
-                                        {/* Single Room Form */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 Space Name *
@@ -971,7 +912,7 @@ const Rooms: React.FC = () => {
                                                 value={formData.name}
                                                 onChange={handleInputChange}
                                                 required
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="Enter Space name"
                                             />
                                         </div>
@@ -986,7 +927,7 @@ const Rooms: React.FC = () => {
                                                 value={formData.capacity}
                                                 onChange={handleInputChange}
                                                 min="1"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="Enter capacity"
                                             />
                                         </div>
@@ -997,14 +938,13 @@ const Rooms: React.FC = () => {
                                                 name="is_available"
                                                 checked={formData.is_available}
                                                 onChange={handleInputChange}
-                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                className={`w-4 h-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                                             />
                                             <label className="ml-2 block text-sm text-gray-900">
                                                 Available for booking
                                             </label>
                                         </div>
 
-                                        {/* Area Group & Booking Interval Section */}
                                         <div className="border-t border-gray-200 pt-4">
                                             <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                                                 <Layers className="w-4 h-4" />
@@ -1020,7 +960,7 @@ const Rooms: React.FC = () => {
                                                         name="area_group"
                                                         value={formData.area_group}
                                                         onChange={handleInputChange}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="e.g., Zone A"
                                                     />
                                                     <p className="text-xs text-gray-500 mt-1">Rooms in the same group share stagger rules</p>
@@ -1036,7 +976,7 @@ const Rooms: React.FC = () => {
                                                         onChange={handleInputChange}
                                                         min="5"
                                                         max="120"
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
                                                     <p className="text-xs text-gray-500 mt-1">Minutes between bookings in group</p>
@@ -1044,7 +984,6 @@ const Rooms: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Break Time Section - Single Mode */}
                                         <div className="border-t border-gray-200 pt-4">
                                             <div className="flex items-center justify-between mb-3">
                                                 <label className="block text-sm font-medium text-gray-700">
@@ -1061,7 +1000,6 @@ const Rooms: React.FC = () => {
                                                 </StandardButton>
                                             </div>
 
-                                            {/* Existing Break Times */}
                                             {formData.break_time.length > 0 && (
                                                 <div className="space-y-2 mb-3">
                                                     {formData.break_time.map((bt, index) => (
@@ -1090,7 +1028,6 @@ const Rooms: React.FC = () => {
                                                 </div>
                                             )}
 
-                                            {/* Add Break Time Form */}
                                             {showBreakTimeForm && (
                                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
                                                     <div>
@@ -1132,7 +1069,7 @@ const Rooms: React.FC = () => {
                                                                 type="time"
                                                                 value={newBreakTime.start_time}
                                                                 onChange={(e) => setNewBreakTime(prev => ({ ...prev, start_time: e.target.value }))}
-                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                             />
                                                         </div>
                                                         <div>
@@ -1141,7 +1078,7 @@ const Rooms: React.FC = () => {
                                                                 type="time"
                                                                 value={newBreakTime.end_time}
                                                                 onChange={(e) => setNewBreakTime(prev => ({ ...prev, end_time: e.target.value }))}
-                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                             />
                                                         </div>
                                                     </div>
@@ -1161,7 +1098,6 @@ const Rooms: React.FC = () => {
                                     </>
                                 ) : (
                                     <>
-                                        {/* Multiple Rooms Form */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 Base Name *
@@ -1171,7 +1107,7 @@ const Rooms: React.FC = () => {
                                                 value={bulkFormData.baseName}
                                                 onChange={(e) => setBulkFormData({ ...bulkFormData, baseName: e.target.value })}
                                                 required
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="e.g., Table"
                                             />
                                         </div>
@@ -1184,7 +1120,7 @@ const Rooms: React.FC = () => {
                                                 <select
                                                     value={bulkFormData.suffixType}
                                                     onChange={(e) => setBulkFormData({ ...bulkFormData, suffixType: e.target.value as 'number' | 'letter' })}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 >
                                                     <option value="number">Number</option>
                                                     <option value="letter">Letter</option>
@@ -1202,7 +1138,7 @@ const Rooms: React.FC = () => {
                                                     min="1"
                                                     max="50"
                                                     required
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 />
                                             </div>
                                         </div>
@@ -1218,7 +1154,7 @@ const Rooms: React.FC = () => {
                                                     onChange={(e) => setBulkFormData({ ...bulkFormData, startNumber: parseInt(e.target.value) || 1 })}
                                                     min="1"
                                                     required
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 />
                                             ) : (
                                                 <input
@@ -1232,7 +1168,7 @@ const Rooms: React.FC = () => {
                                                     }}
                                                     maxLength={1}
                                                     required
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                     placeholder="A"
                                                 />
                                             )}
@@ -1247,7 +1183,7 @@ const Rooms: React.FC = () => {
                                                 value={bulkFormData.capacity}
                                                 onChange={(e) => setBulkFormData({ ...bulkFormData, capacity: e.target.value })}
                                                 min="1"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="Enter capacity for all Spaces"
                                             />
                                         </div>
@@ -1257,14 +1193,13 @@ const Rooms: React.FC = () => {
                                                 type="checkbox"
                                                 checked={bulkFormData.is_available}
                                                 onChange={(e) => setBulkFormData({ ...bulkFormData, is_available: e.target.checked })}
-                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                className={`w-4 h-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                                             />
                                             <label className="ml-2 block text-sm text-gray-900">
                                                 Available for booking
                                             </label>
                                         </div>
 
-                                        {/* Area Group & Booking Interval Section - Bulk Mode */}
                                         <div className="border-t border-gray-200 pt-4">
                                             <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                                                 <Layers className="w-4 h-4" />
@@ -1279,7 +1214,7 @@ const Rooms: React.FC = () => {
                                                         type="text"
                                                         value={bulkFormData.area_group}
                                                         onChange={(e) => setBulkFormData({ ...bulkFormData, area_group: e.target.value })}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="e.g., Zone A"
                                                     />
                                                     <p className="text-xs text-gray-500 mt-1">Rooms in the same group share stagger rules</p>
@@ -1294,7 +1229,7 @@ const Rooms: React.FC = () => {
                                                         onChange={(e) => setBulkFormData({ ...bulkFormData, booking_interval: e.target.value })}
                                                         min="5"
                                                         max="120"
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
                                                     <p className="text-xs text-gray-500 mt-1">Minutes between bookings in group</p>
@@ -1302,7 +1237,6 @@ const Rooms: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Break Time Section - Bulk Mode */}
                                         <div className="border-t border-gray-200 pt-4">
                                             <div className="flex items-center justify-between mb-3">
                                                 <label className="block text-sm font-medium text-gray-700">
@@ -1319,7 +1253,6 @@ const Rooms: React.FC = () => {
                                                 </StandardButton>
                                             </div>
 
-                                            {/* Existing Break Times */}
                                             {bulkFormData.break_time.length > 0 && (
                                                 <div className="space-y-2 mb-3">
                                                     {bulkFormData.break_time.map((bt, index) => (
@@ -1348,7 +1281,6 @@ const Rooms: React.FC = () => {
                                                 </div>
                                             )}
 
-                                            {/* Add Break Time Form */}
                                             {showBreakTimeForm && (
                                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
                                                     <div>
@@ -1390,7 +1322,7 @@ const Rooms: React.FC = () => {
                                                                 type="time"
                                                                 value={newBreakTime.start_time}
                                                                 onChange={(e) => setNewBreakTime(prev => ({ ...prev, start_time: e.target.value }))}
-                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                             />
                                                         </div>
                                                         <div>
@@ -1399,7 +1331,7 @@ const Rooms: React.FC = () => {
                                                                 type="time"
                                                                 value={newBreakTime.end_time}
                                                                 onChange={(e) => setNewBreakTime(prev => ({ ...prev, end_time: e.target.value }))}
-                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                             />
                                                         </div>
                                                     </div>
@@ -1417,7 +1349,6 @@ const Rooms: React.FC = () => {
                                             )}
                                         </div>
 
-                                        {/* Preview */}
                                         {bulkFormData.baseName && generateRoomPreview().length > 0 && (
                                             <div className={`bg-${themeColor}-50 border border-${fullColor} rounded-lg p-4`}>
                                                 <p className="text-sm font-medium text-gray-700 mb-2">
@@ -1471,7 +1402,6 @@ const Rooms: React.FC = () => {
                 </div>
             )}
 
-            {/* Edit Modal */}
             {showEditModal && selectedRoom && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowEditModal(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -1488,7 +1418,7 @@ const Rooms: React.FC = () => {
                                         value={formData.name}
                                         onChange={handleInputChange}
                                         required
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                         placeholder="Enter Space name"
                                     />
                                 </div>
@@ -1503,7 +1433,7 @@ const Rooms: React.FC = () => {
                                         value={formData.capacity}
                                         onChange={handleInputChange}
                                         min="1"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                         placeholder="Enter capacity"
                                     />
                                 </div>
@@ -1514,14 +1444,13 @@ const Rooms: React.FC = () => {
                                         name="is_available"
                                         checked={formData.is_available}
                                         onChange={handleInputChange}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        className={`w-4 h-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                                     />
                                     <label className="ml-2 block text-sm text-gray-900">
                                         Available for booking
                                     </label>
                                 </div>
 
-                                {/* Area Group & Booking Interval Section - Edit Modal */}
                                 <div className="border-t border-gray-200 pt-4">
                                     <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                                         <Layers className="w-4 h-4" />
@@ -1537,7 +1466,7 @@ const Rooms: React.FC = () => {
                                                 name="area_group"
                                                 value={formData.area_group}
                                                 onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="e.g., Zone A"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">Rooms in same group share stagger rules</p>
@@ -1553,7 +1482,7 @@ const Rooms: React.FC = () => {
                                                 onChange={handleInputChange}
                                                 min="5"
                                                 max="120"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="15"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">Minutes between bookings</p>
@@ -1561,7 +1490,6 @@ const Rooms: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Break Time Section - Edit Modal */}
                                 <div className="border-t border-gray-200 pt-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <label className="block text-sm font-medium text-gray-700">
@@ -1578,7 +1506,6 @@ const Rooms: React.FC = () => {
                                         </StandardButton>
                                     </div>
 
-                                    {/* Existing Break Times */}
                                     {formData.break_time.length > 0 && (
                                         <div className="space-y-2 mb-3">
                                             {formData.break_time.map((bt, index) => (
@@ -1607,7 +1534,6 @@ const Rooms: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* Add Break Time Form */}
                                     {showBreakTimeForm && (
                                         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
                                             <div>
@@ -1649,7 +1575,7 @@ const Rooms: React.FC = () => {
                                                         type="time"
                                                         value={newBreakTime.start_time}
                                                         onChange={(e) => setNewBreakTime(prev => ({ ...prev, start_time: e.target.value }))}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                     />
                                                 </div>
                                                 <div>
@@ -1658,7 +1584,7 @@ const Rooms: React.FC = () => {
                                                         type="time"
                                                         value={newBreakTime.end_time}
                                                         onChange={(e) => setNewBreakTime(prev => ({ ...prev, end_time: e.target.value }))}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                     />
                                                 </div>
                                             </div>
@@ -1704,7 +1630,6 @@ const Rooms: React.FC = () => {
                 </div>
             )}
 
-            {/* Toast */}
             {toast && (
                 <div className="fixed top-4 right-4 z-50">
                     <Toast 
@@ -1715,7 +1640,6 @@ const Rooms: React.FC = () => {
                 </div>
             )}
 
-            {/* Area Group Settings Modal */}
             {showAreaGroupModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAreaGroupModal(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
@@ -1739,13 +1663,12 @@ const Rooms: React.FC = () => {
                                         value={selectedAreaGroup}
                                         onChange={(e) => {
                                             setSelectedAreaGroup(e.target.value);
-                                            // Set the current interval for this group
                                             const roomInGroup = rooms.find(r => r.area_group === e.target.value);
                                             if (roomInGroup?.booking_interval) {
                                                 setAreaGroupInterval(roomInGroup.booking_interval.toString());
                                             }
                                         }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                     >
                                         <option value="">-- Select an area group --</option>
                                         {getUniqueAreaGroups().map(group => {
@@ -1789,7 +1712,7 @@ const Rooms: React.FC = () => {
                                                 onChange={(e) => setAreaGroupInterval(e.target.value)}
                                                 min="0"
                                                 max="120"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="15"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">

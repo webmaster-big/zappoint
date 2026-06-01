@@ -1,16 +1,3 @@
-/**
- * EventCacheService
- * 
- * A service that uses the Cache Storage API to cache event data for faster
- * access across management, fee support, special pricing, and purchase components.
- * 
- * Features:
- * - Store events in Cache Storage (not localStorage/sessionStorage)
- * - Provide cached data as primary source for rendering
- * - Update cache when events are created/updated/deleted
- * - Background sync on component navigation
- * - Clear cache on logout
- */
 
 import { eventService } from './EventService';
 import type { Event, EventFilters } from '../types/event.types';
@@ -19,10 +6,8 @@ const CACHE_NAME = 'zapzone-events-cache-v1';
 const EVENTS_CACHE_KEY = '/api/events/cached';
 const CACHE_METADATA_KEY = '/api/events/metadata';
 
-// Track if warmup already happened this session
 let warmupCompleted = false;
 
-// Cache metadata for tracking staleness
 interface CacheMetadata {
   lastUpdated: number;
   locationId?: number;
@@ -30,7 +15,6 @@ interface CacheMetadata {
   totalRecords: number;
 }
 
-// Cache entry structure
 interface EventsCacheEntry {
   events: Event[];
 }
@@ -49,16 +33,10 @@ class EventCacheService {
     return EventCacheService.instance;
   }
 
-  /**
-   * Check if Cache Storage is available
-   */
   private isCacheAvailable(): boolean {
     return 'caches' in window;
   }
 
-  /**
-   * Get the cache instance
-   */
   private async getCache(): Promise<Cache | null> {
     if (!this.isCacheAvailable()) {
       console.warn('[EventCacheService] Cache Storage not available');
@@ -67,9 +45,6 @@ class EventCacheService {
     return await caches.open(CACHE_NAME);
   }
 
-  /**
-   * Store events in cache
-   */
   async cacheEvents(events: Event[], metadata?: Partial<CacheMetadata>): Promise<void> {
     const cache = await this.getCache();
     if (!cache) return;
@@ -86,7 +61,6 @@ class EventCacheService {
 
       await cache.put(EVENTS_CACHE_KEY, response);
 
-      // Store metadata
       const fullMetadata: CacheMetadata = {
         lastUpdated: Date.now(),
         totalRecords: events.length,
@@ -105,9 +79,6 @@ class EventCacheService {
     }
   }
 
-  /**
-   * Get events from cache
-   */
   async getCachedEvents(): Promise<Event[] | null> {
     const cache = await this.getCache();
     if (!cache) return null;
@@ -125,9 +96,6 @@ class EventCacheService {
     }
   }
 
-  /**
-   * Get cache metadata
-   */
   async getCacheMetadata(): Promise<CacheMetadata | null> {
     const cache = await this.getCache();
     if (!cache) return null;
@@ -143,9 +111,6 @@ class EventCacheService {
     }
   }
 
-  /**
-   * Check if cache is stale (older than specified minutes)
-   */
   async isCacheStale(maxAgeMinutes: number = 5): Promise<boolean> {
     const metadata = await this.getCacheMetadata();
     if (!metadata) return true;
@@ -156,9 +121,6 @@ class EventCacheService {
     return ageMs > maxAgeMs;
   }
 
-  /**
-   * Parse events from various API response shapes
-   */
   private parseEventsFromResponse(res: unknown): Event[] {
     const response = res as Record<string, unknown>;
     let list: Event[] = [];
@@ -177,20 +139,14 @@ class EventCacheService {
     return list;
   }
 
-  /**
-   * Fetch events from API and update cache
-   * Returns cached data immediately if available, then syncs in background
-   */
   async fetchAndCacheEvents(
     filters?: EventFilters,
     forceRefresh: boolean = false
   ): Promise<Event[]> {
-    // If already syncing, return the existing promise
     if (this.isSyncing && this.syncPromise) {
       return this.syncPromise;
     }
 
-    // Check cache first (unless force refresh)
     if (!forceRefresh) {
       const cachedEvents = await this.getCachedEvents();
       const isStale = await this.isCacheStale();
@@ -203,13 +159,9 @@ class EventCacheService {
       }
     }
 
-    // No cache or force refresh - fetch from API
     return this.syncFromAPI(filters);
   }
 
-  /**
-   * Sync events from API
-   */
   private async syncFromAPI(filters?: EventFilters): Promise<Event[]> {
     this.isSyncing = true;
 
@@ -222,13 +174,11 @@ class EventCacheService {
 
         const events = this.parseEventsFromResponse(response);
 
-        // Cache the events
         await this.cacheEvents(events, {
           locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
-        // Dispatch event to notify components
         window.dispatchEvent(new CustomEvent('events-cache-updated', {
           detail: { events, source: 'api' }
         }));
@@ -247,9 +197,6 @@ class EventCacheService {
     return this.syncPromise;
   }
 
-  /**
-   * Sync events in background without blocking
-   */
   syncInBackground(filters?: EventFilters): void {
     if (this.isSyncing) return;
 
@@ -263,9 +210,6 @@ class EventCacheService {
     }, 0);
   }
 
-  /**
-   * Update a single event in cache
-   */
   async updateEventInCache(updatedEvent: Event): Promise<void> {
     const cachedEvents = await this.getCachedEvents();
     if (!cachedEvents) return;
@@ -284,9 +228,6 @@ class EventCacheService {
     }));
   }
 
-  /**
-   * Add a new event to cache
-   */
   async addEventToCache(newEvent: Event): Promise<void> {
     const cachedEvents = await this.getCachedEvents();
     const events = cachedEvents || [];
@@ -302,9 +243,6 @@ class EventCacheService {
     }));
   }
 
-  /**
-   * Remove an event from cache
-   */
   async removeEventFromCache(eventId: number): Promise<void> {
     const cachedEvents = await this.getCachedEvents();
     if (!cachedEvents) return;
@@ -317,9 +255,6 @@ class EventCacheService {
     }));
   }
 
-  /**
-   * Get a single event from cache by ID
-   */
   async getEventFromCache(eventId: number): Promise<Event | null> {
     const cachedEvents = await this.getCachedEvents();
     if (!cachedEvents) return null;
@@ -327,9 +262,6 @@ class EventCacheService {
     return cachedEvents.find(e => e.id === eventId) || null;
   }
 
-  /**
-   * Get events from cache filtered by criteria
-   */
   async getFilteredEventsFromCache(filters: EventFilters & { search?: string; is_active?: boolean }): Promise<Event[]> {
     const cachedEvents = await this.getCachedEvents();
     if (!cachedEvents) return [];
@@ -356,9 +288,6 @@ class EventCacheService {
     });
   }
 
-  /**
-   * Clear all event cache data
-   */
   async clearCache(): Promise<void> {
     if (!this.isCacheAvailable()) return;
 
@@ -378,9 +307,6 @@ class EventCacheService {
     }
   }
 
-  /**
-   * Warmup the cache - call this on app initialization or login
-   */
   async warmupCache(filters?: EventFilters): Promise<void> {
     if (warmupCompleted) {
       console.log('[EventCacheService] Warmup already completed this session');
@@ -400,9 +326,6 @@ class EventCacheService {
     warmupCompleted = true;
   }
 
-  /**
-   * Check if cache has data
-   */
   async hasCachedData(): Promise<boolean> {
     const cache = await this.getCache();
     if (!cache) return false;
@@ -415,23 +338,14 @@ class EventCacheService {
     }
   }
 
-  /**
-   * Get events with automatic cache management
-   */
   async getEvents(filters?: EventFilters): Promise<Event[]> {
     return this.fetchAndCacheEvents(filters);
   }
 
-  /**
-   * Force refresh events from API
-   */
   async forceRefresh(filters?: EventFilters): Promise<Event[]> {
     return this.fetchAndCacheEvents(filters, true);
   }
 
-  /**
-   * Subscribe to cache updates
-   */
   onCacheUpdate(callback: (event: CustomEvent) => void): () => void {
     const handler = (e: globalThis.Event) => callback(e as CustomEvent);
     window.addEventListener('events-cache-updated', handler);
@@ -439,6 +353,5 @@ class EventCacheService {
   }
 }
 
-// Export singleton instance
 export const eventCacheService = EventCacheService.getInstance();
 export default eventCacheService;

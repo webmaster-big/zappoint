@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/bookings/CalendarView.tsx
 
 export interface CalendarViewBooking {
   id: string;

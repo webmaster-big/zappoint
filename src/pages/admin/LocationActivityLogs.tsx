@@ -76,7 +76,6 @@ const LocationActivityLogs = () => {
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
   const [totalPages, setTotalPages] = useState(0);
 
-  // Action icons and colors
   const actionIcons = {
     created: Plus,
     updated: Edit,
@@ -128,18 +127,14 @@ const LocationActivityLogs = () => {
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  // Format detailed activity description with metadata based on action type
   const formatActivityDescription = (log: LocationActivityLogsActivityLog) => {
     const metadata = log.metadata || {} as Record<string, unknown>;
     const metadataDetails: string[] = [];
     let description = '';
 
-    // Helper to safely get nested properties
     const getMetaValue = (key: string): unknown => (metadata as Record<string, unknown>)[key];
 
-    // Format based on specific action types from the API
     switch (log.action) {
-      // Booking actions
       case 'Booking Created': {
         const refNum = getMetaValue('reference_number') as string;
         const customerName = getMetaValue('customer_name') as string;
@@ -211,7 +206,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Payment actions
       case 'Payment Recorded': {
         const txnId = getMetaValue('transaction_id') as string;
         const paymentDetails = getMetaValue('payment_details') as { amount?: number; method?: string } | undefined;
@@ -235,7 +229,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // User actions
       case 'User Login': {
         const userDetails = getMetaValue('user_details') as { name?: string; role?: string } | undefined;
         const loginInfo = getMetaValue('login_info') as { ip_address?: string } | undefined;
@@ -287,7 +280,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Attraction purchase actions
       case 'Attraction Purchase Created': {
         const purchaseDetails = getMetaValue('purchase_details') as { attraction_name?: string; quantity?: number; total_amount?: number } | undefined;
         const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
@@ -323,7 +315,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Add-on actions
       case 'Add-On Updated': {
         const addonDetails = getMetaValue('addon_details') as { name?: string; price?: number } | undefined;
         const changes = getMetaValue('changes') as { original_name?: string; new_name?: string } | undefined;
@@ -355,7 +346,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Gift card actions
       case 'Gift Card Updated': {
         const gcDetails = getMetaValue('gift_card_details') as { code?: string; balance?: number } | undefined;
         description = `Gift card ${gcDetails?.code || ''} updated`;
@@ -379,7 +369,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Day off actions
       case 'Day Off Created': {
         const dayOffDetails = getMetaValue('day_off_details') as { date?: string; reason?: string; scope?: string } | undefined;
         description = `Day off created for ${dayOffDetails?.date || ''}`;
@@ -410,7 +399,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Package actions
       case 'Package Deleted': {
         const pkgDetails = getMetaValue('package_details') as { name?: string } | undefined;
         const softDelete = getMetaValue('soft_delete') as boolean | undefined;
@@ -455,7 +443,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Contact actions
       case 'Contact Created': {
         const contactDetails = getMetaValue('contact_details') as { email?: string; name?: string } | undefined;
         description = `Contact "${contactDetails?.email || contactDetails?.name || ''}" created`;
@@ -497,7 +484,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Customer actions
       case 'Customer Updated': {
         const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
         const updatedFields = getMetaValue('updated_fields') as string[] | undefined;
@@ -513,7 +499,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Room actions
       case 'Room Deleted':
       case 'Room Bulk Deleted':
       case 'Rooms Bulk Delete': {
@@ -527,14 +512,12 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Promo actions
       case 'Promo Deleted': {
         const promoDetails = getMetaValue('promo_details') as { code?: string } | undefined;
         description = `Promo code "${promoDetails?.code || ''}" deleted`;
         break;
       }
       
-      // Location/Company actions
       case 'Location Deleted': {
         const locationDetails = getMetaValue('location_details') as { name?: string } | undefined;
         description = `Location "${locationDetails?.name || ''}" deleted`;
@@ -547,7 +530,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Notification actions
       case 'Notification Deleted': {
         const notificationDetails = getMetaValue('notification_details') as { title?: string } | undefined;
         description = `Notification "${notificationDetails?.title || ''}" deleted`;
@@ -560,7 +542,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Attraction actions
       case 'Attraction Deleted':
       case 'Bulk Attractions Deleted': {
         const count = getMetaValue('deleted_count') as number;
@@ -573,7 +554,6 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Package time slot actions
       case 'Package Time Slot Deleted': {
         const timeSlotDetails = getMetaValue('time_slot_details') as { start_time?: string; end_time?: string } | undefined;
         description = `Package time slot deleted`;
@@ -583,21 +563,17 @@ const LocationActivityLogs = () => {
         break;
       }
       
-      // Authorize.Net actions
       case 'Authorize.Net Account Deleted': {
         description = `Authorize.Net account disconnected`;
         break;
       }
       
-      // Legacy/fallback action handling
       default: {
-        // Handle legacy simple actions
         const action = log.action.replace(/_/g, ' ');
         const resourceType = log.resourceType;
         const resourceName = log.resourceName || '';
         const resourceId = log.resourceId ? `#${log.resourceId}` : '';
         
-        // Build description for legacy format
         switch (log.action) {
           case 'created':
             description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
@@ -644,7 +620,6 @@ const LocationActivityLogs = () => {
             description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`.trim();
         }
         
-        // Parse legacy metadata fields
         if (getMetaValue('reference_number')) metadataDetails.push(`Ref: ${getMetaValue('reference_number')}`);
         if (getMetaValue('customer_name')) metadataDetails.push(`Customer: ${getMetaValue('customer_name')}`);
         if (getMetaValue('amount')) metadataDetails.push(`Amount: $${parseFloat(String(getMetaValue('amount'))).toFixed(2)}`);
@@ -653,12 +628,10 @@ const LocationActivityLogs = () => {
       }
     }
     
-    // Append metadata details
     if (metadataDetails.length > 0) {
       description += ` • ${metadataDetails.join(' • ')}`;
     }
     
-    // Add original details if not redundant
     if (log.details && log.details.length > 0 && !description.includes(log.details)) {
       description += ` • ${log.details}`;
     }
@@ -666,7 +639,6 @@ const LocationActivityLogs = () => {
     return description.trim();
   };
 
-  // Toggle expanded state for a log
   const toggleLogExpanded = (logId: string) => {
     setExpandedLogIds(prev => {
       const newSet = new Set(prev);
@@ -679,7 +651,6 @@ const LocationActivityLogs = () => {
     });
   };
 
-  // Format metadata for display in expanded view
   const formatMetadataForDisplay = (metadata: Record<string, unknown> | undefined): { key: string; value: string; category: string }[] => {
     if (!metadata || Object.keys(metadata).length === 0) return [];
     
@@ -729,7 +700,6 @@ const LocationActivityLogs = () => {
       }
     });
 
-    // Sort by category
     const categoryOrder = ['Customer Info', 'Booking Details', 'Financial', 'Package/Room', 'Location', 'User Info', 'Changes', 'Timestamps', 'System', 'Other'];
     result.sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category));
 
@@ -743,9 +713,7 @@ const LocationActivityLogs = () => {
            date.getFullYear() === today.getFullYear();
   };
 
-  // Calculate metrics for selected location
   const getLocationMetrics = () => {
-    // Use filteredLogs which contains the current page's data
     const locationLogs = filteredLogs;
 
     const todayLogs = locationLogs.filter(log => isToday(new Date(log.timestamp)));
@@ -791,7 +759,6 @@ const LocationActivityLogs = () => {
       const response = await locationService.getLocations();
       const locationsData = Array.isArray(response.data) ? response.data : [];
       
-      // Transform locations data
       const transformedLocations = locationsData.map((loc: Location) => ({
         name: loc.name,
         id: loc.id,
@@ -808,7 +775,6 @@ const LocationActivityLogs = () => {
   };
 
   const loadLogs = useCallback(async () => {
-    // Only show full loading spinner on initial load
     const hasLogs = filteredLogs.length > 0;
     if (!hasLogs) {
       setLoading(true);
@@ -819,10 +785,8 @@ const LocationActivityLogs = () => {
       const token = getAuthToken();
       const params = new URLSearchParams();
       
-      // Check if we need client-side filtering (userType filter requires it)
       const needsClientSideFiltering = filters.userType !== 'all';
       
-      // Pagination - if client-side filtering, get all data; otherwise paginate on backend
       if (needsClientSideFiltering) {
         params.append('per_page', '1000'); // Get all records for client-side filtering
         params.append('page', '1');
@@ -831,7 +795,6 @@ const LocationActivityLogs = () => {
         params.append('page', currentPage.toString());
       }
       
-      // Location filter
       if (selectedLocation !== 'all') {
         const location = locations.find(l => l.name === selectedLocation);
         if (location?.id) {
@@ -839,30 +802,23 @@ const LocationActivityLogs = () => {
         }
       }
       
-      // Search filter
       if (filters.search) {
         params.append('search', filters.search);
       }
       
-      // Action filter
       if (filters.action !== 'all') {
         params.append('action', filters.action);
       }
       
-      // Category filter (mapped from resourceType)
       if (filters.resourceType !== 'all') {
         params.append('category', filters.resourceType);
       }
       
-      // User filter
       if (filters.user !== 'all') {
         params.append('user_id', filters.user);
       }
       
-      // User type filter - handled by filtering on frontend after load
-      // Backend doesn't have a direct user_type filter, so we'll filter after fetching
       
-      // Date range filter
       if (filters.dateRange !== 'all') {
         const now = new Date();
         let startDate: Date;
@@ -888,7 +844,6 @@ const LocationActivityLogs = () => {
         }
       }
       
-      // Sort
       params.append('sort_by', 'created_at');
       params.append('sort_order', 'desc');
 
@@ -902,11 +857,9 @@ const LocationActivityLogs = () => {
       if (response.ok) {
         const data = await response.json();
         
-        // Backend returns: { success: true, data: { activity_logs: [...], pagination: {...} } }
         const activityLogs = data.data?.activity_logs || [];
         const pagination = data.data?.pagination || {};
         
-        // Define type for raw API logs
         interface ActivityLogRaw {
           id?: number;
           user_id?: number;
@@ -929,7 +882,6 @@ const LocationActivityLogs = () => {
           created_at?: string;
         }
         
-        // Transform API data to match component structure
         let transformedLogs = activityLogs.map((log: ActivityLogRaw) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
@@ -951,16 +903,13 @@ const LocationActivityLogs = () => {
         
         const needsClientSideFiltering = filters.userType !== 'all';
         
-        // Apply client-side user type filter (since backend doesn't support this)
         if (filters.userType !== 'all') {
           transformedLogs = transformedLogs.filter((log: LocationActivityLogsActivityLog) => log.userType === filters.userType);
         }
         
         if (needsClientSideFiltering) {
-          // Store all logs for client-side pagination
           setAllLogs(transformedLogs);
           
-          // Calculate pagination on frontend
           const startIndex = (currentPage - 1) * itemsPerPage;
           const endIndex = startIndex + itemsPerPage;
           const paginatedLogs = transformedLogs.slice(startIndex, endIndex);
@@ -969,7 +918,6 @@ const LocationActivityLogs = () => {
           setTotalLogs(transformedLogs.length);
           setTotalPages(Math.ceil(transformedLogs.length / itemsPerPage));
         } else {
-          // Use backend pagination
           setAllLogs([]);
           setFilteredLogs(transformedLogs);
           setTotalLogs(pagination.total || 0);
@@ -984,16 +932,13 @@ const LocationActivityLogs = () => {
     }
   }, [itemsPerPage, currentPage, selectedLocation, locations, filters, filteredLogs.length]);
 
-  // Load initial data
   useEffect(() => {
     const initializeData = async () => {
       await loadLocations();
-      // loadLogs will be called by the second useEffect when locations are loaded
     };
     initializeData();
   }, []); // Only run once on mount
 
-  // Debounce search input before updating filters
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setFilters(prev => {
@@ -1005,16 +950,13 @@ const LocationActivityLogs = () => {
     return () => clearTimeout(timeoutId);
   }, [searchInput]);
 
-  // Reload logs when filters or location change (but not on page change for client-side filtering)
   useEffect(() => {
     if (locations.length > 0 || selectedLocation === 'all') {
       const needsClientSideFiltering = filters.userType !== 'all';
       
-      // Only reload if not using client-side filtering, or if it's a filter/location change
       if (!needsClientSideFiltering) {
         loadLogs();
       } else if (allLogs.length === 0) {
-        // First load with client-side filter
         loadLogs();
       }
     }
@@ -1054,30 +996,7 @@ const LocationActivityLogs = () => {
     setCurrentPage(1);
   };
 
-  // const exportLogs = () => {
-  //   const csvContent = [
-  //     ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
-  //     ...filteredLogs.map(log => [
-  //       new Date(log.timestamp).toLocaleString(),
-  //       log.location,
-  //       log.userName,
-  //       log.userType,
-  //       log.action,
-  //       log.resourceType,
-  //       log.resourceName || '',
-  //       log.details,
-  //       log.severity
-  //     ])
-  //   ].map(row => row.join(',')).join('\n');
 
-  //   const blob = new Blob([csvContent], { type: 'text/csv' });
-  //   const url = window.URL.createObjectURL(blob);
-  //   const a = document.createElement('a');
-  //   a.href = url;
-  //   a.download = `location-activity-logs-${selectedLocation}-${new Date().toISOString().split('T')[0]}.csv`;
-  //   a.click();
-  //   window.URL.revokeObjectURL(url);
-  // };
 
   const handleExportWithFilters = async () => {
     setIsExporting(true);
@@ -1085,10 +1004,8 @@ const LocationActivityLogs = () => {
       const token = getAuthToken();
       const params = new URLSearchParams();
       
-      // No pagination limit for export - get all matching records
       params.append('per_page', '100'); // Backend max, we'll handle pagination
       
-      // Location filter - multiple locations support
       if (exportSelectedLocations.length > 0) {
         const locationIds = exportSelectedLocations
           .map(locName => locations.find(l => l.name === locName)?.id)
@@ -1099,31 +1016,24 @@ const LocationActivityLogs = () => {
         });
       }
       
-      // Search filter
       if (exportFilters.search) {
         params.append('search', exportFilters.search);
       }
       
-      // Action filter
       if (exportFilters.action !== 'all') {
         params.append('action', exportFilters.action);
       }
       
-      // Entity type filter (mapped from resourceType)
       if (exportFilters.resourceType !== 'all') {
         params.append('entity_type', exportFilters.resourceType);
       }
       
-      // User filter - multiple users selected
       if (exportSelectedUsers.length > 0) {
-        // Note: If backend supports multiple user_id params, send them all
-        // Otherwise, we'll filter on frontend after fetching
         exportSelectedUsers.forEach(userId => {
           params.append('user_id[]', userId);
         });
       }
       
-      // Date range filter
       if (exportFilters.dateRange !== 'all') {
         const now = new Date();
         let startDate: Date;
@@ -1149,11 +1059,9 @@ const LocationActivityLogs = () => {
         }
       }
       
-      // Sort
       params.append('sort_by', 'created_at');
       params.append('sort_order', 'desc');
 
-      // Fetch all pages
       interface ActivityLogRawExport {
         id?: number;
         user_id?: number;
@@ -1203,7 +1111,6 @@ const LocationActivityLogs = () => {
         }
       }
 
-      // Transform and filter logs
       interface TransformedLog {
         timestamp: string;
         location: string;
@@ -1232,19 +1139,16 @@ const LocationActivityLogs = () => {
         severity: determineSeverity(log.action || '')
       }));
 
-      // Apply client-side user type filter
       if (exportFilters.userType !== 'all') {
         transformedLogs = transformedLogs.filter((log: TransformedLog) => log.userType === exportFilters.userType);
       }
 
-      // Apply client-side user filter if backend doesn't support multiple user_id
       if (exportSelectedUsers.length > 0) {
         transformedLogs = transformedLogs.filter((log: TransformedLog) => 
           exportSelectedUsers.includes(log.userId)
         );
       }
 
-      // Generate CSV
       const csvContent = [
         ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
         ...transformedLogs.map(log => [
@@ -1325,7 +1229,6 @@ const LocationActivityLogs = () => {
     }
   };
 
-  // Get unique values for filters
   const getUniqueUsers = () => {
     const users = filteredLogs
       .map(log => ({ id: log.userId, name: log.userName, type: log.userType }));
@@ -1340,7 +1243,6 @@ const LocationActivityLogs = () => {
     return [...new Set(filteredLogs.map(log => log.resourceType))];
   };
 
-  // Format timestamp
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -1358,7 +1260,6 @@ const LocationActivityLogs = () => {
     return date.toLocaleDateString();
   };
 
-  // Pagination - backend handles slicing, we just display what we get
   const currentLogs = filteredLogs;
   const indexOfFirstItem = filteredLogs.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0;
   const indexOfLastItem = ((currentPage - 1) * itemsPerPage) + filteredLogs.length;
@@ -1367,14 +1268,12 @@ const LocationActivityLogs = () => {
     const needsClientSideFiltering = filters.userType !== 'all';
     
     if (needsClientSideFiltering && allLogs.length > 0) {
-      // Handle pagination on frontend without reloading
       const startIndex = (pageNumber - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const paginatedLogs = allLogs.slice(startIndex, endIndex);
       setFilteredLogs(paginatedLogs);
       setCurrentPage(pageNumber);
     } else {
-      // Backend pagination - will trigger reload
       setCurrentPage(pageNumber);
     }
   };
@@ -1389,7 +1288,6 @@ const LocationActivityLogs = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Location Activity Logs</h1>
@@ -1418,7 +1316,6 @@ const LocationActivityLogs = () => {
         </div>
       </div>
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
@@ -1437,7 +1334,6 @@ const LocationActivityLogs = () => {
                 Configure filters to export specific activity logs. All matching records will be included in the CSV file.
               </p>
 
-              {/* Location Checklist - Multiple Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-800 mb-2">Locations</label>
                 <div className="border border-gray-200 rounded-lg p-3">
@@ -1520,13 +1416,11 @@ const LocationActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Users Checklist */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-800 mb-2">Users</label>
                 <div className="border border-gray-200 rounded-lg p-3">
                   {(() => {
                     const allUsers = getUniqueUsers();
-                    // Filter users based on search query
                     const filteredUsers = userSearchQuery
                       ? allUsers.filter(user => 
                           user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
@@ -1534,7 +1428,6 @@ const LocationActivityLogs = () => {
                         )
                       : allUsers;
                     
-                    // Show first 5 by default, or all selected users, or all if showAllUsers is true
                     const displayedUsers = showAllUsers
                       ? filteredUsers
                       : [
@@ -1549,7 +1442,6 @@ const LocationActivityLogs = () => {
 
                     return (
                       <>
-                        {/* Search Input */}
                         <div className="mb-3">
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1626,7 +1518,6 @@ const LocationActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Search Filter */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
                 <div className="relative">
@@ -1643,7 +1534,6 @@ const LocationActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Filter Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-800 mb-2">Action</label>
@@ -1714,7 +1604,6 @@ const LocationActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
                 <StandardButton
                   variant="secondary"
@@ -1740,7 +1629,6 @@ const LocationActivityLogs = () => {
         </div>
       )}
 
-      {/* Location Filter - Clean pill design */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
         <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
           <button
@@ -1771,7 +1659,6 @@ const LocationActivityLogs = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -1795,7 +1682,6 @@ const LocationActivityLogs = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -1830,7 +1716,6 @@ const LocationActivityLogs = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -1920,7 +1805,6 @@ const LocationActivityLogs = () => {
         )}
       </div>
 
-      {/* Activity Logs List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">
@@ -1966,7 +1850,6 @@ const LocationActivityLogs = () => {
                         )}
                       </div>
                       
-                      {/* Detailed Description */}
                       <p className="text-sm text-gray-700 mb-2 leading-relaxed">
                         {formatActivityDescription(log)}
                       </p>
@@ -1989,7 +1872,6 @@ const LocationActivityLogs = () => {
                           {formatTimestamp(log.timestamp)}
                         </span>
                         
-                        {/* View Metadata Button */}
                         {hasMetadata && (
                           <>
                             <span className="text-gray-400">•</span>
@@ -2009,7 +1891,6 @@ const LocationActivityLogs = () => {
                         )}
                       </div>
                       
-                      {/* Expanded Metadata Section */}
                       {isExpanded && hasMetadata && (
                         <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -2027,7 +1908,6 @@ const LocationActivityLogs = () => {
                             ))}
                           </div>
                           
-                          {/* Raw JSON View */}
                           <details className="mt-4">
                             <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                               View Raw JSON
@@ -2046,7 +1926,6 @@ const LocationActivityLogs = () => {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-6 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -2063,7 +1942,6 @@ const LocationActivityLogs = () => {
   );
 };
 
-// Add missing icons
 const FileText = ({ size }: { size: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/bookings/OnsiteBooking.tsx
 
 export interface OnsiteBookingRoom { 
   id?: number;

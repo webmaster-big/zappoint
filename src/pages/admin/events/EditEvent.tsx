@@ -26,7 +26,6 @@ const EditEvent = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string>('');
@@ -43,7 +42,6 @@ const EditEvent = () => {
   const [features, setFeatures] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
 
-  // Add-ons
   const [allAddOns, setAllAddOns] = useState<Array<{ id: number; name: string; price: number }>>([]);
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<number[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
@@ -94,7 +92,6 @@ const EditEvent = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Phase 1: Try cache for instant display
       let cacheHit = false;
       if (id) {
         try {
@@ -105,13 +102,10 @@ const EditEvent = () => {
             setLoading(false);
           }
         } catch {
-          // Cache miss, continue to API
         }
       }
 
-      // Load locations, add-ons, and event (from API) in parallel
       await Promise.all([
-        // Locations
         (async () => {
           try {
             const locRes = await locationService.getLocations();
@@ -125,7 +119,6 @@ const EditEvent = () => {
             console.error('EditEvent: Failed to load locations');
           }
         })(),
-        // Add-ons from cache
         (async () => {
           try {
             const cached = await addOnCacheService.getCachedAddOns();
@@ -149,7 +142,6 @@ const EditEvent = () => {
             console.error('EditEvent: Failed to load add-ons');
           }
         })(),
-        // Phase 2: Always fetch fresh event from API for complete data (includes add_ons relationships)
         (async () => {
           if (!id) return;
           try {
@@ -157,7 +149,6 @@ const EditEvent = () => {
             const event = parseEventFromResponse(eventRes);
             if (event) {
               populateEventForm(event);
-              // Update cache with fresh full event data
               eventCacheService.updateEventInCache(event);
             } else if (!cacheHit) {
               setToast({ message: 'Failed to load event data', type: 'error' });
@@ -187,7 +178,6 @@ const EditEvent = () => {
     reader.readAsDataURL(file);
   };
 
-  // Features management
   const addFeature = () => setFeatures(prev => [...prev, '']);
   const removeFeature = (index: number) => setFeatures(prev => prev.filter((_, i) => i !== index));
   const updateFeature = (index: number, value: string) => {
@@ -214,7 +204,6 @@ const EditEvent = () => {
   };
   const handleFeatureDragEnd = () => setDraggedFeatureIndex(null);
 
-  // Add-on selection
   const toggleAddOn = (addonId: number) => {
     setSelectedAddOnIds(prev =>
       prev.includes(addonId) ? prev.filter(x => x !== addonId) : [...prev, addonId]
@@ -272,7 +261,6 @@ const EditEvent = () => {
       else if (imageRemoved) payload.image = null;
 
       await eventService.updateEvent(parseInt(id), payload as UpdateEventData);
-      // Refresh event cache so list page shows updated data
       eventCacheService.forceRefresh({ user_id: currentUser?.id });
       setToast({ message: 'Event updated successfully!', type: 'success' });
       setTimeout(() => navigate('/events'), 1000);
@@ -308,7 +296,6 @@ const EditEvent = () => {
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Form Column */}
       <div className="flex-1 mx-auto">
       <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
         <div className="mb-6">
@@ -317,7 +304,6 @@ const EditEvent = () => {
         </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" autoComplete="off">
-        {/* Basic Info */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-blue-500" /> Basic Information
@@ -392,7 +378,6 @@ const EditEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Date & Time */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-blue-500" /> Date & Time
@@ -484,7 +469,6 @@ const EditEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Pricing & Capacity */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold mb-4 text-neutral-900">Pricing & Capacity</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -527,7 +511,6 @@ const EditEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Features */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold text-neutral-900">Features</h3>
@@ -565,7 +548,6 @@ const EditEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Add-ons */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold text-neutral-900">Add-Ons</h3>
@@ -590,7 +572,6 @@ const EditEvent = () => {
             <p className="text-sm text-gray-400">No add-ons available.</p>
           ) : (
             <>
-              {/* Selected Add-ons - Draggable list */}
               {selectedAddOnIds.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
@@ -626,7 +607,6 @@ const EditEvent = () => {
                 </div>
               )}
 
-              {/* Available Add-ons to select */}
               {allAddOns.filter(a => !selectedAddOnIds.includes(a.id)).length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {allAddOns.filter(a => !selectedAddOnIds.includes(a.id)).map(addon => (
@@ -646,7 +626,6 @@ const EditEvent = () => {
           )}
         </div>
 
-        {/* Submit */}
         <hr className="border-gray-100" />
         <div className="flex gap-2">
           <StandardButton variant="primary" type="submit" loading={isSubmitting} fullWidth>
@@ -660,7 +639,6 @@ const EditEvent = () => {
       </div>
       </div>
 
-      {/* Live Preview Sidebar */}
       <div className="w-full md:w-[420px] md:max-w-sm h-fit">
         <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none sticky top-24">
           <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>

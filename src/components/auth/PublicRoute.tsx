@@ -10,7 +10,6 @@ const PublicRoute: React.FC<PublicRouteProps> = ({
   children, 
   restricted = false 
 }) => {
-  // Get user data from localStorage
   const getUserData = () => {
     try {
       const stored = localStorage.getItem('zapzone_user');
@@ -27,9 +26,7 @@ const PublicRoute: React.FC<PublicRouteProps> = ({
   const user = getUserData();
   const isAuthenticated = user && user.token;
 
-  // If this is a restricted public route (like login/register) and user is authenticated
   if (restricted && isAuthenticated) {
-    // Redirect to appropriate dashboard based on role
     const redirectPaths: Record<string, string> = {
       'company_admin': '/company/dashboard',
       'location_manager': '/manager/dashboard',

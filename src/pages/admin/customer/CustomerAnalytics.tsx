@@ -25,7 +25,6 @@ import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 
-// Recharts for charts
 import {
   LineChart,
   Line,
@@ -69,14 +68,12 @@ const CustomerAnalytics: React.FC = () => {
   const user = getStoredUser();
   const isCompanyAdmin = user?.role === 'company_admin';
 
-  // Fetch locations for company admin
   useEffect(() => {
     if (isCompanyAdmin) {
       fetchLocations();
     }
   }, [isCompanyAdmin]);
 
-  // Fetch analytics data when date range or location changes
   useEffect(() => {
     fetchAnalytics();
   }, [dateRange, startDate, endDate, selectedLocation]);
@@ -93,7 +90,6 @@ const CustomerAnalytics: React.FC = () => {
   };
 
   const fetchAnalytics = async () => {
-    // Don't fetch if custom range is selected but dates are not set
     if (dateRange === 'custom' && (!startDate || !endDate)) {
       return;
     }
@@ -105,7 +101,6 @@ const CustomerAnalytics: React.FC = () => {
         date_range: dateRange,
       };
       
-      // Add custom date range if selected
       if (dateRange === 'custom' && startDate && endDate) {
         params.start_date = startDate;
         params.end_date = endDate;
@@ -132,7 +127,6 @@ const CustomerAnalytics: React.FC = () => {
     }
   };
 
-  // Icon mapping for metrics
   const iconMap: Record<string, any> = {
     'Total Customers': Users,
     'Active Customers': Activity,
@@ -142,7 +136,6 @@ const CustomerAnalytics: React.FC = () => {
     'New Customers (30d)': TrendingUp,
   };
 
-  // Tooltip descriptions for metrics
   const metricTooltips: Record<string, string> = {
     'Total Customers': 'Total number of unique customers who have made bookings or purchases.',
     'Active Customers': 'Customers who have made at least one booking in the last 30 days.',
@@ -154,7 +147,6 @@ const CustomerAnalytics: React.FC = () => {
 
   const handleExport = async () => {
     try {
-      // Validate custom date range
       if (exportDateRange === 'custom' && (!startDate || !endDate)) {
         alert('Please select both start and end dates for custom range.');
         return;
@@ -168,16 +160,13 @@ const CustomerAnalytics: React.FC = () => {
         include_sections: exportSections,
       };
       
-      // Add date_range (defaults to 'all' if not set)
       params.date_range = exportDateRange || 'all';
       
-      // Add custom date range if selected
       if (params.date_range === 'custom' && startDate && endDate) {
         params.start_date = startDate;
         params.end_date = endDate;
       }
       
-      // Only add location_id if selected
       if (exportLocation !== null) {
         params.location_id = exportLocation;
       }
@@ -200,7 +189,6 @@ const CustomerAnalytics: React.FC = () => {
         const contentDisposition = response.headers.get('Content-Disposition');
         const filenameMatch = contentDisposition?.match(/filename="(.+)"/);  
         
-        // Use proper file extension based on format
         const fileExtension = exportFormat === 'receipt' ? 'png' : exportFormat;
         const filename = filenameMatch ? filenameMatch[1] : `analytics_export_${Date.now()}.${fileExtension}`;        a.download = filename;
         document.body.appendChild(a);
@@ -243,7 +231,6 @@ const CustomerAnalytics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
@@ -308,7 +295,6 @@ const CustomerAnalytics: React.FC = () => {
           </div>
       </div>
 
-      {/* Key Metrics Grid */}
   <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
         {keyMetrics.map((metric, index) => {
           const Icon = iconMap[metric.label] || Users;
@@ -344,9 +330,7 @@ const CustomerAnalytics: React.FC = () => {
         })}
       </div>
 
-  {/* Charts Grid - now 2 columns for better balance */}
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Booking Time Distribution Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -370,7 +354,6 @@ const CustomerAnalytics: React.FC = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        {/* Customer Growth Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -402,7 +385,6 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Revenue Trend */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -444,7 +426,6 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Bookings per Customer Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -469,7 +450,6 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Customer Status Distribution Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -505,7 +485,6 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Activity by Hour */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -530,7 +509,6 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Customer Lifetime Value */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -566,7 +544,6 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Repeat Customers */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -592,8 +569,6 @@ const CustomerAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Top 5 Most Purchased Activities by Customer */}
-      {/* Top 5 Tables in grid-2 */}
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
@@ -673,7 +648,6 @@ const CustomerAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Events Table */}
       {topEvents.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100 mt-4">
           <div className="flex items-center gap-2 mb-4">
@@ -707,7 +681,6 @@ const CustomerAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Recent Customers Table */}
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -779,7 +752,6 @@ const CustomerAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
@@ -793,7 +765,6 @@ const CustomerAnalytics: React.FC = () => {
               />
             </div>
             
-            {/* Format Selection */}
             <div className="mb-5">
               <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
               <div className="flex gap-4">
@@ -824,7 +795,6 @@ const CustomerAnalytics: React.FC = () => {
               </div>
             </div>
 
-            {/* Date Range Selection */}
             <div className="mb-5">
               <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
               <select 
@@ -864,7 +834,6 @@ const CustomerAnalytics: React.FC = () => {
               )}
             </div>
 
-            {/* Location Selection for Company Admin */}
             {isCompanyAdmin && locations.length > 0 && (
               <div className="mb-5">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
@@ -883,7 +852,6 @@ const CustomerAnalytics: React.FC = () => {
               </div>
             )}
 
-            {/* Sections Selection */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Include Sections</label>
               <div className="space-y-2">
@@ -915,7 +883,6 @@ const CustomerAnalytics: React.FC = () => {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3 pt-2">
               <StandardButton
                 variant="secondary"

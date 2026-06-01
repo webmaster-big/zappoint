@@ -1,4 +1,3 @@
-// Reusable component for displaying applied fees on bookings
 
 import type { AppliedFee } from '../utils/fees';
 

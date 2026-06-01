@@ -34,7 +34,6 @@ const Notifications = () => {
   const [clearingAll, setClearingAll] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<string | null>(null);
 
-  // Helper function to get user auth data
   const getUserAuth = () => {
     const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
     return {
@@ -44,7 +43,6 @@ const Notifications = () => {
     };
   };
 
-  // Notification type configurations
   const getNotificationConfig = (type: string) => {
     const configs: Record<string, any> = {
       booking: {
@@ -92,25 +90,21 @@ const Notifications = () => {
     };
   };
 
-  // Priority colors
   const priorityColors = {
     low: 'text-gray-500',
     medium: 'text-yellow-500',
     high: 'text-red-500'
   };
 
-  // Load notifications
   useEffect(() => {
     loadNotifications();
   }, []);
 
-  // Reset to page 1 when filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [filter]);
 
   const loadNotifications = async () => {
-    // Only show loading spinner on initial load
     if (notifications.length === 0) {
       setInitialLoading(true);
     }
@@ -123,13 +117,11 @@ const Notifications = () => {
         return;
       }
 
-      // Build query parameters - fetch all for client-side pagination
       const params = new URLSearchParams({
         per_page: '500',
         page: '1',
       });
 
-      // Only add location_id if not company_admin
       if (!isCompanyAdmin && locationId) {
         params.append('location_id', locationId.toString());
       }
@@ -144,7 +136,6 @@ const Notifications = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Transform API response to match component format
         const transformedNotifications = data.data.notifications.map((notif: any) => ({
           id: notif.id.toString(),
           type: notif.type,
@@ -157,6 +148,12 @@ const Notifications = () => {
           action_text: notif.action_text || null,
           metadata: notif.metadata || {},
         }));
+
+        transformedNotifications.sort((a: any, b: any) => {
+          const ta = new Date(a.timestamp).getTime();
+          const tb = new Date(b.timestamp).getTime();
+          return tb - ta;
+        });
 
         setNotifications(transformedNotifications);
       }
@@ -183,7 +180,6 @@ const Notifications = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Update local state
         const updatedNotifications = notifications.map(notification =>
           notification.id === id ? { ...notification, read: true } : notification
         );
@@ -217,7 +213,6 @@ const Notifications = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Reload notifications to get updated data
         await loadNotifications();
         window.dispatchEvent(new Event('zapzone_notifications_updated'));
       }
@@ -243,7 +238,6 @@ const Notifications = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Update local state
         const updatedNotifications = notifications.filter(notification => notification.id !== id);
         setNotifications(updatedNotifications);
         window.dispatchEvent(new Event('zapzone_notifications_updated'));
@@ -287,7 +281,6 @@ const Notifications = () => {
   };
 
   const getFilteredNotifications = () => {
-    // Client-side filtering
     if (filter === 'unread') return notifications.filter(n => !n.read);
     if (filter === 'bookings') return notifications.filter(n => n.type === 'booking');
     if (filter === 'purchases') return notifications.filter(n => n.type === 'purchase');
@@ -314,7 +307,6 @@ const Notifications = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
   const filteredNotifications = getFilteredNotifications();
 
-  // Client-side pagination
   const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -334,7 +326,6 @@ const Notifications = () => {
 
   return (
     <div className="min-h-screen px-4 py-6">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
@@ -355,7 +346,6 @@ const Notifications = () => {
         </div>
       </div>
 
-      {/* Actions Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
@@ -404,7 +394,6 @@ const Notifications = () => {
           )}
         </div>
 
-        {/* Filter Options */}
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="flex gap-2 flex-wrap">
@@ -441,7 +430,6 @@ const Notifications = () => {
         )}
       </div>
 
-      {/* Notifications List */}
       <div className="space-y-3">
         {filteredNotifications.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -455,24 +443,19 @@ const Notifications = () => {
           </div>
         ) : (
           currentNotifications.map((notification) => {
-            // Fallback config if notification type is not found
             const config = getNotificationConfig(notification.type);
             const Icon = config.icon;
             
-            // Handle notification click - navigate and mark as read
             const handleNotificationClick = () => {
               if (notification.action_url) {
-                // Mark as read if not already
                 if (!notification.read) {
                   markAsRead(notification.id);
                 }
-                // Navigate to the action URL with from=notifications so back button returns here
                 const separator = notification.action_url.includes('?') ? '&' : '?';
                 navigate(`${notification.action_url}${separator}from=notifications`);
               }
             };
             
-            // Format display: Put customer name first for quick scanning
             const customerName = notification.metadata?.customerName;
             const displayTitle = customerName 
               ? `${customerName}` 
@@ -495,12 +478,10 @@ const Notifications = () => {
               >
                 <div className="p-4">
                   <div className="flex items-start gap-3">
-                    {/* Icon */}
                     <div className={`p-2 rounded-lg ${config.bgColor} flex-shrink-0`}>
                       <Icon className={`h-4 w-4 ${config.color}`} />
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
@@ -528,7 +509,6 @@ const Notifications = () => {
                             {notification.message}
                           </p>
 
-                          {/* Metadata */}
                           {notification.metadata && (
                             <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
                               {notification.metadata.packageName && (
@@ -549,7 +529,6 @@ const Notifications = () => {
                             </div>
                           )}
 
-                          {/* Timestamp and Priority */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 text-xs text-gray-500">
                               <Clock className="h-3 w-3" />
@@ -561,7 +540,6 @@ const Notifications = () => {
                           </div>
                         </div>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {!notification.read && (
                             markingReadId === notification.id ? (
@@ -597,7 +575,6 @@ const Notifications = () => {
         )}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mt-4">
           <Pagination
@@ -611,7 +588,6 @@ const Notifications = () => {
         </div>
       )}
 
-      {/* Empty State for No Notifications */}
     </div>
   );
 };

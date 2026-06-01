@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,10 +22,8 @@ api.interceptors.request.use(
   }
 );
 
-// Blocking scope type for UI
 export type BlockingScope = 'location' | 'packages' | 'rooms' | 'both';
 
-// Types
 export interface DayOff {
   id: number;
   location_id: number;
@@ -119,7 +115,6 @@ export interface CheckDateResponse {
   };
 }
 
-// Cache configuration
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -130,9 +125,6 @@ const CACHE_TTL = 60000; // 1 minute cache TTL
 class DayOffService {
   private cache: Map<string, CacheEntry<unknown>> = new Map();
 
-  /**
-   * Get cached data or fetch fresh
-   */
   private getCached<T>(key: string): T | null {
     const entry = this.cache.get(key);
     if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
@@ -142,23 +134,14 @@ class DayOffService {
     return null;
   }
 
-  /**
-   * Set cache data
-   */
   private setCache<T>(key: string, data: T): void {
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 
-  /**
-   * Invalidate all cache entries
-   */
   invalidateCache(): void {
     this.cache.clear();
   }
 
-  /**
-   * Invalidate cache entries matching a pattern
-   */
   invalidateCacheByPattern(pattern: string): void {
     for (const key of this.cache.keys()) {
       if (key.includes(pattern)) {
@@ -167,9 +150,6 @@ class DayOffService {
     }
   }
 
-  /**
-   * Get all day offs with optional filters
-   */
   async getDayOffs(filters?: DayOffFilters): Promise<PaginatedResponse<DayOff>> {
     const cacheKey = `dayoffs_list_${JSON.stringify(filters || {})}`;
     const cached = this.getCached<PaginatedResponse<DayOff>>(cacheKey);
@@ -183,9 +163,6 @@ class DayOffService {
     return response.data;
   }
 
-  /**
-   * Get a specific day off by ID
-   */
   async getDayOff(id: number): Promise<ApiResponse<DayOff>> {
     const cacheKey = `dayoff_${id}`;
     const cached = this.getCached<ApiResponse<DayOff>>(cacheKey);
@@ -198,36 +175,24 @@ class DayOffService {
     return response.data;
   }
 
-  /**
-   * Create a new day off
-   */
   async createDayOff(data: CreateDayOffData): Promise<ApiResponse<DayOff>> {
     const response = await api.post('/day-offs', data);
     this.invalidateCacheByPattern('dayoffs_');
     return response.data;
   }
 
-  /**
-   * Update an existing day off
-   */
   async updateDayOff(id: number, data: UpdateDayOffData): Promise<ApiResponse<DayOff>> {
     const response = await api.put(`/day-offs/${id}`, data);
     this.invalidateCache(); // Invalidate all cache on update
     return response.data;
   }
 
-  /**
-   * Delete a day off
-   */
   async deleteDayOff(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/day-offs/${id}`);
     this.invalidateCache(); // Invalidate all cache on delete
     return response.data;
   }
 
-  /**
-   * Get day offs by location
-   */
   async getDayOffsByLocation(locationId: number): Promise<ApiResponse<DayOff[]>> {
     const cacheKey = `dayoffs_location_${locationId}`;
     const cached = this.getCached<ApiResponse<DayOff[]>>(cacheKey);
@@ -241,17 +206,11 @@ class DayOffService {
     return response.data;
   }
 
-  /**
-   * Check if a specific date is blocked
-   */
   async checkDate(data: CheckDateData): Promise<CheckDateResponse> {
     const response = await api.post('/day-offs/check-date', data);
     return response.data;
   }
 
-  /**
-   * Bulk delete day offs
-   */
   async bulkDeleteDayOffs(ids: number[]): Promise<ApiResponse<{ deleted_count: number }>> {
     const response = await api.post('/day-offs/bulk-delete', { ids });
     this.invalidateCache(); // Invalidate all cache on bulk delete
@@ -259,6 +218,5 @@ class DayOffService {
   }
 }
 
-// Export a singleton instance
 export const dayOffService = new DayOffService();
 export default dayOffService;

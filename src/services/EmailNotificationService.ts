@@ -1,4 +1,3 @@
-// src/services/EmailNotificationService.ts
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import type {
@@ -21,7 +20,6 @@ import type {
   ResetDefaultResponse,
 } from '../types/EmailNotification.types';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -30,7 +28,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -46,15 +43,7 @@ api.interceptors.request.use(
 
 const BASE_URL = '/email-notifications';
 
-// =============================================================================
-// EMAIL NOTIFICATIONS CRUD
-// =============================================================================
 
-/**
- * Get all email notifications with optional filters
- * @param filters - Optional filters (location_id, trigger_type, is_active, search, per_page, page)
- * @returns Paginated list of email notifications
- */
 export const getEmailNotifications = async (
   filters?: EmailNotificationFilters
 ): Promise<PaginatedEmailNotificationsResponse> => {
@@ -64,11 +53,6 @@ export const getEmailNotifications = async (
   return response.data;
 };
 
-/**
- * Get a single email notification by ID
- * @param id - Email notification ID
- * @returns Email notification details
- */
 export const getEmailNotification = async (
   id: number
 ): Promise<EmailNotificationApiResponse<EmailNotification>> => {
@@ -78,11 +62,6 @@ export const getEmailNotification = async (
   return response.data;
 };
 
-/**
- * Create a new email notification
- * @param data - Email notification creation data
- * @returns Created email notification
- */
 export const createEmailNotification = async (
   data: CreateEmailNotificationData
 ): Promise<EmailNotificationApiResponse<EmailNotification>> => {
@@ -93,12 +72,6 @@ export const createEmailNotification = async (
   return response.data;
 };
 
-/**
- * Update an existing email notification
- * @param id - Email notification ID
- * @param data - Update data
- * @returns Updated email notification
- */
 export const updateEmailNotification = async (
   id: number,
   data: UpdateEmailNotificationData
@@ -110,11 +83,6 @@ export const updateEmailNotification = async (
   return response.data;
 };
 
-/**
- * Delete an email notification
- * @param id - Email notification ID
- * @returns Success response
- */
 export const deleteEmailNotification = async (
   id: number
 ): Promise<EmailNotificationApiResponse<null>> => {
@@ -124,10 +92,6 @@ export const deleteEmailNotification = async (
   return response.data;
 };
 
-/**
- * Live preview the rendered email body/subject (with sample data substitution).
- * If body/subject are omitted, uses the saved effective values.
- */
 export const previewEmailNotification = async (
   id: number,
   data?: PreviewEmailNotificationData
@@ -139,10 +103,6 @@ export const previewEmailNotification = async (
   return response.data;
 };
 
-/**
- * Reset a default notification's user-edited subject/body back to the seeded defaults.
- * Only valid when notification.is_default === true.
- */
 export const resetDefaultNotification = async (
   id: number
 ): Promise<ResetDefaultResponse> => {
@@ -152,9 +112,6 @@ export const resetDefaultNotification = async (
   return response.data;
 };
 
-/**
- * Defaults-only listing (auto-seeds on first call).
- */
 export const getDefaultEmailNotifications = async (
   filters?: EmailNotificationFilters
 ): Promise<PaginatedEmailNotificationsResponse> => {
@@ -165,9 +122,6 @@ export const getDefaultEmailNotifications = async (
   return response.data;
 };
 
-/**
- * Manually re-seed all default notifications for the company.
- */
 export const seedDefaultNotifications = async (): Promise<
   EmailNotificationApiResponse<{ created: number }>
 > => {
@@ -177,9 +131,6 @@ export const seedDefaultNotifications = async (): Promise<
   return response.data;
 };
 
-/**
- * List all available default-key labels (used for UI hints).
- */
 export const getDefaultKeys = async (): Promise<
   EmailNotificationApiResponse<Record<string, string>>
 > => {
@@ -189,42 +140,22 @@ export const getDefaultKeys = async (): Promise<
   return response.data;
 };
 
-// =============================================================================
-// UTILITY ENDPOINTS
-// =============================================================================
 
-/**
- * Get all available trigger types (categorized)
- * @returns Trigger types grouped by category
- */
 export const getTriggerTypes = async (): Promise<TriggerTypesResponse> => {
   const response = await api.get<TriggerTypesResponse>(`${BASE_URL}/trigger-types`);
   return response.data;
 };
 
-/**
- * Get all entity types
- * @returns Entity types (all, package, attraction)
- */
 export const getEntityTypes = async (): Promise<EntityTypesResponse> => {
   const response = await api.get<EntityTypesResponse>(`${BASE_URL}/entity-types`);
   return response.data;
 };
 
-/**
- * Get all recipient types
- * @returns Recipient types (customer, staff, company_admin, location_manager, custom)
- */
 export const getRecipientTypes = async (): Promise<RecipientTypesResponse> => {
   const response = await api.get<RecipientTypesResponse>(`${BASE_URL}/recipient-types`);
   return response.data;
 };
 
-/**
- * Get available template variables for a trigger type
- * @param triggerType - The trigger type to get variables for
- * @returns Variables grouped by category (specific and common)
- */
 export const getVariables = async (
   triggerType: string
 ): Promise<VariablesResponse> => {
@@ -234,12 +165,6 @@ export const getVariables = async (
   return response.data;
 };
 
-/**
- * Get entities (packages or attractions) for selection
- * @param entityType - 'package' or 'attraction'
- * @param locationId - Optional location ID filter
- * @returns List of entities
- */
 export const getEntities = async (
   entityType: EntityType,
   locationId?: number
@@ -250,11 +175,6 @@ export const getEntities = async (
   return response.data;
 };
 
-/**
- * Toggle notification active/inactive status
- * @param id - Email notification ID
- * @returns Updated email notification
- */
 export const toggleNotificationStatus = async (
   id: number
 ): Promise<EmailNotificationApiResponse<EmailNotification>> => {
@@ -264,11 +184,6 @@ export const toggleNotificationStatus = async (
   return response.data;
 };
 
-/**
- * Duplicate an email notification
- * @param id - Email notification ID to duplicate
- * @returns New duplicated email notification
- */
 export const duplicateNotification = async (
   id: number
 ): Promise<EmailNotificationApiResponse<EmailNotification>> => {
@@ -278,12 +193,6 @@ export const duplicateNotification = async (
   return response.data;
 };
 
-/**
- * Send a test email for a notification
- * @param id - Email notification ID
- * @param data - Test email data (test_email, optional real data IDs)
- * @returns Success response
- */
 export const sendTestEmail = async (
   id: number,
   data: SendTestEmailData
@@ -295,16 +204,7 @@ export const sendTestEmail = async (
   return response.data;
 };
 
-// =============================================================================
-// NOTIFICATION LOGS
-// =============================================================================
 
-/**
- * Get notification logs for an email notification
- * @param id - Email notification ID
- * @param params - Pagination params
- * @returns Paginated list of logs
- */
 export const getNotificationLogs = async (
   id: number,
   params?: { page?: number; per_page?: number }
@@ -316,12 +216,6 @@ export const getNotificationLogs = async (
   return response.data;
 };
 
-/**
- * Resend a failed notification log
- * @param notificationId - Email notification ID
- * @param logId - Log ID to resend
- * @returns Success response
- */
 export const resendNotificationLog = async (
   notificationId: number,
   logId: number
@@ -332,12 +226,8 @@ export const resendNotificationLog = async (
   return response.data;
 };
 
-// =============================================================================
-// SERVICE EXPORT
-// =============================================================================
 
 export const emailNotificationService = {
-  // CRUD
   getAll: getEmailNotifications,
   getById: getEmailNotification,
   create: createEmailNotification,
@@ -349,7 +239,6 @@ export const emailNotificationService = {
   seedDefaults: seedDefaultNotifications,
   getDefaultKeys,
   
-  // Utility
   getTriggerTypes,
   getEntityTypes,
   getRecipientTypes,
@@ -359,7 +248,6 @@ export const emailNotificationService = {
   duplicate: duplicateNotification,
   sendTestEmail,
   
-  // Logs
   getLogs: getNotificationLogs,
   resendLog: resendNotificationLog,
 };

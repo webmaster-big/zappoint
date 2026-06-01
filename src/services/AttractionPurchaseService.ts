@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface AttractionPurchase {
   id: number;
   attraction_id: number;
@@ -110,7 +107,6 @@ export interface CreatePurchaseData {
   scheduled_date?: string; // Customer's chosen date
   scheduled_time?: string; // Customer's chosen time slot
   notes?: string;
-  // Optional fields for payment tracking
   amount?: number;
   total_amount?: number; // Total amount including fees
   amount_paid?: number;
@@ -120,19 +116,16 @@ export interface CreatePurchaseData {
   status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   payment_id?: string;
   location_id?: number;
-  // Add-ons selected for this purchase
   additional_addons?: Array<{
     addon_id: number;
     quantity: number;
     price_at_purchase: number;
   }>;
-  // Applied fees snapshot
   applied_fees?: Array<{
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
   }> | null;
-  // Applied discounts snapshot
   applied_discounts?: Array<{
     discount_name: string;
     discount_amount: number;
@@ -220,50 +213,33 @@ export interface PurchaseStatistics {
 }
 
 class AttractionPurchaseService {
-  // Deduplication: track in-flight createPurchase requests to prevent doubles
   private _createPurchaseInFlight: boolean = false;
   private _lastCreatePurchaseTime: number = 0;
   private _lastCreatePurchaseKey: string = '';
 
-  /**
-   * Get all attraction purchases with optional filters
-   */
   async getPurchases(filters?: PurchaseFilters): Promise<PaginatedResponse<AttractionPurchase>> {
     const response = await api.get('/attraction-purchases', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get a specific purchase by ID
-   */
   async getPurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {
     const response = await api.get(`/attraction-purchases/${id}`);
     return response.data;
   }
 
-  /**
-   * Alias for getPurchase - Get a specific purchase by ID
-   */
   async getPurchaseById(id: number): Promise<ApiResponse<AttractionPurchase>> {
     return this.getPurchase(id);
   }
 
-  /**
-   * Create a new attraction purchase
-   * Includes deduplication guard to prevent double submissions
-   */
   async createPurchase(data: CreatePurchaseData): Promise<ApiResponse<AttractionPurchase>> {
-    // Build a fingerprint from key fields to detect duplicate requests
     const dedupKey = `${data.attraction_id}-${data.guest_email || data.customer_id || ''}-${data.quantity}-${data.amount}-${data.purchase_date}`;
     const now = Date.now();
 
-    // Reject if an identical request is already in-flight
     if (this._createPurchaseInFlight && dedupKey === this._lastCreatePurchaseKey) {
       console.warn('⚠️ Duplicate createPurchase blocked (in-flight)');
       throw new Error('Purchase is already being processed. Please wait.');
     }
 
-    // Reject if an identical request completed less than 60 seconds ago
     if (dedupKey === this._lastCreatePurchaseKey && now - this._lastCreatePurchaseTime < 60000) {
       console.warn('⚠️ Duplicate createPurchase blocked (cooldown)');
       throw new Error('A similar purchase was just created. Please wait a moment before trying again.');
@@ -281,74 +257,46 @@ class AttractionPurchaseService {
     }
   }
 
-  /**
-   * Update an existing purchase
-   */
   async updatePurchase(id: number, data: UpdatePurchaseData): Promise<ApiResponse<AttractionPurchase>> {
     const response = await api.put(`/attraction-purchases/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a purchase
-   */
   async deletePurchase(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/attraction-purchases/${id}`);
     return response.data;
   }
 
-  /**
-   * Mark purchase as confirmed
-   */
   async markAsConfirmed(id: number): Promise<ApiResponse<AttractionPurchase>> {
     const response = await api.patch(`/attraction-purchases/${id}/confirm`);
     return response.data;
   }
 
-  /**
-   * Cancel a purchase
-   */
   async cancelPurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {
     const response = await api.patch(`/attraction-purchases/${id}/cancel`);
     return response.data;
   }
 
-  /**
-   * Get purchase statistics
-   */
   async getStatistics(filters?: { start_date?: string; end_date?: string }): Promise<ApiResponse<PurchaseStatistics>> {
     const response = await api.get('/attraction-purchases/statistics', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get purchases by customer
-   */
   async getPurchasesByCustomer(customerId: number): Promise<ApiResponse<AttractionPurchase[]>> {
     const response = await api.get(`/attraction-purchases/customer/${customerId}`);
     return response.data;
   }
 
-  /**
-   * Get purchases by attraction
-   */
   async getPurchasesByAttraction(attractionId: number): Promise<ApiResponse<AttractionPurchase[]>> {
     const response = await api.get(`/attraction-purchases/attraction/${attractionId}`);
     return response.data;
   }
 
-  /**
-   * Get customer's attraction purchases by email (public, no auth required)
-   */
   async getCustomerPurchasesByEmail(email: string, filters?: Record<string, unknown>): Promise<{ success: boolean; data: { purchases: AttractionPurchase[]; pagination: { current_page: number; last_page: number; per_page: number; total: number } } }> {
     const response = await api.get('/attraction-purchases/customer', { params: { guest_email: email, ...filters } });
     return response.data;
   }
 
-  /**
-   * Send receipt email with QR code
-   * Backend determines recipient email from purchase record (customer email or guest_email)
-   */
   async sendReceipt(id: number, qrCode: string, sendEmail: boolean = true): Promise<ApiResponse<{ email_sent_to: string }>> {
     const response = await api.post(`/attraction-purchases/${id}/qrcode`, {
       qr_code: qrCode,
@@ -357,9 +305,6 @@ class AttractionPurchaseService {
     return response.data;
   }
 
-  /**
-   * Check-in / Mark purchase as used by scanning QR code
-   */
   async checkInPurchase(id: number, userId?: number): Promise<ApiResponse<AttractionPurchase>> {
     const payload: { user_id?: number } = {};
     if (userId) {
@@ -369,9 +314,6 @@ class AttractionPurchaseService {
     return response.data;
   }
 
-  /**
-   * Verify purchase by QR code data
-   */
   async verifyPurchase(purchaseId: number): Promise<ApiResponse<AttractionPurchase>> {
     const user = getStoredUser();
     const params = user?.id ? { user_id: user.id } : {};
@@ -379,49 +321,32 @@ class AttractionPurchaseService {
     return response.data;
   }
 
-  /**
-   * Bulk delete attraction purchases
-   */
   async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
     const response = await api.post('/attraction-purchases/bulk-delete', { ids });
     return response.data;
   }
 
-  // ========== SOFT DELETE METHODS ==========
 
-  /**
-   * Get all soft-deleted (trashed) purchases
-   */
   async getTrashedPurchases(filters?: TrashedFilters): Promise<PaginatedResponse<AttractionPurchase>> {
     const response = await api.get('/attraction-purchases/trashed', { params: filters });
     return response.data;
   }
 
-  /**
-   * Restore a soft-deleted purchase
-   */
   async restorePurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {
     const response = await api.post(`/attraction-purchases/${id}/restore`);
     return response.data;
   }
 
-  /**
-   * Permanently delete a soft-deleted purchase
-   */
   async forceDeletePurchase(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/attraction-purchases/${id}/force-delete`);
     return response.data;
   }
 
-  /**
-   * Bulk restore soft-deleted purchases
-   */
   async bulkRestore(ids: number[]): Promise<ApiResponse<{ restored_count: number }>> {
     const response = await api.post('/attraction-purchases/bulk-restore', { ids });
     return response.data;
   }
 }
 
-// Export a singleton instance
 export const attractionPurchaseService = new AttractionPurchaseService();
 export default attractionPurchaseService;

@@ -1,12 +1,3 @@
-/**
- * MetricsCacheService - Cache service for dashboard metrics
- * 
- * Features:
- * - Cache-first loading for instant display
- * - Background refresh with smooth UI updates
- * - Separate caches for different dashboard types
- * - Automatic cache expiration
- */
 
 const CACHE_NAME = 'metrics-cache-v1';
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -26,11 +17,9 @@ export interface AttendantMetrics {
 }
 
 export interface CompanyMetrics extends AttendantMetrics {
-  // Additional company-specific metrics can be added here
 }
 
 export interface ManagerMetrics extends AttendantMetrics {
-  // Additional manager-specific metrics can be added here
 }
 
 export interface CachedMetricsData<T> {
@@ -47,23 +36,14 @@ type DashboardType = 'attendant' | 'company' | 'manager';
 class MetricsCacheService {
   private memoryCache: Map<string, CachedMetricsData<any>> = new Map();
 
-  /**
-   * Generate cache key based on dashboard type, location, and timeframe
-   */
   private getCacheKey(dashboardType: DashboardType, locationId?: number | 'all', timeframe?: string): string {
     return `metrics_${dashboardType}_${locationId || 'all'}_${timeframe || 'last_30d'}`;
   }
 
-  /**
-   * Check if cache is still valid (not expired)
-   */
   private isCacheValid(timestamp: number): boolean {
     return Date.now() - timestamp < CACHE_EXPIRY_MS;
   }
 
-  /**
-   * Get cached metrics from memory or Cache API
-   */
   async getCachedMetrics<T>(
     dashboardType: DashboardType,
     locationId?: number | 'all',
@@ -71,14 +51,12 @@ class MetricsCacheService {
   ): Promise<CachedMetricsData<T> | null> {
     const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
 
-    // Check memory cache first (fastest)
     const memoryData = this.memoryCache.get(cacheKey);
     if (memoryData && this.isCacheValid(memoryData.timestamp)) {
       console.log(`[MetricsCache] Memory hit for ${cacheKey}`);
       return memoryData as CachedMetricsData<T>;
     }
 
-    // Fall back to Cache API
     try {
       if ('caches' in window) {
         const cache = await caches.open(CACHE_NAME);
@@ -89,12 +67,10 @@ class MetricsCacheService {
           
           if (this.isCacheValid(data.timestamp)) {
             console.log(`[MetricsCache] Cache API hit for ${cacheKey}`);
-            // Store in memory for faster subsequent access
             this.memoryCache.set(cacheKey, data);
             return data;
           } else {
             console.log(`[MetricsCache] Cache expired for ${cacheKey}`);
-            // Cache is expired, delete it
             await cache.delete(cacheKey);
           }
         }
@@ -106,9 +82,6 @@ class MetricsCacheService {
     return null;
   }
 
-  /**
-   * Cache metrics data
-   */
   async cacheMetrics<T>(
     dashboardType: DashboardType,
     data: Omit<CachedMetricsData<T>, 'timestamp'>,
@@ -121,11 +94,9 @@ class MetricsCacheService {
       timestamp: Date.now(),
     };
 
-    // Always update memory cache
     this.memoryCache.set(cacheKey, cachedData);
     console.log(`[MetricsCache] Memory cached ${cacheKey}`);
 
-    // Also persist to Cache API
     try {
       if ('caches' in window) {
         const cache = await caches.open(CACHE_NAME);
@@ -140,9 +111,6 @@ class MetricsCacheService {
     }
   }
 
-  /**
-   * Check if we have any cached data (even if expired)
-   */
   async hasCachedData(
     dashboardType: DashboardType,
     locationId?: number | 'all',
@@ -150,12 +118,10 @@ class MetricsCacheService {
   ): Promise<boolean> {
     const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
 
-    // Check memory first
     if (this.memoryCache.has(cacheKey)) {
       return true;
     }
 
-    // Check Cache API
     try {
       if ('caches' in window) {
         const cache = await caches.open(CACHE_NAME);
@@ -169,9 +135,6 @@ class MetricsCacheService {
     return false;
   }
 
-  /**
-   * Invalidate cache for a specific dashboard/location/timeframe
-   */
   async invalidateCache(
     dashboardType: DashboardType,
     locationId?: number | 'all',
@@ -179,10 +142,8 @@ class MetricsCacheService {
   ): Promise<void> {
     const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
 
-    // Clear memory cache
     this.memoryCache.delete(cacheKey);
 
-    // Clear Cache API
     try {
       if ('caches' in window) {
         const cache = await caches.open(CACHE_NAME);
@@ -194,9 +155,6 @@ class MetricsCacheService {
     }
   }
 
-  /**
-   * Clear all metrics caches
-   */
   async clearAllCaches(): Promise<void> {
     this.memoryCache.clear();
 
@@ -210,9 +168,6 @@ class MetricsCacheService {
     }
   }
 
-  /**
-   * Get default/empty metrics object
-   */
   getDefaultMetrics(): AttendantMetrics {
     return {
       totalBookings: 0,
@@ -230,6 +185,5 @@ class MetricsCacheService {
   }
 }
 
-// Export singleton instance
 export const metricsCacheService = new MetricsCacheService();
 export default metricsCacheService;

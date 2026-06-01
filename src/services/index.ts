@@ -1,4 +1,3 @@
-// Import all services
 import { packageService } from './PackageService';
 import { addOnService } from './AddOnService';
 import { attractionService } from './AttractionService';
@@ -11,7 +10,6 @@ import { userService } from './UserService';
 import { locationService } from './LocationService';
 import { dayOffService } from './DayOffService';
 
-// Cache service exports
 export { bookingCacheService } from './BookingCacheService';
 export { roomCacheService } from './RoomCacheService';
 export { packageCacheService } from './PackageCacheService';
@@ -19,7 +17,6 @@ export { addOnCacheService } from './AddOnCacheService';
 export { attractionCacheService } from './AttractionCacheService';
 export { attractionPurchaseCacheService } from './AttractionPurchaseCacheService';
 
-// Service exports for easy importing
 export { packageService } from './PackageService';
 export type { Package, PackageFilters, CreatePackageData, UpdatePackageData } from './PackageService';
 
@@ -62,19 +59,15 @@ export type {
 export { userService } from './UserService';
 export type { User, UserFilters } from './UserService';
 
-// Settings service exports
 export * from './SettingsService';
 
-// Payment service exports
 export * from './PaymentService';
 
-// Location service exports
 export { locationService } from './LocationService';
 export { categoryService } from './CategoryService';
 export type { Category, CreateCategoryData, UpdateCategoryData } from './CategoryService';
 export type { Location, LocationFilters, CreateLocationData, UpdateLocationData } from './LocationService';
 
-// Analytics service exports
 export { default as analyticsService } from './AnalyticsService';
 export type { 
   LocationAnalyticsParams, 
@@ -85,7 +78,6 @@ export type {
   CompanyAnalyticsResponse
 } from './AnalyticsService';
 
-// Contact service exports
 export { contactService } from './ContactService';
 export type {
   Contact,
@@ -97,14 +89,11 @@ export type {
   BulkUpdateData
 } from './ContactService';
 
-// Fee Support service exports
 export { feeSupportService } from './FeeSupportService';
 export type { FeeSupport, FeeSupportFormData, FeeSupportFilters, FeeBreakdown, FeeBreakdownItem } from '../types/FeeSupport.types';
 
-// Common API response types
 export type { ApiResponse, PaginatedResponse } from './PackageService';
 
-// Services object for convenient access
 export const services = {
   packages: packageService,
   addOns: addOnService,

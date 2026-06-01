@@ -64,6 +64,8 @@ const fmtEventName = (name: string | null | undefined): string => {
   if (!name) return '—';
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
+const fmtEntityLabel = (type: string): string =>
+  type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
   open,
@@ -84,7 +86,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
   const [devicesTab, setDevicesTab] = useState<'devices' | 'browsers' | 'oses'>('devices');
   const [internalLocations, setInternalLocations] = useState<Array<{ id: string | number; name: string }>>([]);
 
-  // Fetch location names if not provided via prop
   useEffect(() => {
     if (locations.length > 0) return;
     locationService.getLocations({ is_active: true, per_page: 200 })
@@ -131,7 +132,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 p-4 md:p-6 flex items-center justify-between z-10">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500 font-medium">{entityType}</p>
@@ -169,7 +169,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
 
           {!loading && !error && data && (
             <div className="space-y-6">
-              {/* KPI cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <KpiCard label="Page views" value={data.totals.page_views} icon={TrendingUp} themeColor={themeColor} />
                 <KpiCard label="Unique visitors" value={data.totals.unique_visitors} icon={Users} themeColor={themeColor} />
@@ -186,7 +185,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
                 <KpiCard label="Avg duration" rawValue={formatDuration(data.totals.avg_duration_ms)} themeColor={themeColor} />
               </div>
 
-              {/* Trend */}
               {data.timeseries?.length > 0 && (
                 <Section title="Trend">
                   <ResponsiveContainer width="100%" height={260}>
@@ -205,7 +203,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
                 </Section>
               )}
 
-              {/* By path (variants across locations) */}
               {data.by_path?.length > 0 && (
                 <Section title="Variants (by URL / location)">
                   <SimpleTable
@@ -221,7 +218,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
                 </Section>
               )}
 
-              {/* Sources */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {(data.sources?.utm?.length || data.sources?.direct?.length) ? (
                   <Section title="Traffic sources">
@@ -252,7 +248,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
                 )}
               </div>
 
-              {/* Devices + Countries */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {(() => {
                   const dev = data.devices as unknown as DevicesResponse;
@@ -309,7 +304,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
                 )}
               </div>
 
-              {/* Recent conversions */}
               {data.recent_conversions?.length > 0 && (() => {
                 const filtered = data.recent_conversions.filter((c) => {
                   if (!convSearch.trim()) return true;
@@ -336,11 +330,14 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
                       />
                     </div>
                     <SimpleTable
-                      columns={['When', 'Event', 'Value', 'UTM Source', 'UTM Campaign']}
+                      columns={['When', 'Event', 'Entity', 'Value', 'UTM Source', 'UTM Campaign']}
                       rows={pageRows.map((c) => [
                         fmtDate(c.created_at),
                         fmtEventName(c.event_name),
-                        formatCurrency(c.value),
+                        c.entity_type
+                          ? (c.entity_name || `${fmtEntityLabel(c.entity_type)} #${c.entity_id ?? '—'}`)
+                          : '—',
+                        formatCurrency(c.conversion_value),
                         c.utm_source || '—',
                         c.utm_campaign || '—',
                       ])}
@@ -373,9 +370,6 @@ const EntityAnalyticsModal: React.FC<EntityAnalyticsModalProps> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 const KpiCard: React.FC<{
   label: string;

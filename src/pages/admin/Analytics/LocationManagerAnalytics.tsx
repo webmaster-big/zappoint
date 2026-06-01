@@ -47,15 +47,10 @@ const LocationManagerAnalytics: React.FC = () => {
   const [selectedSections, setSelectedSections] = useState<('packages' | 'metrics' | 'revenue' | 'attractions' | 'timeslots' | 'events')[]>(['metrics', 'revenue', 'packages', 'attractions', 'timeslots', 'events']);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
 
-  // Resolve the manager's own location_id from the authenticated user record.
-  // The backend will 403 cross-location requests, so a hardcoded id (the
-  // previous `= 1`) caused the page to spin forever for any manager not
-  // assigned to location 1.
   const currentUser = getStoredUser();
   const locationId: number | null = currentUser?.location_id ?? null;
 
   const fetchAnalytics = useCallback(async () => {
-    // Don't fetch if custom range is selected but dates are not set
     if (dateRange === 'custom' && (!startDate || !endDate)) {
       return;
     }
@@ -100,7 +95,6 @@ const LocationManagerAnalytics: React.FC = () => {
   const handleExport = async () => {
     if (!analyticsData) return;
     
-    // Validate custom date range
     if (dateRange === 'custom' && (!startDate || !endDate)) {
       alert('Please select both start and end dates for custom range.');
       return;
@@ -180,7 +174,6 @@ const LocationManagerAnalytics: React.FC = () => {
 
   const { location, key_metrics, hourly_revenue, daily_revenue, weekly_trend, package_performance, attraction_performance, time_slot_performance, event_performance } = analyticsData;
 
-  // Format daily_revenue with readable date labels (e.g. "Mon, Jan 27")
   const formattedDailyRevenue = daily_revenue.map(d => ({
     ...d,
     displayDate: (() => {
@@ -190,7 +183,6 @@ const LocationManagerAnalytics: React.FC = () => {
     })(),
   }));
   
-  // Key metrics for single location
   const keyMetrics = [
     { label: 'Location Revenue', value: key_metrics.location_revenue.value, icon: DollarSign, change: key_metrics.location_revenue.change + ' vs last period', trend: key_metrics.location_revenue.trend },
     { label: 'Package Bookings', value: key_metrics.package_bookings.value, icon: Package, change: key_metrics.package_bookings.change + ' vs last period', trend: key_metrics.package_bookings.trend },
@@ -204,7 +196,6 @@ const LocationManagerAnalytics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
@@ -250,7 +241,6 @@ const LocationManagerAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Key Metrics - 6 columns */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-2 sm:gap-4">
         {keyMetrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -280,9 +270,7 @@ const LocationManagerAnalytics: React.FC = () => {
         })}
       </div>
 
-      {/* Charts Grid - 2 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Hourly Revenue Pattern */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -328,7 +316,6 @@ const LocationManagerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Daily Performance */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -375,7 +362,6 @@ const LocationManagerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Package Performance */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -416,7 +402,6 @@ const LocationManagerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Attraction Ticket Sales */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -460,7 +445,6 @@ const LocationManagerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Weekly Trend */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -507,7 +491,6 @@ const LocationManagerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Time Slot Performance */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -557,9 +540,7 @@ const LocationManagerAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Tables - 2 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Package Details Table */}
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
             <Package className={`w-5 h-5 text-${themeColor}-600`} />
@@ -585,7 +566,6 @@ const LocationManagerAnalytics: React.FC = () => {
           </table>
         </div>
 
-        {/* Attraction Details Table */}
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
             <Ticket className={`w-5 h-5 text-${themeColor}-600`} />
@@ -612,7 +592,6 @@ const LocationManagerAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Event Performance Table */}
       {event_performance && event_performance.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
@@ -648,7 +627,6 @@ const LocationManagerAnalytics: React.FC = () => {
         </div>
       )}
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 p-6">
@@ -662,7 +640,6 @@ const LocationManagerAnalytics: React.FC = () => {
               />
             </div>
             <div className="space-y-6">
-              {/* Date Range Filter */}
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Time Period</label>
                 <select
@@ -691,7 +668,6 @@ const LocationManagerAnalytics: React.FC = () => {
                 )}
               </div>
 
-              {/* Data Sections to Include */}
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Include in Export</label>
                 <div className="space-y-2 border border-gray-200 rounded-lg p-3">
@@ -716,7 +692,6 @@ const LocationManagerAnalytics: React.FC = () => {
                 </div>
               </div>
 
-              {/* Export Format */}
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Export Format</label>
                 <select
@@ -730,7 +705,6 @@ const LocationManagerAnalytics: React.FC = () => {
                 </select>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <StandardButton
                   onClick={() => setShowExportModal(false)}

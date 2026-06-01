@@ -31,7 +31,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
   const [maxRefundable, setMaxRefundable] = useState<number>(0);
   const [showNotes, setShowNotes] = useState(false);
 
-  // Reset form when payment changes
   useEffect(() => {
     if (payment && open) {
       const paymentAmount = payment.amount;
@@ -44,7 +43,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
     }
   }, [payment, open]);
 
-  // Auto-toggle cancel based on refund amount
   useEffect(() => {
     if (payment) {
       const refundAmt = parseFloat(amount) || 0;
@@ -124,7 +122,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-orange-100">
@@ -146,7 +143,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
-            {/* Payment Summary Card */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
               <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Original Payment Details
@@ -183,7 +179,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
               </div>
             </div>
 
-            {/* Error Alert */}
             {error && (
               <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
                 <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -191,7 +186,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
               </div>
             )}
 
-            {/* Refund Amount Input */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 Refund Amount
@@ -212,7 +206,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
                 />
               </div>
 
-              {/* Quick amount buttons */}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -249,7 +242,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
               </div>
             </div>
 
-            {/* Partial Refund Breakdown */}
             {isPartialRefund && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <h5 className="text-sm font-medium text-amber-800">Partial Refund Breakdown</h5>
@@ -271,7 +263,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
               </div>
             )}
 
-            {/* Notes */}
             <div className="space-y-2">
               <button
                 type="button"
@@ -292,7 +283,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
               )}
             </div>
 
-            {/* Cancel Booking Checkbox */}
             <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
               <input
                 type="checkbox"
@@ -314,7 +304,6 @@ const RefundModal: React.FC<RefundModalProps> = ({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
             <StandardButton
               variant="secondary"

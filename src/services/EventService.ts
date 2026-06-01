@@ -33,49 +33,41 @@ interface ApiResponse<T> {
 }
 
 class EventService {
-  /** List all events (admin) */
   async getEvents(filters?: EventFilters): Promise<ApiResponse<Event[]>> {
     const response = await api.get('/events', { params: filters });
     return response.data;
   }
 
-  /** Get a single event */
   async getEvent(id: number): Promise<ApiResponse<Event>> {
     const response = await api.get(`/events/${id}`);
     return response.data;
   }
 
-  /** Create a new event */
   async createEvent(data: CreateEventData): Promise<ApiResponse<Event>> {
     const response = await api.post('/events', data);
     return response.data;
   }
 
-  /** Update an event */
   async updateEvent(id: number, data: UpdateEventData): Promise<ApiResponse<Event>> {
     const response = await api.put(`/events/${id}`, data);
     return response.data;
   }
 
-  /** Delete an event (soft delete) */
   async deleteEvent(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/events/${id}`);
     return response.data;
   }
 
-  /** Toggle event active/inactive */
   async toggleStatus(id: number): Promise<ApiResponse<Event>> {
     const response = await api.patch(`/events/${id}/toggle-status`);
     return response.data;
   }
 
-  /** Get active events for a location (public) */
   async getEventsByLocation(locationId: number): Promise<ApiResponse<Event[]>> {
     const response = await api.get(`/events/location/${locationId}`);
     return response.data;
   }
 
-  /** Get a single event (public) – fetches from grouped-by-name and finds the matching event_id */
   async getPublicEvent(eventId: number): Promise<ApiResponse<Event>> {
     const response = await api.get('/events/grouped-by-name');
     const groups = response.data?.data || [];
@@ -110,13 +102,11 @@ class EventService {
     return { success: false, data: null as unknown as Event, message: 'Event not found' };
   }
 
-  /** Get available dates for an event (public) */
   async getAvailableDates(eventId: number): Promise<{ dates: string[] }> {
     const response = await api.get(`/events/${eventId}/available-dates`);
     return response.data;
   }
 
-  /** Get available time slots for a specific date (public) */
   async getAvailableTimeSlots(eventId: number, date: string): Promise<{ date: string; time_slots: string[] }> {
     const response = await api.get(`/events/${eventId}/available-time-slots/${date}`);
     return response.data;

@@ -66,7 +66,6 @@ const AttendantActivityLogs = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
 
-  // Action icons and colors
   const actionIcons = {
     created: Plus,
     updated: Edit,
@@ -115,18 +114,14 @@ const AttendantActivityLogs = () => {
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  // Format detailed activity description with metadata based on action type
   const formatActivityDescription = (log: AttendantActivityLogsLog) => {
     const metadata = log.metadata || {} as Record<string, unknown>;
     const metadataDetails: string[] = [];
     let description = '';
 
-    // Helper to safely get nested properties
     const getMetaValue = (key: string): unknown => (metadata as Record<string, unknown>)[key];
 
-    // Format based on specific action types from the API
     switch (log.action) {
-      // Booking actions
       case 'Booking Created': {
         const refNum = getMetaValue('reference_number') as string;
         const customerName = getMetaValue('customer_name') as string;
@@ -198,7 +193,6 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // Payment actions
       case 'Payment Recorded': {
         const txnId = getMetaValue('transaction_id') as string;
         const paymentDetails = getMetaValue('payment_details') as { amount?: number; method?: string } | undefined;
@@ -222,7 +216,6 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // User actions
       case 'User Login': {
         const userDetails = getMetaValue('user_details') as { name?: string; role?: string } | undefined;
         const loginInfo = getMetaValue('login_info') as { ip_address?: string } | undefined;
@@ -274,7 +267,6 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // Attraction purchase actions
       case 'Attraction Purchase Created': {
         const purchaseDetails = getMetaValue('purchase_details') as { attraction_name?: string; quantity?: number; total_amount?: number } | undefined;
         const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
@@ -310,7 +302,6 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // Gift card actions
       case 'Gift Card Updated': {
         const gcDetails = getMetaValue('gift_card_details') as { code?: string; balance?: number } | undefined;
         description = `Gift card ${gcDetails?.code || ''} updated`;
@@ -334,7 +325,6 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // Customer actions
       case 'Customer Updated': {
         const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
         const updatedFields = getMetaValue('updated_fields') as string[] | undefined;
@@ -350,7 +340,6 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // Room actions
       case 'Room Deleted':
       case 'Room Bulk Deleted':
       case 'Rooms Bulk Delete': {
@@ -364,14 +353,12 @@ const AttendantActivityLogs = () => {
         break;
       }
       
-      // Legacy/fallback action handling
       default: {
         const action = log.action.replace(/_/g, ' ');
         const resourceType = log.resourceType;
         const resourceName = log.resourceName || '';
         const resourceId = log.resourceId ? `#${log.resourceId}` : '';
         
-        // Build description for legacy format
         switch (log.action) {
           case 'created':
             description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
@@ -433,7 +420,6 @@ const AttendantActivityLogs = () => {
             description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`.trim();
         }
         
-        // Parse legacy metadata fields
         if (getMetaValue('reference_number') || getMetaValue('reference') || getMetaValue('booking_reference')) {
           metadataDetails.push(`Ref: ${getMetaValue('reference_number') || getMetaValue('reference') || getMetaValue('booking_reference')}`);
         }
@@ -481,12 +467,10 @@ const AttendantActivityLogs = () => {
       }
     }
     
-    // Append metadata details
     if (metadataDetails.length > 0) {
       description += ` • ${metadataDetails.join(' • ')}`;
     }
     
-    // Add original details if not redundant
     if (log.details && log.details.length > 0 && !description.includes(log.details)) {
       description += ` • ${log.details}`;
     }
@@ -494,7 +478,6 @@ const AttendantActivityLogs = () => {
     return description.trim();
   };
 
-  // Toggle expanded state for a log
   const toggleLogExpanded = (logId: string) => {
     setExpandedLogIds(prev => {
       const newSet = new Set(prev);
@@ -507,7 +490,6 @@ const AttendantActivityLogs = () => {
     });
   };
 
-  // Format metadata for display in expanded view
   const formatMetadataForDisplay = (metadata: Record<string, unknown> | undefined): { key: string; value: string; category: string }[] => {
     if (!metadata || Object.keys(metadata).length === 0) return [];
     
@@ -557,14 +539,12 @@ const AttendantActivityLogs = () => {
       }
     });
 
-    // Sort by category
     const categoryOrder = ['Customer Info', 'Booking Details', 'Financial', 'Package/Room', 'Location', 'User Info', 'Changes', 'Timestamps', 'System', 'Other'];
     result.sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category));
 
     return result;
   };
 
-  // Format metadata for CSV export - extracts all relevant fields into a readable string
   const formatMetadataForExport = (metadata: Record<string, unknown> | undefined): Record<string, string> => {
     if (!metadata || Object.keys(metadata).length === 0) {
       return {
@@ -612,7 +592,6 @@ const AttendantActivityLogs = () => {
       extra_metadata: ''
     };
 
-    // Handle changes object
     if (metadata.changes) {
       try {
         const changes = typeof metadata.changes === 'string' ? JSON.parse(metadata.changes) : metadata.changes;
@@ -630,7 +609,6 @@ const AttendantActivityLogs = () => {
       }
     }
 
-    // Collect any extra metadata fields not already captured
     const knownFields = [
       'guest_name', 'customer_name', 'customer_email', 'email', 'reference_number', 
       'reference', 'booking_reference', 'amount', 'price', 'total_price', 'participants',
@@ -659,17 +637,14 @@ const AttendantActivityLogs = () => {
     return result;
   };
 
-  // Escape CSV value to handle commas, quotes, and newlines
   const escapeCSV = (value: string): string => {
     if (!value) return '';
-    // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
       return `"${value.replace(/"/g, '""')}"`;
     }
     return value;
   };
 
-  // Helper function to check if a date is today
   const isToday = (date: Date) => {
     const today = new Date();
     return date.getDate() === today.getDate() &&
@@ -677,11 +652,9 @@ const AttendantActivityLogs = () => {
            date.getFullYear() === today.getFullYear();
   };
 
-  // Calculate metrics for location
   const getLocationMetrics = () => {
     const locationLogs = filteredLogs;
     const todayLogs = locationLogs.filter(log => isToday(new Date(log.timestamp)));
-    // const attendantLogs = locationLogs.filter(log => log.userType === 'attendant');
 
     return [
       {
@@ -730,36 +703,29 @@ const AttendantActivityLogs = () => {
       const token = getAuthToken();
       const params = new URLSearchParams();
       
-      // Pagination
       params.append('per_page', itemsPerPage.toString());
       params.append('page', currentPage.toString());
       
-      // Location filter - always filter by user's location
       if (userLocationId) {
         params.append('location_id', userLocationId.toString());
       }
       
-      // Search filter
       if (filters.search) {
         params.append('search', filters.search);
       }
       
-      // Action filter
       if (filters.action !== 'all') {
         params.append('action', filters.action);
       }
       
-      // Resource type filter
       if (filters.resourceType !== 'all') {
         params.append('category', filters.resourceType);
       }
       
-      // Attendant filter - single user selection
       if (filters.attendant !== 'all') {
         params.append('user_id[]', filters.attendant);
       }
       
-      // Date range filter
       if (filters.dateRange !== 'all') {
         const now = new Date();
         let startDate: Date;
@@ -785,7 +751,6 @@ const AttendantActivityLogs = () => {
         }
       }
       
-      // Sort
       params.append('sort_by', 'created_at');
       params.append('sort_order', 'desc');
 
@@ -801,7 +766,6 @@ const AttendantActivityLogs = () => {
         const activityLogs = data.data?.activity_logs || [];
         const pagination = data.data?.pagination || {};
         
-        // Transform API data to match component structure
         const transformedLogs = activityLogs.map((log: { id?: number; user_id?: number; user?: { first_name?: string; last_name?: string; email?: string; role?: string }; action?: string; category?: string; entity_type?: string; entity_id?: number; metadata?: Record<string, unknown>; description?: string; created_at?: string }) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
@@ -841,14 +805,12 @@ const AttendantActivityLogs = () => {
     }
   }, [itemsPerPage, currentPage, userLocationId, filters, filteredLogs.length]);
 
-  // Load initial data
   useEffect(() => {
     if (userLocationId) {
       loadLogs();
     }
   }, [filters, currentPage, loadLogs, userLocationId]);
 
-  // Debounce search input before updating filters
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setFilters(prev => {
@@ -895,34 +857,28 @@ const AttendantActivityLogs = () => {
       
       params.append('per_page', '100');
       
-      // Location filter
       if (userLocationId) {
         params.append('location_id', userLocationId.toString());
       }
       
-      // Search filter
       if (exportFilters.search) {
         params.append('search', exportFilters.search);
       }
       
-      // Action filter
       if (exportFilters.action !== 'all') {
         params.append('action', exportFilters.action);
       }
       
-      // Resource type filter
       if (exportFilters.resourceType !== 'all') {
         params.append('entity_type', exportFilters.resourceType);
       }
       
-      // User filter
       if (exportSelectedUsers.length > 0) {
         exportSelectedUsers.forEach(userId => {
           params.append('user_id[]', userId);
         });
       }
       
-      // Date range filter
       if (exportFilters.dateRange !== 'all') {
         const now = new Date();
         let startDate: Date;
@@ -951,7 +907,6 @@ const AttendantActivityLogs = () => {
       params.append('sort_by', 'created_at');
       params.append('sort_order', 'desc');
 
-      // Fetch all pages
       interface ActivityLogRaw {
         id?: number;
         user_id?: number;
@@ -998,7 +953,6 @@ const AttendantActivityLogs = () => {
         }
       }
 
-      // Transform logs
       const transformedLogs = allLogs.map((log: ActivityLogRaw) => ({
         timestamp: log.created_at || new Date().toISOString(),
         attendantName: log.user?.first_name && log.user?.last_name 
@@ -1014,7 +968,6 @@ const AttendantActivityLogs = () => {
         metadata: log.metadata || {}
       }));
 
-      // Generate CSV with metadata columns
       const csvHeaders = [
         'Timestamp', 
         'Attendant', 
@@ -1118,7 +1071,6 @@ const AttendantActivityLogs = () => {
     }
   };
 
-  // Get unique values for filters
   const getUniqueUsers = () => {
     const users = filteredLogs
       .filter(log => log.userId && log.userType)
@@ -1139,7 +1091,6 @@ const AttendantActivityLogs = () => {
     return [...new Set(filteredLogs.map(log => log.resourceType))];
   };
 
-  // Format timestamp
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -1157,7 +1108,6 @@ const AttendantActivityLogs = () => {
     return date.toLocaleDateString();
   };
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentLogs = filteredLogs;
@@ -1174,7 +1124,6 @@ const AttendantActivityLogs = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Activity Logs</h1>
@@ -1201,7 +1150,6 @@ const AttendantActivityLogs = () => {
         </div>
       </div>
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
@@ -1220,7 +1168,6 @@ const AttendantActivityLogs = () => {
                 Configure filters to export specific activity logs. All matching records will be included in the CSV file.
               </p>
 
-              {/* Users Checklist */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-800 mb-2">Users</label>
                 <div className="border border-gray-200 rounded-lg p-3">
@@ -1323,7 +1270,6 @@ const AttendantActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Search Filter */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
                 <div className="relative">
@@ -1340,7 +1286,6 @@ const AttendantActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Filter Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-800 mb-2">Action</label>
@@ -1397,7 +1342,6 @@ const AttendantActivityLogs = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
                 <StandardButton
                   onClick={() => setShowExportModal(false)}
@@ -1423,7 +1367,6 @@ const AttendantActivityLogs = () => {
         </div>
       )}
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -1447,7 +1390,6 @@ const AttendantActivityLogs = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -1482,7 +1424,6 @@ const AttendantActivityLogs = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1559,7 +1500,6 @@ const AttendantActivityLogs = () => {
         )}
       </div>
 
-      {/* Activity Logs List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">Recent Activities</h3>
@@ -1595,7 +1535,6 @@ const AttendantActivityLogs = () => {
                         </span>
                       </div>
                       
-                      {/* Detailed Description */}
                       <p className="text-sm text-gray-700 mb-2 leading-relaxed">
                         {formatActivityDescription(log)}
                       </p>
@@ -1618,7 +1557,6 @@ const AttendantActivityLogs = () => {
                           {formatTimestamp(log.timestamp)}
                         </span>
                         
-                        {/* View Metadata Button */}
                         {hasMetadata && (
                           <>
                             <span className="text-gray-400">•</span>
@@ -1638,7 +1576,6 @@ const AttendantActivityLogs = () => {
                         )}
                       </div>
                       
-                      {/* Expanded Metadata Section */}
                       {isExpanded && hasMetadata && (
                         <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -1656,7 +1593,6 @@ const AttendantActivityLogs = () => {
                             ))}
                           </div>
                           
-                          {/* Raw JSON View */}
                           <details className="mt-4">
                             <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                               View Raw JSON
@@ -1675,7 +1611,6 @@ const AttendantActivityLogs = () => {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-6 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}

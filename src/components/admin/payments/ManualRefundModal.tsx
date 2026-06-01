@@ -1,4 +1,3 @@
-// src/components/admin/payments/ManualRefundModal.tsx
 import React, { useState, useEffect } from 'react';
 import {
   RotateCcw,
@@ -42,7 +41,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [maxRefundable, setMaxRefundable] = useState(0);
 
-  // Reset form when payment changes
   useEffect(() => {
     if (payment) {
       setAmount(payment.amount.toFixed(2));
@@ -53,7 +51,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
     }
   }, [payment]);
 
-  // Auto-set cancel when full refund
   useEffect(() => {
     if (payment) {
       const refundAmt = parseFloat(amount) || 0;
@@ -137,7 +134,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-orange-100">
@@ -159,7 +155,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
-            {/* Staff Reminder Banner */}
             <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
               <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
@@ -172,7 +167,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
               </div>
             </div>
 
-            {/* Payment Summary Card */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
               <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Original Payment Details
@@ -207,7 +201,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
               </div>
             </div>
 
-            {/* Error Alert */}
             {error && (
               <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
                 <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -215,7 +208,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
               </div>
             )}
 
-            {/* Refund Amount Input */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 Refund Amount
@@ -236,7 +228,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
                 />
               </div>
 
-              {/* Quick amount buttons */}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -273,7 +264,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
               </div>
             </div>
 
-            {/* Partial Refund Breakdown */}
             {isPartialRefund && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <h5 className="text-sm font-medium text-amber-800">Partial Refund Breakdown</h5>
@@ -295,7 +285,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
               </div>
             )}
 
-            {/* Notes (Required) */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 Refund Notes <span className="text-red-500">*</span>
@@ -311,7 +300,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
               />
             </div>
 
-            {/* Cancel Booking Checkbox */}
             <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
               <input
                 type="checkbox"
@@ -333,7 +321,6 @@ const ManualRefundModal: React.FC<ManualRefundModalProps> = ({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
             <StandardButton
               variant="secondary"

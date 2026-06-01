@@ -78,7 +78,6 @@ const EventPurchases = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Soft delete (trash) states
   const [showTrashed, setShowTrashed] = useState(false);
   const [trashedPurchases, setTrashedPurchases] = useState<DisplayPurchase[]>([]);
   const [trashedLoading, setTrashedLoading] = useState(false);
@@ -87,7 +86,6 @@ const EventPurchases = () => {
   const [trashedTotal, setTrashedTotal] = useState(0);
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
 
-  // Status colors and icons
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
     'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -98,7 +96,6 @@ const EventPurchases = () => {
     voided: { color: 'bg-red-100 text-red-800', icon: XCircle },
   };
 
-  // Calculate metrics data
   const metrics = [
     {
       title: 'Total Purchases',
@@ -132,7 +129,6 @@ const EventPurchases = () => {
     },
   ];
 
-  // Convert raw API purchases to display format
   const convertPurchases = (rawPurchases: EventPurchase[]): DisplayPurchase[] => {
     return rawPurchases.map((purchase) => ({
       id: purchase.id.toString(),
@@ -165,9 +161,6 @@ const EventPurchases = () => {
         ...(selectedLocation && { location_id: Number(selectedLocation) }),
       };
       const result = await eventPurchaseService.getPurchases(apiFilters as never);
-      // Backend returns plain array via response()->json($purchases)
-      // Service returns axios response.data which IS the array directly
-      // Handle both plain array and wrapped { data: [...] } responses
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = result as any;
       const rawPurchases: EventPurchase[] = Array.isArray(raw)
@@ -234,7 +227,6 @@ const EventPurchases = () => {
       result = result.filter((p) => new Date(p.createdAt) >= startDate);
     }
 
-    // Sort: confirmed at top, cancelled/refunded/checked-in at bottom, newest first within groups
     const statusPriority: Record<string, number> = {
       confirmed: 0,
       pending: 1,
@@ -342,7 +334,6 @@ const EventPurchases = () => {
     }
   };
 
-  // ========== TRASH FUNCTIONS ==========
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const convertTrashedPurchases = (rawPurchases: any[]): DisplayPurchase[] => {
@@ -496,7 +487,6 @@ const EventPurchases = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPurchases = filteredPurchases.slice(indexOfFirstItem, indexOfLastItem);
@@ -522,7 +512,6 @@ const EventPurchases = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Event Purchases</h1>
@@ -556,7 +545,6 @@ const EventPurchases = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       {!showTrashed && (
       <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -582,7 +570,6 @@ const EventPurchases = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -661,7 +648,6 @@ const EventPurchases = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {selectedPurchases.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -686,7 +672,6 @@ const EventPurchases = () => {
         </div>
       )}
 
-      {/* Purchases Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -824,7 +809,6 @@ const EventPurchases = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-4 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -839,10 +823,8 @@ const EventPurchases = () => {
       </>
       )}
 
-      {/* Trashed Purchases View */}
       {showTrashed && (
         <>
-          {/* Bulk Restore Bar */}
           {selectedTrashed.length > 0 && (
             <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
               <span className={`text-${fullColor} font-medium`}>
@@ -854,7 +836,6 @@ const EventPurchases = () => {
             </div>
           )}
 
-          {/* Trashed Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {trashedLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -946,7 +927,6 @@ const EventPurchases = () => {
               </div>
             )}
 
-            {/* Trashed Pagination */}
             {!trashedLoading && trashedTotal > 0 && (
               <div className="bg-white px-4 py-4 border-t border-gray-100">
                 <Pagination
@@ -963,7 +943,6 @@ const EventPurchases = () => {
         </>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

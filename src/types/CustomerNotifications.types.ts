@@ -1,4 +1,3 @@
-// Types for: src/pages/customer/CustomerNotifications.tsx
 
 export type CustomerNotificationsType = 'booking' | 'promotion' | 'system' | 'reminder';
 

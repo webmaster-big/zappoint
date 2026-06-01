@@ -21,7 +21,6 @@ import type {
 } from '../types/Payment.types';
 import { PAYMENT_TYPE } from '../types/Payment.types';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -30,14 +29,12 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     } else {
-      // Fallback: check customer auth token for customer-facing pages
       try {
         const customerData = localStorage.getItem('zapzone_customer');
         if (customerData) {
@@ -47,7 +44,6 @@ api.interceptors.request.use(
           }
         }
       } catch {
-        // Silent fail - no customer token available
       }
     }
     return config;
@@ -57,17 +53,7 @@ api.interceptors.request.use(
   }
 );
 
-/**
- * Payment Processing Service
- */
 
-/**
- * Process payment using Accept.js (Authorize.Net)
- * This method receives tokenized payment data from the frontend
- * 
- * @param data - Payment charge request with opaque data
- * @returns Payment charge response with transaction details
- */
 export const chargePayment = async (
   data: PaymentChargeRequest
 ): Promise<PaymentChargeResponse> => {
@@ -75,12 +61,6 @@ export const chargePayment = async (
   return response.data;
 };
 
-/**
- * Create a payment record
- * 
- * @param data - Payment creation data
- * @returns Created payment record
- */
 export const createPayment = async (
   data: CreatePaymentRequest
 ): Promise<PaymentApiResponse<Payment>> => {
@@ -88,34 +68,16 @@ export const createPayment = async (
   return response.data;
 };
 
-/**
- * Get payment by ID
- * 
- * @param id - Payment ID
- * @returns Payment details
- */
 export const getPayment = async (id: number): Promise<PaymentApiResponse<Payment>> => {
   const response = await api.get<PaymentApiResponse<Payment>>(`/payments/${id}`);
   return response.data;
 };
 
-/**
- * Get all payments with optional filters
- * 
- * @param filters - Optional filters (payable_id, payable_type, customer_id, status, etc.)
- * @returns Paginated list of payments
- */
 export const getPayments = async (filters?: PaymentFilters): Promise<PaginatedPaymentsResponse> => {
   const response = await api.get<PaginatedPaymentsResponse>('/payments', { params: filters });
   return response.data;
 };
 
-/**
- * Get payments for a specific booking
- * 
- * @param bookingId - Booking ID
- * @returns List of payments for the booking
- */
 export const getPaymentsForBooking = async (bookingId: number): Promise<PaginatedPaymentsResponse> => {
   return getPayments({
     payable_id: bookingId,
@@ -123,12 +85,6 @@ export const getPaymentsForBooking = async (bookingId: number): Promise<Paginate
   });
 };
 
-/**
- * Get payments for a specific attraction purchase
- * 
- * @param purchaseId - Attraction purchase ID
- * @returns List of payments for the attraction purchase
- */
 export const getPaymentsForAttractionPurchase = async (purchaseId: number): Promise<PaginatedPaymentsResponse> => {
   return getPayments({
     payable_id: purchaseId,
@@ -136,12 +92,6 @@ export const getPaymentsForAttractionPurchase = async (purchaseId: number): Prom
   });
 };
 
-/**
- * Get payments for a specific event purchase
- * 
- * @param purchaseId - Event purchase ID
- * @returns List of payments for the event purchase
- */
 export const getPaymentsForEventPurchase = async (purchaseId: number): Promise<PaginatedPaymentsResponse> => {
   return getPayments({
     payable_id: purchaseId,
@@ -149,13 +99,6 @@ export const getPaymentsForEventPurchase = async (purchaseId: number): Promise<P
   });
 };
 
-/**
- * Update payment status
- * 
- * @param id - Payment ID
- * @param data - Update data
- * @returns Updated payment
- */
 export const updatePayment = async (
   id: number,
   data: Partial<CreatePaymentRequest>
@@ -164,49 +107,21 @@ export const updatePayment = async (
   return response.data;
 };
 
-/**
- * Soft delete a payment
- * The payment is marked with deleted_at and excluded from queries/analytics.
- * Linked entity's amount_paid is recalculated automatically.
- * 
- * @param id - Payment ID
- * @returns Success response
- */
 export const deletePayment = async (id: number): Promise<PaymentApiResponse> => {
   const response = await api.delete<PaymentApiResponse>(`/payments/${id}`);
   return response.data;
 };
 
-/**
- * Restore a soft-deleted payment
- * The linked entity's amount_paid is recalculated automatically.
- * 
- * @param id - Payment ID
- * @returns Restored payment data
- */
 export const restorePayment = async (id: number): Promise<PaymentApiResponse<Payment>> => {
   const response = await api.patch<PaymentApiResponse<Payment>>(`/payments/${id}/restore`);
   return response.data;
 };
 
-/**
- * Permanently delete a soft-deleted payment
- * Only works on already soft-deleted (trashed) payments.
- * 
- * @param id - Payment ID
- * @returns Success response
- */
 export const forceDeletePayment = async (id: number): Promise<PaymentApiResponse> => {
   const response = await api.delete<PaymentApiResponse>(`/payments/${id}/force-delete`);
   return response.data;
 };
 
-/**
- * Get soft-deleted (trashed) payments
- * 
- * @param filters - Optional filters (payable_type, location_id, per_page)
- * @returns Paginated list of trashed payments
- */
 export const getTrashedPayments = async (filters?: PaymentFilters): Promise<PaginatedPaymentsResponse> => {
   const params = new URLSearchParams();
   if (filters) {
@@ -221,19 +136,7 @@ export const getTrashedPayments = async (filters?: PaymentFilters): Promise<Pagi
   return response.data;
 };
 
-/**
- * Refund & Void Functions
- */
 
-/**
- * Refund a payment (creates a new refund payment record)
- * The original payment stays "completed" — a new record with status "refunded" is created.
- * Supports partial refunds (specify amount < original).
- * 
- * @param paymentId - The ID of the original completed payment to refund
- * @param data - Optional refund details (amount, notes, cancel)
- * @returns Refund response with original and new refund payment records
- */
 export const refundPayment = async (
   paymentId: number,
   data: RefundRequest = {}
@@ -242,14 +145,6 @@ export const refundPayment = async (
   return response.data;
 };
 
-/**
- * Void a payment (cancels an unsettled transaction)
- * The original payment becomes "voided" and a new audit record is created.
- * Void is for unsettled transactions only (typically same day as charge).
- * 
- * @param paymentId - The ID of the original payment to void
- * @returns Void response with original and new void payment records
- */
 export const voidPayment = async (
   paymentId: number
 ): Promise<VoidResponse> => {
@@ -257,15 +152,6 @@ export const voidPayment = async (
   return response.data;
 };
 
-/**
- * Manually refund a non-gateway payment (in-store, cash, card)
- * The original payment stays "completed" — a new record with status "refunded" is created.
- * Notes are REQUIRED for manual refunds to document offline processing.
- * 
- * @param paymentId - The ID of the original completed payment to refund
- * @param data - Manual refund details (amount, notes (required), cancel)
- * @returns Manual refund response with original and new refund payment records
- */
 export const manualRefundPayment = async (
   paymentId: number,
   data: ManualRefundRequest
@@ -274,14 +160,6 @@ export const manualRefundPayment = async (
   return response.data;
 };
 
-/**
- * Link a payment to a booking or attraction purchase
- * Used in the charge-then-link flow: charge first, create entity, then link
- * 
- * @param paymentId - The ID of the payment to link
- * @param data - The payable_id and payable_type to link to
- * @returns Response with updated payment and payable entity
- */
 export const linkPaymentToPayable = async (
   paymentId: number,
   data: LinkPayableRequest,
@@ -296,16 +174,6 @@ export const linkPaymentToPayable = async (
   return response.data;
 };
 
-/**
- * Link payment to payable with retry logic
- * Safe to retry - the PATCH /payments/{id}/payable endpoint is idempotent
- * 
- * @param paymentId - The payment ID  
- * @param payableId - The booking or purchase ID
- * @param payableType - 'booking' or 'attraction_purchase'
- * @param maxRetries - Maximum number of retry attempts (default: 3)
- * @returns Link response
- */
 export const linkPaymentWithRetry = async (
   paymentId: number,
   payableId: number,
@@ -323,14 +191,12 @@ export const linkPaymentWithRetry = async (
     } catch (err) {
       console.warn(`⚠️ Link payment attempt ${attempt}/${maxRetries} failed:`, err);
       if (attempt === maxRetries) throw err;
-      // Exponential backoff: 1s, 2s, 3s
       await new Promise((r) => setTimeout(r, 1000 * attempt));
     }
   }
   throw new Error('Failed to link payment after maximum retries');
 };
 
-/** Common payment shape used by action helpers */
 type ActionablePayment = {
   status: string;
   method: string;
@@ -340,26 +206,16 @@ type ActionablePayment = {
   paid_at?: string | null;
 };
 
-/** Returns true when the payment has a valid payable link */
 const hasPayable = (payment: ActionablePayment): boolean => {
   return !!payment.payable_id && !!payment.payable_type;
 };
 
-/**
- * Helper: Check if a payment can be refunded via Authorize.Net gateway
- * Only completed authorize.net payments with a valid payable can be gateway-refunded
- */
 export const canRefund = (payment: ActionablePayment): boolean => {
   return hasPayable(payment) &&
     payment.status === 'completed' &&
     payment.method === 'authorize.net';
 };
 
-/**
- * Helper: Check if a payment can be voided
- * Void is for unsettled Authorize.Net transactions only.
- * Not available if payable is missing or more than 2 days have passed since payment.
- */
 export const canVoid = (payment: ActionablePayment): boolean => {
   if (!hasPayable(payment)) return false;
   if (
@@ -368,7 +224,6 @@ export const canVoid = (payment: ActionablePayment): boolean => {
   ) {
     return false;
   }
-  // Void window: 2 days from payment creation
   const paymentDate = payment.paid_at || payment.created_at;
   if (paymentDate) {
     const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
@@ -379,47 +234,27 @@ export const canVoid = (payment: ActionablePayment): boolean => {
   return true;
 };
 
-/**
- * Helper: Check if a payment can be manually refunded (non-gateway)
- * For in-store, cash, and card payments that were completed with a valid payable
- */
 export const canManualRefund = (payment: ActionablePayment): boolean => {
   return hasPayable(payment) &&
     payment.status === 'completed' &&
     ['in-store', 'cash', 'card'].includes(payment.method);
 };
 
-/**
- * Helper: Check if a payment is a refund record (created by refund action)
- */
 export const isRefundRecord = (payment: { status: string; notes?: string | null }): boolean => {
   return payment.status === 'refunded' && (payment.notes?.includes('Refund from Payment #') ?? false);
 };
 
-/**
- * Helper: Check if a payment is a void record (created by void action)
- */
 export const isVoidRecord = (payment: { status: string; notes?: string | null }): boolean => {
   return payment.status === 'voided' && (payment.notes?.includes('Void of Payment #') ?? false);
 };
 
-/**
- * Extract the original payment ID from refund/void notes
- * Notes format: "Refund from Payment #123 ..." or "Void of Payment #123 ..."
- */
 export const extractOriginalPaymentId = (notes: string | null | undefined): string | null => {
   if (!notes) return null;
   const match = notes.match(/(?:Refund from|Void of) Payment #(\d+)/);
   return match ? match[1] : null;
 };
 
-/**
- * Invoice Generation Functions
- */
 
-/**
- * Invoice export filter options
- */
 export interface InvoiceExportFilters {
   payment_ids?: number[];
   payable_type?: 'booking' | 'attraction_purchase' | 'event_purchase';
@@ -434,13 +269,6 @@ export interface InvoiceExportFilters {
   view_mode?: 'report' | 'individual';
 }
 
-/**
- * Export invoices with comprehensive filtering options
- * This is the main function that uses the unified /payments/invoices/export endpoint
- * 
- * @param filters - Export filters
- * @param stream - true to view in browser, false to download
- */
 export const exportInvoices = async (
   filters: InvoiceExportFilters,
   stream: boolean = false
@@ -482,7 +310,6 @@ export const exportInvoices = async (
   } else {
     const link = document.createElement('a');
     link.href = url;
-    // Generate filename based on filters
     let filename = 'invoices';
     if (filters.payable_type) {
       filename += '-' + filters.payable_type.replace('_', '-');
@@ -501,12 +328,6 @@ export const exportInvoices = async (
   }
 };
 
-/**
- * Export invoices for a specific day
- * 
- * @param date - Date string (Y-m-d)
- * @param stream - true to view in browser, false to download
- */
 export const exportInvoicesForDay = async (
   date: string,
   stream: boolean = false
@@ -542,12 +363,6 @@ export const exportInvoicesForDay = async (
   }
 };
 
-/**
- * Export invoices for a week
- * 
- * @param week - 'current', 'next', or date string for week containing that date
- * @param stream - true to view in browser, false to download
- */
 export const exportInvoicesForWeek = async (
   week: 'current' | 'next' | string = 'current',
   stream: boolean = false
@@ -583,42 +398,18 @@ export const exportInvoicesForWeek = async (
   }
 };
 
-/**
- * Download or view single invoice PDF
- * Uses the unified export endpoint with single payment ID
- * 
- * @param paymentId - Payment ID
- * @param stream - true to view in browser, false to download
- */
 export const getInvoice = async (paymentId: number, stream: boolean = false): Promise<void> => {
   return exportInvoices({ payment_ids: [paymentId], view_mode: 'individual' }, stream);
 };
 
-/**
- * Download single invoice PDF (backward compatibility)
- * 
- * @param paymentId - Payment ID
- */
 export const downloadInvoice = async (paymentId: number): Promise<void> => {
   return getInvoice(paymentId, false);
 };
 
-/**
- * View single invoice PDF in browser (backward compatibility)
- * 
- * @param paymentId - Payment ID
- */
 export const viewInvoice = async (paymentId: number): Promise<void> => {
   return getInvoice(paymentId, true);
 };
 
-/**
- * Generate filtered invoices report PDF
- * Uses the unified export endpoint with view_mode: 'report'
- * 
- * @param filters - Report filters
- * @param download - Whether to download or view in browser
- */
 export const generateInvoicesReport = async (
   filters: {
     location_id?: number;
@@ -636,13 +427,6 @@ export const generateInvoicesReport = async (
   }, !download); // stream = !download (true to view, false to download)
 };
 
-/**
- * Export multiple invoices as bulk PDF (one invoice per page)
- * Uses the unified export endpoint with view_mode: 'individual'
- * 
- * @param paymentIds - Array of payment IDs
- * @param download - Whether to download or view in browser
- */
 export const exportBulkInvoices = async (
   paymentIds: number[],
   download: boolean = true
@@ -653,38 +437,24 @@ export const exportBulkInvoices = async (
   }, !download); // stream = !download (true to view, false to download)
 };
 
-/**
- * Accept.js Helper Functions
- */
 
-// Track which Accept.js environment is currently loaded
 let loadedAcceptJSEnvironment: 'sandbox' | 'production' | null = null;
 
-/**
- * Load Accept.js library dynamically
- * 
- * @param environment - 'sandbox' or 'production'
- * @returns Promise that resolves when script is loaded
- */
 export const loadAcceptJS = (environment: 'sandbox' | 'production' = 'sandbox'): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Check if already loaded with the correct environment
     if (window.Accept && loadedAcceptJSEnvironment === environment) {
       resolve();
       return;
     }
     
-    // If loaded with different environment, proceed with existing
     if (window.Accept && loadedAcceptJSEnvironment !== environment) {
       resolve();
       return;
     }
 
-    // Create script element
     const script = document.createElement('script');
     script.type = 'text/javascript';
     
-    // Use appropriate Accept.js URL based on environment
     if (environment === 'production') {
       script.src = 'https://js.authorize.net/v1/Accept.js';
     } else {
@@ -707,14 +477,6 @@ export const loadAcceptJS = (environment: 'sandbox' | 'production' = 'sandbox'):
   });
 };
 
-/**
- * Tokenize card data using Accept.js
- * 
- * @param cardData - Card information
- * @param apiLoginID - Authorize.Net API Login ID (public key)
- * @param clientKey - Public client key (optional, can use API Login ID)
- * @returns Promise with opaque data token
- */
 export const tokenizeCard = (
   cardData: {
     cardNumber: string;
@@ -726,7 +488,6 @@ export const tokenizeCard = (
   clientKey?: string
 ): Promise<PaymentOpaqueData> => {
   return new Promise((resolve, reject) => {
-    // Check if running on HTTPS (required by Authorize.Net Accept.js)
     if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
       reject(new Error('HTTPS connection required. Authorize.Net Accept.js only works on HTTPS or localhost.'));
       return;
@@ -758,16 +519,6 @@ export const tokenizeCard = (
   });
 };
 
-/**
- * Complete payment flow: tokenize card and charge
- * 
- * @param cardData - Card information
- * @param paymentData - Payment details (amount, booking_id, etc.)
- * @param apiLoginID - Authorize.Net API Login ID
- * @param clientKey - Public client key (optional)
- * @param customerData - Customer billing information (optional)
- * @returns Payment charge response
- */
 export const processCardPayment = async (
   cardData: {
     cardNumber: string;
@@ -791,10 +542,8 @@ export const processCardPayment = async (
   }
 ): Promise<PaymentChargeResponse> => {
   try {
-    // Step 1: Tokenize card data
     const opaqueData = await tokenizeCard(cardData, apiLoginID, clientKey);
     
-    // Step 2: Charge payment with token
     const chargeRequest: PaymentChargeRequest = {
       ...paymentData,
       opaqueData,
@@ -809,9 +558,6 @@ export const processCardPayment = async (
   }
 };
 
-/**
- * Party Summary Export Filter Options
- */
 export interface PartySummaryFilters {
   date?: string; // Single date Y-m-d
   start_date?: string;
@@ -824,13 +570,6 @@ export interface PartySummaryFilters {
   view_mode?: 'detailed' | 'compact';
 }
 
-/**
- * Export party summaries for staff organization (full booking details + notes)
- * Provides detailed printable summaries for staff to organize and prepare for parties
- * 
- * @param filters - Export filters
- * @param stream - true to view in browser, false to download
- */
 export const exportPartySummaries = async (
   filters: PartySummaryFilters,
   stream: boolean = false
@@ -868,7 +607,6 @@ export const exportPartySummaries = async (
   } else {
     const link = document.createElement('a');
     link.href = url;
-    // Generate filename based on filters
     let filename = 'party-summaries';
     if (filters.date) {
       filename += '-' + filters.date;
@@ -884,12 +622,6 @@ export const exportPartySummaries = async (
   }
 };
 
-/**
- * Export party summaries for a specific day (shortcut)
- * 
- * @param date - Date string (Y-m-d)
- * @param stream - true to view in browser, false to download
- */
 export const exportPartySummariesForDay = async (
   date: string,
   stream: boolean = false
@@ -925,12 +657,6 @@ export const exportPartySummariesForDay = async (
   }
 };
 
-/**
- * Export party summaries for a specific week (shortcut)
- * 
- * @param week - 'current', 'next', or date string
- * @param stream - true to view in browser, false to download
- */
 export const exportPartySummariesForWeek = async (
   week: 'current' | 'next' | string = 'current',
   stream: boolean = false
@@ -966,9 +692,6 @@ export const exportPartySummariesForWeek = async (
   }
 };
 
-/**
- * Package Invoice Export Filter Options
- */
 export interface PackageInvoiceFilters {
   package_id: number; // Required
   date?: string;
@@ -978,13 +701,6 @@ export interface PackageInvoiceFilters {
   status?: 'pending' | 'completed' | 'failed' | 'refunded';
 }
 
-/**
- * Export package-specific invoices (all invoices for bookings of a specific package)
- * Lists all payment invoices grouped by package in a consistent invoice format
- * 
- * @param filters - Export filters (package_id is required)
- * @param stream - true to view in browser, false to download
- */
 export const exportPackageInvoices = async (
   filters: PackageInvoiceFilters,
   stream: boolean = false
@@ -992,7 +708,6 @@ export const exportPackageInvoices = async (
   const token = getStoredUser()?.token;
   const params = new URLSearchParams();
   
-  // package_id is required
   params.append('package_id', filters.package_id.toString());
   
   if (filters.date) params.append('date', filters.date);
@@ -1021,7 +736,6 @@ export const exportPackageInvoices = async (
   } else {
     const link = document.createElement('a');
     link.href = url;
-    // Generate filename based on filters
     let filename = `package-invoices-${filters.package_id}`;
     if (filters.date) {
       filename += '-' + filters.date;
@@ -1035,13 +749,6 @@ export const exportPackageInvoices = async (
   }
 };
 
-/**
- * Validate card number using Luhn algorithm
- * 
- * @param cardNumber - Card number to validate
- * @returns true if valid, false otherwise
- */
-// Known test card numbers that should be blocked in production
 const TEST_CARD_NUMBERS = new Set([
   '4242424242424242', // Visa
   '4000056655665556', // Visa (debit)
@@ -1102,24 +809,12 @@ export const validateCardNumber = (cardNumber: string): boolean => {
   return sum % 10 === 0;
 };
 
-/**
- * Format card number with spaces
- * 
- * @param cardNumber - Card number to format
- * @returns Formatted card number (e.g., "1234 5678 9012 3456")
- */
 export const formatCardNumber = (cardNumber: string): string => {
   const cleaned = cardNumber.replace(/\s+/g, '');
   const groups = cleaned.match(/.{1,4}/g);
   return groups ? groups.join(' ') : cleaned;
 };
 
-/**
- * Get card type from card number
- * 
- * @param cardNumber - Card number
- * @returns Card type (Visa, Mastercard, Amex, Discover, etc.)
- */
 export const getCardType = (cardNumber: string): string => {
   const cleaned = cardNumber.replace(/\s+/g, '');
   
@@ -1169,14 +864,11 @@ export default {
   validateCardNumber,
   formatCardNumber,
   getCardType,
-  // Party Summary exports
   exportPartySummaries,
   exportPartySummariesForDay,
   exportPartySummariesForWeek,
-  // Package Invoice exports
   exportPackageInvoices,
   PAYMENT_TYPE,
 };
 
-// Re-export PAYMENT_TYPE for convenience
 export { PAYMENT_TYPE };

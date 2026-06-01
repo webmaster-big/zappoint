@@ -156,7 +156,6 @@ const MyAttractions = () => {
       `}</style>
 
       <div className="min-h-screen bg-gray-50/80">
-        {/* Hero */}
         <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 slide-up">
@@ -180,9 +179,7 @@ const MyAttractions = () => {
           </div>
         </section>
 
-        {/* Main */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Search & Filters */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-5 slide-up">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="flex-1 relative max-w-md w-full">
@@ -235,7 +232,6 @@ const MyAttractions = () => {
             </div>
           </div>
 
-          {/* Loading */}
           {loading && (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
@@ -256,7 +252,6 @@ const MyAttractions = () => {
             </div>
           )}
 
-          {/* Error */}
           {error && !loading && (
             <div className="bg-white rounded-xl shadow-sm border border-red-100 p-5 mb-5 flex items-start gap-3">
               <div className="p-2 rounded-lg bg-red-50">
@@ -272,7 +267,6 @@ const MyAttractions = () => {
             </div>
           )}
 
-          {/* Cards */}
           {!loading && !error && (
             <div className="space-y-3">
               {purchases.length === 0 ? (
@@ -309,7 +303,6 @@ const MyAttractions = () => {
                   >
                     <div className="p-4 sm:p-5">
                       <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                        {/* Thumbnail */}
                         {purchase.attraction?.image && (
                           <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
                             <img
@@ -320,7 +313,6 @@ const MyAttractions = () => {
                           </div>
                         )}
 
-                        {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2.5 mb-2">
                             <h3 className="text-base font-semibold text-gray-900 truncate">
@@ -368,7 +360,6 @@ const MyAttractions = () => {
                           </div>
                         </div>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             onClick={() => handleDownloadQRCode(purchase)}
@@ -389,7 +380,6 @@ const MyAttractions = () => {
                       </div>
                     </div>
 
-                    {/* Expand Toggle */}
                     <button
                       onClick={() => setExpandedId(expandedId === purchase.id ? null : purchase.id)}
                       className="w-full flex items-center justify-between px-5 py-2.5 bg-gray-50 hover:bg-gray-100 transition text-sm border-t border-gray-100"
@@ -400,7 +390,6 @@ const MyAttractions = () => {
                       {expandedId === purchase.id ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
                     </button>
 
-                    {/* Expanded */}
                     {expandedId === purchase.id && (
                       <div className="p-4 sm:p-5 bg-gray-50/50 fade-in">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -458,7 +447,6 @@ const MyAttractions = () => {
                             </div>
                           </div>
 
-                          {/* Add-ons */}
                           {purchase.add_ons && purchase.add_ons.length > 0 && (
                             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                               <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Add-Ons</h4>
@@ -490,7 +478,6 @@ const MyAttractions = () => {
             </div>
           )}
 
-          {/* Pagination */}
           {!loading && !error && totalPages > 1 && (
             <div className="mt-6">
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -499,11 +486,9 @@ const MyAttractions = () => {
         </div>
       </div>
 
-      {/* Details Modal */}
       {showDetailsModal && selectedPurchase && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 fade-in" onClick={() => setShowDetailsModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
               <h2 className="text-lg font-bold text-gray-900">Attraction Ticket Details</h2>
               <button onClick={() => setShowDetailsModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition">
@@ -512,7 +497,6 @@ const MyAttractions = () => {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Attraction Info */}
               <div>
                 <div className="flex items-start gap-4">
                   {selectedPurchase.attraction?.image && (
@@ -546,7 +530,6 @@ const MyAttractions = () => {
                 </div>
               </div>
 
-              {/* Details Grid */}
               <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Purchase Date</span>
@@ -604,7 +587,6 @@ const MyAttractions = () => {
                 </div>
               </div>
 
-              {/* Add-ons */}
               {selectedPurchase.add_ons && selectedPurchase.add_ons.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Add-Ons</h4>
@@ -626,7 +608,6 @@ const MyAttractions = () => {
                 </div>
               )}
 
-              {/* Notes */}
               {selectedPurchase.notes && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-1">Notes</h4>
@@ -634,7 +615,6 @@ const MyAttractions = () => {
                 </div>
               )}
 
-              {/* Scheduled Time Highlight */}
               {selectedPurchase.scheduled_time && (
                 <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-1">
@@ -651,7 +631,6 @@ const MyAttractions = () => {
                 </div>
               )}
 
-              {/* Download QR Code */}
               <button
                 onClick={() => handleDownloadQRCode(selectedPurchase)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-xl transition-all text-sm"
@@ -664,7 +643,6 @@ const MyAttractions = () => {
         </div>
       )}
 
-      {/* Coming Soon Popup - only on production */}
       {showComingSoon && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>

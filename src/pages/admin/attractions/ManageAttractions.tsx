@@ -48,7 +48,6 @@ const ManageAttractions = () => {
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
 
-  // Get auth token from localStorage
   const getAuthToken = () => {
     const userData = localStorage.getItem('zapzone_user');
     if (userData) {
@@ -82,7 +81,6 @@ const ManageAttractions = () => {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Export/Import handlers
   const handleOpenExportModal = () => {
     setSelectedForExport(attractions.map(attraction => attraction.id));
     setShowExportModal(true);
@@ -125,11 +123,9 @@ const ManageAttractions = () => {
         return;
       }
 
-      // Get the current user's location_id
       const currentUser = getStoredUser();
       const userLocationId = currentUser?.location_id || 1;
 
-      // Convert to API format - use user's location_id for all imports
       const attractionsToImport = parsedData.map((attraction: ManageAttractionsAttraction) => ({
         location_id: userLocationId, // Use logged-in user's location_id
         name: attraction.name,
@@ -149,7 +145,6 @@ const ManageAttractions = () => {
         is_active: attraction.status === 'active',
       }));
 
-      // Use bulk import endpoint
       try {
         const response = await attractionService.bulkImport({ attractions: attractionsToImport });
         
@@ -170,7 +165,6 @@ const ManageAttractions = () => {
       } catch (err) {
         console.error('Bulk import failed, trying individual imports...', err);
         
-        // Fallback: import one by one if bulk endpoint fails
         let successCount = 0;
         for (const attraction of attractionsToImport) {
           try {
@@ -204,14 +198,12 @@ const ManageAttractions = () => {
     }
   };
 
-  // Status colors
   const statusColors = {
     active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800',
     maintenance: 'bg-yellow-100 text-yellow-800',
   };
 
-  // Calculate metrics data
   const metrics = [
     {
       title: 'Total Attractions',
@@ -245,7 +237,6 @@ const ManageAttractions = () => {
     }
   ];
 
-  // Fetch locations for company admin
   useEffect(() => {
     if (isCompanyAdmin) {
       const fetchLocations = async () => {
@@ -262,16 +253,13 @@ const ManageAttractions = () => {
     }
   }, [isCompanyAdmin]);
 
-  // Load attractions from localStorage
   useEffect(() => {
     loadAttractions();
   }, [selectedLocation]);
 
-  // Listen for cache updates (from background sync) and refresh UI silently
   useEffect(() => {
     const unsubscribe = attractionCacheService.onCacheUpdate(async (event) => {
       if (event.detail?.source === 'api') {
-        // Background sync completed — silently refresh from the now-fresh cache
         const fresh = await attractionCacheService.getCachedAttractions();
         if (fresh && fresh.length > 0) {
           const converted: ManageAttractionsAttraction[] = fresh
@@ -305,26 +293,21 @@ const ManageAttractions = () => {
     return unsubscribe;
   }, [selectedLocation]);
 
-  // Apply filters when attractions or filters change
   useEffect(() => {
     applyFilters();
   }, [attractions, filters]);
 
   const loadAttractions = async () => {
     try {
-      // Only show full-page spinner on initial load (no data yet)
       if (attractions.length === 0) setLoading(true);
       const authToken = getAuthToken();
       console.log('🔐 Loading attractions - Auth Token:', authToken ? 'Present' : 'Missing');
       
-      // Check cache first for instant loading
       const cachedAttractions = await attractionCacheService.getCachedAttractions();
       
       if (cachedAttractions && cachedAttractions.length > 0) {
-        // Convert cached API format to component format
         const convertedAttractions: ManageAttractionsAttraction[] = cachedAttractions
           .filter((attr: Attraction & { location?: { id: number; name: string } }) => {
-            // Apply location filter if set
             if (selectedLocation !== null && attr.location_id !== selectedLocation) {
               return false;
             }
@@ -361,7 +344,6 @@ const ManageAttractions = () => {
         setAttractions(convertedAttractions);
         setLoading(false);
 
-        // Always background-sync with API to catch deletions/updates from other tabs/users
         attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
@@ -373,7 +355,6 @@ const ManageAttractions = () => {
         user_id: getStoredUser()?.id
       };
       
-      // Only add is_active filter if status is not 'all'
       if (filters.status !== 'all') {
         params.is_active = filters.status === 'active';
       }
@@ -384,10 +365,8 @@ const ManageAttractions = () => {
       
       const response = await attractionService.getAttractions(params);
       
-      // Cache the fetched attractions
       await attractionCacheService.cacheAttractions(response.data.attractions);
 
-      // Convert API format to component format
       const convertedAttractions: ManageAttractionsAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
         id: attr.id.toString(),
         name: attr.name,
@@ -429,7 +408,6 @@ const ManageAttractions = () => {
   const applyFilters = () => {
     let result = [...attractions];
 
-    // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(attraction =>
@@ -440,17 +418,14 @@ const ManageAttractions = () => {
       );
     }
 
-    // Apply status filter
     if (filters.status !== 'all') {
       result = result.filter(attraction => attraction.status === filters.status);
     }
 
-    // Apply category filter
     if (filters.category !== 'all') {
       result = result.filter(attraction => attraction.category === filters.category);
     }
 
-    // Sort by display order
     result.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
 
     setFilteredAttractions(result);
@@ -471,7 +446,6 @@ const ManageAttractions = () => {
     });
   };
 
-  // Drag-and-drop reorder handlers
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
   };
@@ -492,14 +466,12 @@ const ManageAttractions = () => {
 
   const handleDragEnd = async () => {
     setDraggedIndex(null);
-    // Persist new order to backend
     const reorderItems = filteredAttractions.map((attr, idx) => ({
       id: Number(attr.id),
       display_order: idx,
     }));
     try {
       await attractionService.reorderAttractions(reorderItems);
-      // Update local state with new display orders
       setAttractions(prev =>
         prev.map(attr => {
           const reordered = reorderItems.find(r => r.id === Number(attr.id));
@@ -509,7 +481,6 @@ const ManageAttractions = () => {
       setToast({ message: 'Display order updated', type: 'success' });
     } catch {
       setToast({ message: 'Failed to update display order', type: 'error' });
-      // Re-apply filters to reset order from source of truth
       applyFilters();
     }
   };
@@ -538,12 +509,10 @@ const ManageAttractions = () => {
         await attractionService.deactivateAttraction(Number(id));
       }
       
-      // Update attraction status in state without full reload
       setAttractions(prev => prev.map(attraction => 
         attraction.id === id ? { ...attraction, status: newStatus } : attraction
       ));
       
-      // Update cache with new status
       const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
       if (cachedAttraction) {
         await attractionCacheService.updateAttractionInCache({
@@ -564,10 +533,8 @@ const ManageAttractions = () => {
       try {
         await attractionService.deleteAttraction(Number(id));
         
-        // Remove attraction from state without full reload
         setAttractions(prev => prev.filter(attraction => attraction.id !== id));
         
-        // Remove from cache
         await attractionCacheService.removeAttractionFromCache(Number(id));
         
         setToast({ message: 'Attraction deleted successfully', type: 'success' });
@@ -583,15 +550,12 @@ const ManageAttractions = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedAttractions.length} attraction(s)? This action cannot be undone.`)) {
       try {
-        // Delete each attraction
         await Promise.all(
           selectedAttractions.map(id => attractionService.deleteAttraction(Number(id)))
         );
         
-        // Remove attractions from state without full reload
         setAttractions(prev => prev.filter(attraction => !selectedAttractions.includes(attraction.id)));
         
-        // Remove from cache
         await Promise.all(
           selectedAttractions.map(id => attractionCacheService.removeAttractionFromCache(Number(id)))
         );
@@ -609,7 +573,6 @@ const ManageAttractions = () => {
     if (selectedAttractions.length === 0) return;
     
     try {
-      // Update each attraction's status
       await Promise.all(
         selectedAttractions.map(id => 
           newStatus === 'active' 
@@ -618,14 +581,12 @@ const ManageAttractions = () => {
         )
       );
       
-      // Update attractions status in state without full reload
       setAttractions(prev => prev.map(attraction => 
         selectedAttractions.includes(attraction.id) 
           ? { ...attraction, status: newStatus }
           : attraction
       ));
       
-      // Update cache for each attraction
       await Promise.all(
         selectedAttractions.map(async (id) => {
           const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
@@ -650,11 +611,9 @@ const ManageAttractions = () => {
     try {
       setDuplicatingId(attraction.id);
 
-      // Fetch the full attraction data from API to get all fields
       const response = await attractionService.getAttraction(Number(attraction.id));
       const original = response.data;
 
-      // Build create payload, stripping server-generated fields
       const duplicateData: CreateAttractionData = {
         location_id: original.location_id,
         name: `${original.name} (Copy)`,
@@ -673,10 +632,8 @@ const ManageAttractions = () => {
       const createResponse = await attractionService.createAttraction(duplicateData);
 
       if (createResponse.success && createResponse.data) {
-        // Add to cache
         await attractionCacheService.addAttractionToCache(createResponse.data);
 
-        // Add to local state
         const newAttraction: ManageAttractionsAttraction = {
           id: createResponse.data.id.toString(),
           name: createResponse.data.name,
@@ -709,7 +666,6 @@ const ManageAttractions = () => {
   };
 
   const copyPurchaseLink = (attraction: ManageAttractionsAttraction) => {
-    // Create a URL-friendly location slug from location name or use location_id
     const locationSlug = attraction.locationName 
       ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
       : `location-${attraction.locationId || '1'}`;
@@ -720,13 +676,11 @@ const ManageAttractions = () => {
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
-  // Get unique categories
   const getUniqueCategories = () => {
     const categories = attractions.map(attraction => attraction.category);
     return [...new Set(categories)];
   };
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentAttractions = filteredAttractions.slice(indexOfFirstItem, indexOfLastItem);
@@ -744,7 +698,6 @@ const ManageAttractions = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Manage Attractions</h1>
@@ -772,7 +725,6 @@ const ManageAttractions = () => {
         </div>
       </div>
 
-      {/* Action Buttons Row */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Link to="/fee-supports?entity_type=attraction">
           <StandardButton variant="secondary" size="sm" icon={DollarSign}>Fee Supports</StandardButton>
@@ -784,7 +736,6 @@ const ManageAttractions = () => {
         <StandardButton onClick={handleOpenExportModal} disabled={attractions.length === 0} variant="secondary" size="sm" icon={Download}>Export</StandardButton>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -808,7 +759,6 @@ const ManageAttractions = () => {
         })}
       </div>
 
-      {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
@@ -843,7 +793,6 @@ const ManageAttractions = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -886,7 +835,6 @@ const ManageAttractions = () => {
         )}
       </div>
 
-      {/* Bulk Actions */}
       {selectedAttractions.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
@@ -913,7 +861,6 @@ const ManageAttractions = () => {
         </div>
       )}
 
-      {/* Attractions Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -1070,7 +1017,6 @@ const ManageAttractions = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="bg-white px-6 py-4 border-t border-gray-100">
           <Pagination
             currentPage={currentPage}
@@ -1083,7 +1029,6 @@ const ManageAttractions = () => {
         </div>
       </div>
 
-      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowExportModal(false)}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1177,7 +1122,6 @@ const ManageAttractions = () => {
         </div>
       )}
 
-      {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => { setShowImportModal(false); setImportData(''); }}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -1279,7 +1223,6 @@ const ManageAttractions = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
           <Toast

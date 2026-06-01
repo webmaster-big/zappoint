@@ -130,7 +130,6 @@ const ViewEventPurchase = () => {
         .animate-fade-in-up { animation: fade-in-up 0.4s ease-out; }
       `}</style>
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <StandardButton variant="ghost" size="sm" onClick={() => navigate(getBackPath())} icon={ArrowLeft}>
@@ -143,13 +142,10 @@ const ViewEventPurchase = () => {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Purchase Information */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchase Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <User className={`h-5 w-5 text-${fullColor}`} />
@@ -170,7 +166,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Reference Number */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <Hash className={`h-5 w-5 text-${fullColor}`} />
@@ -181,7 +176,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Purchase Date */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <Calendar className={`h-5 w-5 text-${fullColor}`} />
@@ -192,7 +186,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Status */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
@@ -207,11 +200,9 @@ const ViewEventPurchase = () => {
             </div>
           </div>
 
-          {/* Event Details */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Event Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Event Name */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <MapPin className={`h-5 w-5 text-${fullColor}`} />
@@ -225,7 +216,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Quantity */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <Ticket className={`h-5 w-5 text-${fullColor}`} />
@@ -236,7 +226,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Scheduled Date & Time */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <Calendar className={`h-5 w-5 text-${fullColor}`} />
@@ -254,7 +243,6 @@ const ViewEventPurchase = () => {
             </div>
           </div>
 
-          {/* Purchased Add-ons */}
           {purchase.add_ons && purchase.add_ons.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchased Add-ons</h2>
@@ -278,7 +266,6 @@ const ViewEventPurchase = () => {
             </div>
           )}
 
-          {/* Event Features */}
           {purchase.event?.features && purchase.event.features.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Event Features</h2>
@@ -290,11 +277,9 @@ const ViewEventPurchase = () => {
             </div>
           )}
 
-          {/* Payment Information */}
           <div className="p-6 border-b border-gray-100 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Total Amount */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
@@ -307,7 +292,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Amount Paid */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
@@ -320,7 +304,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Payment Method */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <CreditCard className={`h-5 w-5 text-${fullColor}`} />
@@ -333,7 +316,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Payment Status */}
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
@@ -346,7 +328,6 @@ const ViewEventPurchase = () => {
                 </div>
               </div>
 
-              {/* Transaction ID */}
               {purchase.transaction_id && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 ${iconBg} rounded-lg`}>
@@ -359,7 +340,6 @@ const ViewEventPurchase = () => {
                 </div>
               )}
 
-              {/* Discount */}
               {purchase.discount_amount && Number(purchase.discount_amount) > 0 && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 ${iconBg} rounded-lg`}>
@@ -372,14 +352,12 @@ const ViewEventPurchase = () => {
                 </div>
               )}
 
-              {/* Applied Fees */}
               {purchase.applied_fees && purchase.applied_fees.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedFeesDisplay appliedFees={purchase.applied_fees} />
                 </div>
               )}
 
-              {/* Applied Discounts */}
               {purchase.applied_discounts && purchase.applied_discounts.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedDiscountsDisplay appliedDiscounts={purchase.applied_discounts} />
@@ -388,7 +366,6 @@ const ViewEventPurchase = () => {
             </div>
           </div>
 
-          {/* Notes / Special Requests */}
           {(purchase.notes || purchase.special_requests) && (
             <div className="p-6 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
@@ -409,7 +386,6 @@ const ViewEventPurchase = () => {
         </div>
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

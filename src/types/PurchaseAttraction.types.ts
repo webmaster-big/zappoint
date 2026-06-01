@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/attractions/PurchaseAttraction.tsx
 
 export interface PurchaseAttractionAddOn {
   id: number;
@@ -37,7 +36,6 @@ export interface PurchaseAttractionCustomerInfo {
   lastName: string;
   email: string;
   phone: string;
-  // Billing Information
   address?: string;
   address2?: string;
   city?: string;

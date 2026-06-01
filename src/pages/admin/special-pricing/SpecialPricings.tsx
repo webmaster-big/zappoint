@@ -67,12 +67,9 @@ const SpecialPricings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   
-  // Check if user is company admin (can select locations)
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  // For non-company admins, auto-use their location_id
   const userLocationId = currentUser?.location_id || null;
 
-  // Pre-filter entity_type from URL query param
   const entityTypeParam = searchParams.get('entity_type');
   const initialEntityType: 'package' | 'attraction' | 'event' | 'all' =
     entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' ? entityTypeParam : 'all';
@@ -86,19 +83,16 @@ const SpecialPricings: React.FC = () => {
   const [itemsPerPage] = useState(10);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
 
-  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingSpecialPricing, setEditingSpecialPricing] = useState<SpecialPricing | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Entity data for the modal
   const [packages, setPackages] = useState<Array<{ id: number; name: string }>>([]);
   const [attractions, setAttractions] = useState<Array<{ id: number; name: string }>>([]);
   const [events, setEvents] = useState<Array<{ id: number; name: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingEntities, setLoadingEntities] = useState(false);
 
-  // Form state
   const [form, setForm] = useState<SpecialPricingFormData>({
     company_id: currentUser?.company_id || 1,
     location_id: null,
@@ -128,7 +122,6 @@ const SpecialPricings: React.FC = () => {
     search: '',
   });
 
-  // Load special pricings
   const loadSpecialPricings = useCallback(async () => {
     try {
       setLoading(true);
@@ -147,7 +140,6 @@ const SpecialPricings: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  // Load locations
   const loadLocations = useCallback(async () => {
     try {
       const response = await locationService.getLocations();
@@ -160,7 +152,6 @@ const SpecialPricings: React.FC = () => {
     }
   }, []);
 
-  // Load entities using cache services
   const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'all') => {
     setLoadingEntities(true);
     try {
@@ -201,7 +192,6 @@ const SpecialPricings: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  // Apply client-side filters
   const applyFilters = useCallback(() => {
     let result = [...specialPricings];
 
@@ -232,14 +222,12 @@ const SpecialPricings: React.FC = () => {
   useEffect(() => { applyFilters(); }, [applyFilters]);
   useEffect(() => { setCurrentPage(1); }, [filters]);
 
-  // Load entities when modal opens
   useEffect(() => {
     if (showModal) {
       loadEntities(form.entity_type);
     }
   }, [showModal, form.entity_type, loadEntities]);
 
-  // Handlers
   const handleFilterChange = (key: keyof SpecialPricingListFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -318,7 +306,6 @@ const SpecialPricings: React.FC = () => {
     return sp.recurrence_type;
   };
 
-  // Modal handlers
   const openCreateModal = () => {
     setEditingSpecialPricing(null);
     setForm({
@@ -442,28 +429,23 @@ const SpecialPricings: React.FC = () => {
     }
   };
 
-  // Live preview calculation
   const samplePrice = 100;
   const previewDiscount = form.discount_type === 'percentage'
     ? samplePrice * (form.discount_amount / 100)
     : form.discount_amount;
   const previewTotal = samplePrice - previewDiscount;
 
-  // Metrics
   const totalActive = specialPricings.filter(sp => sp.is_active).length;
   const weeklyCount = specialPricings.filter(sp => sp.recurrence_type === 'weekly').length;
   const oneTimeCount = specialPricings.filter(sp => sp.recurrence_type === 'one_time').length;
 
-  // Pagination
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
   const currentItems = filteredSpecialPricings.slice(indexOfFirst, indexOfLast);
   const totalPages = Math.ceil(filteredSpecialPricings.length / itemsPerPage);
 
-  // Back path
   const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
-  // Entities for selection
   const getEntitiesForSelection = () => {
     if (form.entity_type === 'package') return packages;
     if (form.entity_type === 'attraction') return attractions;
@@ -483,7 +465,6 @@ const SpecialPricings: React.FC = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div className="flex items-center gap-3">
           {backPath && (
@@ -503,7 +484,6 @@ const SpecialPricings: React.FC = () => {
         </div>
       </div>
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
           { title: 'Total Special Pricings', value: specialPricings.length.toString(), sub: `${totalActive} active`, icon: Tag },
@@ -524,7 +504,6 @@ const SpecialPricings: React.FC = () => {
         })}
       </div>
 
-      {/* Filters & Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         {selectedItems.size > 0 && (
           <div className={`flex items-center justify-between p-3 mb-4 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
@@ -600,7 +579,6 @@ const SpecialPricings: React.FC = () => {
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -724,7 +702,6 @@ const SpecialPricings: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {filteredSpecialPricings.length > itemsPerPage && (
           <div className="px-6 py-4 border-t border-gray-100">
             <Pagination
@@ -739,12 +716,10 @@ const SpecialPricings: React.FC = () => {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeModal}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 overflow-y-auto flex-1">
-              {/* Modal Header */}
               <div className="flex items-start gap-4 mb-6">
                 <div className={`w-10 h-10 rounded-xl bg-${themeColor}-100 flex items-center justify-center flex-shrink-0`}>
                   <Tag className={`w-5 h-5 text-${fullColor}`} />
@@ -760,7 +735,6 @@ const SpecialPricings: React.FC = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Basic Info */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Discount Name <span className="text-red-500">*</span>
@@ -788,7 +762,6 @@ const SpecialPricings: React.FC = () => {
                   />
                 </div>
 
-                {/* Location - Only show for company_admin */}
                 {isCompanyAdmin && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
@@ -805,7 +778,6 @@ const SpecialPricings: React.FC = () => {
                   </div>
                 )}
 
-                {/* Discount Settings */}
                 <div className="border-t border-gray-200 pt-5">
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <DollarSign className={`w-4 h-4 text-${fullColor}`} /> Discount Settings
@@ -846,7 +818,6 @@ const SpecialPricings: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* Preview */}
                   <div className={`mt-3 bg-${themeColor}-50 border border-${themeColor}-100 rounded-lg p-3 text-sm`}>
                     <span className="text-gray-600">Preview: </span>
                     <span className="text-gray-400 line-through">${samplePrice.toFixed(2)}</span>
@@ -856,7 +827,6 @@ const SpecialPricings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Schedule */}
                 <div className="border-t border-gray-200 pt-5">
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Calendar className={`w-4 h-4 text-${fullColor}`} /> Schedule
@@ -876,7 +846,6 @@ const SpecialPricings: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* One-Time Date */}
                   {form.recurrence_type === 'one_time' && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -892,7 +861,6 @@ const SpecialPricings: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Weekly Day Selection */}
                   {form.recurrence_type === 'weekly' && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -917,7 +885,6 @@ const SpecialPricings: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Monthly Day Selection - Improved with grid */}
                   {form.recurrence_type === 'monthly' && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -943,7 +910,6 @@ const SpecialPricings: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Date Range for recurring */}
                   {form.recurrence_type !== 'one_time' && (
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
@@ -967,7 +933,6 @@ const SpecialPricings: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Time Window */}
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Time From</label>
@@ -990,7 +955,6 @@ const SpecialPricings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Apply To */}
                 <div className="border-t border-gray-200 pt-5">
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Layers className={`w-4 h-4 text-${fullColor}`} /> Apply To
@@ -1011,7 +975,6 @@ const SpecialPricings: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* Entity Selection */}
                   {form.entity_type !== 'all' && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-2">
@@ -1054,7 +1017,6 @@ const SpecialPricings: React.FC = () => {
                   )}
                 </div>
 
-                {/* Advanced Settings */}
                 <div className="border-t border-gray-200 pt-5">
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Settings className={`w-4 h-4 text-${fullColor}`} /> Advanced
@@ -1098,7 +1060,6 @@ const SpecialPricings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Footer */}
                 <div className="flex justify-end gap-3 pt-4">
                   <StandardButton type="button" variant="secondary" onClick={closeModal}>Cancel</StandardButton>
                   <StandardButton type="submit" variant="primary" disabled={saving}>
@@ -1111,7 +1072,6 @@ const SpecialPricings: React.FC = () => {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

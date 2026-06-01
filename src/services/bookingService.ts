@@ -3,9 +3,6 @@ import type { BookPackagePackage } from '../types/BookPackage.types';
 import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Returns the best available auth token:
-// 1. Admin/user token (zapzone_user) for admin pages
-// 2. Customer token (zapzone_customer) as fallback for customer pages
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
   if (adminToken) return adminToken;
@@ -16,12 +13,10 @@ const getBestToken = (): string | null => {
       return customer?.token || null;
     }
   } catch {
-    // ignore
   }
   return null;
 };
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -30,7 +25,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getBestToken();
@@ -44,15 +38,12 @@ api.interceptors.request.use(
   }
 );
 
-// Enhanced interfaces matching Laravel backend
 export interface CreateBookingData {
-  // Customer information (either customer_id OR guest details required)
   customer_id?: number;
   guest_name?: string;
   guest_email?: string;
   guest_phone?: string;
   
-  // Booking details
   package_id?: number;
   location_id: number;
   room_id?: number;
@@ -61,33 +52,27 @@ export interface CreateBookingData {
   promo_id?: number;
   type: 'package';
   
-  // Date and time
   booking_date: string; // YYYY-MM-DD format
   booking_time: string; // HH:mm format
   
-  // Participants and duration
   participants: number;
   duration: number;
   duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   
-  // Payment
   total_amount: number;
   amount_paid?: number;
   discount_amount?: number;
   payment_method?: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   payment_status?: 'paid' | 'partial' | 'pending';
   
-  // Status and notes
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
   special_requests?: string;
   
-  // Related items
   attraction_ids?: number[];
   addon_ids?: number[];
   quantity?: number;
   
-  // Detailed attraction/addon data with individual quantities and prices
   additional_attractions?: Array<{
     attraction_id: number;
     quantity: number;
@@ -99,14 +84,12 @@ export interface CreateBookingData {
     price_at_booking: number;
   }>;
 
-  // Applied fees snapshot
   applied_fees?: Array<{
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
   }> | null;
 
-  // Applied discounts snapshot
   applied_discounts?: Array<{
     discount_name: string;
     discount_amount: number;
@@ -154,14 +137,12 @@ export interface UpdateBookingData {
     price_at_booking: number;
   }>;
 
-  // Applied fees snapshot
   applied_fees?: Array<{
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
   }> | null;
 
-  // Applied discounts snapshot
   applied_discounts?: Array<{
     discount_name: string;
     discount_amount: number;
@@ -245,7 +226,6 @@ export interface Booking {
   deleted_at?: string; // Soft delete timestamp
   created_at: string;
   updated_at: string;
-  // Relations
   customer?: unknown;
   package?: BookPackagePackage;
   location?: unknown;
@@ -323,17 +303,11 @@ export interface TimeSlotResponse {
 }
 
 const bookingService = {
-  /**
-   * Fetch a specific package by ID with all relations
-   */
   async getPackageById(packageId: number): Promise<{ success: boolean; data: BookPackagePackage }> {
     const response = await api.get(`/packages/${packageId}`);
     return response.data;
   },
 
-  /**
-   * Get all bookings with optional filters (Paginated)
-   */
   async getBookings(filters?: BookingFilters): Promise<PaginatedBookingResponse> {
     const params = new URLSearchParams();
     
@@ -347,7 +321,6 @@ const bookingService = {
 
     console.log('Booking filters params:', params.toString());
 
-    // Use customer bookings endpoint if customer_id or guest_email is provided
     const useCustomerEndpoint = filters?.customer_id || filters?.guest_email;
     const endpoint = useCustomerEndpoint ? '/customers/bookings' : '/bookings';
 
@@ -355,49 +328,31 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Get booking by ID
-   */
   async getBookingById(bookingId: number): Promise<BookingResponse> {
     const response = await api.get(`/bookings/${bookingId}`);
     return response.data;
   },
 
-  /**
-   * Create a new booking (Main CREATE method)
-   */
   async createBooking(bookingData: CreateBookingData): Promise<BookingResponse> {
     const response = await api.post('/bookings', bookingData);
     return response.data;
   },
 
-  /**
-   * Update an existing booking
-   */
   async updateBooking(id: number, data: UpdateBookingData): Promise<BookingResponse> {
     const response = await api.put(`/bookings/${id}`, data);
     return response.data;
   },
 
-  /**
-   * Delete a booking
-   */
   async deleteBooking(id: number): Promise<{ success: boolean; message: string }> {
     const response = await api.delete(`/bookings/${id}`);
     return response.data;
   },
 
-  /**
-   * Cancel a booking
-   */
   async cancelBooking(id: number): Promise<BookingResponse> {
     const response = await api.patch(`/bookings/${id}/cancel`);
     return response.data;
   },
 
-  /**
-   * Check in a booking
-   */
   async checkInBooking(referenceNumber: string, userId?: number): Promise<BookingResponse> {
     const payload: { reference_number: string; user_id?: number } = {
       reference_number: referenceNumber
@@ -411,17 +366,11 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Complete a booking
-   */
   async completeBooking(id: number): Promise<BookingResponse> {
     const response = await api.patch(`/bookings/${id}/complete`);
     return response.data;
   },
 
-  /**
-   * Get bookings by location and date
-   */
   async getBookingsByLocationAndDate(location_id: number, date: string): Promise<{ success: boolean; data: Booking[] }> {
     const response = await api.get('/bookings/location-date', {
       params: { location_id, date }
@@ -429,9 +378,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Search bookings
-   */
   async searchBookings(query: string): Promise<{ success: boolean; data: Booking[] }> {
     const response = await api.get('/bookings/search', {
       params: { query }
@@ -439,17 +385,11 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Get bookings by customer email (Legacy method)
-   */
   async getCustomerBookings(email: string): Promise<{ success: boolean; data: Booking[] }> {
     const response = await api.get(`/bookings/customer/${email}`);
     return response.data;
   },
 
-  /**
-   * Get customer bookings with filters and pagination (NEW)
-   */
   async getCustomerBookingsFiltered(params: {
     customer_id?: number;
     guest_email?: string;
@@ -463,17 +403,11 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Create a time slot record for a booking
-   */
   async createTimeSlot(timeSlotData: CreateTimeSlotData): Promise<TimeSlotResponse> {
     const response = await api.post('/package-time-slots', timeSlotData);
     return response.data;
   },
 
-  /**
-   * Get all packages (for onsite booking and package selection)
-   */
   async getPackages(filters?: PackageFilters): Promise<{ 
     success: boolean; 
     data: { 
@@ -492,9 +426,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Store QR code for a booking
-   */
   async storeQrCode(bookingId: number, qrCodeBase64: string, sendEmail: boolean = true): Promise<{ 
     success: boolean; 
     message: string;
@@ -510,9 +441,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Export bookings with advanced filters
-   */
   async exportBookings(filters: {
     user_id?: number;
     location_id?: number | number[];
@@ -535,9 +463,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Bulk delete bookings
-   */
   async bulkDelete(ids: number[]): Promise<{
     success: boolean;
     message: string;
@@ -546,9 +471,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Update internal notes for a booking
-   */
   async updateInternalNotes(bookingId: number, internalNotes: string): Promise<{
     success: boolean;
     message: string;
@@ -558,9 +480,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Create package room association
-   */
   async createPackageRoom(data: {
     package_id: number;
     room_id: number;
@@ -573,11 +492,7 @@ const bookingService = {
     return response.data;
   },
 
-  // ========== SOFT DELETE METHODS ==========
 
-  /**
-   * Get all soft-deleted (trashed) bookings
-   */
   async getTrashedBookings(filters?: {
     search?: string;
     location_id?: number;
@@ -591,17 +506,11 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Restore a soft-deleted booking
-   */
   async restoreBooking(id: number): Promise<BookingResponse> {
     const response = await api.post(`/bookings/${id}/restore`);
     return response.data;
   },
 
-  /**
-   * Permanently delete a soft-deleted booking
-   */
   async forceDeleteBooking(id: number): Promise<{
     success: boolean;
     message: string;
@@ -610,9 +519,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Bulk restore soft-deleted bookings
-   */
   async bulkRestore(ids: number[]): Promise<{
     success: boolean;
     message: string;
@@ -622,9 +528,6 @@ const bookingService = {
     return response.data;
   },
 
-  /**
-   * Bulk import bookings from a Bookly CSV/Excel file
-   */
   async bulkImportCsv(
     file: File,
     locationId: number,

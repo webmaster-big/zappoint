@@ -16,7 +16,6 @@ interface UserData {
   role: 'attendant' | 'location_manager' | 'company_admin';
 }
 
-// Package type configuration for display
 const packageTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
   custom: { label: 'Custom', icon: Sparkles, color: 'text-blue-600', bgColor: 'bg-blue-50' },
   holiday: { label: 'Holiday', icon: CalendarHeart, color: 'text-red-600', bgColor: 'bg-red-50' },
@@ -39,7 +38,6 @@ const CustomPackages: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Load user data from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('zapzone_user');
     if (stored) {
@@ -47,30 +45,24 @@ const CustomPackages: React.FC = () => {
     }
   }, []);
 
-  // Fetch packages from backend (non-regular only)
   useEffect(() => {
     const fetchPackages = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Check cache first
         const cachedPackages = await packageCacheService.getCachedPackages();
         
         if (cachedPackages && cachedPackages.length > 0) {
-          // Filter to only show non-regular packages from cache
-          // Also filter out soft-deleted packages
           const customPackages = cachedPackages.filter(
             (pkg: Package) => pkg.package_type && pkg.package_type !== 'regular' && !pkg.deleted_at
           );
           setPackages(customPackages);
           setLoading(false);
-          // Trigger background sync for freshness
           packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         
-        // If no cache, fetch from API
         const response = await packageService.getPackages({ 
           per_page: 50,
           sort_by: 'id',
@@ -80,11 +72,8 @@ const CustomPackages: React.FC = () => {
         
         const packagesData = response.data.packages || [];
         
-        // Cache the fetched data
         await packageCacheService.cachePackages(packagesData);
         
-        // Filter to only show non-regular packages
-        // Also filter out soft-deleted packages
         const customPackages = packagesData.filter(
           (pkg: Package) => pkg.package_type && pkg.package_type !== 'regular' && !pkg.deleted_at
         );
@@ -114,7 +103,6 @@ const CustomPackages: React.FC = () => {
     fetchPackages();
   }, []);
 
-  // Listen for cache updates from background sync
   useEffect(() => {
     const unsubscribe = packageCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
@@ -130,27 +118,22 @@ const CustomPackages: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Search and filter effect
   useEffect(() => {
     let result = [...packages];
 
-    // Filter by package type
     if (filterType !== "all") {
       result = result.filter(pkg => pkg.package_type === filterType);
     }
 
-    // Filter by location (for company-admin users)
     if (filterLocation !== "all") {
       const locationId = parseInt(filterLocation);
       result = result.filter(pkg => pkg.location_id === locationId);
     }
 
-    // Filter by category
     if (filterCategory !== "all") {
       result = result.filter(pkg => pkg.category === filterCategory);
     }
 
-    // Filter by search term
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       result = result.filter(pkg => {
@@ -165,7 +148,6 @@ const CustomPackages: React.FC = () => {
       });
     }
 
-    // Sort packages
     result.sort((a, b) => {
       let aValue: string | number = '';
       let bValue: string | number = '';
@@ -194,13 +176,10 @@ const CustomPackages: React.FC = () => {
     setFilteredPackages(result);
   }, [packages, filterType, filterCategory, filterLocation, searchTerm, sortBy, sortOrder]);
 
-  // Get unique categories for filtering
   const categories = ["all", ...new Set(packages.map(pkg => pkg.category).filter(Boolean))];
 
-  // Get unique package types for filtering
   const packageTypes = ["all", ...new Set(packages.map(pkg => pkg.package_type).filter(Boolean))];
 
-  // Get unique locations for filtering (for company-admin)
   const uniqueLocations = packages
     .filter(pkg => pkg.location)
     .reduce((acc, pkg) => {
@@ -218,7 +197,6 @@ const CustomPackages: React.FC = () => {
         await packageService.deletePackage(id);
         setPackages(prev => prev.filter(pkg => pkg.id !== id));
         
-        // Remove from cache
         await packageCacheService.removePackageFromCache(id);
         
         setToast({ message: 'Package deleted successfully!', type: 'success' });
@@ -239,7 +217,6 @@ const CustomPackages: React.FC = () => {
         pkg.id === id ? updatedPackage : pkg
       ));
       
-      // Update cache
       await packageCacheService.updatePackageInCache(updatedPackage);
       
       const statusText = response.data.is_active ? 'activated' : 'deactivated';
@@ -287,7 +264,6 @@ const CustomPackages: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Page Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Custom Packages</h1>
@@ -315,11 +291,8 @@ const CustomPackages: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        {/* Filters */}
         <div className="mb-6">
-          {/* Search Bar */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-lg">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -335,7 +308,6 @@ const CustomPackages: React.FC = () => {
             </div>
             
             <div className="flex gap-1 items-center flex-wrap">
-              {/* Package Type Filter */}
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
@@ -349,7 +321,6 @@ const CustomPackages: React.FC = () => {
                 ))}
               </select>
 
-              {/* Category Filter */}
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
@@ -361,7 +332,6 @@ const CustomPackages: React.FC = () => {
                 ))}
               </select>
 
-              {/* Location Filter (for company admin) */}
               {isCompanyAdmin && uniqueLocations.length > 0 && (
                 <select
                   value={filterLocation}
@@ -375,7 +345,6 @@ const CustomPackages: React.FC = () => {
                 </select>
               )}
 
-              {/* Sort */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -396,13 +365,11 @@ const CustomPackages: React.FC = () => {
             </div>
           </div>
 
-          {/* Results count */}
           <div className="text-sm text-gray-500 mt-3">
             Showing {filteredPackages.length} of {packages.length} custom package{packages.length !== 1 ? 's' : ''}
           </div>
         </div>
 
-        {/* Package Grid */}
         {filteredPackages.length === 0 ? (
           <div className="text-center py-12">
             <Sparkles className="w-12 h-12 mx-auto text-gray-300 mb-4" />
@@ -520,7 +487,6 @@ const CustomPackages: React.FC = () => {
           </div>
         )}
 
-        {/* Summary */}
         {filteredPackages.length > 0 && (
           <div className="mt-6 pt-4 border-t border-gray-100 text-sm text-gray-500">
             Showing {filteredPackages.length} of {packages.length} custom package{packages.length !== 1 ? 's' : ''}
@@ -528,7 +494,6 @@ const CustomPackages: React.FC = () => {
         )}
       </div>
 
-      {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50">
           <Toast 

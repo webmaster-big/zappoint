@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/attractions/CreatePurchase.tsx
 
 export interface CreatePurchaseAddOn {
   id: number;

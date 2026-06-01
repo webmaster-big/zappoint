@@ -157,7 +157,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
@@ -180,9 +179,7 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
           />
         </div>
 
-        {/* Form */}
         <div className="px-6 py-5 space-y-4">
-          {/* Name */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First name *</label>
@@ -212,7 +209,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
             </div>
           </div>
 
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
             <input
@@ -227,7 +223,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
             )}
           </div>
 
-          {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
             <input
@@ -239,7 +234,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
             />
           </div>
 
-          {/* Position */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
             <input
@@ -251,7 +245,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
             />
           </div>
 
-          {/* Department & Shift */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
@@ -282,7 +275,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
             </div>
           </div>
 
-          {/* Status */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
@@ -297,7 +289,6 @@ const AttendantEditModal = ({ isOpen, onClose, attendant, onSaved }: AttendantEd
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
           <StandardButton
             onClick={onClose}

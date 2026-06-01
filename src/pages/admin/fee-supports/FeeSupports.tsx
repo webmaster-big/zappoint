@@ -38,12 +38,9 @@ const FeeSupports: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   
-  // Check if user is company admin (can select locations)
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  // For non-company admins, auto-use their location_id
   const userLocationId = currentUser?.location_id || null;
 
-  // Pre-filter entity_type from URL query param (from Packages or Attractions pages)
   const entityTypeParam = searchParams.get('entity_type');
   const initialEntityType: 'package' | 'attraction' | 'event' | 'all' = 
     entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' ? entityTypeParam : 'all';
@@ -57,19 +54,16 @@ const FeeSupports: React.FC = () => {
   const [itemsPerPage] = useState(10);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
 
-  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingFeeSupport, setEditingFeeSupport] = useState<FeeSupport | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Entity data for the modal
   const [packages, setPackages] = useState<Array<{ id: number; name: string }>>([]);
   const [attractions, setAttractions] = useState<Array<{ id: number; name: string }>>([]);
   const [events, setEvents] = useState<Array<{ id: number; name: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingEntities, setLoadingEntities] = useState(false);
 
-  // Form state
   const [form, setForm] = useState<FeeSupportFormData>({
     company_id: currentUser?.company_id || 1,
     location_id: null,
@@ -90,7 +84,6 @@ const FeeSupports: React.FC = () => {
     search: ''
   });
 
-  // Load fee supports
   const loadFeeSupports = useCallback(async () => {
     try {
       setLoading(true);
@@ -109,7 +102,6 @@ const FeeSupports: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  // Load locations
   const loadLocations = useCallback(async () => {
     try {
       const response = await locationService.getLocations();
@@ -122,7 +114,6 @@ const FeeSupports: React.FC = () => {
     }
   }, []);
 
-  // Load entities using cache services for faster loading
   const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event') => {
     setLoadingEntities(true);
     try {
@@ -162,7 +153,6 @@ const FeeSupports: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  // Apply client-side filters
   const applyFilters = useCallback(() => {
     let result = [...feeSupports];
 
@@ -193,14 +183,12 @@ const FeeSupports: React.FC = () => {
   useEffect(() => { applyFilters(); }, [applyFilters]);
   useEffect(() => { setCurrentPage(1); }, [filters]);
 
-  // Load entities when modal opens or entity type changes
   useEffect(() => {
     if (showModal) {
       loadEntities(form.entity_type);
     }
   }, [showModal, form.entity_type, loadEntities]);
 
-  // Handlers
   const handleFilterChange = (key: keyof FeeSupportListFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -265,7 +253,6 @@ const FeeSupports: React.FC = () => {
     return `$${parseFloat(fs.fee_amount).toFixed(2)}`;
   };
 
-  // Modal handlers
   const openCreateModal = () => {
     setEditingFeeSupport(null);
     setForm({
@@ -305,7 +292,6 @@ const FeeSupports: React.FC = () => {
 
   const handleFormChange = (field: keyof FeeSupportFormData, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    // Clear entity_ids when switching entity type
     if (field === 'entity_type') {
       setForm(prev => ({ ...prev, entity_ids: [] }));
     }
@@ -332,7 +318,6 @@ const FeeSupports: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (!form.fee_name.trim()) {
       setToast({ message: 'Fee name is required', type: 'error' });
       return;
@@ -369,7 +354,6 @@ const FeeSupports: React.FC = () => {
     }
   };
 
-  // Live preview calculation
   const samplePrice = 100;
   const previewFeeAmount = form.fee_calculation_type === 'percentage'
     ? samplePrice * (form.fee_amount / 100)
@@ -378,19 +362,16 @@ const FeeSupports: React.FC = () => {
     ? samplePrice + previewFeeAmount
     : samplePrice;
 
-  // Metrics
   const totalActive = feeSupports.filter(fs => fs.is_active).length;
   const totalPackageFees = feeSupports.filter(fs => fs.entity_type === 'package').length;
   const totalAttractionFees = feeSupports.filter(fs => fs.entity_type === 'attraction').length;
   const totalEventFees = feeSupports.filter(fs => fs.entity_type === 'event').length;
 
-  // Pagination
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
   const currentItems = filteredFeeSupports.slice(indexOfFirst, indexOfLast);
   const totalPages = Math.ceil(filteredFeeSupports.length / itemsPerPage);
 
-  // Determine back path based on entity_type query
   const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
   const entities = form.entity_type === 'package' ? packages : form.entity_type === 'event' ? events : attractions;
@@ -405,7 +386,6 @@ const FeeSupports: React.FC = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div className="flex items-center gap-3">
           {backPath && (
@@ -425,7 +405,6 @@ const FeeSupports: React.FC = () => {
         </div>
       </div>
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { title: 'Total Fee Supports', value: feeSupports.length.toString(), sub: `${totalActive} active`, icon: DollarSign },
@@ -447,9 +426,7 @@ const FeeSupports: React.FC = () => {
         })}
       </div>
 
-      {/* Filters & Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        {/* Bulk actions */}
         {selectedItems.size > 0 && (
           <div className={`flex items-center justify-between p-3 mb-4 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
             <span className={`text-sm font-medium text-${themeColor}-800`}>{selectedItems.size} selected</span>
@@ -523,7 +500,6 @@ const FeeSupports: React.FC = () => {
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -627,7 +603,6 @@ const FeeSupports: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {filteredFeeSupports.length > itemsPerPage && (
           <div className="px-6 py-4 border-t border-gray-100">
             <Pagination
@@ -642,12 +617,10 @@ const FeeSupports: React.FC = () => {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeModal}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 overflow-y-auto flex-1">
-              {/* Modal Header */}
               <div className="flex items-start gap-4 mb-6">
                 <div className={`w-10 h-10 rounded-xl bg-${themeColor}-100 flex items-center justify-center flex-shrink-0`}>
                   <DollarSign className={`w-5 h-5 text-${fullColor}`} />
@@ -663,7 +636,6 @@ const FeeSupports: React.FC = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Basic Info */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Fee Name <span className="text-red-500">*</span>
@@ -678,7 +650,6 @@ const FeeSupports: React.FC = () => {
                   />
                 </div>
 
-                {/* Location - Only show for company_admin */}
                 {isCompanyAdmin && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
@@ -695,7 +666,6 @@ const FeeSupports: React.FC = () => {
                   </div>
                 )}
 
-                {/* Fee Settings */}
                 <div className="border-t border-gray-200 pt-5">
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <DollarSign className={`w-4 h-4 text-${fullColor}`} /> Fee Settings
@@ -736,7 +706,6 @@ const FeeSupports: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Application Type */}
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Application Type</label>
                     <select
@@ -749,7 +718,6 @@ const FeeSupports: React.FC = () => {
                     </select>
                   </div>
                   
-                  {/* Preview */}
                   <div className={`mt-3 bg-${themeColor}-50 border border-${themeColor}-100 rounded-lg p-3 text-sm`}>
                     <span className="text-gray-600">Preview ($100): </span>
                     <span className={`text-${fullColor} font-semibold`}>+${previewFeeAmount.toFixed(2)}</span>
@@ -757,7 +725,6 @@ const FeeSupports: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Apply To */}
                 <div className="border-t border-gray-200 pt-5">
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Layers className={`w-4 h-4 text-${fullColor}`} /> Apply To
@@ -777,7 +744,6 @@ const FeeSupports: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* Entity Selection */}
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-gray-700">
@@ -820,7 +786,6 @@ const FeeSupports: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status */}
                 <div className="border-t border-gray-200 pt-5">
                   <div className="flex items-center">
                     <input
@@ -833,7 +798,6 @@ const FeeSupports: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Footer */}
                 <div className="flex justify-end gap-3 pt-4">
                   <StandardButton type="button" variant="secondary" onClick={closeModal}>Cancel</StandardButton>
                   <StandardButton type="submit" variant="primary" disabled={saving}>
@@ -846,7 +810,6 @@ const FeeSupports: React.FC = () => {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

@@ -1,4 +1,3 @@
-// src/pages/admin/email/EmailNotificationDetails.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
@@ -44,7 +43,6 @@ const EmailNotificationDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { themeColor, fullColor } = useThemeColor();
 
-  // State
   const [notification, setNotification] = useState<EmailNotification | null>(null);
   const [logs, setLogs] = useState<EmailNotificationLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,13 +54,11 @@ const EmailNotificationDetails: React.FC = () => {
   const [sendingTest, setSendingTest] = useState(false);
   const [previewModal, setPreviewModal] = useState(false);
   
-  // Logs pagination
   const [logsPage, setLogsPage] = useState(1);
   const [logsTotalPages, setLogsTotalPages] = useState(1);
   const [logsTotalItems, setLogsTotalItems] = useState(0);
   const logsPerPage = 10;
 
-  // Trigger type labels
   const triggerTypeLabels: Record<string, string> = {
     booking_created: 'Booking Created',
     booking_confirmed: 'Booking Confirmed',
@@ -89,7 +85,6 @@ const EmailNotificationDetails: React.FC = () => {
     purchase_followup: 'Purchase Follow-up',
   };
 
-  // Recipient type labels
   const recipientTypeLabels: Record<RecipientType, string> = {
     customer: 'Customer',
     staff: 'Staff',
@@ -98,7 +93,6 @@ const EmailNotificationDetails: React.FC = () => {
     custom: 'Custom Email',
   };
 
-  // Get trigger type category icon
   const getTriggerIcon = (triggerType: TriggerType) => {
     if (triggerType.startsWith('booking_')) return Calendar;
     if (triggerType.startsWith('purchase_')) return Ticket;
@@ -106,19 +100,16 @@ const EmailNotificationDetails: React.FC = () => {
     return Bell;
   };
 
-  // Get trigger type category color
   const getTriggerColor = () => {
     return `bg-${themeColor}-100 text-${themeColor}-700 border-${themeColor}-200`;
   };
 
-  // Get entity type icon
   const getEntityIcon = (entityType: EntityType) => {
     if (entityType === 'package') return Package;
     if (entityType === 'attraction') return Ticket;
     return Users;
   };
 
-  // Get log status config
   const getLogStatusConfig = (status: string) => {
     switch (status) {
       case 'sent':
@@ -131,7 +122,6 @@ const EmailNotificationDetails: React.FC = () => {
     }
   };
 
-  // Fetch notification
   useEffect(() => {
     const fetchNotification = async () => {
       if (!id) return;
@@ -152,7 +142,6 @@ const EmailNotificationDetails: React.FC = () => {
     fetchNotification();
   }, [id]);
 
-  // Fetch logs
   const fetchLogs = useCallback(async () => {
     if (!id) return;
 
@@ -178,7 +167,6 @@ const EmailNotificationDetails: React.FC = () => {
     fetchLogs();
   }, [fetchLogs]);
 
-  // Handle delete
   const handleDelete = async () => {
     if (!id) return;
 
@@ -198,7 +186,6 @@ const EmailNotificationDetails: React.FC = () => {
     }
   };
 
-  // Handle toggle status
   const handleToggleStatus = async () => {
     if (!notification) return;
 
@@ -217,7 +204,6 @@ const EmailNotificationDetails: React.FC = () => {
     }
   };
 
-  // Handle duplicate
   const handleDuplicate = async () => {
     if (!notification) return;
 
@@ -233,7 +219,6 @@ const EmailNotificationDetails: React.FC = () => {
     }
   };
 
-  // Handle send test email
   const handleSendTestEmail = async () => {
     if (!notification || !testEmail.trim()) return;
 
@@ -256,7 +241,6 @@ const EmailNotificationDetails: React.FC = () => {
     }
   };
 
-  // Handle resend log
   const handleResendLog = async (logId: number) => {
     if (!notification) return;
 
@@ -272,7 +256,6 @@ const EmailNotificationDetails: React.FC = () => {
     }
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -313,7 +296,6 @@ const EmailNotificationDetails: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div className="flex items-center gap-4">
           <button
@@ -386,14 +368,11 @@ const EmailNotificationDetails: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Details */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Configuration */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Configuration</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Trigger Type */}
               <div>
                 <label className="text-sm font-medium text-gray-500">Trigger Type</label>
                 <div className="mt-1 flex items-center gap-2">
@@ -404,7 +383,6 @@ const EmailNotificationDetails: React.FC = () => {
                 </div>
               </div>
 
-              {/* Entity Type */}
               <div>
                 <label className="text-sm font-medium text-gray-500">Applies To</label>
                 <div className="mt-1 flex items-center gap-2">
@@ -415,7 +393,6 @@ const EmailNotificationDetails: React.FC = () => {
                 </div>
               </div>
 
-              {/* Location */}
               <div>
                 <label className="text-sm font-medium text-gray-500">Location</label>
                 <p className="mt-1 text-gray-900">
@@ -423,7 +400,6 @@ const EmailNotificationDetails: React.FC = () => {
                 </p>
               </div>
 
-              {/* Include QR Code */}
               <div>
                 <label className="text-sm font-medium text-gray-500">QR Code</label>
                 <div className="mt-1 flex items-center gap-2">
@@ -438,7 +414,6 @@ const EmailNotificationDetails: React.FC = () => {
                 </div>
               </div>
 
-              {/* Reminder/Follow-up timing */}
               {(notification.send_before_hours || notification.send_after_hours) && (
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-gray-500">Timing</label>
@@ -454,7 +429,6 @@ const EmailNotificationDetails: React.FC = () => {
             </div>
           </div>
 
-          {/* Recipients */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-gray-600" />
@@ -493,7 +467,6 @@ const EmailNotificationDetails: React.FC = () => {
             </div>
           </div>
 
-          {/* Email Content */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Email Content</h2>
@@ -529,7 +502,6 @@ const EmailNotificationDetails: React.FC = () => {
             )}
           </div>
 
-          {/* Logs */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -604,7 +576,6 @@ const EmailNotificationDetails: React.FC = () => {
                   })}
                 </div>
 
-                {/* Logs Pagination */}
                 {logsTotalPages > 1 && (
                   <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                     <Pagination
@@ -619,7 +590,6 @@ const EmailNotificationDetails: React.FC = () => {
           </div>
         </div>
 
-        {/* Sidebar - Stats */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sticky top-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Statistics</h3>
@@ -686,7 +656,6 @@ const EmailNotificationDetails: React.FC = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -714,7 +683,6 @@ const EmailNotificationDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Test Email Modal */}
       {testEmailModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
@@ -765,7 +733,6 @@ const EmailNotificationDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Preview Modal */}
       {previewModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -809,7 +776,6 @@ const EmailNotificationDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}

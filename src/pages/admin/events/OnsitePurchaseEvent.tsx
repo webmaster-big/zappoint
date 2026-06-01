@@ -42,11 +42,9 @@ const OnsitePurchaseEvent = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
-  // Locations
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
-  // Event selection
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [eventSearch, setEventSearch] = useState('');
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -56,21 +54,18 @@ const OnsitePurchaseEvent = () => {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Date & time
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Purchase details
   const [quantity, setQuantity] = useState(1);
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('authorize.net');
   const [notes, setNotes] = useState('');
   const [sendEmail, setSendEmail] = useState(false);
 
-  // Card payment details (Authorize.Net)
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -81,11 +76,9 @@ const OnsitePurchaseEvent = () => {
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
 
-  // Pagination for event grid
   const [currentPage, setCurrentPage] = useState(1);
   const eventsPerPage = 6;
 
-  // Customer
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
@@ -94,18 +87,14 @@ const OnsitePurchaseEvent = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
 
-  // Add-ons
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
 
-  // Fee & special pricing support
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
-  // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
-  // Format date helper
   const formatEventDate = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
@@ -120,7 +109,6 @@ const OnsitePurchaseEvent = () => {
     }
   };
 
-  // Load locations for company admin
   useEffect(() => {
     if (isCompanyAdmin) {
       locationService.getLocations().then(res => {
@@ -131,12 +119,10 @@ const OnsitePurchaseEvent = () => {
     }
   }, [isCompanyAdmin]);
 
-  // Load all events on mount
   useEffect(() => {
     const fetchEvents = async () => {
       setLoadingEvents(true);
       try {
-        // Try cache first for faster load
         const cached = await eventCacheService.getCachedEvents();
         if (cached && cached.length > 0) {
           setAllEvents(cached.filter(e => e.is_active));
@@ -227,7 +213,6 @@ const OnsitePurchaseEvent = () => {
     }
   };
 
-  // Customer search by email
   useEffect(() => {
     if (guestEmail.length < 2) {
       setFoundCustomers([]);
@@ -257,7 +242,6 @@ const OnsitePurchaseEvent = () => {
     setShowCustomerDropdown(false);
   };
 
-  // Initialize Authorize.Net when payment method is authorize.net
   useEffect(() => {
     if (paymentMethod !== 'authorize.net') return;
     const initializeAuthorizeNet = async () => {
@@ -271,7 +255,6 @@ const OnsitePurchaseEvent = () => {
           await loadAcceptJS((response.environment || 'sandbox') as 'sandbox' | 'production');
         }
       } catch {
-        // Authorize.Net not configured — user can still use other methods
       }
     };
     initializeAuthorizeNet();
@@ -291,7 +274,6 @@ const OnsitePurchaseEvent = () => {
     else if (name === 'phone') setGuestPhone(value);
   };
 
-  // Add-on helpers
   const handleAddOnQty = (addonId: number, qty: number) => {
     if (qty <= 0) {
       setSelectedAddOns(prev => {
@@ -304,7 +286,6 @@ const OnsitePurchaseEvent = () => {
     }
   };
 
-  // Price calculation
   const eventPrice = event ? parseFloat(event.price) : 0;
   const calculateSubtotal = () => eventPrice * quantity;
   const addOnTotal = event?.add_ons
@@ -315,12 +296,10 @@ const OnsitePurchaseEvent = () => {
     : 0;
   const calculateBaseTotal = () => Math.max(0, calculateSubtotal() + addOnTotal - discount);
 
-  // Compute total with fees and special pricing
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
   const totalAfterSpecialPricing = Math.max(0, calculateBaseTotal() - specialPricingDiscount);
   const calculateTotal = () => feeBreakdown ? Math.max(0, feeBreakdown.total - specialPricingDiscount) : totalAfterSpecialPricing;
 
-  // Fetch fee breakdown when event, quantity, or add-ons change (debounced)
   useEffect(() => {
     if (!event) {
       setFeeBreakdown(null);
@@ -349,7 +328,6 @@ const OnsitePurchaseEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, quantity, selectedAddOns, discount]);
 
-  // Fetch special pricing breakdown for event (debounced)
   useEffect(() => {
     if (!event) {
       setSpecialPricingBreakdown(null);
@@ -415,7 +393,6 @@ const OnsitePurchaseEvent = () => {
       return;
     }
 
-    // Validate card if authorize.net
     const isCardPayment = paymentMethod === 'authorize.net';
     if (isCardPayment) {
       if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
@@ -485,7 +462,6 @@ const OnsitePurchaseEvent = () => {
 
       const createdPurchase = purchaseRes.data || purchaseRes;
 
-      // Process card payment via Authorize.Net
       if (isCardPayment) {
         const cardData = {
           cardNumber: cardNumber.replace(/\s/g, ''),
@@ -550,7 +526,6 @@ const OnsitePurchaseEvent = () => {
           throw new Error(friendlyMsg);
         }
       } else if (paymentMethod === 'in-store' && total > 0) {
-        // Record cash payment
         try {
           await createPayment({
             payable_id: createdPurchase.id,
@@ -564,7 +539,6 @@ const OnsitePurchaseEvent = () => {
             notes: `Payment for event purchase: ${event!.name}`,
           });
         } catch {
-          // Non-critical
         }
       }
 
@@ -583,23 +557,19 @@ const OnsitePurchaseEvent = () => {
     }
   };
 
-  // Filter events by search
   const filteredEvents = allEvents.filter(ev =>
     ev.name.toLowerCase().includes(eventSearch.toLowerCase()) ||
     (ev.location?.name || '').toLowerCase().includes(eventSearch.toLowerCase())
   );
 
-  // Pagination
   const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
   const paginatedEvents = filteredEvents.slice(
     (currentPage - 1) * eventsPerPage,
     currentPage * eventsPerPage
   );
 
-  // Reset to page 1 when search changes
   useEffect(() => { setCurrentPage(1); }, [eventSearch]);
 
-  // Order add-ons by add_ons_order
   const orderedAddOns: EventAddOn[] = event
     ? (event.add_ons_order && event.add_ons
         ? event.add_ons_order
@@ -616,7 +586,6 @@ const OnsitePurchaseEvent = () => {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Onsite Event Purchase</h1>
@@ -638,9 +607,7 @@ const OnsitePurchaseEvent = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - All Form Sections */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 1. Select Event */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Event</h2>
 
@@ -673,7 +640,6 @@ const OnsitePurchaseEvent = () => {
               </div>
             ) : (
               <>
-                {/* Search */}
                 <div className="relative mb-4">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-5 w-5 text-gray-400" />
@@ -687,7 +653,6 @@ const OnsitePurchaseEvent = () => {
                   />
                 </div>
 
-                {/* Events Grid */}
                 {loadingEvents ? (
                   <div className="flex items-center justify-center py-12">
                     <div className={`w-8 h-8 border-4 border-${themeColor}-200 border-t-${themeColor}-600 rounded-full animate-spin`} />
@@ -729,7 +694,6 @@ const OnsitePurchaseEvent = () => {
                     ))}
                   </div>
 
-                  {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
                       <span className="text-sm text-gray-500">
@@ -772,7 +736,6 @@ const OnsitePurchaseEvent = () => {
             )}
           </div>
 
-          {/* 2. Customer Information */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -796,7 +759,6 @@ const OnsitePurchaseEvent = () => {
                   </div>
                 )}
 
-                {/* Customer Dropdown */}
                 {showCustomerDropdown && foundCustomers.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {foundCustomers.map((customer) => (
@@ -853,7 +815,6 @@ const OnsitePurchaseEvent = () => {
             </div>
           </div>
 
-          {/* 3. Purchase Details — only when event is selected */}
           {event && !loading && (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
@@ -862,7 +823,6 @@ const OnsitePurchaseEvent = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Quantity */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
                   <div className="flex items-center gap-2">
@@ -889,7 +849,6 @@ const OnsitePurchaseEvent = () => {
                   </div>
                 </div>
 
-                {/* Discount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Discount ($)</label>
                   <input
@@ -903,7 +862,6 @@ const OnsitePurchaseEvent = () => {
                   />
                 </div>
 
-                {/* Notes */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
                   <textarea
@@ -916,7 +874,6 @@ const OnsitePurchaseEvent = () => {
                 </div>
               </div>
 
-              {/* Date & Time Section */}
               <div className="mt-6 pt-5 border-t border-gray-100">
                 <div className="flex items-center gap-2 mb-3">
                   <Calendar className="h-4 w-4 text-gray-500" />
@@ -980,7 +937,6 @@ const OnsitePurchaseEvent = () => {
                 </div>
               </div>
 
-              {/* Add-ons Selection */}
               {orderedAddOns.length > 0 && (
                 <div className="mt-6 pt-5 border-t border-gray-100">
                   <div className="flex items-center gap-2 mb-3">
@@ -1033,7 +989,6 @@ const OnsitePurchaseEvent = () => {
             </div>
           )}
 
-          {/* 4. Payment Method — only when event is selected */}
           {event && !loading && (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-2 mb-4">
@@ -1076,7 +1031,6 @@ const OnsitePurchaseEvent = () => {
                 </button>
               </div>
 
-              {/* Pay Later Notice */}
               {paymentMethod === 'paylater' && (
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                   <div className="flex items-start gap-2">
@@ -1091,12 +1045,10 @@ const OnsitePurchaseEvent = () => {
                 </div>
               )}
 
-              {/* Card Payment Form */}
               {paymentMethod === 'authorize.net' && (
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
 
-                  {/* Card Number */}
                   <div className="mb-3">
                     <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
                     <div className="relative">
@@ -1128,7 +1080,6 @@ const OnsitePurchaseEvent = () => {
                     )}
                   </div>
 
-                  {/* Expiration and CVV */}
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
@@ -1179,14 +1130,12 @@ const OnsitePurchaseEvent = () => {
                     </div>
                   </div>
 
-                  {/* Error Message */}
                   {paymentError && (
                     <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
                       {paymentError}
                     </div>
                   )}
 
-                  {/* Security Notice */}
                   <div className="mt-3 flex items-start gap-2 text-xs text-gray-600">
                     <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
@@ -1199,14 +1148,12 @@ const OnsitePurchaseEvent = () => {
           )}
         </div>
 
-        {/* Right Column - Order Summary */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
 
             {event ? (
               <>
-                {/* Selected Event Card */}
                 <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
                   <div className="w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
                     {event.image ? (
@@ -1229,13 +1176,11 @@ const OnsitePurchaseEvent = () => {
                   </div>
                 </div>
 
-                {/* Line Items */}
                 <div className="space-y-2 text-sm mb-4">
                   <div className="flex justify-between text-gray-600">
                     <span>Qty: {quantity} × ${eventPrice.toFixed(2)}</span>
                     <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
                   </div>
-                  {/* Selected Add-ons */}
                   {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                     const addOn = event.add_ons?.find(a => a.id === Number(idStr));
                     if (!addOn) return null;
@@ -1260,14 +1205,12 @@ const OnsitePurchaseEvent = () => {
                   )}
                 </div>
 
-                {/* Fee Breakdown */}
                 {feeBreakdown && feeBreakdown.fees.length > 0 && (
                   <div className="mb-3">
                     <PriceBreakdownDisplay breakdown={feeBreakdown} compact />
                   </div>
                 )}
 
-                {/* Total */}
                 <div className="border-t border-gray-200 pt-3 mb-4">
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
@@ -1281,7 +1224,6 @@ const OnsitePurchaseEvent = () => {
                   )}
                 </div>
 
-                {/* Send Email Receipt */}
                 <div className="mb-4">
                   <label className="flex items-center gap-2 cursor-pointer group">
                     <input
@@ -1297,7 +1239,6 @@ const OnsitePurchaseEvent = () => {
                   </label>
                 </div>
 
-                {/* Complete Purchase */}
                 <StandardButton
                   variant="primary"
                   size="lg"

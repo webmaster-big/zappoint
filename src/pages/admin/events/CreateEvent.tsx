@@ -22,7 +22,6 @@ const CreateEvent = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string>('');
@@ -38,7 +37,6 @@ const CreateEvent = () => {
   const [features, setFeatures] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
 
-  // Add-ons
   const [allAddOns, setAllAddOns] = useState<Array<{ id: number; name: string; price: number }>>([]);
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<number[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
@@ -58,7 +56,6 @@ const CreateEvent = () => {
         setSelectedLocation(list[0].id.toString());
       }
     } catch {
-      // ignore
     }
   };
 
@@ -68,7 +65,6 @@ const CreateEvent = () => {
       const list = res.data?.add_ons || [];
       setAllAddOns(list.map((a: { id: number; name: string; price: number | null }) => ({ id: a.id, name: a.name, price: a.price || 0 })));
     } catch {
-      // ignore
     }
   };
 
@@ -82,7 +78,6 @@ const CreateEvent = () => {
     reader.readAsDataURL(file);
   };
 
-  // Features management
   const addFeature = () => setFeatures(prev => [...prev, '']);
   const removeFeature = (index: number) => setFeatures(prev => prev.filter((_, i) => i !== index));
   const updateFeature = (index: number, value: string) => {
@@ -93,7 +88,6 @@ const CreateEvent = () => {
     });
   };
 
-  // Feature drag
   const [draggedFeatureIndex, setDraggedFeatureIndex] = useState<number | null>(null);
   const handleFeatureDragStart = (index: number) => setDraggedFeatureIndex(index);
   const handleFeatureDragOver = (e: React.DragEvent, index: number) => {
@@ -110,14 +104,12 @@ const CreateEvent = () => {
   };
   const handleFeatureDragEnd = () => setDraggedFeatureIndex(null);
 
-  // Add-on selection
   const toggleAddOn = (id: number) => {
     setSelectedAddOnIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
-  // Add-on drag reorder
   const handleAddOnDragStart = (index: number) => setDraggedAddOnIndex(index);
   const handleAddOnDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
@@ -207,7 +199,6 @@ const CreateEvent = () => {
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Form Column */}
       <div className="flex-1 mx-auto">
       <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
         <div className="mb-6">
@@ -216,7 +207,6 @@ const CreateEvent = () => {
         </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" autoComplete="off">
-        {/* Basic Info */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-blue-500" /> Basic Information
@@ -293,7 +283,6 @@ const CreateEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Date & Time */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-blue-500" /> Date & Time
@@ -385,7 +374,6 @@ const CreateEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Pricing & Capacity */}
         <div className="space-y-4">
           <h3 className="text-xl font-bold mb-4 text-neutral-900">Pricing & Capacity</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -428,7 +416,6 @@ const CreateEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Features */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold text-neutral-900">Features</h3>
@@ -471,7 +458,6 @@ const CreateEvent = () => {
 
         <hr className="border-gray-100" />
 
-        {/* Add-ons */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold text-neutral-900">Add-Ons</h3>
@@ -494,7 +480,6 @@ const CreateEvent = () => {
           </div>
           <p className="text-sm text-gray-500">Select add-ons available for this event.</p>
 
-          {/* Selected Add-ons - Draggable list */}
           {selectedAddOnIds.length > 0 && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
@@ -530,7 +515,6 @@ const CreateEvent = () => {
             </div>
           )}
 
-          {/* Available Add-ons to select */}
           {allAddOns.length === 0 ? (
             <p className="text-sm text-gray-400">No add-ons available.</p>
           ) : (
@@ -550,7 +534,6 @@ const CreateEvent = () => {
           )}
         </div>
 
-        {/* Submit */}
         <hr className="border-gray-100" />
         <div className="flex gap-2">
           <StandardButton variant="primary" type="submit" loading={isSubmitting} icon={Plus} fullWidth>
@@ -564,7 +547,6 @@ const CreateEvent = () => {
       </div>
       </div>
 
-      {/* Live Preview Sidebar */}
       <div className="w-full md:w-[420px] md:max-w-sm h-fit">
         <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none sticky top-24">
           <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>

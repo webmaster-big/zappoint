@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
-// Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = getStoredUser()?.token;
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Types
 export interface Location {
   id: number;
   name: string;
@@ -60,7 +57,6 @@ export interface CreateLocationData {
   email?: string;
   capacity?: number;
   operating_hours?: string;
-  /** IANA timezone (e.g. "America/Chicago"). See backend Section 3. */
   timezone?: string;
   is_active?: boolean;
 }
@@ -79,41 +75,26 @@ export interface PaginatedResponse<T> {
 }
 
 class LocationService {
-  /**
-   * Get all locations with optional filters
-   */
   async getLocations(filters?: LocationFilters): Promise<PaginatedResponse<Location>> {
     const response = await api.get('/locations', { params: filters });
     return response.data;
   }
 
-  /**
-   * Get a specific location by ID
-   */
   async getLocation(id: number): Promise<ApiResponse<Location>> {
     const response = await api.get(`/locations/${id}`);
     return response.data;
   }
 
-  /**
-   * Create a new location
-   */
   async createLocation(data: CreateLocationData): Promise<ApiResponse<Location>> {
     const response = await api.post('/locations', data);
     return response.data;
   }
 
-  /**
-   * Update an existing location
-   */
   async updateLocation(id: number, data: UpdateLocationData): Promise<ApiResponse<Location>> {
     const response = await api.put(`/locations/${id}`, data);
     return response.data;
   }
 
-  /**
-   * Delete a location
-   */
   async deleteLocation(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/locations/${id}`);
     return response.data;

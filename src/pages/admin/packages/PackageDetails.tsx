@@ -40,7 +40,6 @@ const PackageDetails = () => {
     try {
       setLoading(true);
       
-      // Check cache first
       const cachedPackage = await packageCacheService.getPackageFromCache(packageId);
       
       if (cachedPackage) {
@@ -49,12 +48,10 @@ const PackageDetails = () => {
         return;
       }
       
-      // If not in cache, fetch from API
       const response = await packageService.getPackage(packageId);
       console.log(response);
       setPackageData(response.data);
       
-      // Update cache with fetched data
       if (response.data) {
         await packageCacheService.updatePackageInCache(response.data);
       }
@@ -71,7 +68,6 @@ const PackageDetails = () => {
       try {
         await packageService.deletePackage(packageData!.id);
         
-        // Remove from cache
         await packageCacheService.removePackageFromCache(packageData!.id);
         
         setToast({ message: 'Package deleted successfully', type: 'success' });
@@ -143,7 +139,6 @@ const PackageDetails = () => {
       )}
 
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <StandardButton
@@ -186,7 +181,6 @@ const PackageDetails = () => {
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          {/* Description */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
             <p className="text-gray-700 leading-relaxed">
@@ -194,7 +188,6 @@ const PackageDetails = () => {
             </p>
           </div>
 
-          {/* Features */}
           {packageData.features && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
@@ -210,7 +203,6 @@ const PackageDetails = () => {
             </div>
           )}
 
-          {/* Package Details */}
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Package Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -305,7 +297,6 @@ const PackageDetails = () => {
             </div>
           </div>
 
-          {/* Availability Schedules */}
           {(packageData as any).availability_schedules && (packageData as any).availability_schedules.length > 0 ? (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Availability Schedules</h2>
@@ -386,7 +377,6 @@ const PackageDetails = () => {
             </div>
           ) : null}
 
-          {/* Rooms */}
           {packageData.rooms && packageData.rooms.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Spaces</h2>
@@ -411,7 +401,6 @@ const PackageDetails = () => {
             </div>
           )}
 
-          {/* Attractions */}
           {packageData.attractions && packageData.attractions.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Included Attractions</h2>
@@ -435,7 +424,6 @@ const PackageDetails = () => {
             </div>
           )}
 
-          {/* Add-ons */}
           {packageData.add_ons && packageData.add_ons.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Add-ons</h2>
@@ -460,7 +448,6 @@ const PackageDetails = () => {
             </div>
           )}
 
-          {/* Promos */}
           {packageData.promos && packageData.promos.length > 0 && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Active Promotions</h2>
@@ -477,7 +464,6 @@ const PackageDetails = () => {
             </div>
           )}
 
-          {/* Gift Cards */}
           {packageData.gift_cards && packageData.gift_cards.length > 0 && (
             <div className="p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Applicable Gift Cards</h2>

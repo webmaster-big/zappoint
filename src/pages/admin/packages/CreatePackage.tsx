@@ -31,21 +31,17 @@ import type {
 } from '../../../types/createPackage.types';
 import { getStoredUser } from "../../../utils/storage";
 
-// Helper function to get ordinal suffix (1st, 2nd, 3rd, etc.)
 const getOrdinal = (n: number): string => {
     const s = ['th', 'st', 'nd', 'rd'];
     const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
-// Helper function to sort rooms numerically (extracts numbers from room names)
 const sortRoomsNumerically = (roomNames: string[]): string[] => {
     return [...roomNames].sort((a, b) => {
-        // Extract numbers from room names (e.g., "Room 1" -> 1, "Space 10" -> 10)
         const numA = parseInt(a.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.replace(/\D/g, '')) || 0;
         if (numA !== numB) return numA - numB;
-        // If no numbers or same numbers, sort alphabetically
         return a.localeCompare(b);
     });
 };
@@ -54,7 +50,6 @@ const CreatePackage: React.FC = () => {
     const navigate = useNavigate();
     const { themeColor, fullColor } = useThemeColor();
     
-    // State for fetched data
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]); // must include id
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]); // must include id
     const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
@@ -69,7 +64,6 @@ const CreatePackage: React.FC = () => {
     const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
     const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
-    // Fetch locations for company admin
     useEffect(() => {
         if (isCompanyAdmin) {
             const fetchLocations = async () => {
@@ -86,19 +80,16 @@ const CreatePackage: React.FC = () => {
         }
     }, [isCompanyAdmin]);
 
-    // Fetch data from database on component mount
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
                 
-                // Fetch all data in parallel
                 const params: { user_id: any; location_id?: number } = {user_id: getStoredUser()?.id};
                 if (selectedLocation !== null && selectedLocation !== undefined) {
                     params.location_id = selectedLocation;
                 }
                 
-                // Check caches first before making API calls
                 const cacheFilters = selectedLocation ? { location_id: selectedLocation } : {};
                 
                 const [cachedRooms, cachedAttractions, cachedAddOns] = await Promise.all([
@@ -107,12 +98,10 @@ const CreatePackage: React.FC = () => {
                     addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true })
                 ]);
                 
-                // Trigger background sync for stale caches (updates for next visit)
                 if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground(params);
                 if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground(params);
                 if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(params);
                 
-                // Only fetch from API if cache is empty
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
                     ? Promise.resolve({ data: { rooms: cachedRooms } })
                     : roomService.getRooms(params);
@@ -134,7 +123,6 @@ const CreatePackage: React.FC = () => {
                     categoryService.getCategories()
                 ]);
 
-                // Transform data to match component types (include id)
                 const attractionsData = attractionsRes.data?.attractions?.map(attr => ({
                     id: attr.id,
                     name: attr.name,
@@ -148,7 +136,6 @@ const CreatePackage: React.FC = () => {
                     price: addon.price || 0
                 })) || [];
 
-                // Rooms data - use the result from cache or API
                 let roomsData: CreatePackageRoom[] = [];
                 const roomsList = roomsRes.data?.rooms || [];
                 roomsData = roomsList.map((room: any) => ({
@@ -157,14 +144,12 @@ const CreatePackage: React.FC = () => {
                     area_group: room.area_group || undefined
                 }));
                 
-                // Cache data if we fetched from API (not from cache)
                 if (!cachedRooms || cachedRooms.length === 0) {
                     if (roomsList.length > 0) {
                         await roomCacheService.cacheRooms(roomsList);
                     }
                 }
                 
-                // Cache attractions if fetched from API
                 if (!cachedAttractions || cachedAttractions.length === 0) {
                     const attractionsList = attractionsRes.data?.attractions || [];
                     if (attractionsList.length > 0) {
@@ -172,7 +157,6 @@ const CreatePackage: React.FC = () => {
                     }
                 }
                 
-                // Cache add-ons if fetched from API
                 if (!cachedAddOns || cachedAddOns.length === 0) {
                     const addOnsList = addOnsRes.data?.add_ons || [];
                     if (addOnsList.length > 0) {
@@ -217,7 +201,6 @@ const CreatePackage: React.FC = () => {
         fetchData();
     }, [selectedLocation]);
 
-    // Form state
     const [form, setForm] = useState({
         name: "",
         description: "",
@@ -248,15 +231,12 @@ const CreatePackage: React.FC = () => {
         bookingWindowDays: "", // Max days in advance for booking (1-365)
         minBookingNoticeHours: "" as string, // Min hours in advance for booking (0-8760)
         
-        // NEW: Replace old availability fields with schedules array
         availability_schedules: [] as AvailabilitySchedule[],
         displayOrder: "0",
     });
 
 
-    // Image preview state
     const [imagePreview, setImagePreview] = useState<string>("");
-    // Handle image upload
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -269,7 +249,6 @@ const CreatePackage: React.FC = () => {
         }
     };
 
-    // Handle invitation file upload
     const handleInvitationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -281,7 +260,6 @@ const CreatePackage: React.FC = () => {
         }
     };
 
-    // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
     const showToast = (message: string, type?: "success" | "error" | "info") => {
         setToast({ message, type });
@@ -293,7 +271,6 @@ const CreatePackage: React.FC = () => {
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Handle feature input change
     const handleFeatureChange = (index: number, value: string) => {
         setForm((prev) => {
             const newFeatures = [...prev.features];
@@ -302,7 +279,6 @@ const CreatePackage: React.FC = () => {
         });
     };
 
-    // Add new feature input
     const handleAddFeature = () => {
         setForm((prev) => ({
             ...prev,
@@ -310,7 +286,6 @@ const CreatePackage: React.FC = () => {
         }));
     };
 
-    // Remove feature input
     const handleRemoveFeature = (index: number) => {
         setForm((prev) => ({
             ...prev,
@@ -318,10 +293,8 @@ const CreatePackage: React.FC = () => {
         }));
     };
 
-    // Drag and drop state for features
     const [draggedFeatureIndex, setDraggedFeatureIndex] = useState<number | null>(null);
     
-    // Drag and drop handlers for features
     const handleFeatureDragStart = (index: number) => {
         setDraggedFeatureIndex(index);
     };
@@ -344,10 +317,8 @@ const CreatePackage: React.FC = () => {
         setDraggedFeatureIndex(null);
     };
 
-    // Drag and drop state for add-ons
     const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
     
-    // Drag and drop handlers for add-ons
     const handleAddOnDragStart = (index: number) => {
         setDraggedAddOnIndex(index);
     };
@@ -370,7 +341,6 @@ const CreatePackage: React.FC = () => {
         setDraggedAddOnIndex(null);
     };
 
-    // Multi-select for promos and gift cards
     const handleMultiSelectCheckbox = (name: 'promos' | 'giftCards', value: string) => {
         setForm((prev) => {
             const arr = prev[name] as string[];
@@ -393,7 +363,6 @@ const CreatePackage: React.FC = () => {
         });
     };
 
-    // Add new availability schedule
     const addNewSchedule = () => {
         setForm(prev => ({
             ...prev,
@@ -411,7 +380,6 @@ const CreatePackage: React.FC = () => {
         }));
     };
 
-    // Update a specific schedule
     const updateSchedule = (index: number, updates: Partial<AvailabilitySchedule>) => {
         setForm(prev => ({
             ...prev,
@@ -421,7 +389,6 @@ const CreatePackage: React.FC = () => {
         }));
     };
 
-    // Remove a schedule
     const removeSchedule = (index: number) => {
         setForm(prev => ({
             ...prev,
@@ -429,7 +396,6 @@ const CreatePackage: React.FC = () => {
         }));
     };
 
-    // Select all days for weekly schedule
     const selectAllWeekDays = (index: number) => {
         const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const schedule = form.availability_schedules[index];
@@ -438,7 +404,6 @@ const CreatePackage: React.FC = () => {
         updateSchedule(index, { day_configuration: allSelected ? [] : allDays });
     };
 
-    // Add option with API calls instead of localStorage
     const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
         if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
         
@@ -539,11 +504,9 @@ const CreatePackage: React.FC = () => {
         }
     };
 
-    // On submit, save form data using API instead of localStorage
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Validate availability schedules
         if (form.availability_schedules.length === 0) {
             showToast("Please add at least one availability schedule", "error");
             return;
@@ -551,12 +514,10 @@ const CreatePackage: React.FC = () => {
         
         setSubmitting(true);
         try {
-            // Validate required numeric fields
             const price = parseFloat(form.price);
             const minParticipants = form.minParticipants ? parseInt(form.minParticipants) : undefined;
             const maxParticipants = parseInt(form.maxParticipants);
             const pricePerAdditional = form.pricePerAdditional ? parseFloat(form.pricePerAdditional) : 0;
-            // Calculate duration based on unit type
             let duration: number;
             if (form.durationUnit === 'hours and minutes') {
                 const hours = parseInt(form.durationHours) || 0;
@@ -566,7 +527,6 @@ const CreatePackage: React.FC = () => {
                     setSubmitting(false);
                     return;
                 }
-                // Convert to decimal hours: e.g., 1 hour 45 min = 1.75
                 duration = hours + (minutes / 60);
             } else {
                 duration = parseFloat(form.duration);
@@ -596,7 +556,6 @@ const CreatePackage: React.FC = () => {
                 return;
             }
 
-            // Prepare package data for API (send IDs)
             const packageData = {
                 name: form.name,
                 description: form.description,
@@ -621,7 +580,6 @@ const CreatePackage: React.FC = () => {
                 booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null,
                 min_booking_notice_hours: form.minBookingNoticeHours ? parseInt(form.minBookingNoticeHours) : null,
                 
-                // NEW: Send availability schedules
                 availability_schedules: form.availability_schedules,
                 attraction_ids: form.attractions.map(name => {
                     const found = attractions.find(a => a.name === name);
@@ -635,7 +593,6 @@ const CreatePackage: React.FC = () => {
                     const found = addOns.find(a => a.name === name);
                     return found?.id;
                 }).filter(Boolean),
-                // Store add-ons order for display (uses add-on names)
                 add_ons_order: form.addOns,
                 display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
                 promo_ids: form.promos.map(code => {
@@ -651,10 +608,8 @@ const CreatePackage: React.FC = () => {
                         console.log("Package created:", packageData);
 
 
-            // Create package first
             const packageResponse = await packageService.createPackage(packageData);
             
-            // Then create availability schedules if package was created successfully
             if (packageResponse.success && packageResponse.data?.id && form.availability_schedules.length > 0) {
                 try {
                     await packageService.updateAvailabilitySchedules(
@@ -669,14 +624,12 @@ const CreatePackage: React.FC = () => {
                 }
             }
             
-            // Add to cache
             if (packageResponse.success && packageResponse.data) {
                 await packageCacheService.addPackageToCache(packageResponse.data);
             }
             
             showToast("Package created successfully!", "success");
             
-            // Reset form
             setForm({
                 name: "",
                 description: "",
@@ -719,7 +672,6 @@ const CreatePackage: React.FC = () => {
         }
     };
 
-    // Format availability for display
     const formatAvailability = () => {
         if (form.availability_schedules.length === 0) return "No schedules configured";
         
@@ -742,7 +694,6 @@ const CreatePackage: React.FC = () => {
         }).join(', ');
     };
 
-    // Format duration for display
     const formatDuration = () => {
         if (form.durationUnit === 'hours and minutes') {
             const hours = parseInt(form.durationHours) || 0;
@@ -768,7 +719,6 @@ const CreatePackage: React.FC = () => {
 
     return (
             <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
-                {/* Form Section */}
                 <div className="flex-1 mx-auto">
                     <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
                         <div className="mb-6">
@@ -777,7 +727,6 @@ const CreatePackage: React.FC = () => {
                         </div>
                         
                         <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
-                            {/* Location Selection for company_admin */}
                             {isCompanyAdmin && (
                                 <div>
                                     <LocationSelector
@@ -799,7 +748,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             )}
                             
-                            {/* Image Upload */}
                             <div>
                                 <label className="block font-semibold mb-2 text-base text-neutral-800">Package Image</label>
                                 <input
@@ -808,9 +756,9 @@ const CreatePackage: React.FC = () => {
                                     onChange={handleImageChange}
                                     className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                                 />
-                                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                    <p className="text-xs text-blue-800 font-medium">Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
-                                    <p className="text-xs text-blue-600 mt-1">Images will be cropped to fit the display area. Center your subject for best results.</p>
+                                <div className={`mt-2 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-md`}>
+                                    <p className={`text-xs text-${themeColor}-800 font-medium`}>Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
+                                    <p className={`text-xs text-${fullColor} mt-1`}>Images will be cropped to fit the display area. Center your subject for best results.</p>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Max file size: 20MB. Use optimized images for faster loading.</p>
                                 {imagePreview && (
@@ -822,7 +770,6 @@ const CreatePackage: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                            {/* Details Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Info className="w-5 h-5 text-primary" /> Details
@@ -844,7 +791,6 @@ const CreatePackage: React.FC = () => {
                         />
                     </div>
                     
-                    {/* Duration Section */}
                     <div>
                         <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
                         <div className="space-y-2">
@@ -933,7 +879,6 @@ const CreatePackage: React.FC = () => {
                                         </div>
                                     </div>
                                     
-                    {/* Additional Pricing Section */}
                     {form.maxParticipants && (
                         <div>
                             <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
@@ -1023,7 +968,6 @@ const CreatePackage: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Package Type */}
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Package Type</label>
                                         <select
@@ -1043,7 +987,6 @@ const CreatePackage: React.FC = () => {
                                         </p>
                                     </div>
 
-                                    {/* Features input below category */}
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Features <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
                                         <div className="space-y-2">
@@ -1103,7 +1046,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Availability Schedules Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -1153,7 +1095,6 @@ const CreatePackage: React.FC = () => {
                                                 />
 
                                                 <div className="space-y-4">
-                                                    {/* Schedule Type */}
                                                     <div>
                                                         <label className="block font-semibold mb-2 text-sm text-neutral-800">
                                                             Schedule Type
@@ -1178,7 +1119,6 @@ const CreatePackage: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Day Configuration for Weekly */}
                                                     {schedule.availability_type === 'weekly' && (
                                                         <div>
                                                             <div className="flex items-center justify-between mb-2">
@@ -1222,7 +1162,6 @@ const CreatePackage: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                    {/* Day Configuration for Monthly */}
                                                     {schedule.availability_type === 'monthly' && (
                                                         <div>
                                                             <label className="block font-semibold mb-2 text-sm text-neutral-800">
@@ -1258,7 +1197,6 @@ const CreatePackage: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                    {/* Time Slot Configuration */}
                                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                         <div>
                                                             <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
@@ -1292,13 +1230,11 @@ const CreatePackage: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Preview generated time slots */}
                                                     {((form.durationUnit === 'hours and minutes' && (form.durationHours || form.durationMinutes)) || (form.durationUnit !== 'hours and minutes' && form.duration)) && schedule.time_slot_start && schedule.time_slot_end && (
                                                         <div className="mt-3 pt-3 border-t border-gray-200">
                                                             <p className="text-xs font-medium text-gray-600 mb-2">Generated Time Slots:</p>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {(() => {
-                                                                    // Calculate duration in minutes based on unit
                                                                     let slotDuration: number;
                                                                     if (form.durationUnit === 'hours and minutes') {
                                                                         const hours = parseInt(form.durationHours) || 0;
@@ -1348,7 +1284,6 @@ const CreatePackage: React.FC = () => {
                             
                             <div className="border-b border-gray-100 my-2" />
                             
-            {/* Attractions Section */}
             <div>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -1426,7 +1361,6 @@ const CreatePackage: React.FC = () => {
                                         {form.rooms.length === rooms.length ? 'Deselect All' : 'Select All'}
                                     </StandardButton>
                                 </div>
-                                {/* Group rooms by area_group */}
                                 {(() => {
                                     const groupedRooms = rooms.reduce((acc, room) => {
                                         const group = room.area_group || 'Ungrouped';
@@ -1491,7 +1425,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Add-ons Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -1516,7 +1449,6 @@ const CreatePackage: React.FC = () => {
                                     </StandardButton>
                                 </div>
                                 
-                                {/* Selected Add-ons - Draggable list */}
                                 {form.addOns.length > 0 && (
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
@@ -1551,7 +1483,6 @@ const CreatePackage: React.FC = () => {
                                     </div>
                                 )}
                                 
-                                {/* Available Add-ons to select */}
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {addOns.filter(add => !form.addOns.includes(add.name)).map((add) => (
                                         <StandardButton
@@ -1592,7 +1523,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Promos Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -1639,7 +1569,7 @@ const CreatePackage: React.FC = () => {
                                                     type="checkbox"
                                                     checked={form.promos.includes(promo.code)}
                                                     onChange={() => handleMultiSelectCheckbox('promos', promo.code)}
-                                                    className="accent-indigo-500"
+                                                    className={`accent-${fullColor}`}
                                                 />
                                                 <span className="relative group cursor-pointer flex items-center gap-1">
                                                     {promo.name}
@@ -1659,7 +1589,6 @@ const CreatePackage: React.FC = () => {
                                 )}
                             </div>
                             
-                            {/* Gift Cards Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
@@ -1726,7 +1655,6 @@ const CreatePackage: React.FC = () => {
                                 )}
                             </div>
                             
-                            {/* Pricing Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Info className="w-5 h-5 text-primary" /> Pricing
@@ -1748,7 +1676,6 @@ const CreatePackage: React.FC = () => {
                                     required
                                 />
                             </div>
-                            {/* Partial Payment Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Info className="w-5 h-5 text-primary" /> Partial Payment Options
@@ -1789,7 +1716,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Guest of Honor Toggle */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                                     <Gift className="w-5 h-5 text-primary" /> Guest of Honor
@@ -1806,7 +1732,6 @@ const CreatePackage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-2">When enabled, customers can specify the name, age, and gender of the guest of honor during booking.</p>
                             </div>
 
-                            {/* Customer Notes */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                                     <FileText className="w-5 h-5 text-primary" /> Customer Notes
@@ -1822,12 +1747,10 @@ const CreatePackage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
                             </div>
 
-                            {/* Booking Window */}
                             <div>
                                 <label className="block font-semibold mb-3 text-base text-neutral-800">Booking Window</label>
                                 <p className="text-sm text-gray-500 mb-3">How far in advance customers can book this package</p>
                                 
-                                {/* Quick presets row */}
                                 <div className="flex flex-wrap gap-1.5 mb-3">
                                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => {
                                         const days = month * 30;
@@ -1849,7 +1772,6 @@ const CreatePackage: React.FC = () => {
                                     })}
                                 </div>
                                 
-                                {/* Custom and No Limit options */}
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
                                         <input
@@ -1891,7 +1813,6 @@ const CreatePackage: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Advance Booking Time */}
                             <div>
                                 <label className="block font-semibold mb-3 text-base text-neutral-800">
                                     Advance Booking Time
@@ -1899,7 +1820,6 @@ const CreatePackage: React.FC = () => {
                                 </label>
                                 <p className="text-sm text-gray-500 mb-3">Set how far in advance customers must book. For example, setting 48 hours means if a customer visits on Monday at 2:00 PM, the earliest available time slot would be Wednesday at 2:00 PM. This only affects customer-facing bookings — staff can still book freely.</p>
                                 
-                                {/* Quick select buttons */}
                                 <div className="flex flex-wrap gap-2 mb-3">
                                     {[
                                         { hours: 1, label: '1 h' },
@@ -1943,7 +1863,6 @@ const CreatePackage: React.FC = () => {
                                     })}
                                 </div>
                                 
-                                {/* Custom hours input */}
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="number"
@@ -1979,11 +1898,9 @@ const CreatePackage: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Invitation */}
                             <div>
                                 <label className="block font-semibold mb-3 text-base text-neutral-800">Invitation Template</label>
                                 
-                                {/* Tab Navigation */}
                                 <div className="flex border-b border-gray-200 mb-4">
                                     <button
                                         type="button"
@@ -2009,7 +1926,6 @@ const CreatePackage: React.FC = () => {
                                     </button>
                                 </div>
 
-                                {/* Tab Content */}
                                 {form.invitationType === 'link' ? (
                                     <div>
                                         <input
@@ -2100,7 +2016,6 @@ const CreatePackage: React.FC = () => {
                     </div>
                 </div>
                 
-                {/* Live Preview Section */}
                 <div className="w-full md:w-[420px] md:max-w-sm h-fit">
                     <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
                         <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>
@@ -2111,7 +2026,6 @@ const CreatePackage: React.FC = () => {
                             </div>
                             <div className="text-xs text-gray-500 mb-2">{form.category || <span className='text-gray-300'>Category</span>}</div>
                             
-                            {/* Duration in Preview */}
                             <div className="mb-2 flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-gray-500" />
                                 <span className="font-semibold">Duration:</span> 
@@ -2120,7 +2034,6 @@ const CreatePackage: React.FC = () => {
                                 </span>
                             </div>
                             
-                            {/* Availability in Preview */}
                             <div className="mb-2 flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-gray-500" />
                                 <span className="font-semibold">Available:</span> 
@@ -2129,7 +2042,6 @@ const CreatePackage: React.FC = () => {
                                 </span>
                             </div>
                             
-                            {/* Additional Time Pricing in Preview */}
                             
                             <div className="mb-4 text-neutral-800 text-base min-h-[48px]">{form.description || <span className='text-gray-300'>Description</span>}</div>
                             <div className="mb-2">
@@ -2200,7 +2112,6 @@ const CreatePackage: React.FC = () => {
                 </div>
         
         
-            {/* Toast notification (top right) */}
             {toast && (
                 <div className="fixed top-6 right-6 z-50 animate-fade-in-up">
                     <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

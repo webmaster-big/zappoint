@@ -1,4 +1,3 @@
-// Types for: src/pages/admin/packages/GiftCard.tsx
 
 export type GiftCardStatus = "active" | "inactive" | "expired" | "redeemed" | "cancelled" | "deleted";
 export type GiftCardType = "fixed" | "percentage";
