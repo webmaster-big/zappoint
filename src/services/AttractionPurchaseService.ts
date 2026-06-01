@@ -133,6 +133,14 @@ export interface CreatePurchaseData {
     original_price: number;
     special_pricing_id: number | null;
   }> | null;
+  membership_id?: number | null;
+  membership_applied?: Array<{
+    membership_plan_benefit_id: number | null;
+    benefit_type: string;
+    value_mode: string;
+    value_applied: number;
+  }> | null;
+  sms_consent?: boolean;
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {

@@ -119,6 +119,12 @@ export interface CreateEventPurchaseData {
   amount_paid?: number;
   discount_amount?: number;
   membership_id?: number | null;
+  membership_applied?: Array<{
+    membership_plan_benefit_id: number | null;
+    benefit_type: string;
+    value_mode: string;
+    value_applied: number;
+  }> | null;
   payment_method?: string;
   payment_status?: string;
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';

@@ -20,7 +20,6 @@ import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import locationService from '../../services/LocationService';
 import type { Membership, MembershipPlan, MembershipPlanBenefit } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import StandardButton from '../../components/ui/StandardButton';
 import InfoTooltip from '../../components/ui/InfoTooltip';
 import { useToast } from '../../hooks/useToast';
@@ -304,10 +303,6 @@ const PurchaseMembership = () => {
     }
   };
 
-  if (loading) {
-    return <LoadingSpinner fullScreen size="medium" message="Loading plans…" />;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50/80">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
@@ -355,9 +350,22 @@ const PurchaseMembership = () => {
             </button>
           </div>
         )}
-          {plans.length === 0 && <p className="text-gray-500 col-span-3 text-sm">No plans available right now.</p>}
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {plans.length === 0 && <p className="text-gray-500 col-span-3 text-sm">No plans available right now.</p>}
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 bg-white p-4 animate-pulse space-y-3">
+                <div className="h-4 bg-gray-200 rounded w-2/3" />
+                <div className="h-6 bg-gray-200 rounded w-1/2" />
+                <div className="h-3 bg-gray-100 rounded w-full" />
+                <div className="space-y-1.5">
+                  <div className="h-3 bg-gray-100 rounded w-5/6" />
+                  <div className="h-3 bg-gray-100 rounded w-4/6" />
+                </div>
+              </div>
+            ))
+          ) : plans.length === 0 ? (
+            <p className="text-gray-500 col-span-3 text-sm">No plans available right now.</p>
+          ) : null}
           {plans.map((plan) => {
             const active = selectedPlanId === plan.id;
             const isCurrent = isUpgrade && plan.id === currentPlanId;

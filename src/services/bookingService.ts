@@ -97,6 +97,29 @@ export interface CreateBookingData {
     original_price: number;
     special_pricing_id: number | null;
   }> | null;
+
+  membership_id?: number | null;
+  membership_applied?: Array<{
+    membership_plan_benefit_id: number | null;
+    benefit_type: string;
+    value_mode: string;
+    value_applied: number;
+  }> | null;
+
+  promo_code?: string | null;
+  gift_card_code?: string | null;
+  sms_consent?: boolean;
+  send_email?: boolean;
+  internal_notes?: string;
+
+  guest_of_honor_name?: string;
+  guest_of_honor_age?: number;
+  guest_of_honor_gender?: 'male' | 'female' | 'other';
+  guest_address?: string;
+  guest_city?: string;
+  guest_state?: string;
+  guest_zip?: string;
+  guest_country?: string;
 }
 
 export interface UpdateBookingData {

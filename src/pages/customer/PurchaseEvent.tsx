@@ -29,7 +29,7 @@ import TermsAndConditionsCheckbox from '../../components/TermsAndConditionsCheck
 import StandardButton from '../../components/ui/StandardButton';
 import type { FeeBreakdown } from '../../types/FeeSupport.types';
 import { buildAppliedFees } from '../../utils/fees';
-import { buildAppliedDiscounts } from '../../utils/discounts';
+import { buildAppliedDiscounts, buildMembershipDiscount } from '../../utils/discounts';
 import { feeSupportService } from '../../services/FeeSupportService';
 import { specialPricingService } from '../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../types/SpecialPricing.types';
@@ -184,6 +184,7 @@ const PurchaseEvent = () => {
 
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+  const [showSavingsBreakdown, setShowSavingsBreakdown] = useState(false);
 
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -452,6 +453,13 @@ const PurchaseEvent = () => {
   const membershipDiscount = membershipBenefits.discount;
   const totalAmount = Math.max(0, totalBeforeMembership - membershipDiscount);
 
+  // Resolve human-readable item names for membership discount labels.
+  const eventItemName = (type: string, id: number | null | undefined): string | undefined => {
+    if (type === 'event') return event?.name ?? undefined;
+    if (type === 'addon') return event?.add_ons?.find((a) => a.id === id)?.name ?? undefined;
+    return undefined;
+  };
+
   const formatTime = (t: string) => {
     const [h, m] = t.split(':');
     const hour = parseInt(h);
@@ -591,7 +599,7 @@ const PurchaseEvent = () => {
           quantity,
           total_amount: totalAmount,
           amount_paid: 0,
-          discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
+          discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
           membership_id: membershipBenefits.membershipId ?? undefined,
           membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
           payment_method: 'authorize.net',
@@ -599,7 +607,13 @@ const PurchaseEvent = () => {
           special_requests: specialRequests || undefined,
           send_email: false,
           applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
-          applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : undefined,
+          applied_discounts: (() => {
+            const items = [
+              ...buildAppliedDiscounts(specialPricingBreakdown),
+              ...buildMembershipDiscount(membershipBenefits, totalBeforeMembership, eventItemName),
+            ];
+            return items.length > 0 ? items : undefined;
+          })(),
           add_ons: addOnsPayload.length > 0 ? addOnsPayload : undefined,
         });
       } catch (createErr) {
@@ -1448,10 +1462,63 @@ const PurchaseEvent = () => {
                       <span className="text-emerald-600">— no discounts apply to this event</span>
                     </div>
                   )}
-                  {membershipDiscount > 0 && (
-                    <div className="mt-3 flex justify-between text-emerald-600 text-sm">
-                      <span>Member Savings{membershipBenefits.planName ? ` (${membershipBenefits.planName})` : ''}</span>
+                  {membershipBenefits.lines.filter((l) => l.discount > 0).length > 0 ? (
+                    <div className="mt-3 space-y-1">
+                      {membershipBenefits.lines.filter((l) => l.discount > 0).map((line, i) => (
+                        <div key={i} className="flex justify-between text-emerald-600 text-xs">
+                          <span className="truncate pr-2">{eventItemName(line.type, line.id) ?? (line.type.charAt(0).toUpperCase() + line.type.slice(1))} — Member Savings</span>
+                          <span className="flex-shrink-0">-${line.discount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : membershipDiscount > 0 ? (
+                    <div className="mt-3 flex justify-between text-emerald-600 text-xs">
+                      <span>Member Savings</span>
                       <span>-${membershipDiscount.toFixed(2)}</span>
+                    </div>
+                  ) : null}
+                  {(membershipBenefits.lines.some((l) => l.discount > 0) || membershipDiscount > 0) && (
+                    <div className="mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowSavingsBreakdown((v) => !v)}
+                        className="flex items-center gap-1 text-emerald-600 text-xs hover:text-emerald-800"
+                      >
+                        <span>{showSavingsBreakdown ? '▲' : '▼'}</span>
+                        <span>Savings breakdown</span>
+                      </button>
+                      {showSavingsBreakdown && (
+                        <div className="mt-2 rounded-lg bg-emerald-50 border border-emerald-100 p-2.5 space-y-2 text-xs">
+                          {membershipBenefits.planName && (
+                            <p className="font-semibold text-emerald-800">{membershipBenefits.planName} — Member Benefits</p>
+                          )}
+                          {membershipBenefits.lines.filter((l) => l.discount > 0).map((line, i) => {
+                            const name = eventItemName(line.type, line.id) ?? (line.type.charAt(0).toUpperCase() + line.type.slice(1));
+                            return (
+                              <div key={i} className="border-t border-emerald-100 pt-1.5 first:border-t-0 first:pt-0">
+                                <div className="flex justify-between font-medium text-emerald-800">
+                                  <span className="truncate pr-2">{name}</span>
+                                  <span className="flex-shrink-0">${line.line_total.toFixed(2)}</span>
+                                </div>
+                                {line.benefits.map((b, j) => (
+                                  <div key={j} className="flex justify-between text-emerald-600 pl-2 mt-0.5">
+                                    <span>{b.label ? b.label : b.value_mode === 'percent' ? `${((b.amount / line.line_total) * 100).toFixed(0)}% off` : b.value_mode === 'free' ? 'Free' : 'Discount'}</span>
+                                    <span className="flex-shrink-0">−${b.amount.toFixed(2)}</span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between font-medium text-emerald-700 mt-0.5 pt-0.5 border-t border-emerald-100">
+                                  <span>You pay</span>
+                                  <span>${(line.line_total - line.discount).toFixed(2)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div className="border-t border-emerald-200 pt-1 flex justify-between font-bold text-emerald-800">
+                            <span>Total Saved</span>
+                            <span>−${membershipDiscount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
@@ -1530,6 +1597,65 @@ const PurchaseEvent = () => {
                     </div>
                   )}
                 </div>
+                {membershipBenefits.lines.filter((l) => l.discount > 0).length > 0 ? (
+                  <div className="mt-3 space-y-1">
+                    {membershipBenefits.lines.filter((l) => l.discount > 0).map((line, i) => (
+                      <div key={i} className="flex justify-between text-emerald-600 text-xs">
+                        <span className="truncate pr-2">{eventItemName(line.type, line.id) ?? (line.type.charAt(0).toUpperCase() + line.type.slice(1))} — Member Savings</span>
+                        <span className="flex-shrink-0">-${line.discount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : membershipDiscount > 0 ? (
+                  <div className="mt-3 flex justify-between text-emerald-600 text-xs">
+                    <span>Member Savings</span>
+                    <span>-${membershipDiscount.toFixed(2)}</span>
+                  </div>
+                ) : null}
+                {(membershipBenefits.lines.some((l) => l.discount > 0) || membershipDiscount > 0) && (
+                  <div className="mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowSavingsBreakdown((v) => !v)}
+                      className="flex items-center gap-1 text-emerald-600 text-xs hover:text-emerald-800"
+                    >
+                      <span>{showSavingsBreakdown ? '▲' : '▼'}</span>
+                      <span>Savings breakdown</span>
+                    </button>
+                    {showSavingsBreakdown && (
+                      <div className="mt-2 rounded-lg bg-emerald-50 border border-emerald-100 p-2.5 space-y-2 text-xs">
+                        {membershipBenefits.planName && (
+                          <p className="font-semibold text-emerald-800">{membershipBenefits.planName} — Member Benefits</p>
+                        )}
+                        {membershipBenefits.lines.filter((l) => l.discount > 0).map((line, i) => {
+                          const name = eventItemName(line.type, line.id) ?? (line.type.charAt(0).toUpperCase() + line.type.slice(1));
+                          return (
+                            <div key={i} className="border-t border-emerald-100 pt-1.5 first:border-t-0 first:pt-0">
+                              <div className="flex justify-between font-medium text-emerald-800">
+                                <span className="truncate pr-2">{name}</span>
+                                <span className="flex-shrink-0">${line.line_total.toFixed(2)}</span>
+                              </div>
+                              {line.benefits.map((b, j) => (
+                                <div key={j} className="flex justify-between text-emerald-600 pl-2 mt-0.5">
+                                  <span>{b.label ? b.label : b.value_mode === 'percent' ? `${((b.amount / line.line_total) * 100).toFixed(0)}% off` : b.value_mode === 'free' ? 'Free' : 'Discount'}</span>
+                                  <span className="flex-shrink-0">−${b.amount.toFixed(2)}</span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between font-medium text-emerald-700 mt-0.5 pt-0.5 border-t border-emerald-100">
+                                <span>You pay</span>
+                                <span>${(line.line_total - line.discount).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="border-t border-emerald-200 pt-1 flex justify-between font-bold text-emerald-800">
+                          <span>Total Saved</span>
+                          <span>−${membershipDiscount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-white text-sm">Total</span>
