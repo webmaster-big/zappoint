@@ -83,12 +83,44 @@ type ScopeOption = { id: number; name: string };
 type ScopeTargetType = 'package' | 'attraction' | 'event' | 'addon' | 'location';
 
 const VALUE_MODES: { value: MembershipBenefitValueMode; label: string }[] = [
-  { value: 'percent', label: 'Percent (%)' },
-  { value: 'fixed', label: 'Fixed amount ($)' },
+  { value: 'percent', label: 'Percent off (%)' },
+  { value: 'fixed', label: 'Fixed amount off ($)' },
   { value: 'free', label: 'Free (100% off)' },
-  { value: 'count', label: 'Count (passes)' },
-  { value: 'flag', label: 'Flag (access only)' },
+  { value: 'count', label: 'Number of passes' },
+  { value: 'flag', label: 'Access only (no value)' },
 ];
+
+// Which value modes make sense for each benefit type. Mirrors the backend VALUE_MODE_MATRIX.
+// Discounts reduce price; passes grant a count; access benefits are simple flags.
+const VALUE_MODE_MATRIX: Record<MembershipBenefitType, MembershipBenefitValueMode[]> = {
+  package_discount: ['percent', 'fixed', 'free'],
+  attraction_discount: ['percent', 'fixed', 'free'],
+  event_discount: ['percent', 'fixed', 'free'],
+  addon_discount: ['percent', 'fixed', 'free'],
+  free_entry_pass: ['count'],
+  guest_pass: ['count'],
+  priority_booking: ['flag'],
+  member_only_access: ['flag'],
+  birthday_reward: ['free', 'percent', 'fixed', 'count'],
+};
+
+const allowedValueModesFor = (bt: MembershipBenefitType): MembershipBenefitValueMode[] =>
+  VALUE_MODE_MATRIX[bt] ?? ['percent'];
+
+const defaultValueFor = (mode: MembershipBenefitValueMode): number => {
+  switch (mode) {
+    case 'percent': return 10;
+    case 'fixed':   return 5;
+    case 'count':   return 1;
+    default:        return 0; // free / flag carry no numeric value
+  }
+};
+
+// A benefit that grants a fixed number of redeemable passes. For these the count IS
+// the cap, so there is no separate "max redemptions" field.
+const isCountValueMode = (mode: MembershipBenefitValueMode) => mode === 'count';
+// Access-only benefits (priority booking, member-only access) carry no value at all.
+const isFlagValueMode = (mode: MembershipBenefitValueMode) => mode === 'flag';
 
 // Period is the window a redemption cap resets over. Only relevant when a cap is set.
 const PERIODS: { value: MembershipBenefitPeriod; label: string }[] = [
@@ -131,7 +163,7 @@ function describeBenefit(b: MembershipPlanBenefit): string {
     case 'free':
       return 'Free (100% off)';
     case 'count':
-      return `${v} pass${v === 1 ? '' : 'es'}${b.max_redemptions ? ` (max ${b.max_redemptions} / ${normalizePeriod(b.period).replace('_', ' ')})` : ''}`;
+      return `${v} pass${v === 1 ? '' : 'es'} / ${normalizePeriod(b.period).replace('_', ' ')}`;
     case 'flag':
       return 'Access grant';
     default:
@@ -286,24 +318,38 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
     }
   };
 
-  const isDiscount = ['package_discount', 'attraction_discount', 'event_discount', 'addon_discount'].includes(form.benefit_type);
-  const isPass = ['free_entry_pass', 'guest_pass'].includes(form.benefit_type);
-
-  // When the benefit type changes, drop any scope that is no longer valid for it.
+  // When the benefit type changes, realign value mode and scope to what's valid for it.
   const onBenefitTypeChange = (bt: MembershipBenefitType) => {
-    const allowed = allowedScopesFor(bt);
+    const allowedScopes = allowedScopesFor(bt);
+    const allowedModes = allowedValueModesFor(bt);
     setForm((prev) => {
-      const keepScope = allowed.includes(prev.scope_type) ? prev.scope_type : 'any';
+      const keepScope = allowedScopes.includes(prev.scope_type) ? prev.scope_type : 'any';
       const scopeChanged = keepScope !== prev.scope_type;
+      const keepMode = allowedModes.includes(prev.value_mode) ? prev.value_mode : allowedModes[0];
+      const modeChanged = keepMode !== prev.value_mode;
       return {
         ...prev,
         benefit_type: bt,
+        value_mode: keepMode,
+        value: modeChanged ? defaultValueFor(keepMode) : prev.value,
+        // max redemptions only applies to discounts; passes use their count as the cap.
+        max_redemptions: isCountValueMode(keepMode) || isFlagValueMode(keepMode) ? null : prev.max_redemptions,
         scope_type: keepScope,
         scope_id: scopeChanged ? null : prev.scope_id,
         scope_ids: scopeChanged ? null : prev.scope_ids,
         scope_category: scopeChanged ? null : prev.scope_category,
       };
     });
+  };
+
+  const onValueModeChange = (mode: MembershipBenefitValueMode) => {
+    setForm((prev) => ({
+      ...prev,
+      value_mode: mode,
+      value: defaultValueFor(mode),
+      // count = self-capping passes; flag = no value -> no separate redemption cap.
+      max_redemptions: isCountValueMode(mode) || isFlagValueMode(mode) ? null : prev.max_redemptions,
+    }));
   };
 
   const onScopeTypeChange = (st: MembershipBenefitScopeType) => {
@@ -421,28 +467,31 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                 </div>
                 <div>
                   <label className={`${labelCls} flex items-center gap-1`}>
-                    Value mode <InfoTooltip content="How the value is interpreted: percent off, fixed $ off, free, a pass count, or an access flag." />
+                    Value mode <InfoTooltip content="How this benefit's value is applied. Options are limited to what fits the benefit type: discounts reduce price, passes grant a count, access benefits are flags." />
                   </label>
                   <select
                     value={form.value_mode}
-                    onChange={(e) => setForm({ ...form, value_mode: e.target.value as MembershipBenefitValueMode })}
+                    onChange={(e) => onValueModeChange(e.target.value as MembershipBenefitValueMode)}
                     className={inputCls}
                   >
-                    {VALUE_MODES.map((m) => (
+                    {VALUE_MODES.filter((m) => allowedValueModesFor(form.benefit_type).includes(m.value)).map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
                 </div>
 
-                {(isDiscount || isPass || form.value_mode === 'count' || form.value_mode === 'percent' || form.value_mode === 'fixed') && form.value_mode !== 'free' && form.value_mode !== 'flag' && (
+                {(form.value_mode === 'percent' || form.value_mode === 'fixed' || form.value_mode === 'count') && (
                   <div>
-                    <label className={labelCls}>
-                      {form.value_mode === 'percent' ? 'Percent off' : form.value_mode === 'fixed' ? 'Amount off ($)' : 'Count'}
+                    <label className={`${labelCls} flex items-center gap-1`}>
+                      {form.value_mode === 'percent' ? 'Percent off' : form.value_mode === 'fixed' ? 'Amount off ($)' : 'Number of passes'}
+                      {form.value_mode === 'count' && (
+                        <InfoTooltip content="How many passes the member gets each reset period. This count is itself the usage cap — there's no separate redemption limit." />
+                      )}
                     </label>
                     <input
                       type="number"
-                      step="0.01"
-                      min={0}
+                      step={form.value_mode === 'count' ? 1 : 0.01}
+                      min={form.value_mode === 'count' ? 1 : 0}
                       value={form.value ?? ''}
                       onChange={(e) => setForm({ ...form, value: e.target.value ? parseFloat(e.target.value) : 0 })}
                       className={inputCls}
@@ -531,24 +580,26 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                   </div>
                 )}
 
-                <div>
-                  <label className={`${labelCls} flex items-center gap-1`}>
-                    Max redemptions <InfoTooltip content="Cap on how many times this benefit can be used. Leave empty for unlimited — the reset window only matters when a cap is set." />
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.max_redemptions ?? ''}
-                    onChange={(e) => setForm({ ...form, max_redemptions: e.target.value ? parseInt(e.target.value) : null })}
-                    className={inputCls}
-                    placeholder="Unlimited"
-                  />
-                </div>
-
-                {form.max_redemptions != null && form.max_redemptions > 0 && (
+                {(form.value_mode === 'percent' || form.value_mode === 'fixed' || form.value_mode === 'free') && (
                   <div>
                     <label className={`${labelCls} flex items-center gap-1`}>
-                      Resets <InfoTooltip content="How often the redemption cap above resets back to full." />
+                      Max redemptions <InfoTooltip content="Cap on how many times this discount can be used. Leave empty for unlimited — the reset window only matters when a cap is set." />
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.max_redemptions ?? ''}
+                      onChange={(e) => setForm({ ...form, max_redemptions: e.target.value ? parseInt(e.target.value) : null })}
+                      className={inputCls}
+                      placeholder="Unlimited"
+                    />
+                  </div>
+                )}
+
+                {(form.value_mode === 'count' || (form.max_redemptions != null && form.max_redemptions > 0)) && (
+                  <div>
+                    <label className={`${labelCls} flex items-center gap-1`}>
+                      Resets <InfoTooltip content={form.value_mode === 'count' ? 'How often the pass count refills back to full.' : 'How often the redemption cap above resets back to full.'} />
                     </label>
                     <select
                       value={normalizePeriod(form.period)}
