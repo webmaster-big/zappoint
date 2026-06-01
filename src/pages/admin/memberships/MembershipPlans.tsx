@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Building2, Lock, Sparkles, DollarSign, ExternalLink } from 'lucide-react';
+import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Building2, Lock, Sparkles, DollarSign, Eye, EyeOff, KeyRound } from 'lucide-react';
 import membershipService from '../../../services/MembershipService';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import locationService from '../../../services/LocationService';
+import { connectAuthorizeNetAccount } from '../../../services/SettingsService';
 import type { MembershipPlan, CreateMembershipPlanData } from '../../../types/Membership.types';
 import type { Location } from '../../../services/LocationService';
 import Toast from '../../../components/ui/Toast';
@@ -45,7 +45,6 @@ const emptyForm: CreateMembershipPlanData = {
 const MembershipPlans = () => {
   const { themeColor } = useThemeColor();
   const user = getStoredUser();
-  const navigate = useNavigate();
   const isCompanyAdmin = user?.role === 'company_admin';
   const isLocationManager = user?.role === 'location_manager';
   const canManagePlans = isCompanyAdmin || isLocationManager;
@@ -59,6 +58,14 @@ const MembershipPlans = () => {
   const [saving, setSaving] = useState(false);
   const [benefitsPlan, setBenefitsPlan] = useState<MembershipPlan | null>(null);
   const { toast, showSuccess, showError, clear } = useToast();
+
+  // Authorize.Net add-account modal
+  const emptyAuthForm = { location_id: null as number | null, api_login_id: '', transaction_key: '', public_client_key: '', environment: 'sandbox' as 'sandbox' | 'production' };
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authForm, setAuthForm] = useState(emptyAuthForm);
+  const [savingAuth, setSavingAuth] = useState(false);
+  const [showTxKey, setShowTxKey] = useState(false);
+  const [showPubKey, setShowPubKey] = useState(false);
 
   const inputCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`;
   const labelCls = 'block text-xs font-medium text-gray-800 mb-1';
@@ -176,6 +183,38 @@ const MembershipPlans = () => {
       load(true);
     } catch (e: unknown) {
       showError(e, 'Delete failed');
+    }
+  };
+
+  const saveAuth = async () => {
+    if (!authForm.location_id) { showError(null, 'Select a location for this account'); return; }
+    if (!authForm.api_login_id.trim() || !authForm.transaction_key.trim() || !authForm.public_client_key.trim()) {
+      showError(null, 'All credential fields are required'); return;
+    }
+    setSavingAuth(true);
+    try {
+      const res = await connectAuthorizeNetAccount({
+        api_login_id: authForm.api_login_id.trim(),
+        transaction_key: authForm.transaction_key.trim(),
+        public_client_key: authForm.public_client_key.trim(),
+        environment: authForm.environment,
+        location_id: authForm.location_id,
+      });
+      if (res.success) {
+        showSuccess('Authorize.Net account connected');
+        // Auto-select the location as billing location for this plan
+        setForm((prev) => ({ ...prev, billing_location_id: authForm.location_id }));
+        setAuthForm(emptyAuthForm);
+        setShowAuthModal(false);
+        // Refresh location list in case new location was indirectly added
+        locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
+      } else {
+        showError(null, (res as any).message ?? 'Failed to connect account');
+      }
+    } catch (e: unknown) {
+      showError(e, 'Failed to connect Authorize.Net account');
+    } finally {
+      setSavingAuth(false);
     }
   };
 
@@ -504,15 +543,19 @@ const MembershipPlans = () => {
                     Payments will use the Authorize.Net account registered to{' '}
                     <strong>{locations.find((l) => l.id === form.location_id)?.name ?? 'the selected location'}</strong>.
                     {' '}
-                    <button type="button" onClick={() => navigate('/admin/settings')} className="underline hover:no-underline inline-flex items-center gap-0.5">
-                      Manage accounts <ExternalLink size={10} />
+                    <button
+                      type="button"
+                      onClick={() => { setAuthForm({ ...emptyAuthForm, location_id: form.location_id ?? null }); setShowAuthModal(true); }}
+                      className="underline hover:no-underline inline-flex items-center gap-0.5"
+                    >
+                      <KeyRound size={10} /> Add / update credentials
                     </button>
                   </p>
                 </div>
               )}
               {isCompanyAdmin && form.location_access_mode !== 'single' && (
                 <div>
-                  <TipLabel tip={<>Choose which location&apos;s Authorize.Net account handles ALL membership charges for this plan, regardless of where the member signed up. Leave blank to charge through each member&apos;s home location. <button type="button" onClick={() => navigate('/admin/settings')} className="underline">Add or manage Authorize.Net accounts in Settings.</button></>}>
+                  <TipLabel tip="Choose which location's Authorize.Net account handles ALL membership charges for this plan. Leave blank to charge through each member's home location. Use 'Add new account' to register credentials for a new location.">
                     <DollarSign size={12} className="inline" /> Billing Location (Authorize.Net)
                   </TipLabel>
                   <select
@@ -520,17 +563,18 @@ const MembershipPlans = () => {
                     onChange={(e) => setForm({ ...form, billing_location_id: e.target.value ? parseInt(e.target.value) : null })}
                     className={inputCls}
                   >
-                    <option value="">Each member&apos;s home location (default)</option>
+                    <option value="">Each member's home location (default)</option>
                     {locations.map((loc) => (
                       <option key={loc.id} value={loc.id}>{loc.name}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    Need a new Authorize.Net account?{' '}
-                    <button type="button" onClick={() => navigate('/admin/settings')} className={`text-${themeColor}-600 underline hover:no-underline inline-flex items-center gap-0.5`}>
-                      Configure in Settings <ExternalLink size={10} />
-                    </button>
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthForm({ ...emptyAuthForm, location_id: form.billing_location_id ?? null }); setShowAuthModal(true); }}
+                    className={`mt-1.5 text-xs text-${themeColor}-600 hover:text-${themeColor}-800 font-medium flex items-center gap-1 underline underline-offset-2`}
+                  >
+                    <KeyRound size={11} /> Add new Authorize.Net account
+                  </button>
                 </div>
               )}
               <div>
@@ -627,6 +671,108 @@ const MembershipPlans = () => {
           canManage={canManagePlans}
           onClose={() => setBenefitsPlan(null)}
         />
+      )}
+
+      {/* Add Authorize.Net Account Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setShowAuthModal(false); setShowTxKey(false); setShowPubKey(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <KeyRound size={16} className={`text-${themeColor}-600`} />
+                <h3 className="text-base font-semibold text-gray-900">Add Authorize.Net Account</h3>
+              </div>
+              <button onClick={() => { setShowAuthModal(false); setShowTxKey(false); setShowPubKey(false); }} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 text-sm">
+              <p className="text-xs text-gray-500">
+                Enter the Authorize.Net credentials for a location. After saving, that location will be available as a billing location for membership plans.
+              </p>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Location <span className="text-red-500">*</span></label>
+                <select
+                  value={authForm.location_id ?? ''}
+                  onChange={(e) => setAuthForm({ ...authForm, location_id: e.target.value ? parseInt(e.target.value) : null })}
+                  className={inputCls}
+                >
+                  <option value="">Select a location</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">API Login ID <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  placeholder="e.g. 5Jd2Kn..."
+                  value={authForm.api_login_id}
+                  onChange={(e) => setAuthForm({ ...authForm, api_login_id: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Transaction Key <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <input
+                    type={showTxKey ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Transaction key"
+                    value={authForm.transaction_key}
+                    onChange={(e) => setAuthForm({ ...authForm, transaction_key: e.target.value })}
+                    className={`${inputCls} pr-10`}
+                  />
+                  <button type="button" onClick={() => setShowTxKey((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showTxKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Public Client Key <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <input
+                    type={showPubKey ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Public client key (for Accept.js)"
+                    value={authForm.public_client_key}
+                    onChange={(e) => setAuthForm({ ...authForm, public_client_key: e.target.value })}
+                    className={`${inputCls} pr-10`}
+                  />
+                  <button type="button" onClick={() => setShowPubKey((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPubKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Environment</label>
+                <select
+                  value={authForm.environment}
+                  onChange={(e) => setAuthForm({ ...authForm, environment: e.target.value as 'sandbox' | 'production' })}
+                  className={inputCls}
+                >
+                  <option value="sandbox">Sandbox (testing)</option>
+                  <option value="production">Production (live)</option>
+                </select>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-2 justify-end bg-gray-50">
+              <StandardButton variant="secondary" onClick={() => { setShowAuthModal(false); setShowTxKey(false); setShowPubKey(false); }} disabled={savingAuth}>
+                Cancel
+              </StandardButton>
+              <StandardButton variant="primary" onClick={saveAuth} loading={savingAuth}>
+                Save Account
+              </StandardButton>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

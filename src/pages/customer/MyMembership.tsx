@@ -86,18 +86,18 @@ const MyMembership = () => {
       return map[b.benefit_type] ?? 'All applicable items';
     }
     if (b.scope_type === 'category') return `Category: ${b.scope_category ?? '—'}`;
-    const typeLabel: Partial<Record<MembershipBenefitType, string>> = {
-      package_discount:    'packages',
-      attraction_discount: 'attractions',
-      event_discount:      'events',
-      addon_discount:      'add-ons',
-      free_entry_pass:     'attractions',
-      guest_pass:          'guest entries',
+    // Entity-scoped: scope_type is 'package' | 'attraction' | 'event' | 'addon'
+    const scopeNoun: Record<string, string> = {
+      package:    'packages',
+      attraction: 'attractions',
+      event:      'events',
+      addon:      'add-ons',
     };
-    const noun = typeLabel[b.benefit_type] ?? 'items';
+    const noun = scopeNoun[b.scope_type] ?? 'items';
     if (b.scope_targets && b.scope_targets.length > 0)
       return `Specific ${noun} (${b.scope_targets.length})`;
-    return `Specific ${noun}`;
+    // No specific targets stored → applies to ALL of this entity type
+    return `All ${noun}`;
   };
 
   const load = async (forceRefresh = false) => {
