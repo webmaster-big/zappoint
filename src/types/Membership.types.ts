@@ -43,7 +43,9 @@ export type MembershipBenefitValueMode = 'percent' | 'fixed' | 'free' | 'count' 
 export type MembershipBenefitPeriod =
   | 'per_term'
   | 'per_day'
-  | 'lifetime';
+  | 'per_visit'
+  | 'lifetime'
+  | 'once';
 
 export interface MembershipPlanBenefit {
   id: number;
@@ -302,7 +304,7 @@ export interface Membership {
   expires_at?: string | null;
 
   visits_remaining?: number | null;
-  visits_used_this_term: number;
+  visits_used_this_term?: number;
   last_visit_at?: string | null;
 
   photo_path?: string | null;

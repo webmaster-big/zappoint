@@ -125,15 +125,15 @@ const isFlagValueMode = (mode: MembershipBenefitValueMode) => mode === 'flag';
 // Period is the window a redemption cap resets over. Only relevant when a cap is set.
 const PERIODS: { value: MembershipBenefitPeriod; label: string }[] = [
   { value: 'per_day', label: 'Per day (resets daily)' },
+  { value: 'per_visit', label: 'Per visit' },
   { value: 'per_term', label: 'Per billing term (resets each renewal)' },
+  { value: 'once', label: 'Once (never resets)' },
   { value: 'lifetime', label: 'Lifetime (never resets)' },
 ];
 
-// Legacy period values may exist in older records; map them onto the supported set.
+// Legacy period values may exist in older records; map onto valid values if needed.
 const normalizePeriod = (p?: string | null): MembershipBenefitPeriod => {
-  if (p === 'per_day' || p === 'per_term' || p === 'lifetime') return p;
-  if (p === 'once') return 'lifetime';
-  if (p === 'per_visit') return 'per_term';
+  if (p === 'per_day' || p === 'per_term' || p === 'per_visit' || p === 'lifetime' || p === 'once') return p;
   return 'per_term';
 };
 
