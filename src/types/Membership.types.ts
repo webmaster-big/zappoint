@@ -1,6 +1,6 @@
 
-export type MembershipBillingInterval = 'monthly' | 'quarterly' | 'annual' | 'one_time';
-export type MembershipUsageType = 'unlimited' | 'limited_visits' | 'punch_card';
+export type MembershipBillingInterval = 'monthly' | 'quarterly' | 'annual' | 'one_time' | 'custom';
+export type MembershipUsageType = 'unlimited' | 'limited' | 'limited_visits' | 'punch_card';
 export type MembershipLocationAccessMode = 'single' | 'multi' | 'all';
 export type MembershipCancellationMode = 'immediate' | 'end_of_term' | 'staff_only';
 
@@ -171,7 +171,7 @@ export interface MembershipPlan {
   tier?: string | null;
   price: number;
   billing_interval: MembershipBillingInterval;
-  billing_cycle?: 'monthly' | 'annual' | 'custom' | null;
+  billing_cycle?: 'monthly' | 'quarterly' | 'annual' | 'one_time' | 'custom' | null;
   custom_billing_days?: number | null;
   trial_days: number;            // 0 = no trial; backend default is 0
   term_length_months?: number | null;
@@ -245,9 +245,13 @@ export interface MembershipPayment {
 export interface MembershipNote {
   id: number;
   membership_id: number;
-  author_user_id?: number | null;
-  body: string;
+  user_id?: number | null;
+  content: string;
+  pinned?: boolean;
+  type?: string;
+  visibility?: string;
   created_at: string;
+  user?: { id: number; first_name: string; last_name: string } | null;
 }
 
 export interface MembershipAuditLog {
@@ -294,7 +298,7 @@ export interface Membership {
   grace_period_ends_at?: string | null;
   frozen_until?: string | null;
   canceled_at?: string | null;
-  cancel_at_period_end: boolean;
+  cancellation_effective_at?: string | null;
   expires_at?: string | null;
 
   visits_remaining?: number | null;

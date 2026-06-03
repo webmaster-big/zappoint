@@ -209,6 +209,8 @@ const PurchaseMembership = () => {
     const termEnd = existingMembership.current_term_end ? new Date(existingMembership.current_term_end) : null;
     const termStart = existingMembership.current_term_start ? new Date(existingMembership.current_term_start) : null;
     const billingDays = existingMembership.plan?.billing_cycle === 'annual' ? 365
+      : existingMembership.plan?.billing_cycle === 'quarterly' ? 90
+      : existingMembership.plan?.billing_cycle === 'one_time' ? 0
       : (existingMembership.plan?.custom_billing_days ?? 30);
     let remainingDays = billingDays;
     if (termEnd) {

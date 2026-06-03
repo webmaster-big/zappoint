@@ -530,7 +530,7 @@ const MembershipDetails = () => {
             <ul className="text-sm divide-y divide-gray-100 max-h-60 overflow-auto">
               {(m.notes || []).map((n) => (
                 <li key={n.id} className="py-2">
-                  <p className="text-gray-800">{n.body}</p>
+                  <p className="text-gray-800">{n.content}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
                 </li>
               ))}
