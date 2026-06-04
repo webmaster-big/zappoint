@@ -107,7 +107,9 @@ const MembershipPlans = () => {
     const base = { ...emptyForm };
     if (isLocationManager) {
       base.location_access_mode = 'single';
-      base.location_id = locations.find((l) => l.name === user?.location_name)?.id ?? null;
+      // Use location_id directly from stored user — name-matching against the
+      // locations list is fragile and can silently produce null.
+      base.location_id = user?.location_id ?? null;
     }
     setForm(base);
     setShowForm(true);
