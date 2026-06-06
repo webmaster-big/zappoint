@@ -573,8 +573,13 @@ const DayOffs: React.FC = () => {
         setCurrentPage(page);
     };
 
+    const parseLocalDate = (isoDateString: string): Date => {
+        const [year, month, day] = isoDateString.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    };
+
     const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
+        const date = parseLocalDate(dateString);
         return date.toLocaleDateString('en-US', { 
             weekday: 'short',
             month: 'short', 
@@ -586,7 +591,7 @@ const DayOffs: React.FC = () => {
     const isPastDate = (dateString: string) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const date = new Date(dateString);
+        const date = parseLocalDate(dateString);
         return date < today;
     };
 

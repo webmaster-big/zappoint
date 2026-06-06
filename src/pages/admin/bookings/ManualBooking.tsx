@@ -414,9 +414,10 @@ const ManualBooking: React.FC = () => {
         if (response.success && response.data) {
           const allDayOffs: DayOffWithTime[] = [];
           const today = new Date();
+          today.setHours(0, 0, 0, 0);
           
           response.data.forEach((dayOff: DayOff) => {
-            const offDate = new Date(dayOff.date);
+            const offDate = parseLocalDate(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
             const dayOffData = {
