@@ -1,5 +1,14 @@
-export const API_BASE_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/api"
-export const ASSET_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/storage/"
+const DEFAULT_API_BASE_URL = 'https://zapzone-backend-yt1lm2w5.on-forge.com/api';
+
+const normalizeBaseUrl = (value: string): string => value.trim().replace(/\/+$/, '');
+
+const configuredApiBaseUrl = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
+
+export const API_BASE_URL = configuredApiBaseUrl.endsWith('/api')
+  ? configuredApiBaseUrl
+  : `${configuredApiBaseUrl}/api`;
+
+export const ASSET_URL = `${API_BASE_URL.replace(/\/api$/, '')}/storage/`;
 
 export const getImageUrl = (img?: string | null | any): string => {
   if (!img) return '';
