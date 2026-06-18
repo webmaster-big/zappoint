@@ -18,11 +18,13 @@ import {
   X,
   DollarSign,
   Ticket,
+  CalendarPlus,
+  Trash2,
 } from 'lucide-react';
 import membershipService from '../../../services/MembershipService';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import type { Membership, MembershipPayment, MembershipBenefitRedemption } from '../../../types/Membership.types';
-import { getImageUrl } from '../../../utils/storage';
+import { getImageUrl, getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
@@ -83,6 +85,8 @@ const MembershipDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { themeColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [m, setM] = useState<Membership | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
@@ -139,6 +143,33 @@ const MembershipDetails = () => {
     setActing('cancel');
     try { applyUpdate(await membershipService.cancelMembership(m.id, mode)); showSuccess('Canceled'); }
     catch (e: unknown) { showError(e, 'Cancel failed'); }
+    finally { setActing(null); }
+  };
+
+  const extend = async () => {
+    if (!m) return;
+    const current = m.current_term_end ? m.current_term_end.slice(0, 10) : '';
+    const newDate = window.prompt('Extend membership until (YYYY-MM-DD)', current);
+    if (!newDate) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { showError(null, 'Enter a valid date (YYYY-MM-DD)'); return; }
+    const note = window.prompt('Reason / note (optional)') || undefined;
+    setActing('extend');
+    try { applyUpdate(await membershipService.extendMembership(m.id, newDate, note)); showSuccess('Membership extended'); }
+    catch (e: unknown) { showError(e, 'Extend failed'); }
+    finally { setActing(null); }
+  };
+
+  const remove = async () => {
+    if (!m) return;
+    if (!window.confirm('Permanently delete this canceled membership? This cannot be undone.')) return;
+    setActing('delete');
+    try {
+      await membershipService.deleteMembership(m.id);
+      void membershipCache.invalidate('list');
+      showSuccess('Membership deleted');
+      navigate('/admin/memberships');
+    }
+    catch (e: unknown) { showError(e, 'Delete failed'); }
     finally { setActing(null); }
   };
 
@@ -365,6 +396,20 @@ const MembershipDetails = () => {
                 <InfoTooltip content="Ends access right now. No refund is issued automatically — handle separately if needed." />
               </div>
             </>
+          )}
+          <div className="inline-flex items-center gap-1">
+            <StandardButton variant="secondary" size="sm" icon={CalendarPlus} loading={acting === 'extend'} onClick={extend}>
+              Extend
+            </StandardButton>
+            <InfoTooltip content="Manually set a new term end date. Extends access beyond the plan's season end or revives an expired/past-due membership." />
+          </div>
+          {isCompanyAdmin && m.status === 'canceled' && (
+            <div className="inline-flex items-center gap-1">
+              <StandardButton variant="danger" size="sm" icon={Trash2} loading={acting === 'delete'} onClick={remove}>
+                Delete
+              </StandardButton>
+              <InfoTooltip content="Permanently remove this canceled membership. Admins only and cannot be undone." />
+            </div>
           )}
           <label
             className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-lg cursor-pointer ${acting === 'photo' ? 'opacity-50 pointer-events-none' : ''}`}

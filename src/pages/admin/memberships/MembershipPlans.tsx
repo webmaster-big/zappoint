@@ -23,6 +23,8 @@ const emptyForm: CreateMembershipPlanData = {
   price: 0,
   billing_interval: 'monthly',
   term_length_months: 1,
+  season_start_date: null,
+  season_end_date: null,
   usage_type: 'unlimited',
   unlimited_uses: true,
   unlimited_visits: true,
@@ -123,6 +125,8 @@ const MembershipPlans = () => {
       price: Number(p.price),
       billing_interval: p.billing_interval,
       term_length_months: p.term_length_months ?? null,
+      season_start_date: p.season_start_date ? p.season_start_date.slice(0, 10) : null,
+      season_end_date: p.season_end_date ? p.season_end_date.slice(0, 10) : null,
       usage_type: p.usage_type,
       unlimited_uses: p.unlimited_uses,
       unlimited_visits: p.unlimited_visits,
@@ -393,6 +397,25 @@ const MembershipPlans = () => {
                   type="number"
                   value={form.term_length_months ?? ''}
                   onChange={(e) => setForm({ ...form, term_length_months: e.target.value ? parseInt(e.target.value) : null })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <TipLabel tip="Optional. The date this fixed-season plan begins. Leave blank for rolling memberships.">Season Start Date</TipLabel>
+                <input
+                  type="date"
+                  value={form.season_start_date ?? ''}
+                  onChange={(e) => setForm({ ...form, season_start_date: e.target.value || null })}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <TipLabel tip="Optional. When set, every membership on this plan expires on this date (e.g. a season pass ending Sept 7). Staff can still extend individual members past this date.">Season End Date</TipLabel>
+                <input
+                  type="date"
+                  value={form.season_end_date ?? ''}
+                  min={form.season_start_date ?? undefined}
+                  onChange={(e) => setForm({ ...form, season_end_date: e.target.value || null })}
                   className={inputCls}
                 />
               </div>

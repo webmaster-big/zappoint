@@ -19,6 +19,8 @@ import { membershipCache } from '../../../services/MembershipCacheService';
 import locationService from '../../../services/LocationService';
 import type { Location } from '../../../services/LocationService';
 import type { Membership, MembershipPlan, MembershipStatus } from '../../../types/Membership.types';
+import { loadAcceptJS, tokenizeCard } from '../../../services/PaymentService';
+import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -77,12 +79,61 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
 
   const [planId, setPlanId] = useState<number | ''>('');
   const [locationId, setLocationId] = useState<number | ''>('');
-  const [isComped, setIsComped] = useState(false);
+  // Payment handling for in-person sales (task 1).
+  const [paymentMethod, setPaymentMethod] = useState<'charge' | 'external' | 'comp'>('charge');
+  const isComped = paymentMethod === 'comp';
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpMonth, setCardExpMonth] = useState('');
+  const [cardExpYear, setCardExpYear] = useState('');
+  const [cardCode, setCardCode] = useState('');
+  const [gatewayReady, setGatewayReady] = useState(false);
+  const [gatewayError, setGatewayError] = useState('');
+  const [anetLoginId, setAnetLoginId] = useState('');
+  const [anetClientKey, setAnetClientKey] = useState('');
+
+  const selectedPlan = useMemo(() => plans.find((p) => p.id === planId) || null, [plans, planId]);
+  const planPrice = selectedPlan ? Number(selectedPlan.price) : 0;
 
   useEffect(() => {
     membershipService.listPlans().then(setPlans).catch(() => {});
     locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
   }, []);
+
+  // When charging a card in person, load the Authorize.Net Accept.js config for the
+  // chosen location so the card can be tokenized client-side (PCI-safe).
+  useEffect(() => {
+    if (paymentMethod !== 'charge' || planPrice <= 0) {
+      setGatewayReady(false);
+      setGatewayError('');
+      return;
+    }
+    const locId = locationId || selectedPlan?.location?.id || null;
+    if (!locId) {
+      setGatewayReady(false);
+      setGatewayError('Select a home location to charge a card.');
+      return;
+    }
+    let cancelled = false;
+    setGatewayReady(false);
+    setGatewayError('');
+    (async () => {
+      try {
+        const res = await getAuthorizeNetPublicKey(Number(locId));
+        if (cancelled) return;
+        if (res?.api_login_id) {
+          setAnetLoginId(res.api_login_id);
+          setAnetClientKey(res.client_key || res.api_login_id);
+          await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
+          if (!cancelled) setGatewayReady(true);
+        } else {
+          setGatewayError('No payment gateway configured for this location.');
+        }
+      } catch {
+        if (!cancelled) setGatewayError('Could not load the payment gateway for this location.');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [paymentMethod, planPrice, locationId, selectedPlan]);
 
   const searchCustomers = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setCustomerResults([]); setDidSearch(false); return; }
@@ -134,7 +185,8 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
       home_location_id: locationId || null,
       is_comped: isComped,
       terms_accepted: true,
-      recurring_billing_authorized: !isComped,
+      recurring_billing_authorized: paymentMethod === 'charge' && !isComped,
+      payment_type: planPrice > 0 ? paymentMethod : 'none',
     };
 
     if (selectedCustomer) {
@@ -159,6 +211,38 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
 
     setSaving(true);
     try {
+      // Charge the card in person: tokenize via Accept.js so raw PAN never hits our server.
+      if (paymentMethod === 'charge' && planPrice > 0) {
+        if (!gatewayReady) {
+          setFormError(gatewayError || 'Payment gateway is not ready. Try again in a moment.');
+          setSaving(false);
+          return;
+        }
+        if (!cardNumber.trim() || !cardExpMonth.trim() || !cardExpYear.trim() || !cardCode.trim()) {
+          setFormError('Enter the full card details to charge the card.');
+          setSaving(false);
+          return;
+        }
+        try {
+          const opaque = await tokenizeCard(
+            {
+              cardNumber: cardNumber.replace(/\s+/g, ''),
+              month: cardExpMonth.padStart(2, '0'),
+              year: cardExpYear.length === 2 ? `20${cardExpYear}` : cardExpYear,
+              cardCode: cardCode.trim(),
+            },
+            anetLoginId,
+            anetClientKey,
+          );
+          payload.opaque_data = opaque;
+          payload.amount = planPrice;
+        } catch (err: unknown) {
+          setFormError(err instanceof Error ? err.message : 'Card could not be processed.');
+          setSaving(false);
+          return;
+        }
+      }
+
       await membershipService.createMembership(payload);
       showSuccess('Membership created! Activation email sent.');
       setTimeout(() => { onCreated(); onClose(); }, 1200);
@@ -289,16 +373,99 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsComped((v) => !v)}
-            className="flex items-center gap-3 w-full text-left"
-          >
-            <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isComped ? `bg-${themeColor}-600` : 'bg-gray-200'}`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isComped ? 'translate-x-4' : 'translate-x-0.5'}`} />
-            </span>
-            <span className="text-sm text-gray-700">Comped (complimentary — no charge)</span>
-          </button>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Payment {planPrice > 0 && <span className="text-gray-500 font-normal">— ${planPrice.toFixed(2)}</span>}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { key: 'charge', label: 'Charge card' },
+                { key: 'external', label: 'Cash / external' },
+                { key: 'comp', label: 'Comp (free)' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setPaymentMethod(opt.key)}
+                  className={`px-2 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                    paymentMethod === opt.key
+                      ? `bg-${themeColor}-600 text-white border-${themeColor}-600`
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {paymentMethod === 'comp' && (
+              <p className="mt-2 text-xs text-gray-500">Complimentary membership — no charge will be made.</p>
+            )}
+            {paymentMethod === 'external' && (
+              <p className="mt-2 text-xs text-gray-500">
+                {planPrice > 0
+                  ? `Records a $${planPrice.toFixed(2)} payment taken outside the system (cash or external terminal).`
+                  : 'No charge — this plan is free.'}
+              </p>
+            )}
+            {paymentMethod === 'charge' && planPrice <= 0 && (
+              <p className="mt-2 text-xs text-gray-500">This plan is free — no card needed.</p>
+            )}
+
+            {paymentMethod === 'charge' && planPrice > 0 && (
+              <div className="mt-3 space-y-2">
+                {gatewayError && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{gatewayError}</p>
+                )}
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="cc-number"
+                  placeholder="Card number"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(e.target.value)}
+                  className={ic}
+                  disabled={!gatewayReady}
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="MM"
+                    maxLength={2}
+                    value={cardExpMonth}
+                    onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, ''))}
+                    className={ic}
+                    disabled={!gatewayReady}
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="YYYY"
+                    maxLength={4}
+                    value={cardExpYear}
+                    onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, ''))}
+                    className={ic}
+                    disabled={!gatewayReady}
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    placeholder="CVV"
+                    maxLength={4}
+                    value={cardCode}
+                    onChange={(e) => setCardCode(e.target.value.replace(/\D/g, ''))}
+                    className={ic}
+                    disabled={!gatewayReady}
+                  />
+                </div>
+                {!gatewayReady && !gatewayError && (
+                  <p className="text-xs text-gray-400">Loading secure payment field…</p>
+                )}
+              </div>
+            )}
+          </div>
 
           {formError && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>

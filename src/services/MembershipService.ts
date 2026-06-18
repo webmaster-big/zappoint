@@ -119,6 +119,11 @@ async function myMembership(): Promise<Membership | null> {
   return payload || null;
 }
 
+async function myMemberships(): Promise<Membership[]> {
+  const res = await api.get('/memberships/mine/all');
+  return unwrap<Membership[]>(res.data) || [];
+}
+
 async function purchaseMembership(payload: PurchaseMembershipPayload): Promise<Membership> {
   const res = await api.post('/memberships/purchase', payload);
   return unwrap<Membership>(res.data);
@@ -142,6 +147,15 @@ async function freezeMembership(id: number, until: string, note?: string): Promi
 async function cancelMembership(id: number, mode: 'immediate' | 'end_of_term', note?: string): Promise<Membership> {
   const res = await api.patch(`/memberships/${id}/cancel`, { effective: mode, note });
   return unwrap<Membership>(res.data);
+}
+
+async function extendMembership(id: number, newTermEnd: string, note?: string): Promise<Membership> {
+  const res = await api.patch(`/memberships/${id}/extend`, { new_term_end: newTermEnd, note });
+  return unwrap<Membership>(res.data);
+}
+
+async function deleteMembership(id: number): Promise<void> {
+  await api.delete(`/memberships/${id}`);
 }
 
 async function changeMembershipPlan(id: number, newPlanId: number, note?: string): Promise<Membership> {
@@ -293,11 +307,14 @@ export const membershipService = {
   listMemberships,
   getMembership,
   myMembership,
+  myMemberships,
   purchaseMembership,
   createMembership,
   updateMembershipStatus,
   freezeMembership,
   cancelMembership,
+  extendMembership,
+  deleteMembership,
   changeMembershipPlan,
   updatePaymentMethod,
   upgradePlan,

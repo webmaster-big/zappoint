@@ -177,6 +177,8 @@ export interface MembershipPlan {
   custom_billing_days?: number | null;
   trial_days: number;            // 0 = no trial; backend default is 0
   term_length_months?: number | null;
+  season_start_date?: string | null; // Fixed-season plans: when the season begins
+  season_end_date?: string | null;   // Fixed-season plans: everyone expires on this date
 
   usage_type: MembershipUsageType;
   unlimited_uses: boolean;
@@ -302,6 +304,8 @@ export interface Membership {
   canceled_at?: string | null;
   cancellation_effective_at?: string | null;
   expires_at?: string | null;
+  manually_extended_at?: string | null;
+  manually_extended_by_user_id?: number | null;
 
   visits_remaining?: number | null;
   visits_used_this_term?: number;
@@ -385,6 +389,8 @@ export interface CreateMembershipPlanData {
   billing_interval: MembershipBillingInterval;
   trial_days?: number;           // 0 = no trial; >0 = free days before first charge
   term_length_months?: number | null;
+  season_start_date?: string | null; // Fixed-season plans: season start (YYYY-MM-DD)
+  season_end_date?: string | null;   // Fixed-season plans: shared expiry date (YYYY-MM-DD)
   usage_type: MembershipUsageType;
   unlimited_uses?: boolean;
   unlimited_visits?: boolean;
