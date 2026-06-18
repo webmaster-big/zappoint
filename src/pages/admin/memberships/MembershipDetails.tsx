@@ -29,6 +29,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
 import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
+import { SkeletonDetailCard } from '../../../components/ui/Skeleton';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { formatMembershipDate, formatMembershipPrice } from '../../../utils/membershipFormat';
@@ -87,8 +88,12 @@ const MembershipDetails = () => {
   const { themeColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [m, setM] = useState<Membership | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Pre-fill from the list cache so the page shows content immediately;
+  // a fresh network fetch happens in the background.
+  const cachedM = id ? membershipCache.getMembershipFromCache(Number(id)) : null;
+  const [m, setM] = useState<Membership | null>(cachedM);
+  const [loading, setLoading] = useState(cachedM === null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [pmLabel, setPmLabel] = useState('');
@@ -111,7 +116,9 @@ const MembershipDetails = () => {
   };
 
   const load = async () => {
-    setLoading(true);
+    // Only show full loading state if we have nothing from cache
+    if (!m) setLoading(true);
+    else setIsSyncing(true);
     try {
       const data = await membershipService.getMembership(Number(id));
       setM(data);
@@ -120,6 +127,7 @@ const MembershipDetails = () => {
       showError(e, 'Failed to load membership');
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
@@ -263,10 +271,13 @@ const MembershipDetails = () => {
   };
 
   if (loading) return (
-    <div className="px-6 py-8 max-w-7xl mx-auto">
-      <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-4" />
+    <div className="px-6 py-8 max-w-7xl mx-auto space-y-6">
+      <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+      <SkeletonDetailCard />
       <div className="grid md:grid-cols-2 gap-6">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />)}
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />
+        ))}
       </div>
     </div>
   );
@@ -298,6 +309,11 @@ const MembershipDetails = () => {
   return (
     <div className="px-6 py-8 max-w-6xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
+      {isSyncing && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 bg-blue-100">
+          <div className="h-full w-1/3 bg-blue-400 animate-pulse" />
+        </div>
+      )}
 
       <div className="mb-6">
         <StandardButton variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate('/memberships')}>

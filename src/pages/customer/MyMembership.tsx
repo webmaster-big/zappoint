@@ -24,9 +24,9 @@ import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
 import type { Membership, MembershipBenefitRedemption, MembershipPlanBenefit, MembershipBenefitType } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import StandardButton from '../../components/ui/StandardButton';
 import InfoTooltip from '../../components/ui/InfoTooltip';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import MembershipStatusBadge from '../../components/membership/MembershipStatusBadge';
@@ -38,8 +38,14 @@ import {
 const MyMembership = () => {
   const navigate = useNavigate();
   const { themeColor } = useThemeColor();
-  const [membership, setMembership] = useState<Membership | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Use sync cache for instant render — avoids full-screen loading spinner on revisit.
+  const [membership, setMembership] = useState<Membership | null>(
+    () => membershipCache.getMineSync()
+  );
+  const [loading, setLoading] = useState(
+    () => (membershipCache.getMineSync() === null)
+  );
+  const [isSyncing, setIsSyncing] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
   const [detailBenefit, setDetailBenefit] = useState<MembershipPlanBenefit | null>(null);
   const { toast, showSuccess, showError, show, clear } = useToast();
@@ -101,6 +107,8 @@ const MyMembership = () => {
   };
 
   const load = async (forceRefresh = false) => {
+    if (!membership) setLoading(true);
+    else setIsSyncing(true);
     try {
       const m = await membershipCache.getMine(forceRefresh);
       setMembership(m);
@@ -108,17 +116,18 @@ const MyMembership = () => {
       showError(e, 'Failed to load membership');
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
   useEffect(() => {
     load();
-    const off = membershipCache.onUpdate(async (detail) => {
+    const off = membershipCache.onUpdate((detail) => {
+      if (detail.source === 'syncing') { setIsSyncing(true); return; }
+      if (detail.source === 'synced') { setIsSyncing(false); return; }
       if (detail.key === 'mine' || detail.key === 'all') {
-        try {
-          const m = await membershipCache.getMine();
-          setMembership(m);
-        } catch { /* ignore */ }
+        const cached = membershipCache.getMineSync();
+        if (cached !== null) setMembership(cached);
       }
     });
     return off;
@@ -178,7 +187,19 @@ const MyMembership = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner fullScreen size="medium" message="Loading your membership…" />;
+    return (
+      <div className="min-h-screen bg-gray-50/80 animate-pulse">
+        <div className="h-32 bg-gray-300" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <div className="grid md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-36 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!membership) {
@@ -246,6 +267,11 @@ const MyMembership = () => {
   return (
     <div className="min-h-screen bg-gray-50/80">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
+      {isSyncing && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 bg-blue-100">
+          <div className="h-full w-1/3 bg-blue-400 animate-pulse" />
+        </div>
+      )}
 
       {/* Benefit Detail Modal */}
       {detailBenefit && (

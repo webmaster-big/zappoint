@@ -20,6 +20,38 @@ interface CacheMetadata {
 
 type CacheKey = keyof typeof KEYS;
 
+// ─── In-memory store for instant synchronous reads ───────────────────────────
+// Populated after the first async CacheStorage read so that subsequent
+// page navigations within the same session can access data synchronously.
+const memStore = new Map<string, unknown>();
+
+// Track which keys are currently being refreshed so pages can show a
+// subtle "syncing" indicator rather than a full loading overlay.
+const syncingKeys = new Set<string>();
+
+function setMemory(key: string, data: unknown): void {
+  memStore.set(key, data);
+}
+
+function getMemory<T>(key: string): T | null {
+  const val = memStore.get(key);
+  return val !== undefined ? (val as T) : null;
+}
+
+// ─── Stale timestamps per key (updated when data is written) ─────────────────
+const staleTimestamps = new Map<string, number>();
+
+function isKeyStale(key: string, maxAgeMinutes: number): boolean {
+  const ts = staleTimestamps.get(key);
+  if (!ts) return true;
+  return Date.now() - ts > maxAgeMinutes * 60 * 1000;
+}
+
+function touchKey(key: string): void {
+  staleTimestamps.set(key, Date.now());
+}
+
+// ─── CacheStorage helpers ─────────────────────────────────────────────────────
 const isCacheAvailable = (): boolean =>
   typeof window !== 'undefined' && 'caches' in window;
 
@@ -33,18 +65,27 @@ async function openCache(): Promise<Cache | null> {
 }
 
 async function readJson<T>(key: string): Promise<T | null> {
+  // Check memory first (synchronous, fast)
+  const mem = getMemory<T>(key);
+  if (mem !== null) return mem;
+
   const cache = await openCache();
   if (!cache) return null;
   try {
     const res = await cache.match(key);
     if (!res) return null;
-    return (await res.json()) as T;
+    const data = (await res.json()) as T;
+    // Populate memory on first read from disk
+    setMemory(key, data);
+    return data;
   } catch {
     return null;
   }
 }
 
 async function writeJson(key: string, data: unknown): Promise<void> {
+  setMemory(key, data); // Always update memory immediately
+  touchKey(key);
   const cache = await openCache();
   if (!cache) return;
   try {
@@ -64,21 +105,22 @@ async function touchMetadata(): Promise<void> {
   await writeJson(KEYS.metadata, meta);
 }
 
-async function getMetadata(): Promise<CacheMetadata | null> {
-  return readJson<CacheMetadata>(KEYS.metadata);
-}
-
-async function isStale(maxAgeMinutes: number): Promise<boolean> {
-  const meta = await getMetadata();
-  if (!meta) return true;
-  return Date.now() - meta.lastUpdated > maxAgeMinutes * 60 * 1000;
+function isStaleSync(key: string, maxAgeMinutes: number): boolean {
+  return isKeyStale(key, maxAgeMinutes);
 }
 
 function emit(detail: Record<string, unknown> = {}): void {
+  if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('memberships-cache-updated', { detail }));
 }
 
 const inflight = new Map<CacheKey, Promise<unknown>>();
+
+function emitSyncing(key: CacheKey, syncing: boolean): void {
+  if (syncing) syncingKeys.add(key);
+  else syncingKeys.delete(key);
+  emit({ key, source: syncing ? 'syncing' : 'synced' });
+}
 
 async function fetchAndStore<T>(
   key: CacheKey,
@@ -88,13 +130,15 @@ async function fetchAndStore<T>(
     return inflight.get(key) as Promise<T>;
   }
   const p = (async () => {
+    emitSyncing(key, true);
     try {
       const data = await fetcher();
       await writeJson(KEYS[key], data);
       await touchMetadata();
-      emit({ key });
+      emit({ key, source: 'updated' });
       return data;
     } finally {
+      emitSyncing(key, false);
       inflight.delete(key);
     }
   })();
@@ -105,18 +149,42 @@ async function fetchAndStore<T>(
 function backgroundRefresh<T>(key: CacheKey, fetcher: () => Promise<T>): void {
   if (inflight.has(key)) return;
   setTimeout(() => {
-    fetchAndStore(key, fetcher).catch(() => {
-    });
+    fetchAndStore(key, fetcher).catch(() => {});
   }, 0);
 }
 
 
 export const membershipCache = {
+  // ── Sync reads (from in-memory store — available after first async load) ──
+
+  getPlansSync(): MembershipPlan[] | null {
+    return getMemory<MembershipPlan[]>(KEYS.plans);
+  },
+
+  getListSync(): { data: Membership[]; meta?: Record<string, unknown> } | null {
+    return getMemory<{ data: Membership[]; meta?: Record<string, unknown> }>(KEYS.list);
+  },
+
+  getMineSync(): Membership | null {
+    return getMemory<Membership>(KEYS.mine);
+  },
+
+  getPublicPlansSync(): MembershipPlan[] | null {
+    return getMemory<MembershipPlan[]>(KEYS.publicPlans);
+  },
+
+  isSyncing(key?: CacheKey): boolean {
+    if (key) return syncingKeys.has(key);
+    return syncingKeys.size > 0;
+  },
+
+  // ── Async reads (CacheStorage → network fallback) ─────────────────────────
+
   async getPlans(forceRefresh = false): Promise<MembershipPlan[]> {
     if (!forceRefresh) {
       const cached = await readJson<MembershipPlan[]>(KEYS.plans);
       if (cached && Array.isArray(cached)) {
-        if (await isStale(10)) {
+        if (isStaleSync('plans', 10)) {
           backgroundRefresh('plans', () => membershipService.listPlans());
         }
         return cached;
@@ -129,7 +197,7 @@ export const membershipCache = {
     if (!forceRefresh) {
       const cached = await readJson<MembershipPlan[]>(KEYS.publicPlans);
       if (cached && Array.isArray(cached)) {
-        if (await isStale(15)) {
+        if (isStaleSync('publicPlans', 15)) {
           backgroundRefresh('publicPlans', () => membershipService.publicPlans());
         }
         return cached;
@@ -153,7 +221,7 @@ export const membershipCache = {
         KEYS.list
       );
       if (cached && Array.isArray(cached.data)) {
-        if (await isStale(5)) {
+        if (isStaleSync('list', 3)) {
           backgroundRefresh('list', () => membershipService.listMemberships(params));
         }
         return cached;
@@ -166,7 +234,7 @@ export const membershipCache = {
     if (!forceRefresh) {
       const cached = await readJson<Membership | null>(KEYS.mine);
       if (cached !== null) {
-        if (await isStale(5)) {
+        if (isStaleSync('mine', 3)) {
           backgroundRefresh('mine', () => membershipService.myMembership());
         }
         return cached;
@@ -176,8 +244,19 @@ export const membershipCache = {
   },
 
   async invalidate(key?: CacheKey): Promise<void> {
+    // Clear from memory immediately so pages don't show stale data
+    if (key) {
+      memStore.delete(KEYS[key]);
+      staleTimestamps.delete(key);
+    } else {
+      memStore.clear();
+      staleTimestamps.clear();
+    }
     const cache = await openCache();
-    if (!cache) return;
+    if (!cache) {
+      emit({ key: key ?? 'all', source: 'invalidate' });
+      return;
+    }
     try {
       if (key) {
         await cache.delete(KEYS[key]);
@@ -206,6 +285,12 @@ export const membershipCache = {
       await writeJson(KEYS.mine, updated);
       emit({ key: 'mine', source: 'update', id: updated.id });
     }
+  },
+
+  // Returns the individual membership from the list cache (no network call).
+  getMembershipFromCache(id: number): Membership | null {
+    const list = getMemory<{ data: Membership[] }>(KEYS.list);
+    return list?.data?.find((m) => m.id === id) ?? null;
   },
 
   onUpdate(handler: (detail: Record<string, unknown>) => void): () => void {

@@ -8,9 +8,9 @@ import type { MembershipPlan, CreateMembershipPlanData } from '../../../types/Me
 import type { Location } from '../../../services/LocationService';
 import type { SettingsAuthorizeNetAccount } from '../../../types/settings.types';
 import Toast from '../../../components/ui/Toast';
-import LoadingSpinner from '../../../components/ui/LoadingSpinner';
 import StandardButton from '../../../components/ui/StandardButton';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
+import { SkeletonTableRow } from '../../../components/ui/Skeleton';
 import PlanBenefitsManager from '../../../components/membership/PlanBenefitsManager';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -52,9 +52,14 @@ const MembershipPlans = () => {
   const isLocationManager = user?.role === 'location_manager';
   const canManagePlans = isCompanyAdmin || isLocationManager;
 
-  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [plans, setPlans] = useState<MembershipPlan[]>(
+    () => membershipCache.getPlansSync() ?? []
+  );
   const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => (membershipCache.getPlansSync() === null)
+  );
+  const [isSyncing, setIsSyncing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<MembershipPlan | null>(null);
   const [form, setForm] = useState<CreateMembershipPlanData>(emptyForm);
@@ -82,7 +87,7 @@ const MembershipPlans = () => {
   );
 
   const load = async (forceRefresh = false) => {
-    setLoading(true);
+    if (!forceRefresh && plans.length === 0) setLoading(true);
     try {
       const list = await membershipCache.getPlans(forceRefresh);
       setPlans(list);
@@ -98,6 +103,8 @@ const MembershipPlans = () => {
     locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
     getAllAuthorizeNetAccounts().then((r) => setAuthAccounts(r.data)).catch(() => {});
     const off = membershipCache.onUpdate((detail) => {
+      if (detail.source === 'syncing') { setIsSyncing(true); return; }
+      if (detail.source === 'synced') { setIsSyncing(false); return; }
       if (detail.key === 'plans' || detail.key === 'all') load();
     });
     return off;
@@ -254,8 +261,19 @@ const MembershipPlans = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {isSyncing && (
+          <div className="h-0.5 bg-blue-100">
+            <div className="h-full w-1/4 bg-blue-400 animate-pulse rounded-r-full" />
+          </div>
+        )}
         {loading ? (
-          <div className="py-20 flex justify-center"><LoadingSpinner size="medium" /></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={7} />)}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">

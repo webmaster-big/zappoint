@@ -89,9 +89,13 @@ const PurchaseMembership = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { themeColor } = useThemeColor();
-  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [plans, setPlans] = useState<MembershipPlan[]>(
+    () => (membershipCache.getPublicPlansSync() ?? []).filter((p) => p.is_active)
+  );
   const [locations, setLocations] = useState<{ id: number; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => (membershipCache.getPublicPlansSync() === null)
+  );
   const [homeLocationName, setHomeLocationName] = useState<string>('');
   const { toast, show, showSuccess, showError, clear } = useToast();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
@@ -125,7 +129,7 @@ const PurchaseMembership = () => {
 
   useEffect(() => {
     (async () => {
-      setLoading(true);
+      if (plans.length === 0) setLoading(true);
       try {
         const [plansResult, locsResult, myMembership] = await Promise.all([
           membershipCache.getPublicPlans(),

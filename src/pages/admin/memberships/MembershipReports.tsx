@@ -14,11 +14,11 @@ import {
 import membershipService from '../../../services/MembershipService';
 import type { MembershipReportSummary } from '../../../types/Membership.types';
 import Toast from '../../../components/ui/Toast';
-import LoadingSpinner from '../../../components/ui/LoadingSpinner';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
+import { SkeletonStatCard } from '../../../components/ui/Skeleton';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { formatMembershipPrice } from '../../../utils/membershipFormat';
@@ -30,6 +30,33 @@ const monthAgoIso = () => {
   d.setMonth(d.getMonth() - 1);
   return d.toISOString().slice(0, 10);
 };
+
+const REPORT_CACHE_KEY = 'zz_report_cache';
+
+interface ReportCacheEntry {
+  data: MembershipReportSummary;
+  from: string;
+  to: string;
+  cachedAt: number;
+}
+
+function getCachedReport(from: string, to: string): MembershipReportSummary | null {
+  try {
+    const raw = localStorage.getItem(REPORT_CACHE_KEY);
+    if (!raw) return null;
+    const entry: ReportCacheEntry = JSON.parse(raw);
+    const isExpired = Date.now() - entry.cachedAt > 10 * 60 * 1000; // 10-min TTL
+    if (entry.from === from && entry.to === to && !isExpired) return entry.data;
+    return null;
+  } catch { return null; }
+}
+
+function setCachedReport(from: string, to: string, data: MembershipReportSummary): void {
+  try {
+    const entry: ReportCacheEntry = { data, from, to, cachedAt: Date.now() };
+    localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(entry));
+  } catch { }
+}
 
 interface StatProps {
   icon: LucideIcon;
@@ -60,32 +87,50 @@ const Stat = ({ icon: Icon, label, value, accent, tooltip }: StatProps) => (
 
 const MembershipReports = () => {
   const { themeColor } = useThemeColor();
-  const [from, setFrom] = useState(monthAgoIso());
-  const [to, setTo] = useState(todayIso());
-  const [data, setData] = useState<MembershipReportSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const initFrom = monthAgoIso();
+  const initTo   = todayIso();
+  const initCache = getCachedReport(initFrom, initTo);
+
+  const [from, setFrom] = useState(initFrom);
+  const [to, setTo] = useState(initTo);
+  const [data, setData] = useState<MembershipReportSummary | null>(initCache);
+  // Show full loading skeleton only when there is no cached data at all.
+  const [loading, setLoading] = useState(initCache === null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { toast, showError, clear } = useToast();
 
   const cardCls = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (fromVal = from, toVal = to) => {
+    // If we have cached data, only show a subtle syncing bar; no full skeleton.
+    if (!data) setLoading(true);
+    else setIsSyncing(true);
     try {
-      const res = await membershipService.reportSummary({ from, to });
+      const res = await membershipService.reportSummary({ from: fromVal, to: toVal });
       setData(res);
+      setCachedReport(fromVal, toVal, res);
     } catch (e: unknown) {
       showError(e, 'Failed to load report');
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
-  useEffect(() => { load(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // If cache miss on mount, fetch immediately; otherwise let user click Apply.
+    if (initCache === null) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="px-6 py-8 max-w-6xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
+      {isSyncing && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 bg-blue-100">
+          <div className="h-full w-1/3 bg-blue-400 animate-pulse" />
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
         <div>
@@ -110,15 +155,24 @@ const MembershipReports = () => {
             onChange={(s, e) => { setFrom(s); setTo(e); }}
             themeColor={themeColor}
           />
-          <StandardButton variant="primary" size="md" icon={RefreshCcw} onClick={load} loading={loading}>
+          <StandardButton variant="primary" size="md" icon={RefreshCcw} onClick={() => load(from, to)} loading={loading || isSyncing}>
             Apply
           </StandardButton>
         </div>
       </div>
 
-      {loading || !data ? (
-        <div className="py-20 flex justify-center"><LoadingSpinner size="medium" /></div>
-      ) : (
+      {loading ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => <SkeletonStatCard key={i} />)}
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ) : !data ? null : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <Stat icon={Users} label="Active" value={data.counts.active} accent="blue"

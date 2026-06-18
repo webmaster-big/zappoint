@@ -26,6 +26,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
+import { SkeletonTableRow, SkeletonStatCard } from '../../../components/ui/Skeleton';
 import { formatMembershipDate } from '../../../utils/membershipFormat';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -486,8 +487,15 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
 const Memberships = () => {
   const navigate = useNavigate();
   const { themeColor } = useThemeColor();
-  const [items, setItems] = useState<Membership[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Initialise instantly from the in-memory cache so the page renders content
+  // on the very first frame — no blank screen between navigations.
+  const [items, setItems] = useState<Membership[]>(
+    () => membershipCache.getListSync()?.data ?? []
+  );
+  const [loading, setLoading] = useState(
+    () => (membershipCache.getListSync() === null)
+  );
+  const [isSyncing, setIsSyncing] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<MembershipStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -495,6 +503,7 @@ const Memberships = () => {
   const { toast, showError, clear } = useToast();
 
   const load = async (forceRefresh = false) => {
+    if (!forceRefresh && items.length === 0) setLoading(true);
     try {
       if (status === 'all' && !search) {
         const res = await membershipCache.getList({}, forceRefresh);
@@ -516,8 +525,10 @@ const Memberships = () => {
   useEffect(() => {
     load();
     const off = membershipCache.onUpdate((detail) => {
+      if (detail.source === 'syncing') { setIsSyncing(true); return; }
+      if (detail.source === 'synced') { setIsSyncing(false); return; }
       if (status === 'all' && !search && (detail.key === 'list' || detail.key === 'all')) {
-        load();
+        membershipCache.getListSync() && setItems(membershipCache.getListSync()!.data);
       }
     });
     return off;
@@ -587,26 +598,28 @@ const Memberships = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {metrics.map((m) => {
-          const Icon = m.icon;
-          return (
-            <div
-              key={m.title}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg bg-${m.accent}-100 text-${m.accent}-600`}>
-                  <Icon size={20} />
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
+          : metrics.map((m) => {
+              const Icon = m.icon;
+              return (
+                <div
+                  key={m.title}
+                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 rounded-lg bg-${m.accent}-100 text-${m.accent}-600`}>
+                      <Icon size={20} />
+                    </div>
+                    <span className="text-base font-semibold text-gray-800">{m.title}</span>
+                    <InfoTooltip content={m.tooltip} className="ml-auto" />
+                  </div>
+                  <div className="flex items-end gap-2 mt-2">
+                    <CounterAnimation value={m.value} className="text-2xl font-bold text-gray-900" />
+                  </div>
                 </div>
-                <span className="text-base font-semibold text-gray-800">{m.title}</span>
-                <InfoTooltip content={m.tooltip} className="ml-auto" />
-              </div>
-              <div className="flex items-end gap-2 mt-2">
-                <CounterAnimation value={m.value} className="text-2xl font-bold text-gray-900" />
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
@@ -653,6 +666,11 @@ const Memberships = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {isSyncing && (
+          <div className="h-0.5 bg-blue-100">
+            <div className="h-full w-1/4 bg-blue-400 animate-pulse rounded-r-full" />
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
@@ -687,9 +705,7 @@ const Memberships = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">Loading…</td>
-                </tr>
+                Array.from({ length: 6 }).map((_, i) => <SkeletonTableRow key={i} cols={6} />)
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-gray-500">No memberships found.</td>
