@@ -1775,7 +1775,7 @@ const EntertainmentLandingPage = () => {
             </div>
             
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {locations.map(location => {
+              {locations.filter(location => location !== 'All Locations').map(location => {
                 const availableLocations = activeBookingType === 'attraction' 
                   ? selectedAttraction?.availableLocations 
                   : activeBookingType === 'event'
