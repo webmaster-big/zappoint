@@ -32,6 +32,7 @@ import { getStoredUser } from '../../../utils/storage';
 import CreateStaffAccountModal from '../../../components/admin/users/CreateStaffAccountModal';
 import CreateLocationModal from '../../../components/admin/users/CreateLocationModal';
 import EditLocationModal from '../../../components/admin/users/EditLocationModal';
+import LocationsListModal from '../../../components/admin/users/LocationsListModal';
 import ResendCredentialsModal from '../../../components/admin/users/ResendCredentialsModal';
 import AccountViewModal from '../../../components/admin/users/AccountViewModal';
 import AccountEditModal from '../../../components/admin/users/AccountEditModal';
@@ -333,6 +334,7 @@ const ManageAccounts = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [locationsData, setLocationsData] = useState<Location[]>([]);
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [editLocationTarget, setEditLocationTarget] = useState<Location | null>(null);
 
   const locations = [
@@ -731,14 +733,24 @@ const ManageAccounts = () => {
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
           {isCompanyAdmin && (
-            <StandardButton
-              onClick={() => setShowCreateLocationModal(true)}
-              variant="secondary"
-              size="md"
-              icon={Building2}
-            >
-              Add Location
-            </StandardButton>
+            <>
+              <StandardButton
+                onClick={() => setShowLocationsModal(true)}
+                variant="secondary"
+                size="md"
+                icon={MapPin}
+              >
+                Locations
+              </StandardButton>
+              <StandardButton
+                onClick={() => setShowCreateLocationModal(true)}
+                variant="secondary"
+                size="md"
+                icon={Building2}
+              >
+                Add Location
+              </StandardButton>
+            </>
           )}
           <StandardButton
             onClick={() => handleInviteAccount()}
@@ -781,48 +793,6 @@ const ManageAccounts = () => {
           );
         })}
       </div>
-
-      {isCompanyAdmin && locationsData.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-          <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
-            <Building2 className="h-4 w-4 text-gray-500" />
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Locations</h2>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {locationsData.map((loc) => (
-              <div key={loc.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50">
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-900 text-sm">{loc.name}</p>
-                  {(loc.address || loc.city) && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {[loc.address, loc.city, loc.state, loc.zip_code].filter(Boolean).join(', ')}
-                    </p>
-                  )}
-                  <div className="flex gap-3 mt-0.5">
-                    {loc.phone && (
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
-                        <Phone className="h-3 w-3" />{loc.phone}
-                      </span>
-                    )}
-                    {loc.email && (
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
-                        <Mail className="h-3 w-3" />{loc.email}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setEditLocationTarget(loc)}
-                  className="ml-4 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Edit location"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -1145,10 +1115,18 @@ const ManageAccounts = () => {
         }}
       />
 
+      <LocationsListModal
+        isOpen={showLocationsModal}
+        onClose={() => setShowLocationsModal(false)}
+        locations={locationsData}
+        onEditLocation={(loc) => setEditLocationTarget(loc)}
+      />
+
       <EditLocationModal
         isOpen={editLocationTarget !== null}
         onClose={() => setEditLocationTarget(null)}
         location={editLocationTarget}
+        elevated={showLocationsModal}
         onUpdated={(updated) => {
           setLocationsData((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
           setEditLocationTarget(null);

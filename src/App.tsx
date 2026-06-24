@@ -190,7 +190,6 @@ function App() {
           <Route path="/packages/gift-cards" element={<GiftCard />} />
           
           <Route path="/fee-supports" element={<FeeSupports />} />
-
           <Route path="/special-pricings" element={<SpecialPricings />} />
 
           <Route path="/bookings" element={<Bookings />} />

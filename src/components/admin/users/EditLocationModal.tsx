@@ -10,12 +10,13 @@ interface EditLocationModalProps {
   onClose: () => void;
   location: Location | null;
   onUpdated?: (location: Location) => void;
+  elevated?: boolean;
 }
 
 // Allows digits, spaces, dashes, plus, parens, dots — 7–20 chars total
 const PHONE_RE = /^[\d\s\-\+\(\)\.]{7,20}$/;
 
-const EditLocationModal = ({ isOpen, onClose, location, onUpdated }: EditLocationModalProps) => {
+const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = false }: EditLocationModalProps) => {
   const { themeColor } = useThemeColor();
   const [form, setForm] = useState<UpdateLocationData>({});
   const [submitting, setSubmitting] = useState(false);
@@ -107,7 +108,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated }: EditLocatio
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade"
+      className={`fixed inset-0 bg-black/50 flex items-center justify-center ${elevated ? 'z-[60]' : 'z-50'} p-4 animate-backdrop-fade`}
       onClick={submitting ? undefined : onClose}
     >
       <div

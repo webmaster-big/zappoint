@@ -355,10 +355,11 @@ const ManageAttendants = () => {
   }, [attendants, filters]);
 
   const loadLocationInfo = async () => {
+    if (!currentUser?.location_id) return;
     try {
-      const res = await locationService.getLocations();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setLocationInfo(res.data[0]);
+      const res = await locationService.getLocation(currentUser.location_id);
+      if (res.success && res.data) {
+        setLocationInfo(res.data);
       }
     } catch {
       // location card will simply not render
