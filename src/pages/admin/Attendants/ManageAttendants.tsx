@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  Eye, 
-  Pencil, 
-  Trash2, 
-  Plus, 
-  Search, 
-  Filter, 
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  Plus,
+  Search,
+  Filter,
   RefreshCcw,
   Users,
   User,
@@ -16,17 +16,21 @@ import {
   X,
   Copy,
   CheckCircle,
-  UserPlus
+  UserPlus,
+  Building2,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
-import { API_BASE_URL } from '../../../utils/storage';
+import { API_BASE_URL, getStoredUser } from '../../../utils/storage';
 import { userService } from '../../../services/UserService';
+import { locationService } from '../../../services/LocationService';
+import type { Location } from '../../../services/LocationService';
 import CreateStaffAccountModal from '../../../components/admin/users/CreateStaffAccountModal';
 import AttendantViewModal from '../../../components/admin/users/AttendantViewModal';
 import AttendantEditModal from '../../../components/admin/users/AttendantEditModal';
+import EditLocationModal from '../../../components/admin/users/EditLocationModal';
 import type {
   ManageAttendantsAttendant,
   ManageAttendantsFilterOptions,
@@ -251,6 +255,8 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
 
 const ManageAttendants = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const isLocationManager = currentUser?.role === 'location_manager';
   const [attendants, setAttendants] = useState<ManageAttendantsAttendant[]>([]);
   const [filteredAttendants, setFilteredAttendants] = useState<ManageAttendantsAttendant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,6 +273,8 @@ const ManageAttendants = () => {
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
   const [viewTarget, setViewTarget] = useState<ManageAttendantsAttendant | null>(null);
   const [editTarget, setEditTarget] = useState<ManageAttendantsAttendant | null>(null);
+  const [locationInfo, setLocationInfo] = useState<Location | null>(null);
+  const [editLocationTarget, setEditLocationTarget] = useState<Location | null>(null);
 
   const statusColors = {
     active: `bg-${themeColor}-100 text-${fullColor}`,
@@ -346,8 +354,22 @@ const ManageAttendants = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [attendants, filters]);
 
+  const loadLocationInfo = async () => {
+    try {
+      const res = await locationService.getLocations();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setLocationInfo(res.data[0]);
+      }
+    } catch {
+      // location card will simply not render
+    }
+  };
+
   useEffect(() => {
     loadAttendants();
+    if (isLocationManager) {
+      loadLocationInfo();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -637,6 +659,47 @@ const ManageAttendants = () => {
         </div>
       </div>
 
+      {isLocationManager && locationInfo && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                <Building2 className={`h-5 w-5 text-${themeColor}-600`} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Your Location</p>
+                <p className="font-semibold text-gray-900">{locationInfo.name}</p>
+                {(locationInfo.address || locationInfo.city) && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {[locationInfo.address, locationInfo.city, locationInfo.state, locationInfo.zip_code].filter(Boolean).join(', ')}
+                  </p>
+                )}
+                <div className="flex gap-4 mt-1">
+                  {locationInfo.phone && (
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Phone className="h-3 w-3" />{locationInfo.phone}
+                    </span>
+                  )}
+                  {locationInfo.email && (
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Mail className="h-3 w-3" />{locationInfo.email}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setEditLocationTarget(locationInfo)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Edit location details"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -917,6 +980,16 @@ const ManageAttendants = () => {
             prev.map((a) => (a.id === updated.id ? updated : a))
           );
           setEditTarget(null);
+        }}
+      />
+
+      <EditLocationModal
+        isOpen={editLocationTarget !== null}
+        onClose={() => setEditLocationTarget(null)}
+        location={editLocationTarget}
+        onUpdated={(updated) => {
+          setLocationInfo(updated);
+          setEditLocationTarget(null);
         }}
       />
     </div>
