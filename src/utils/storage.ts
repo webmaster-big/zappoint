@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'https://zapzone-backend-yt1lm2w5.on-forge.com/api';
+const DEFAULT_API_BASE_URL = 'http://localhost:8000/api';
 
 const normalizeBaseUrl = (value: string): string => value.trim().replace(/\/+$/, '');
 
