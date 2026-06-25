@@ -175,7 +175,7 @@ const MembershipDetails = () => {
       await membershipService.deleteMembership(m.id);
       void membershipCache.invalidate('list');
       showSuccess('Membership deleted');
-      navigate('/admin/memberships');
+      navigate('/memberships');
     }
     catch (e: unknown) { showError(e, 'Delete failed'); }
     finally { setActing(null); }
@@ -330,19 +330,38 @@ const MembershipDetails = () => {
           </div>
         )}
         <div className="flex-1 min-w-[240px]">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            {m.customer?.first_name} {m.customer?.last_name}
-            <InfoTooltip
-              widthClass="w-80"
-              content={
-                <>
-                  <p className="font-semibold mb-1">Member Detail Page</p>
-                  <p>Full lifecycle view for a single membership: current status, plan terms, visit history, payment ledger, staff notes, and audit log.</p>
-                </>
-              }
-            />
-          </h1>
-          <p className="text-gray-600 mt-1">{m.customer?.email}</p>
+          {(() => {
+            const guardianName = `${m.customer?.first_name ?? ''} ${m.customer?.last_name ?? ''}`.trim();
+            const holder = m.holder_name?.trim();
+            // The pass holder (authorized user) is the headline; the account is
+            // owned by the guardian/customer shown beneath.
+            const headline = holder || guardianName || 'Member';
+            const showGuardian = !!holder && !!guardianName;
+            return (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pass Holder</p>
+                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  {headline}
+                  <InfoTooltip
+                    widthClass="w-80"
+                    content={
+                      <>
+                        <p className="font-semibold mb-1">Member Detail Page</p>
+                        <p>Full lifecycle view for a single membership: current status, plan terms, visit history, payment ledger, staff notes, and audit log.</p>
+                        <p className="mt-1">The headline is the <b>pass holder</b> (the authorized user who checks in). The <b>account / guardian</b> below owns billing and login.</p>
+                      </>
+                    }
+                  />
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  {showGuardian && (
+                    <span className="text-gray-500">Account / Guardian: <span className="text-gray-700 font-medium">{guardianName}</span> · </span>
+                  )}
+                  {m.customer?.email || <span className="text-gray-400">no email on file</span>}
+                </p>
+              </>
+            );
+          })()}
           <div className="mt-3 flex flex-wrap gap-2 text-sm items-center">
             <MembershipStatusBadge status={m.status} size="md" />
             <InfoTooltip

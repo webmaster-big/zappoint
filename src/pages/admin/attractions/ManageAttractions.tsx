@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
   Pencil, 
@@ -26,6 +26,7 @@ import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import Pagination from '../../../components/ui/Pagination';
 import type {
   ManageAttractionsAttraction,
@@ -41,6 +42,7 @@ import { createSlugWithId } from '../../../utils/slug';
 import { getStoredUser } from '../../../utils/storage';
 
 const ManageAttractions = () => {
+  const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
@@ -703,7 +705,7 @@ const ManageAttractions = () => {
           <h1 className="text-3xl font-bold text-gray-900">Manage Attractions</h1>
           <p className="text-gray-600 mt-1">View and manage all attractions</p>
         </div>
-        <div className="mt-4 sm:mt-0 flex items-center gap-2">
+        <div className="mt-4 sm:mt-0 flex flex-wrap items-center gap-2">
           {isCompanyAdmin && (
             <LocationSelector
               variant="compact"
@@ -715,25 +717,22 @@ const ManageAttractions = () => {
               showAllOption={true}
             />
           )}
+          <ActionMenu
+            items={[
+              { label: 'Fee Supports', icon: DollarSign, onClick: () => navigate('/fee-supports?entity_type=attraction') },
+              { label: 'Special Pricing', icon: Percent, onClick: () => navigate('/special-pricings?entity_type=attraction') },
+              { label: 'Import Attractions', icon: Upload, onClick: () => setShowImportModal(true), dividerBefore: true },
+              { label: 'Export Attractions', icon: Download, onClick: handleOpenExportModal, disabled: attractions.length === 0 },
+            ]}
+          />
           <StandardButton
-            onClick={() => window.location.href = "/attractions/create"}
+            onClick={() => navigate('/attractions/create')}
             variant="primary"
             size="md"
           >
             New Attraction
           </StandardButton>
         </div>
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <Link to="/fee-supports?entity_type=attraction">
-          <StandardButton variant="secondary" size="sm" icon={DollarSign}>Fee Supports</StandardButton>
-        </Link>
-        <Link to="/special-pricings?entity_type=attraction">
-          <StandardButton variant="secondary" size="sm" icon={Percent}>Special Pricing</StandardButton>
-        </Link>
-        <StandardButton onClick={() => setShowImportModal(true)} variant="secondary" size="sm" icon={Upload}>Import</StandardButton>
-        <StandardButton onClick={handleOpenExportModal} disabled={attractions.length === 0} variant="secondary" size="sm" icon={Download}>Export</StandardButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -8,7 +8,7 @@ export interface FeeSupport {
   fee_calculation_type: 'fixed' | 'percentage';
   fee_application_type: 'additive' | 'inclusive';
   entity_ids: number[];
-  entity_type: 'package' | 'attraction' | 'event';
+  entity_type: 'package' | 'attraction' | 'event' | 'membership';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -24,7 +24,7 @@ export interface FeeSupportFormData {
   fee_calculation_type: 'fixed' | 'percentage';
   fee_application_type: 'additive' | 'inclusive';
   entity_ids: number[];
-  entity_type: 'package' | 'attraction' | 'event';
+  entity_type: 'package' | 'attraction' | 'event' | 'membership';
   is_active: boolean;
 }
 
@@ -33,7 +33,7 @@ export interface FeeSupportFilters {
   page?: number;
   company_id?: number;
   location_id?: number;
-  entity_type?: 'package' | 'attraction' | 'event';
+  entity_type?: 'package' | 'attraction' | 'event' | 'membership';
   fee_calculation_type?: 'fixed' | 'percentage';
   fee_application_type?: 'additive' | 'inclusive';
   is_active?: boolean;
@@ -62,7 +62,7 @@ export interface FeeBreakdown {
 }
 
 export interface FeeSupportListFilters {
-  entity_type: 'all' | 'package' | 'attraction' | 'event';
+  entity_type: 'all' | 'package' | 'attraction' | 'event' | 'membership';
   calculation_type: 'all' | 'fixed' | 'percentage';
   application_type: 'all' | 'additive' | 'inclusive';
   status: 'all' | 'active' | 'inactive';

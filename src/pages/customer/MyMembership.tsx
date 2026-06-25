@@ -410,7 +410,10 @@ const MyMembership = () => {
             <div className="bg-white p-3 border border-gray-200 rounded-xl">
               <QRCodeSVG value={membership.qr_token} size={180} level="M" />
             </div>
-            <p className="font-mono text-xs text-gray-500 mt-3 break-all">{membership.qr_token}</p>
+            {membership.holder_name?.trim() && (
+              <p className="mt-3 text-sm font-semibold text-gray-900">{membership.holder_name.trim()}</p>
+            )}
+            <p className="font-mono text-xs text-gray-500 mt-2 break-all">{membership.qr_token}</p>
             <p className="text-xs text-gray-500 mt-2">Show this at the front desk on every visit.</p>
           </div>
 

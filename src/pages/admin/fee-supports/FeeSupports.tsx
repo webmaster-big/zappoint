@@ -15,7 +15,8 @@ import {
   Square,
   Package as PackageIcon,
   Ticket,
-  Layers
+  Layers,
+  CreditCard
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { feeSupportService } from '../../../services/FeeSupportService';
@@ -23,6 +24,7 @@ import { packageCacheService } from '../../../services/PackageCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { locationService } from '../../../services/LocationService';
 import { eventCacheService } from '../../../services/EventCacheService';
+import { membershipCache } from '../../../services/MembershipCacheService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -42,8 +44,8 @@ const FeeSupports: React.FC = () => {
   const userLocationId = currentUser?.location_id || null;
 
   const entityTypeParam = searchParams.get('entity_type');
-  const initialEntityType: 'package' | 'attraction' | 'event' | 'all' = 
-    entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' ? entityTypeParam : 'all';
+  const initialEntityType: 'package' | 'attraction' | 'event' | 'membership' | 'all' =
+    entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' || entityTypeParam === 'membership' ? entityTypeParam : 'all';
 
   const [feeSupports, setFeeSupports] = useState<FeeSupport[]>([]);
   const [filteredFeeSupports, setFilteredFeeSupports] = useState<FeeSupport[]>([]);
@@ -61,6 +63,7 @@ const FeeSupports: React.FC = () => {
   const [packages, setPackages] = useState<Array<{ id: number; name: string }>>([]);
   const [attractions, setAttractions] = useState<Array<{ id: number; name: string }>>([]);
   const [events, setEvents] = useState<Array<{ id: number; name: string }>>([]);
+  const [membershipPlans, setMembershipPlans] = useState<Array<{ id: number; name: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingEntities, setLoadingEntities] = useState(false);
 
@@ -114,10 +117,13 @@ const FeeSupports: React.FC = () => {
     }
   }, []);
 
-  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event') => {
+  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'membership') => {
     setLoadingEntities(true);
     try {
-      if (entityType === 'package') {
+      if (entityType === 'membership') {
+        const plans = await membershipCache.getPlans();
+        setMembershipPlans(plans.map((p) => ({ id: p.id, name: p.name })));
+      } else if (entityType === 'package') {
         const cachedPackages = await packageCacheService.getCachedPackages();
         if (cachedPackages && cachedPackages.length > 0) {
           setPackages(cachedPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
@@ -307,7 +313,10 @@ const FeeSupports: React.FC = () => {
   };
 
   const toggleSelectAllEntities = () => {
-    const entities = form.entity_type === 'package' ? packages : attractions;
+    const entities = form.entity_type === 'package' ? packages
+      : form.entity_type === 'event' ? events
+      : form.entity_type === 'membership' ? membershipPlans
+      : attractions;
     if (form.entity_ids.length === entities.length) {
       setForm(prev => ({ ...prev, entity_ids: [] }));
     } else {
@@ -366,6 +375,7 @@ const FeeSupports: React.FC = () => {
   const totalPackageFees = feeSupports.filter(fs => fs.entity_type === 'package').length;
   const totalAttractionFees = feeSupports.filter(fs => fs.entity_type === 'attraction').length;
   const totalEventFees = feeSupports.filter(fs => fs.entity_type === 'event').length;
+  const totalMembershipFees = feeSupports.filter(fs => fs.entity_type === 'membership').length;
 
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
@@ -374,7 +384,15 @@ const FeeSupports: React.FC = () => {
 
   const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
-  const entities = form.entity_type === 'package' ? packages : form.entity_type === 'event' ? events : attractions;
+  const entities = form.entity_type === 'package' ? packages
+    : form.entity_type === 'event' ? events
+    : form.entity_type === 'membership' ? membershipPlans
+    : attractions;
+  const entityNoun = form.entity_type === 'package' ? 'Packages'
+    : form.entity_type === 'event' ? 'Events'
+    : form.entity_type === 'membership' ? 'Membership Plans'
+    : 'Attractions';
+  const entityNounLower = entityNoun.toLowerCase();
 
   if (loading) {
     return (
@@ -395,7 +413,7 @@ const FeeSupports: React.FC = () => {
           )}
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Fee Supports</h1>
-            <p className="text-gray-600 mt-1">Manage additional fees for packages, attractions, and events</p>
+            <p className="text-gray-600 mt-1">Manage additional fees for packages, attractions, events, and memberships</p>
           </div>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
@@ -405,12 +423,13 @@ const FeeSupports: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {[
           { title: 'Total Fee Supports', value: feeSupports.length.toString(), sub: `${totalActive} active`, icon: DollarSign },
           { title: 'Package Fees', value: totalPackageFees.toString(), sub: 'Applied to packages', icon: PackageIcon },
           { title: 'Attraction Fees', value: totalAttractionFees.toString(), sub: 'Applied to attractions', icon: Ticket },
           { title: 'Event Fees', value: totalEventFees.toString(), sub: 'Applied to events', icon: Layers },
+          { title: 'Membership Fees', value: totalMembershipFees.toString(), sub: 'Applied to memberships', icon: CreditCard },
         ].map((m, i) => {
           const Icon = m.icon;
           return (
@@ -466,6 +485,7 @@ const FeeSupports: React.FC = () => {
                   <option value="package">Package</option>
                   <option value="attraction">Attraction</option>
                   <option value="event">Event</option>
+                  <option value="membership">Membership</option>
                 </select>
               </div>
               <div>
@@ -557,9 +577,9 @@ const FeeSupports: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${fs.entity_type === 'package' ? `bg-${themeColor}-100 text-${fullColor}` : fs.entity_type === 'event' ? 'bg-amber-100 text-amber-800' : `bg-${themeColor}-100 text-${fullColor}`}`}>
-                          {fs.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> : fs.entity_type === 'event' ? <Layers className="w-3 h-3" /> : <Ticket className="w-3 h-3" />}
-                          {fs.entity_type === 'package' ? 'Package' : fs.entity_type === 'event' ? 'Event' : 'Attraction'}
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${fs.entity_type === 'event' ? 'bg-amber-100 text-amber-800' : fs.entity_type === 'membership' ? 'bg-purple-100 text-purple-800' : `bg-${themeColor}-100 text-${fullColor}`}`}>
+                          {fs.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> : fs.entity_type === 'event' ? <Layers className="w-3 h-3" /> : fs.entity_type === 'membership' ? <CreditCard className="w-3 h-3" /> : <Ticket className="w-3 h-3" />}
+                          {fs.entity_type === 'package' ? 'Package' : fs.entity_type === 'event' ? 'Event' : fs.entity_type === 'membership' ? 'Membership' : 'Attraction'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -729,7 +749,7 @@ const FeeSupports: React.FC = () => {
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Layers className={`w-4 h-4 text-${fullColor}`} /> Apply To
                   </h4>
-                  <p className="text-xs text-gray-400 mb-4">Select which packages, attractions, or events include this fee.</p>
+                  <p className="text-xs text-gray-400 mb-4">Select which packages, attractions, events, or membership plans include this fee.</p>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Entity Type</label>
@@ -741,13 +761,14 @@ const FeeSupports: React.FC = () => {
                       <option value="package">Packages</option>
                       <option value="attraction">Attractions</option>
                       <option value="event">Events</option>
+                      <option value="membership">Membership Plans</option>
                     </select>
                   </div>
 
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-gray-700">
-                        Select {form.entity_type === 'package' ? 'Packages' : form.entity_type === 'event' ? 'Events' : 'Attractions'} <span className="text-red-500">*</span>
+                        Select {entityNoun} <span className="text-red-500">*</span>
                       </label>
                       <button type="button" onClick={toggleSelectAllEntities} className={`text-xs text-${fullColor} hover:underline font-medium`}>
                         {form.entity_ids.length === entities.length ? 'Deselect All' : 'Select All'}
@@ -759,7 +780,7 @@ const FeeSupports: React.FC = () => {
                       </div>
                     ) : entities.length === 0 ? (
                       <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                        No {form.entity_type === 'package' ? 'packages' : form.entity_type === 'event' ? 'events' : 'attractions'} found
+                        No {entityNounLower} found
                       </div>
                     ) : (
                       <div className="max-h-40 overflow-y-auto bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">

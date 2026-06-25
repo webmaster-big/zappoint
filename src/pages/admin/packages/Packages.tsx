@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package, type CreatePackageData } from '../../../services';
 import { packageCacheService } from '../../../services/PackageCacheService';
@@ -17,6 +18,7 @@ interface UserData {
 }
 
 const Packages: React.FC = () => {
+  const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const [packages, setPackages] = useState<Package[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
@@ -579,47 +581,42 @@ const Packages: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
           <p className="text-gray-600 mt-1">Manage and view all your packages</p>
         </div>
-        <Link to="/packages/create">
-          <StandardButton
-            variant="primary"
-            size="md"
-            icon={Plus}
-          >
-            Create Package
-          </StandardButton>
-        </Link>
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {selectedForBulkUpdate.length > 0 && (
-          <StandardButton
-            variant="primary"
-            size="sm"
-            icon={Clock}
-            onClick={() => setShowBulkMinNoticeModal(true)}
-          >
-            Set Advance Time ({selectedForBulkUpdate.length})
-          </StandardButton>
-        )}
-        <Link to="/fee-supports?entity_type=package">
-          <StandardButton variant="secondary" size="sm" icon={DollarSign}>Fee Supports</StandardButton>
-        </Link>
-        <Link to="/special-pricings?entity_type=package">
-          <StandardButton variant="secondary" size="sm" icon={Percent}>Special Pricing</StandardButton>
-        </Link>
-        <Link to="/packages/global-notes">
-          <StandardButton variant="secondary" size="sm" icon={FileText}>Notes</StandardButton>
-        </Link>
-        <StandardButton variant="secondary" size="sm" icon={Upload} onClick={() => setShowImportModal(true)}>Import</StandardButton>
-        <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleOpenExportModal} disabled={packages.length === 0}>Export</StandardButton>
-        <Link to="/packages/trashed">
-          <StandardButton variant="ghost" size="sm" icon={Trash2}>Deleted</StandardButton>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedForBulkUpdate.length > 0 && (
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Clock}
+              onClick={() => setShowBulkMinNoticeModal(true)}
+            >
+              Set Advance Time ({selectedForBulkUpdate.length})
+            </StandardButton>
+          )}
+          <ActionMenu
+            items={[
+              { label: 'Fee Supports', icon: DollarSign, onClick: () => navigate('/fee-supports?entity_type=package') },
+              { label: 'Special Pricing', icon: Percent, onClick: () => navigate('/special-pricings?entity_type=package') },
+              { label: 'Global Notes', icon: FileText, onClick: () => navigate('/packages/global-notes') },
+              { label: 'Import Packages', icon: Upload, onClick: () => setShowImportModal(true), dividerBefore: true },
+              { label: 'Export Packages', icon: Download, onClick: handleOpenExportModal, disabled: packages.length === 0 },
+              { label: 'Deleted Packages', icon: Trash2, onClick: () => navigate('/packages/trashed'), dividerBefore: true, danger: true },
+            ]}
+          />
+          <Link to="/packages/create">
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Plus}
+            >
+              Create Package
+            </StandardButton>
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

@@ -24,6 +24,7 @@ import {
   Sparkles,
   CalendarDays,
   Eye,
+  EyeOff,
   Edit,
   FileText,
   LogIn,
@@ -31,6 +32,9 @@ import {
   Loader2,
   CheckCircle,
   Ticket,
+  Columns,
+  Info,
+  UserPlus,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -73,14 +77,41 @@ const CompanyDashboard: React.FC = () => {
   const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
-  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
-  const [timeframeDescription, setTimeframeDescription] = useState('All Time');
+  const getDefaultTimeframe = (): TimeframeType => {
+    const user = getStoredUser();
+    const key = user?.id ? `dashboard_timeframe_${user.id}` : 'dashboard_timeframe';
+    const saved = localStorage.getItem(key);
+    if (saved && ['today','last_24h','last_7d','last_30d','all_time','custom'].includes(saved)) {
+      return saved as TimeframeType;
+    }
+    return 'today';
+  };
+  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>(getDefaultTimeframe);
+  const [timeframeDescription, setTimeframeDescription] = useState(() =>
+    getDefaultTimeframe() === 'today' ? 'Today' : 'All Time'
+  );
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
   
   const [rooms, setRooms] = useState<Room[]>([]);
   
-  const [newBookings, setNewBookings] = useState<any[]>([]);
+  const [, setNewBookings] = useState<any[]>([]);
+
+  // --- Card visibility toggle ---
+  const getDefaultCardVisibility = () => {
+    const user = getStoredUser();
+    const key = user?.id ? `dashboard_card_visibility_${user.id}` : 'dashboard_card_visibility';
+    const saved = localStorage.getItem(key);
+    if (saved) { try { return JSON.parse(saved); } catch {} }
+    return { packages: true, partyParticipants: true, attractionsSold: true, eventsSold: true, memberships: true, uniqueCustomers: true, confirmedBookings: true };
+  };
+  const [cardVisibility, setCardVisibility] = useState<Record<string,boolean>>(getDefaultCardVisibility);
+  const [showCardSelector, setShowCardSelector] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  // --- Breakdown data from API ---
+  const [dashboardBreakdowns, setDashboardBreakdowns] = useState<any>({});
+  const [membershipCount, setMembershipCount] = useState(0);
 
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
@@ -106,6 +137,8 @@ const CompanyDashboard: React.FC = () => {
     totalBookings: 0,
     totalRevenue: 0,
     totalCustomers: 0,
+    newCustomers: 0,
+    returningCustomers: 0,
     confirmedBookings: 0,
     pendingBookings: 0,
     completedBookings: 0,
@@ -117,6 +150,9 @@ const CompanyDashboard: React.FC = () => {
     eventPurchaseRevenue: 0,
     totalEventPurchases: 0,
     totalEventTickets: 0,
+    totalMemberships: 0,
+    activeMemberships: 0,
+    newMemberships: 0,
   });
 
   const getWeekDates = (date: Date): Date[] => {
@@ -383,6 +419,11 @@ const CompanyDashboard: React.FC = () => {
   const getTimeframeCutoffDate = (): Date | null => {
     const now = new Date();
     switch (metricsTimeframe) {
+      case 'today': {
+        const d = new Date(now);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
       case 'last_24h': {
         const d = new Date(now);
         d.setDate(now.getDate() - 1);
@@ -533,10 +574,15 @@ const CompanyDashboard: React.FC = () => {
         
         if (metricsResponse.metrics) {
           setMetrics(metricsResponse.metrics);
+          setMembershipCount(metricsResponse.metrics.newMemberships ?? 0);
         } else {
           console.error('⚠️ No metrics in API response');
         }
-        
+
+        if (metricsResponse.breakdowns) {
+          setDashboardBreakdowns(metricsResponse.breakdowns);
+        }
+
         if (metricsResponse.timeframe) {
           setTimeframeDescription(metricsResponse.timeframe.description);
         }
@@ -638,62 +684,80 @@ const CompanyDashboard: React.FC = () => {
     console.log('📅 [CompanyDashboard] Weekly bookings filtered:', weekly.length);
   }, [allBookings, currentWeek]);
 
-  const metricsCards = [
+  const allDashboardCards = [
     {
-      title: 'Total Bookings',
-      value: metrics.totalBookings.toString(),
-      change: `${metrics.totalParticipants} total participants`,
-      trend: 'up',
-      icon: Calendar,
+      key: 'packages',
+      title: 'Packages',
+      value: metrics.totalBookings,
+      description: `${metrics.confirmedBookings} confirmed`,
+      icon: PackageIcon,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.packageBreakdown ?? [],
     },
     {
-      title: 'New Bookings',
-      value: newBookings.length.toString(),
-      change: `Created • ${timeframeDescription}`,
-      trend: newBookings.length > 0 ? 'up' : 'stable',
-      icon: Sparkles,
-      accent: 'bg-yellow-100 text-yellow-700',
-      timeframe: timeframeDescription,
-    },
-    {
-      title: 'Active Locations',
-      value: locations.length.toString(),
-      change: 'All locations operational',
-      trend: 'stable',
-      icon: Building,
-      accent: `bg-${themeColor}-100 text-${fullColor}`,
-      timeframe: 'All Time',
-    },
-    {
-      title: 'Total Revenue',
-      value: `$${metrics.totalRevenue.toFixed(2)}`,
-      change: `Bkgs: $${Math.round(metrics.bookingRevenue)} | Tix: $${Math.round(metrics.purchaseRevenue)}${metrics.eventPurchaseRevenue > 0 ? ` | Events: $${Math.round(metrics.eventPurchaseRevenue)}` : ''}`,
-      trend: 'up',
-      icon: DollarSign,
-      accent: `bg-${themeColor}-100 text-${fullColor}`,
-      timeframe: timeframeDescription,
-    },
-    {
-      title: 'Participants',
-      value: metrics.totalParticipants.toString(),
-      change: `${metrics.totalCustomers} unique customers`,
-      trend: 'up',
+      key: 'partyParticipants',
+      title: 'Party Participants',
+      value: metrics.totalParticipants,
+      description: `From package bookings`,
       icon: Users,
-      accent: `bg-${themeColor}-100 text-${fullColor}`,
+      accent: 'bg-blue-100 text-blue-700',
       timeframe: timeframeDescription,
+      breakdown: [] as any[],
     },
     {
-      title: 'Avg. Booking Value',
-      value: metrics.totalBookings > 0 ? `$${(metrics.bookingRevenue / metrics.totalBookings).toFixed(2)}` : '$0.00',
-      change: `${metrics.totalPurchases} tickets${metrics.totalEventTickets > 0 ? ` • ${metrics.totalEventTickets} event tickets` : ''} sold`,
-      trend: 'up',
-      icon: CreditCard,
-      accent: `bg-${themeColor}-100 text-${fullColor}`,
+      key: 'attractionsSold',
+      title: 'Attractions Sold',
+      value: metrics.totalPurchases,
+      description: `Tickets sold`,
+      icon: Ticket,
+      accent: 'bg-green-100 text-green-700',
       timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.attractionBreakdown ?? [],
+    },
+    {
+      key: 'eventsSold',
+      title: 'Events Sold',
+      value: metrics.totalEventPurchases,
+      description: `${metrics.totalEventTickets} tickets`,
+      icon: CalendarDays,
+      accent: 'bg-purple-100 text-purple-700',
+      timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.eventBreakdown ?? [],
+    },
+    {
+      key: 'memberships',
+      title: 'Memberships',
+      value: membershipCount,
+      description: `New this period`,
+      icon: CreditCard,
+      accent: 'bg-amber-100 text-amber-700',
+      timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.membershipBreakdown ?? [],
+    },
+    {
+      key: 'uniqueCustomers',
+      title: 'Unique Customers',
+      value: metrics.totalCustomers,
+      description: `${metrics.newCustomers ?? 0} new`,
+      icon: UserPlus,
+      accent: 'bg-rose-100 text-rose-700',
+      timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.customerBreakdown ?? [],
+    },
+    {
+      key: 'confirmedBookings',
+      title: 'Confirmed Bookings',
+      value: metrics.confirmedBookings,
+      description: `Packages + events + attractions`,
+      icon: CheckCircle,
+      accent: 'bg-emerald-100 text-emerald-700',
+      timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.confirmedBreakdown ?? [],
     },
   ];
+
+  const visibleDashboardCards = allDashboardCards.filter(c => cardVisibility[c.key] !== false);
 
   const bookingsThisWeek = weeklyBookings.filter(booking => {
     const bookingDate = parseLocalDate(booking.booking_date);
@@ -927,6 +991,21 @@ const CompanyDashboard: React.FC = () => {
   console.log('Top Locations:', topLocations);
 
   const [showAllLocations, setShowAllLocations] = useState(false);
+
+  const handleTimeframeChange = (tf: TimeframeType) => {
+    setMetricsTimeframe(tf);
+    const user = getStoredUser();
+    const key = user?.id ? `dashboard_timeframe_${user.id}` : 'dashboard_timeframe';
+    localStorage.setItem(key, tf);
+  };
+
+  const updateCardVisibility = (card: string, visible: boolean) => {
+    const updated = { ...cardVisibility, [card]: visible };
+    setCardVisibility(updated);
+    const user = getStoredUser();
+    const key = user?.id ? `dashboard_card_visibility_${user.id}` : 'dashboard_card_visibility';
+    localStorage.setItem(key, JSON.stringify(updated));
+  };
   const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue);
   const displayedLocations = showAllLocations ? sortedLocations : sortedLocations.slice(0, 4);
 
@@ -1010,9 +1089,10 @@ const CompanyDashboard: React.FC = () => {
             <div className="relative">
               <select
                 value={metricsTimeframe}
-                onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
+                onChange={(e) => handleTimeframeChange(e.target.value as TimeframeType)}
                 className={`appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-transparent cursor-pointer`}
               >
+                <option value="today">Today</option>
                 <option value="last_24h">Last 24 Hours</option>
                 <option value="last_7d">Last 7 Days</option>
                 <option value="last_30d">Last 30 Days</option>
@@ -1024,6 +1104,46 @@ const CompanyDashboard: React.FC = () => {
             {metricsLoading && (
               <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
             )}
+
+            {/* Card visibility toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setShowCardSelector(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors`}
+                title="Customize cards"
+              >
+                {showCardSelector ? <EyeOff size={14} /> : <Columns size={14} />}
+                <span className="hidden sm:inline">Cards</span>
+              </button>
+              {showCardSelector && (
+                <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3">
+                  <div className="text-xs font-semibold text-gray-700 mb-2">Show / Hide Cards</div>
+                  {allDashboardCards.map(card => (
+                    <label key={card.key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded text-sm">
+                      <input
+                        type="checkbox"
+                        checked={cardVisibility[card.key] !== false}
+                        onChange={(e) => updateCardVisibility(card.key, e.target.checked)}
+                        className={`rounded border-gray-300 text-${fullColor} w-3.5 h-3.5`}
+                      />
+                      <span className="text-gray-700">{card.title}</span>
+                    </label>
+                  ))}
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex gap-2">
+                    <button
+                      onClick={() => {
+                        const all = Object.fromEntries(allDashboardCards.map(c => [c.key, true]));
+                        setCardVisibility(all);
+                        const user = getStoredUser();
+                        const k = user?.id ? `dashboard_card_visibility_${user.id}` : 'dashboard_card_visibility';
+                        localStorage.setItem(k, JSON.stringify(all));
+                      }}
+                      className={`text-xs text-${themeColor}-600 hover:text-${themeColor}-800`}
+                    >Show All</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           
           {metricsTimeframe === 'custom' && (
@@ -1064,35 +1184,77 @@ const CompanyDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {metricsCards.map((metric, index) => {
-          const Icon = metric.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[100px] md:min-h-[120px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={18} className="md:size-5" /></div>
-                  <span className="text-sm md:text-base font-semibold text-gray-800">{metric.title}</span>
+      {/* Summary metric cards */}
+      {visibleDashboardCards.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          {visibleDashboardCards.map((card) => {
+            const Icon = card.icon;
+            const isExpanded = expandedCard === card.key;
+            const hasBreakdown = Array.isArray(card.breakdown) && card.breakdown.length > 0;
+            return (
+              <div key={card.key} className="relative">
+                <div
+                  className={`bg-white rounded-xl border shadow-sm p-4 flex flex-col gap-1.5 transition-all cursor-pointer select-none ${
+                    isExpanded ? 'border-gray-300 shadow-md' : 'border-gray-100 hover:shadow-md'
+                  }`}
+                  onClick={() => setExpandedCard(isExpanded ? null : card.key)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className={`p-1.5 rounded-lg ${card.accent}`}>
+                      <Icon size={16} />
+                    </div>
+                    {hasBreakdown && (
+                      <Info size={13} className="text-gray-300" />
+                    )}
+                  </div>
+                  <div className="mt-1">
+                    {loading ? (
+                      <div className="h-7 bg-gray-200 rounded w-14 animate-pulse mb-1" />
+                    ) : (
+                      <CounterAnimation value={card.value.toString()} className="text-2xl font-bold text-gray-900" />
+                    )}
+                    <p className="text-xs font-medium text-gray-700 mt-0.5 leading-tight">{card.title}</p>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-[10px] text-gray-400 truncate">{loading ? '' : card.description}</span>
+                    <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full ml-1 shrink-0">{card.timeframe}</span>
+                  </div>
                 </div>
-                {metric.timeframe && (
-                  <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{metric.timeframe}</span>
+
+                {/* Breakdown popover */}
+                {isExpanded && (
+                  <div className="absolute top-full left-0 mt-1 z-40 bg-white rounded-xl border border-gray-200 shadow-xl p-3 min-w-[200px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-700">{card.title} Breakdown</span>
+                      <button onClick={() => setExpandedCard(null)} className="text-gray-400 hover:text-gray-600">
+                        <X size={12} />
+                      </button>
+                    </div>
+                    {hasBreakdown ? (
+                      <div className="space-y-1.5">
+                        {(card.breakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
+                          <div key={item.label} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 truncate mr-2">{item.label}</span>
+                            <span className="text-gray-800 font-medium shrink-0">
+                              {item.count} <span className="text-gray-400">({item.percentage}%)</span>
+                            </span>
+                          </div>
+                        ))}
+                        <div className="pt-1.5 mt-1.5 border-t border-gray-100 flex items-center justify-between text-xs font-semibold">
+                          <span className="text-gray-700">Total</span>
+                          <span className="text-gray-900">{card.value}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">No breakdown available</p>
+                    )}
+                  </div>
                 )}
               </div>
-              <div className="flex items-end gap-2 mt-2">
-                {loading ? (
-                  <div className="h-8 bg-gray-200 rounded w-20 animate-pulse"></div>
-                ) : (
-                  <CounterAnimation value={metric.value} className="text-xl md:text-2xl font-bold text-gray-900" />
-                )}
-              </div>
-              <p className="text-xs mt-1 text-gray-400">{loading ? '' : metric.change}</p>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">

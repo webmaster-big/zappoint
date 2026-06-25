@@ -24,6 +24,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import Pagination from '../../../components/ui/Pagination';
 import { API_BASE_URL } from '../../../utils/storage';
 import { locationService } from '../../../services';
@@ -731,26 +732,16 @@ const ManageAccounts = () => {
           <h1 className="text-3xl font-bold text-gray-900">Manage Accounts</h1>
           <p className="text-gray-600 mt-2">Manage all attendant and location manager accounts</p>
         </div>
-        <div className="flex gap-2 mt-4 sm:mt-0">
+        <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
           {isCompanyAdmin && (
-            <>
-              <StandardButton
-                onClick={() => setShowLocationsModal(true)}
-                variant="secondary"
-                size="md"
-                icon={MapPin}
-              >
-                Locations
-              </StandardButton>
-              <StandardButton
-                onClick={() => setShowCreateLocationModal(true)}
-                variant="secondary"
-                size="md"
-                icon={Building2}
-              >
-                Add Location
-              </StandardButton>
-            </>
+            <ActionMenu
+              label="Locations"
+              icon={MapPin}
+              items={[
+                { label: 'View Locations', icon: MapPin, onClick: () => setShowLocationsModal(true) },
+                { label: 'Add Location', icon: Building2, onClick: () => setShowCreateLocationModal(true) },
+              ]}
+            />
           )}
           <StandardButton
             onClick={() => handleInviteAccount()}

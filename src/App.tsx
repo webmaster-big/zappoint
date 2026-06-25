@@ -77,6 +77,7 @@ import EmailNotifications from "./pages/admin/email/EmailNotifications";
 import CreateEmailNotification from "./pages/admin/email/CreateEmailNotification";
 import EditEmailNotification from "./pages/admin/email/EditEmailNotification";
 import EmailNotificationDetails from "./pages/admin/email/EmailNotificationDetails";
+import SmsNotifications from "./pages/admin/sms/SmsNotifications";
 import FeeSupports from "./pages/admin/fee-supports/FeeSupports";
 import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
 import RsvpPage from "./pages/public/RsvpPage";
@@ -223,6 +224,7 @@ function App() {
           <Route path="/admin/email/notifications/create" element={<CreateEmailNotification />} />
           <Route path="/admin/email/notifications/edit/:id" element={<EditEmailNotification />} />
           <Route path="/admin/email/notifications/:id" element={<EmailNotificationDetails />} />
+          <Route path="/admin/sms/notifications" element={<SmsNotifications />} />
           
           <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAdminProfile /></ProtectedRoute>} />
           <Route path="/manager/profile" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationManagerProfile /></ProtectedRoute>} />

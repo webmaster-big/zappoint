@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
@@ -2584,38 +2585,19 @@ const Bookings: React.FC = () => {
             >
               Manual Booking
             </StandardButton>
-            <StandardButton
-              variant="primary"
-              size="md"
-              icon={Upload}
-              onClick={() => setShowBulkImportModal(true)}
-            >
-              Bulk Import
-            </StandardButton>
-            <StandardButton
-              variant="primary"
-              size="md"
-              icon={Download}
-              onClick={() => setShowExportModal(true)}
-            >
-              Export Bookings
-            </StandardButton>
-            <StandardButton
-              variant="primary"
-              size="md"
-              icon={FileDown}
-              onClick={handleOpenReportModal}
-            >
-              Generate Report
-            </StandardButton>
-            <StandardButton
-              variant={showTrashed ? 'primary' : 'secondary'}
-              size="md"
-              onClick={toggleTrashedView}
-              icon={showTrashed ? RefreshCcw : Archive}
-            >
-              {showTrashed ? 'View Active' : 'View Deleted'}
-            </StandardButton>
+            <ActionMenu
+              items={[
+                { label: 'Bulk Import', icon: Upload, onClick: () => setShowBulkImportModal(true) },
+                { label: 'Export Bookings', icon: Download, onClick: () => setShowExportModal(true) },
+                { label: 'Generate Report', icon: FileDown, onClick: handleOpenReportModal },
+                {
+                  label: showTrashed ? 'View Active' : 'View Deleted',
+                  icon: showTrashed ? RefreshCcw : Archive,
+                  onClick: toggleTrashedView,
+                  dividerBefore: true,
+                },
+              ]}
+            />
           </div>
         </div>
 

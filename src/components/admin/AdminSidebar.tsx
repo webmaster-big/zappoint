@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Search,
   Bell,
+  MessageSquare,
   Dot,
   Settings,
   Menu,
@@ -183,7 +184,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Campaigns', href: '/admin/email/campaigns', icon: Send },
           { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus },
           { label: 'Email Notifications', href: '/admin/email/notifications', icon: Bell },
-          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus }
+          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus },
+          { label: 'SMS Notifications', href: '/admin/sms/notifications', icon: MessageSquare }
         ]},
         { label: 'Profile', icon: User, href: '/attendant/profile', section: 'Account' },
         { label: 'Settings', icon: Settings, href: '/attendant/settings', section: 'Account' }
@@ -241,7 +243,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Campaigns', href: '/admin/email/campaigns', icon: Send },
           { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus },
           { label: 'Email Notifications', href: '/admin/email/notifications', icon: Bell },
-          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus }
+          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus },
+          { label: 'SMS Notifications', href: '/admin/sms/notifications', icon: MessageSquare }
         ]},
         { label: 'Payments', icon: CreditCard, href: '/manager/payments', section: 'Financial' },
         { label: 'Attendants Management', icon: UserCog, section: 'Team', items: [
@@ -310,7 +313,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Campaigns', href: '/admin/email/campaigns', icon: Send },
           { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus },
           { label: 'Email Notifications', href: '/admin/email/notifications', icon: Bell },
-          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus }
+          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus },
+          { label: 'SMS Notifications', href: '/admin/sms/notifications', icon: MessageSquare }
         ]},
         { label: 'Payments', icon: CreditCard, href: '/admin/payments', section: 'Financial' },
         { label: 'User Management', icon: UserCog, section: 'Administration', items: [

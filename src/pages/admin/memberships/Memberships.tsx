@@ -12,6 +12,8 @@ import {
   RefreshCcw,
   Plus,
   X,
+  CalendarCheck,
+  BarChart3,
 } from 'lucide-react';
 import axios from 'axios';
 import membershipService from '../../../services/MembershipService';
@@ -23,6 +25,7 @@ import { loadAcceptJS, tokenizeCard } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
@@ -77,6 +80,9 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
   const [lastName, setLastName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [phone, setPhone] = useState('');
+  // Pass holder (authorized user) — distinct from the account/guardian above.
+  // Optional: defaults to the account holder's name on the back end if left blank.
+  const [holderName, setHolderName] = useState('');
 
   const [planId, setPlanId] = useState<number | ''>('');
   const [locationId, setLocationId] = useState<number | ''>('');
@@ -190,20 +196,28 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
       payment_type: planPrice > 0 ? paymentMethod : 'none',
     };
 
+    if (holderName.trim()) {
+      payload.holder_name = holderName.trim();
+    }
+
     if (selectedCustomer) {
       payload.customer_id = selectedCustomer.id;
     } else if (showNewForm) {
-      if (!firstName.trim() || !lastName.trim() || !newEmail.trim()) {
-        setFormError('First name, last name, and email are required.');
+      if (!firstName.trim() || !lastName.trim()) {
+        setFormError('First name and last name are required.');
         return;
       }
-      if (!newEmail.includes('@')) {
-        setFormError('Please enter a valid email address.');
+      if (newEmail.trim() && !newEmail.includes('@')) {
+        setFormError('Please enter a valid email address, or leave it blank.');
+        return;
+      }
+      if (paymentMethod === 'charge' && planPrice > 0 && !newEmail.trim()) {
+        setFormError('An email is required when charging a card.');
         return;
       }
       payload.first_name = firstName.trim();
       payload.last_name  = lastName.trim();
-      payload.email      = newEmail.trim();
+      payload.email      = newEmail.trim() || undefined;
       payload.phone      = phone.trim() || undefined;
     } else {
       setFormError('Search for a customer or create a new one.');
@@ -244,8 +258,9 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
         }
       }
 
+      const hasEmail = !!(selectedCustomer?.email || (showNewForm && newEmail.trim()));
       await membershipService.createMembership(payload);
-      showSuccess('Membership created! Activation email sent.');
+      showSuccess(hasEmail ? 'Membership created! Activation email sent.' : 'Membership created.');
       setTimeout(() => { onCreated(); onClose(); }, 1200);
     } catch (e: unknown) {
       showModalError(e, 'Failed to create membership');
@@ -339,18 +354,36 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Email *</label>
+                      <label className="block text-xs text-gray-600 mb-1">Email <span className="text-gray-400 font-normal">(optional)</span></label>
                       <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className={ic} placeholder="jane@example.com" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Phone</label>
+                      <label className="block text-xs text-gray-600 mb-1">Phone <span className="text-gray-400 font-normal">(optional)</span></label>
                       <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={ic} placeholder="+1 555 000 0000" />
                     </div>
-                    <p className="text-xs text-gray-400">A temporary password is set automatically. The customer can reset it from the login page.</p>
+                    <p className="text-xs text-gray-400">
+                      {newEmail.trim()
+                        ? 'Login credentials are emailed automatically. The customer can reset the password from the login page.'
+                        : 'No email — this is a walk-in pass with no online account. Add an email later to enable customer login.'}
+                    </p>
                   </div>
                 )}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Pass Holder Name <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={holderName}
+              onChange={(e) => setHolderName(e.target.value)}
+              className={ic}
+              placeholder="Name shown on the pass — e.g. the child or authorized user"
+            />
+            <p className="mt-1 text-xs text-gray-400">Leave blank to use the account holder's name.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -542,6 +575,7 @@ const Memberships = () => {
       const name = `${m.customer?.first_name || ''} ${m.customer?.last_name || ''}`.toLowerCase();
       return (
         name.includes(q) ||
+        m.holder_name?.toLowerCase().includes(q) ||
         m.customer?.email?.toLowerCase().includes(q) ||
         m.qr_token.toLowerCase().includes(q)
       );
@@ -581,16 +615,14 @@ const Memberships = () => {
           </h1>
           <p className="text-gray-600 mt-1">View and manage all member subscriptions</p>
         </div>
-        <div className="flex gap-2 mt-4 sm:mt-0">
-          <StandardButton variant="secondary" size="md" icon={CreditCard} onClick={() => navigate('/memberships/plans')}>
-            Plans
-          </StandardButton>
-          <StandardButton variant="secondary" size="md" onClick={() => navigate('/memberships/check-in')}>
-            Check-In
-          </StandardButton>
-          <StandardButton variant="secondary" size="md" onClick={() => navigate('/memberships/reports')}>
-            Reports
-          </StandardButton>
+        <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+          <ActionMenu
+            items={[
+              { label: 'Plans', icon: CreditCard, onClick: () => navigate('/memberships/plans') },
+              { label: 'Check-In', icon: CalendarCheck, onClick: () => navigate('/memberships/check-in') },
+              { label: 'Reports', icon: BarChart3, onClick: () => navigate('/memberships/reports') },
+            ]}
+          />
           <StandardButton variant="primary" size="md" icon={Plus} onClick={() => setShowAddModal(true)}>
             Add Member
           </StandardButton>
@@ -719,9 +751,14 @@ const Memberships = () => {
                   >
                     <td className="px-4 py-4">
                       <div className="font-medium text-gray-900">
-                        {m.customer?.first_name} {m.customer?.last_name}
+                        {m.holder_name?.trim() || `${m.customer?.first_name ?? ''} ${m.customer?.last_name ?? ''}`.trim()}
                       </div>
-                      <div className="text-xs text-gray-500">{m.customer?.email}</div>
+                      <div className="text-xs text-gray-500">
+                        {m.holder_name?.trim() && (
+                          <span>{m.customer?.first_name} {m.customer?.last_name} · </span>
+                        )}
+                        {m.customer?.email || 'no email'}
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">{m.plan?.name || `#${m.membership_plan_id}`}</td>
                     <td className="px-4 py-4"><MembershipStatusBadge status={m.status} /></td>

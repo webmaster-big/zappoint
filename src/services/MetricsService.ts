@@ -16,9 +16,29 @@ export interface DashboardMetrics {
   eventPurchaseRevenue: number;
   totalEventPurchases: number;
   totalEventTickets: number;
+  newCustomers: number;
+  returningCustomers: number;
+  totalMemberships: number;
+  activeMemberships: number;
+  newMemberships: number;
 }
 
-export type TimeframeType = 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';
+export interface BreakdownItem {
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface DashboardBreakdowns {
+  packageBreakdown: BreakdownItem[];
+  attractionBreakdown: BreakdownItem[];
+  eventBreakdown: BreakdownItem[];
+  membershipBreakdown: BreakdownItem[];
+  customerBreakdown: BreakdownItem[];
+  confirmedBreakdown: BreakdownItem[];
+}
+
+export type TimeframeType = 'today' | 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';
 
 export interface TimeframeInfo {
   type: TimeframeType;
@@ -85,6 +105,7 @@ export interface DashboardResponse {
   recentEventPurchases?: RecentEventPurchase[];
   locationStats?: LocationStats; // Only for company_admin
   locationDetails?: LocationDetails; // Only for manager/attendant
+  breakdowns?: DashboardBreakdowns;
 }
 
 export interface RecentBooking {
@@ -126,7 +147,7 @@ class MetricsService {
     }
 
     const queryParams = new URLSearchParams();
-    
+
     if (params?.timeframe) {
       queryParams.append('timeframe', params.timeframe);
     }
@@ -135,6 +156,10 @@ class MetricsService {
     }
     if (params?.date_to) {
       queryParams.append('date_to', params.date_to);
+    }
+    // Only send timezone for the "today" timeframe so backend calculates midnight correctly
+    if (params?.timeframe === 'today') {
+      queryParams.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
 
     const url = `${API_BASE_URL}/metrics/dashboard/${user.id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;

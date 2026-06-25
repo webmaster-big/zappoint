@@ -288,6 +288,7 @@ export interface MembershipLocationRef {
 export interface Membership {
   id: number;
   customer_id: number;
+  holder_name?: string | null;
   membership_plan_id: number;
   membership_group_id?: number | null;
   home_location_id?: number | null;
