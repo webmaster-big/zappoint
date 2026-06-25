@@ -31,6 +31,7 @@ export interface BreakdownItem {
 
 export interface DashboardBreakdowns {
   packageBreakdown: BreakdownItem[];
+  participantBreakdown: BreakdownItem[];
   attractionBreakdown: BreakdownItem[];
   eventBreakdown: BreakdownItem[];
   membershipBreakdown: BreakdownItem[];
@@ -139,6 +140,7 @@ class MetricsService {
     timeframe?: TimeframeType;
     date_from?: string;
     date_to?: string;
+    location_id?: number | string;
   }): Promise<DashboardResponse> {
     const user = getStoredUser();
     if (!user || !user.id) {
@@ -156,6 +158,9 @@ class MetricsService {
     }
     if (params?.date_to) {
       queryParams.append('date_to', params.date_to);
+    }
+    if (params?.location_id !== undefined && params.location_id !== null && params.location_id !== 'all') {
+      queryParams.append('location_id', params.location_id.toString());
     }
     // Only send timezone for the "today" timeframe so backend calculates midnight correctly
     if (params?.timeframe === 'today') {

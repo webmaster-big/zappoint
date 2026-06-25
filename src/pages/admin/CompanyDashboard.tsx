@@ -543,6 +543,9 @@ const CompanyDashboard: React.FC = () => {
         if (cachedData) {
           console.log('📦 [CompanyDashboard] Loaded metrics from cache for timeframe:', metricsTimeframe);
           setMetrics(cachedData.metrics);
+          if ((cachedData as any).breakdowns) {
+            setDashboardBreakdowns((cachedData as any).breakdowns);
+          }
           if (cachedData.locationStats) {
             setApiLocationStats(cachedData.locationStats);
           }
@@ -560,7 +563,11 @@ const CompanyDashboard: React.FC = () => {
         const metricsParams: any = {
           timeframe: metricsTimeframe,
         };
-        
+
+        if (selectedLocation !== 'all') {
+          metricsParams.location_id = selectedLocation;
+        }
+
         if (metricsTimeframe === 'custom' && customDateFrom && customDateTo) {
           metricsParams.date_from = customDateFrom;
           metricsParams.date_to = customDateTo;
@@ -606,10 +613,11 @@ const CompanyDashboard: React.FC = () => {
         
         await metricsCacheService.cacheMetrics('company', {
           metrics: metricsResponse.metrics,
+          breakdowns: metricsResponse.breakdowns,
           locationStats: metricsResponse.locationStats,
           recentPurchases: metricsResponse.recentPurchases,
           recentEventPurchases: metricsResponse.recentEventPurchases,
-        }, selectedLocation, metricsTimeframe);
+        } as any, selectedLocation, metricsTimeframe);
         
         console.log('✅ [CompanyDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
         
@@ -703,7 +711,7 @@ const CompanyDashboard: React.FC = () => {
       icon: Users,
       accent: 'bg-blue-100 text-blue-700',
       timeframe: timeframeDescription,
-      breakdown: [] as any[],
+      breakdown: dashboardBreakdowns.participantBreakdown ?? [],
     },
     {
       key: 'attractionsSold',
