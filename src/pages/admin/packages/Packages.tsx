@@ -4,7 +4,7 @@ import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, T
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { packageService, type Package, type CreatePackageData } from '../../../services';
+import { packageService, locationService, type Package, type CreatePackageData } from '../../../services';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
 import { createSlugWithId } from '../../../utils/slug';
@@ -31,6 +31,7 @@ const Packages: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedForExport, setSelectedForExport] = useState<number[]>([]);
   const [importData, setImportData] = useState<string>("");
+  const [importLocationId, setImportLocationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -41,11 +42,28 @@ const Packages: React.FC = () => {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showDuplicateLocationModal, setShowDuplicateLocationModal] = useState(false);
+  const [packageToDuplicate, setPackageToDuplicate] = useState<Package | null>(null);
+  const [duplicateTargetLocationId, setDuplicateTargetLocationId] = useState<number | null>(null);
+  const [allLocations, setAllLocations] = useState<Array<{ id: number; name: string }>>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem('zapzone_user');
     if (stored) {
       setUserData(JSON.parse(stored));
+    }
+  }, []);
+
+  useEffect(() => {
+    const currentUser = getStoredUser();
+    if (currentUser?.role === 'company_admin') {
+      locationService.getLocations().then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          setAllLocations(res.data.map(l => ({ id: l.id, name: l.name })));
+        }
+      }).catch(() => {});
+    } else if (currentUser?.location_id) {
+      setAllLocations([{ id: currentUser.location_id, name: currentUser.location_name || 'My Location' }]);
     }
   }, []);
 
@@ -289,7 +307,7 @@ const Packages: React.FC = () => {
     
     const cleanedPackages = packagesToExport.map(pkg => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id: _id, created_at: _created, updated_at: _updated, ...cleanPkg } = pkg;
+      const { id: _id, created_at: _created, updated_at: _updated, location_id: _lid, location: _loc, ...cleanPkg } = pkg;
       return cleanPkg;
     });
     
@@ -325,13 +343,13 @@ const Packages: React.FC = () => {
       }
 
       const currentUser = getStoredUser();
-      const userLocationId = currentUser?.location_id || 1;
+      const targetLocationId = importLocationId || currentUser?.location_id || 1;
 
       const packagesForImport = parsedData.map(pkg => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _id, created_at: _created, updated_at: _updated, ...cleanPkg } = pkg;
+        const { id: _id, created_at: _created, updated_at: _updated, location_id: _lid, location: _loc, ...cleanPkg } = pkg;
         return {
-          location_id: userLocationId, // Use logged-in user's location_id
+          location_id: targetLocationId,
           name: cleanPkg.name,
           description: cleanPkg.description || '',
           category: cleanPkg.category || 'Uncategorized',
@@ -426,15 +444,23 @@ const Packages: React.FC = () => {
     }
   };
 
-  const handleDuplicatePackage = async (pkg: Package) => {
-    try {
-      setDuplicatingId(pkg.id);
+  const handleDuplicatePackage = (pkg: Package) => {
+    setPackageToDuplicate(pkg);
+    setDuplicateTargetLocationId(pkg.location_id);
+    setShowDuplicateLocationModal(true);
+  };
 
-      const response = await packageService.getPackage(pkg.id);
+  const handleConfirmDuplicate = async () => {
+    if (!packageToDuplicate || !duplicateTargetLocationId) return;
+    try {
+      setDuplicatingId(packageToDuplicate.id);
+      setShowDuplicateLocationModal(false);
+
+      const response = await packageService.getPackage(packageToDuplicate.id);
       const original = response.data;
 
       const duplicateData: CreatePackageData = {
-        location_id: original.location_id,
+        location_id: duplicateTargetLocationId,
         name: `${original.name} (Copy)`,
         description: original.description,
         category: original.category,
@@ -453,7 +479,7 @@ const Packages: React.FC = () => {
         available_month_days: original.available_month_days,
         availability_schedules: original.availability_schedules,
         image: original.image,
-        is_active: false, // Duplicates start inactive
+        is_active: false,
         partial_payment_percentage: original.partial_payment_percentage,
         partial_payment_fixed: original.partial_payment_fixed,
         has_guest_of_honor: original.has_guest_of_honor,
@@ -470,16 +496,17 @@ const Packages: React.FC = () => {
 
       if (createResponse.success && createResponse.data) {
         await packageCacheService.addPackageToCache(createResponse.data);
-
         setPackages(prev => [createResponse.data, ...prev]);
-
-        alert(`"${original.name}" duplicated successfully!`);
+        const targetName = allLocations.find(l => l.id === duplicateTargetLocationId)?.name || '';
+        alert(`"${original.name}" duplicated successfully${targetName ? ` to ${targetName}` : ''}!`);
       }
     } catch (error) {
       console.error('Error duplicating package:', error);
       alert('Failed to duplicate package. Please try again.');
     } finally {
       setDuplicatingId(null);
+      setPackageToDuplicate(null);
+      setDuplicateTargetLocationId(null);
     }
   };
 
@@ -997,6 +1024,7 @@ const Packages: React.FC = () => {
                   onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
+                    setImportLocationId(null);
                   }}
                   variant="ghost"
                   size="sm"
@@ -1008,6 +1036,23 @@ const Packages: React.FC = () => {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
+              {isCompanyAdmin && allLocations.length > 1 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Import to Location
+                  </label>
+                  <select
+                    value={importLocationId ?? ''}
+                    onChange={(e) => setImportLocationId(e.target.value ? Number(e.target.value) : null)}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                  >
+                    <option value="">Select a location...</option>
+                    {allLocations.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upload or Drag JSON File
@@ -1046,11 +1091,10 @@ const Packages: React.FC = () => {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="text-sm font-semibold text-blue-900 mb-2">Import Notes:</h4>
-                <ul className="text-xs text-${} space-y-1">
+                <ul className="text-xs text-blue-800 space-y-1">
                   <li>• JSON must be an array of package objects</li>
                   <li>• Each package must have at least a name and price</li>
-                  <li>• Package IDs will be automatically generated</li>
-                  <li>• Existing IDs in the import file will be ignored</li>
+                  <li>• Package IDs and location data will be ignored; packages will be registered to the selected location</li>
                   <li>• You can include relationship IDs (attraction_ids, addon_ids, room_ids, gift_card_ids, promo_ids)</li>
                 </ul>
               </div>
@@ -1061,6 +1105,7 @@ const Packages: React.FC = () => {
                 onClick={() => {
                   setShowImportModal(false);
                   setImportData('');
+                  setImportLocationId(null);
                 }}
                 variant="secondary"
                 size="md"
@@ -1069,7 +1114,7 @@ const Packages: React.FC = () => {
               </StandardButton>
               <StandardButton
                 onClick={handleImport}
-                disabled={!importData.trim()}
+                disabled={!importData.trim() || (isCompanyAdmin && allLocations.length > 1 && !importLocationId)}
                 variant="primary"
                 size="md"
                 icon={Upload}
@@ -1185,6 +1230,78 @@ const Packages: React.FC = () => {
                 icon={Clock}
               >
                 {bulkUpdating ? 'Updating...' : `Update ${selectedForBulkUpdate.length} Package${selectedForBulkUpdate.length !== 1 ? 's' : ''}`}
+              </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDuplicateLocationModal && packageToDuplicate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Duplicate Package</h3>
+                  <p className="text-sm text-gray-500 mt-1">Select the location for the duplicate</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDuplicateLocationModal(false);
+                    setPackageToDuplicate(null);
+                    setDuplicateTargetLocationId(null);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-700 mb-4">
+                Duplicating: <span className="font-semibold">{packageToDuplicate.name}</span>
+              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Destination Location
+              </label>
+              {allLocations.length > 1 ? (
+                <select
+                  value={duplicateTargetLocationId ?? ''}
+                  onChange={(e) => setDuplicateTargetLocationId(Number(e.target.value))}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                >
+                  {allLocations.map(loc => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}{loc.id === packageToDuplicate.location_id ? ' (current)' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-gray-600 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                  {allLocations[0]?.name || 'Current location'}
+                </p>
+              )}
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <StandardButton
+                onClick={() => {
+                  setShowDuplicateLocationModal(false);
+                  setPackageToDuplicate(null);
+                  setDuplicateTargetLocationId(null);
+                }}
+                variant="secondary"
+                size="md"
+              >
+                Cancel
+              </StandardButton>
+              <StandardButton
+                onClick={handleConfirmDuplicate}
+                disabled={!duplicateTargetLocationId}
+                variant="primary"
+                size="md"
+                icon={Copy}
+              >
+                Duplicate
               </StandardButton>
             </div>
           </div>

@@ -23,7 +23,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
-import { API_BASE_URL, getStoredUser } from '../../../utils/storage';
+import { API_BASE_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
 import { userService } from '../../../services/UserService';
 import { locationService } from '../../../services/LocationService';
 import type { Location } from '../../../services/LocationService';
@@ -991,6 +991,11 @@ const ManageAttendants = () => {
         onUpdated={(updated) => {
           setLocationInfo(updated);
           setEditLocationTarget(null);
+          // Sync the updated location name into the stored user so it reflects everywhere
+          const storedUser = getStoredUser();
+          if (storedUser && storedUser.location_id === updated.id) {
+            setStoredUser({ ...storedUser, location_name: updated.name }, true);
+          }
         }}
       />
     </div>

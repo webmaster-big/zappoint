@@ -50,6 +50,7 @@ const EditPackage: React.FC = () => {
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [packageLocationId, setPackageLocationId] = useState<number>(1);
     
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]);
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
@@ -216,12 +217,16 @@ const EditPackage: React.FC = () => {
                 const pkg = response.data as any; // Using 'any' to handle time slot fields that may not be in type yet
                 
                 console.log("Loaded package data:", pkg);
-                
+
                 if (!pkg || !pkg.id) {
                     console.error('Package data is empty or missing ID');
                     setNotFound(true);
                     setLoading(false);
                     return;
+                }
+
+                if (pkg.location_id) {
+                    setPackageLocationId(pkg.location_id);
                 }
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -531,7 +536,7 @@ const EditPackage: React.FC = () => {
                         const price = Number(priceValue.toFixed(2)); // Ensure 2 decimal places
                         
                         await addOnService.createAddOn({
-                            location_id: 1, // Default location
+                            location_id: packageLocationId,
                             name: value,
                             price,
                             description: '',
@@ -555,7 +560,7 @@ const EditPackage: React.FC = () => {
                 case 'room':
                     if (!rooms.some(r => r.name === value)) {
                         await roomService.createRoom({
-                            location_id: 1, // Default location
+                            location_id: packageLocationId,
                             name: value,
                             capacity: 20,
                             is_available: true
@@ -709,7 +714,7 @@ const EditPackage: React.FC = () => {
                 price_per_additional: Number(pricePerAdditional.toFixed(2)),
                 duration: duration,
                 duration_unit: form.durationUnit,
-                location_id: 1, // Default location ID
+                location_id: packageLocationId,
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,

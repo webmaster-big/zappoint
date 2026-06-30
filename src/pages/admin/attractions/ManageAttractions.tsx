@@ -79,6 +79,7 @@ const ManageAttractions = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
   const [importData, setImportData] = useState<string>("");
+  const [importLocationId, setImportLocationId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -104,7 +105,12 @@ const ManageAttractions = () => {
 
   const handleExport = () => {
     const attractionsToExport = attractions.filter(attraction => selectedForExport.includes(attraction.id || ''));
-    const jsonData = JSON.stringify(attractionsToExport, null, 2);
+    const cleanedAttractions = attractionsToExport.map(attraction => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, location_id: _lid, location: _loc, ...clean } = attraction as any;
+      return clean;
+    });
+    const jsonData = JSON.stringify(cleanedAttractions, null, 2);
     const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -126,10 +132,10 @@ const ManageAttractions = () => {
       }
 
       const currentUser = getStoredUser();
-      const userLocationId = currentUser?.location_id || 1;
+      const targetLocationId = importLocationId || currentUser?.location_id || 1;
 
       const attractionsToImport = parsedData.map((attraction: ManageAttractionsAttraction) => ({
-        location_id: userLocationId, // Use logged-in user's location_id
+        location_id: targetLocationId,
         name: attraction.name,
         description: attraction.description,
         price: Number(attraction.price),
@@ -1122,7 +1128,7 @@ const ManageAttractions = () => {
       )}
 
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => { setShowImportModal(false); setImportData(''); }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => { setShowImportModal(false); setImportData(''); setImportLocationId(null); }}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
@@ -1134,6 +1140,7 @@ const ManageAttractions = () => {
                   onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
+                    setImportLocationId(null);
                   }}
                   variant="ghost"
                   size="sm"
@@ -1143,6 +1150,23 @@ const ManageAttractions = () => {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
+              {isCompanyAdmin && locations.length > 1 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Import to Location
+                  </label>
+                  <select
+                    value={importLocationId ?? ''}
+                    onChange={(e) => setImportLocationId(e.target.value ? Number(e.target.value) : null)}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                  >
+                    <option value="">Select a location...</option>
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upload JSON File
@@ -1193,7 +1217,7 @@ const ManageAttractions = () => {
                 <ul className={`text-xs text-${fullColor} space-y-1`}>
                   <li>• JSON must be an array of attraction objects</li>
                   <li>• Each attraction must have at least a name and price</li>
-                  <li>• Imported attractions will be added to existing attractions</li>
+                  <li>• Location data is ignored; attractions will be registered to the selected location</li>
                   <li>• New IDs will be generated to avoid conflicts</li>
                 </ul>
               </div>
@@ -1204,6 +1228,7 @@ const ManageAttractions = () => {
                 onClick={() => {
                   setShowImportModal(false);
                   setImportData('');
+                  setImportLocationId(null);
                 }}
                 variant="secondary"
               >
@@ -1211,7 +1236,7 @@ const ManageAttractions = () => {
               </StandardButton>
               <StandardButton
                 onClick={handleImport}
-                disabled={!importData.trim()}
+                disabled={!importData.trim() || (isCompanyAdmin && locations.length > 1 && !importLocationId)}
                 variant="primary"
                 icon={Upload}
               >
