@@ -20,7 +20,8 @@ import {
   Link2,
   Copy,
   Percent,
-  GripVertical
+  GripVertical,
+  CalendarDays
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -83,6 +84,11 @@ const ManageAttractions = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const formatCreatedAt = (dateStr: string): string => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const handleOpenExportModal = () => {
     setSelectedForExport(attractions.map(attraction => attraction.id));
@@ -920,9 +926,23 @@ const ManageAttractions = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900">{attraction.name}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-gray-900">{attraction.name}</span>
+                          {attraction.name?.includes('(Copy)') && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-300 shrink-0">
+                              <Copy className="w-2.5 h-2.5" />
+                              Copy
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-gray-600 mt-1">{attraction.location}</div>
                         <div className="text-xs text-gray-500 mt-1 line-clamp-2">{attraction.description}</div>
+                        {attraction.createdAt && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <CalendarDays className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-400">{formatCreatedAt(attraction.createdAt)}</span>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

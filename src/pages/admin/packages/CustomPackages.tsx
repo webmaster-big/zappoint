@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, Power, Sparkles, CalendarHeart, Calendar, Clock } from "lucide-react";
+import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, Power, Sparkles, CalendarHeart, Calendar, Clock, Copy, CalendarDays } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, packageCacheService, type Package } from '../../../services';
@@ -235,6 +235,11 @@ const CustomPackages: React.FC = () => {
     return config;
   };
 
+  const formatCreatedAt = (dateStr: string): string => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   if (loading) {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center justify-center min-h-96">
@@ -400,10 +405,24 @@ const CustomPackages: React.FC = () => {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-base text-gray-900 truncate mb-1">{pkg.name || "Unnamed Package"}</h3>
+                        {pkg.name?.includes('(Copy)') && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-300">
+                              <Copy className="w-2.5 h-2.5" />
+                              Copy
+                            </span>
+                          </div>
+                        )}
                         {pkg.location && (
                           <div className="flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-gray-400" />
                             <span className="text-xs text-gray-500">{pkg.location.name}</span>
+                          </div>
+                        )}
+                        {pkg.created_at && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <CalendarDays className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-400">{formatCreatedAt(pkg.created_at)}</span>
                           </div>
                         )}
                       </div>

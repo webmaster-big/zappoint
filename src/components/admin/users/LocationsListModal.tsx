@@ -7,9 +7,10 @@ interface LocationsListModalProps {
   onClose: () => void;
   locations: Location[];
   onEditLocation: (location: Location) => void;
+  loading?: boolean;
 }
 
-const LocationsListModal = ({ isOpen, onClose, locations, onEditLocation }: LocationsListModalProps) => {
+const LocationsListModal = ({ isOpen, onClose, locations, onEditLocation, loading = false }: LocationsListModalProps) => {
   const { themeColor } = useThemeColor();
 
   if (!isOpen) return null;
@@ -44,7 +45,11 @@ const LocationsListModal = ({ isOpen, onClose, locations, onEditLocation }: Loca
         </div>
 
         <div className="overflow-y-auto flex-1 divide-y divide-gray-50">
-          {locations.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-14">
+              <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${themeColor}-600`} />
+            </div>
+          ) : locations.length === 0 ? (
             <div className="px-6 py-10 text-center text-gray-500 text-sm">No locations found.</div>
           ) : (
             locations.map((loc) => (

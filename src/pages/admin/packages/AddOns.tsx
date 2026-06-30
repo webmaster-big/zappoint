@@ -27,6 +27,7 @@ const ManageAddons = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
   const [importData, setImportData] = useState<string>("");
+  const [importLocationId, setImportLocationId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -545,7 +546,12 @@ const ManageAddons = () => {
 
   const handleExport = () => {
     const addonsToExport = addons.filter(addon => selectedForExport.includes(addon.id || ''));
-    const jsonData = JSON.stringify(addonsToExport, null, 2);
+    const cleanedAddons = addonsToExport.map(addon => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, location: _loc, ...clean } = addon;
+      return clean;
+    });
+    const jsonData = JSON.stringify(cleanedAddons, null, 2);
     const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -558,40 +564,80 @@ const ManageAddons = () => {
     setShowExportModal(false);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     try {
       const parsedData = JSON.parse(importData);
-      
+
       if (!Array.isArray(parsedData)) {
-        alert('Invalid JSON format. Please provide an array of add-ons.');
+        showToast('Invalid JSON format. Please provide an array of add-ons.', 'error');
         return;
       }
 
-      const isValid = parsedData.every(addon => 
+      const isValid = parsedData.every(addon =>
         typeof addon === 'object' && addon.name && addon.price
       );
 
       if (!isValid) {
-        alert('Invalid add-on data structure. Each add-on must have at least name and price.');
+        showToast('Invalid data structure. Each add-on must have at least name and price.', 'error');
         return;
       }
 
-      const importedAddons = parsedData.map(addon => ({
-        ...addon,
-        id: addon.id || `addon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        price: typeof addon.price === 'number' ? addon.price : parseFloat(addon.price)
-      }));
+      const targetLocationId = importLocationId || currentUser?.location_id || 1;
 
-      const updatedAddons = [...addons, ...importedAddons];
-      setAddons(updatedAddons);
-      localStorage.setItem('zapzone_addons', JSON.stringify(updatedAddons));
-      
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const addon of parsedData) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { id: _id, location: _loc, ...clean } = addon;
+          const result = await addOnService.createAddOn({
+            location_id: targetLocationId,
+            name: clean.name,
+            price: typeof clean.price === 'number' ? clean.price : parseFloat(clean.price),
+            description: clean.description || '',
+            is_active: clean.is_active !== false,
+            min_quantity: clean.min_quantity ? parseInt(clean.min_quantity) : 1,
+            max_quantity: clean.max_quantity ? parseInt(clean.max_quantity) : undefined,
+            is_force_add_on: clean.is_force_add_on || false,
+            image: clean.image || undefined,
+          });
+          if (result.data) {
+            const newAddon: AddOnsAddon = {
+              id: result.data.id.toString(),
+              name: result.data.name,
+              price: result.data.price,
+              image: result.data.image
+                ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`)
+                : '',
+              description: result.data.description,
+              location: result.data.location && typeof result.data.location === 'object' ? result.data.location : null,
+              min_quantity: result.data.min_quantity,
+              max_quantity: result.data.max_quantity,
+              is_force_add_on: result.data.is_force_add_on,
+              price_each_packages: result.data.price_each_packages,
+            };
+            setAddons(prev => [...prev, newAddon]);
+            await addOnCacheService.addAddOnToCache(result.data).catch(() => {});
+            successCount++;
+          }
+        } catch {
+          failCount++;
+        }
+      }
+
       setShowImportModal(false);
       setImportData('');
-      alert(`Successfully imported ${importedAddons.length} add-on(s)!`);
+      setImportLocationId(null);
+
+      if (failCount > 0) {
+        showToast(`Imported ${successCount} add-on(s). ${failCount} failed.`, 'info');
+      } else {
+        showToast(`Successfully imported ${successCount} add-on(s)!`, 'success');
+      }
     } catch (error) {
-      alert('Error parsing JSON. Please check the format and try again.');
       console.error('Import error:', error);
+      showToast('Error parsing JSON. Please check the format and try again.', 'error');
     }
   };
 
@@ -1313,7 +1359,7 @@ const ManageAddons = () => {
         )}
 
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => { setShowImportModal(false); setImportData(''); }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => { setShowImportModal(false); setImportData(''); setImportLocationId(null); }}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
@@ -1325,6 +1371,7 @@ const ManageAddons = () => {
                     onClick={() => {
                       setShowImportModal(false);
                       setImportData('');
+                      setImportLocationId(null);
                     }}
                     variant="ghost"
                     size="sm"
@@ -1334,6 +1381,23 @@ const ManageAddons = () => {
               </div>
 
               <div className="p-6 overflow-y-auto flex-1">
+                {isCompanyAdmin && locations.length > 1 && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Import to Location
+                    </label>
+                    <select
+                      value={importLocationId ?? ''}
+                      onChange={(e) => setImportLocationId(e.target.value ? Number(e.target.value) : null)}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    >
+                      <option value="">Select a location...</option>
+                      {locations.map(loc => (
+                        <option key={loc.id} value={loc.id}>{loc.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload JSON File
@@ -1375,8 +1439,8 @@ const ManageAddons = () => {
                   <ul className="text-xs text-blue-800 space-y-1">
                     <li>• JSON must be an array of add-on objects</li>
                     <li>• Each add-on must have at least a name and price</li>
-                    <li>• Imported add-ons will be added to existing add-ons</li>
-                    <li>• New IDs will be generated to avoid conflicts</li>
+                    <li>• Location data is ignored; add-ons will be registered to the selected location</li>
+                    <li>• New IDs will be generated automatically</li>
                     <li>• Images should be base64 encoded or URLs</li>
                   </ul>
                 </div>
@@ -1387,6 +1451,7 @@ const ManageAddons = () => {
                   onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
+                    setImportLocationId(null);
                   }}
                   variant="secondary"
                   size="md"
@@ -1395,7 +1460,7 @@ const ManageAddons = () => {
                 </StandardButton>
                 <StandardButton
                   onClick={handleImport}
-                  disabled={!importData.trim()}
+                  disabled={!importData.trim() || (isCompanyAdmin && locations.length > 1 && !importLocationId)}
                   variant="primary"
                   size="md"
                   icon={Upload}

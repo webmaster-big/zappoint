@@ -335,6 +335,7 @@ const ManageAccounts = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [locationsData, setLocationsData] = useState<Location[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [editLocationTarget, setEditLocationTarget] = useState<Location | null>(null);
 
@@ -393,12 +394,15 @@ const ManageAccounts = () => {
 
   const loadLocations = async () => {
     try {
+      setLocationsLoading(true);
       const res = await locationService.getLocations();
       if (res.success) {
         setLocationsData(Array.isArray(res.data) ? res.data : []);
       }
     } catch {
       // location section will simply not render
+    } finally {
+      setLocationsLoading(false);
     }
   };
 
@@ -1110,6 +1114,7 @@ const ManageAccounts = () => {
         isOpen={showLocationsModal}
         onClose={() => setShowLocationsModal(false)}
         locations={locationsData}
+        loading={locationsLoading}
         onEditLocation={(loc) => setEditLocationTarget(loc)}
       />
 
