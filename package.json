@@ -18,6 +18,7 @@
     "@tailwindcss/vite": "^4.1.13",
     "@uiw/react-codemirror": "^4.25.9",
     "axios": "^1.11.0",
+    "dompurify": "^3.3.0",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.3",

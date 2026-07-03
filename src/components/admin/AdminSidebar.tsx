@@ -42,7 +42,8 @@ import {
   CalendarCheck,
   Calculator,
   Activity,
-  IdCard
+  IdCard,
+  FileSignature
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -178,6 +179,11 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
+        { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
+          { label: 'Waiver Records', href: '/waivers', icon: List },
+          { label: 'Templates', href: '/waivers/templates', icon: FileText },
+          { label: 'Group Invites', href: '/waivers/bulk', icon: Users }
+        ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
@@ -226,6 +232,11 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Pricing', icon: Percent, section: 'Pricing', items: [
           { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
+        ]},
+        { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
+          { label: 'Waiver Records', href: '/waivers', icon: List },
+          { label: 'Templates', href: '/waivers/templates', icon: FileText },
+          { label: 'Group Invites', href: '/waivers/bulk', icon: Users }
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
@@ -296,6 +307,11 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Pricing', icon: Percent, section: 'Pricing', items: [
           { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
+        ]},
+        { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
+          { label: 'Waiver Records', href: '/waivers', icon: List },
+          { label: 'Templates', href: '/waivers/templates', icon: FileText },
+          { label: 'Group Invites', href: '/waivers/bulk', icon: Users }
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },

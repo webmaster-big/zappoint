@@ -20,7 +20,7 @@ import { customerDataCacheService } from '../../services/CustomerDataCacheServic
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
-import MembershipCarousel from '../../components/customer/MembershipCarousel';
+// import MembershipCarousel from '../../components/customer/MembershipCarousel';
 
 
 interface DisplayEventLocation {
@@ -1034,7 +1034,7 @@ const EntertainmentLandingPage = () => {
           </section>
         )}
 
-        <MembershipCarousel />
+        {/* <MembershipCarousel /> */}
 
         <section className="mb-12 md:mb-20">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
