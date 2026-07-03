@@ -170,7 +170,7 @@ export interface BulkChaperoneView {
 export interface AvailableActivities {
   type: ActivityType;
   claimed_ids: Array<number | string>;
-  available: Array<{ id: number; name: string; location_id: number | null }>;
+  available: Array<{ id: number; name: string; location_id: number | null; location_name: string | null }>;
 }
 
 export interface WaiverSettings {

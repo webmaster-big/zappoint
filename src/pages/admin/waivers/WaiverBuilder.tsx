@@ -395,7 +395,10 @@ const WaiverBuilder = () => {
                         return (
                           <button key={item.id} type="button" onClick={() => toggleAssignment(a.column, item.id)} className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${checked ? `bg-${themeColor}-50` : ''}`}>
                             {checked ? <CheckSquare className={`w-4 h-4 text-${fullColor}`} /> : <Square className="w-4 h-4 text-gray-400" />}
-                            <span className="text-sm text-gray-900">{item.name}</span>
+                            <span className="min-w-0">
+                              <span className="block text-sm text-gray-900">{item.name}</span>
+                              {item.location_name && <span className="block text-[11px] text-gray-400">{item.location_name}</span>}
+                            </span>
                           </button>
                         );
                       })}
