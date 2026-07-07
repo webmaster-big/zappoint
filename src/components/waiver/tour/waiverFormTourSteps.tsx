@@ -1,12 +1,12 @@
 import type { Step } from 'react-joyride';
 
 const row = (label: string, desc: string) => (
-  <div style={{ display: 'flex', gap: 7, marginBottom: 7, lineHeight: 1.45 }}>
-    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#2563eb', flexShrink: 0, marginTop: 5 }} />
-    <span style={{ fontSize: 13 }}>
-      <span style={{ fontWeight: 600, color: '#1e293b' }}>{label}</span>
-      <span style={{ color: '#64748b' }}> — {desc}</span>
-    </span>
+  <div style={{ marginBottom: 12, textAlign: 'left' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+      <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#2563eb', flexShrink: 0 }} />
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{label}</span>
+    </div>
+    <div style={{ paddingLeft: 15, fontSize: 12, color: '#64748b', lineHeight: 1.55, textAlign: 'left' }}>{desc}</div>
   </div>
 );
 

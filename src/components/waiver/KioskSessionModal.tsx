@@ -1,17 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, Tablet, Search, Loader2, ChevronRight } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import waiverService from '../../services/waiverService';
 import bookingService from '../../services/bookingService';
+import attractionPurchaseService from '../../services/AttractionPurchaseService';
+import eventPurchaseService from '../../services/EventPurchaseService';
 import { packageCacheService } from '../../services/PackageCacheService';
 import { attractionCacheService } from '../../services/AttractionCacheService';
 import { eventCacheService } from '../../services/EventCacheService';
 import type { Package } from '../../services/PackageService';
 import type { Attraction } from '../../services/AttractionService';
-import type { Event } from '../../types/event.types';
+import type { Event, EventPurchase } from '../../types/event.types';
 import type { Booking } from '../../services/bookingService';
+import type { AttractionPurchase } from '../../services/AttractionPurchaseService';
 
 type SourceType = 'booking' | 'attraction_purchase' | 'event_purchase' | 'package' | 'attraction' | 'event';
+
+type SearchResult =
+  | { kind: 'booking'; data: Booking }
+  | { kind: 'attraction_purchase'; data: AttractionPurchase }
+  | { kind: 'event_purchase'; data: EventPurchase };
 
 interface Props {
   templateId: number;
@@ -22,14 +30,20 @@ interface Props {
   onClose: () => void;
 }
 
-const SOURCE_OPTIONS: Array<{ value: SourceType; label: string; hint: string }> = [
-  { value: 'booking', label: 'Booking', hint: 'Prefills customer name, package & date' },
-  { value: 'attraction_purchase', label: 'Attraction Purchase', hint: 'Prefills customer & attraction from a purchase' },
-  { value: 'event_purchase', label: 'Event Purchase', hint: 'Prefills customer & event from a purchase' },
+const PURCHASE_SOURCE_OPTIONS: Array<{ value: SourceType; label: string; hint: string; badge: string }> = [
+  { value: 'booking', label: 'Booking', hint: 'Prefills customer name, package & date', badge: 'bg-blue-100 text-blue-700' },
+  { value: 'attraction_purchase', label: 'Attraction Purchase', hint: 'Prefills customer & attraction from a purchase', badge: 'bg-violet-100 text-violet-700' },
+  { value: 'event_purchase', label: 'Event Purchase', hint: 'Prefills customer & event from a purchase', badge: 'bg-amber-100 text-amber-700' },
+];
+
+const ACTIVITY_SOURCE_OPTIONS: Array<{ value: SourceType; label: string; hint: string }> = [
   { value: 'package', label: 'Package', hint: 'Pre-selects activity only — customer fills their own info' },
   { value: 'attraction', label: 'Attraction', hint: 'Pre-selects attraction only' },
   { value: 'event', label: 'Event', hint: 'Pre-selects event only' },
 ];
+
+const isPurchaseType = (t: SourceType) =>
+  t === 'booking' || t === 'attraction_purchase' || t === 'event_purchase';
 
 export default function KioskSessionModal({
   templateId,
@@ -48,15 +62,13 @@ export default function KioskSessionModal({
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
 
-  const [bookingQuery, setBookingQuery] = useState('');
-  const [bookingResults, setBookingResults] = useState<Booking[]>([]);
-  const [bookingSearching, setBookingSearching] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [purchaseId, setPurchaseId] = useState('');
   const [selectedActivityId, setSelectedActivityId] = useState<number | ''>('');
-
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,37 +86,79 @@ export default function KioskSessionModal({
   }, [assignedPackageIds, assignedAttractionIds, assignedEventIds]);
 
   useEffect(() => {
-    setSelectedBooking(null);
-    setBookingQuery('');
-    setBookingResults([]);
-    setPurchaseId('');
+    setSelectedResult(null);
+    setSearchQuery('');
+    setSearchResults([]);
     setSelectedActivityId('');
     setError(null);
   }, [sourceType]);
 
-  const handleBookingSearch = (q: string) => {
-    setBookingQuery(q);
-    setSelectedBooking(null);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!q.trim()) { setBookingResults([]); return; }
-    searchTimer.current = setTimeout(async () => {
-      setBookingSearching(true);
-      try {
-        const res = await bookingService.searchBookings(q);
-        setBookingResults(res.success ? res.data.slice(0, 6) : []);
-      } catch {
-        setBookingResults([]);
-      } finally {
-        setBookingSearching(false);
+  const runSearch = useCallback(async (q: string, type: SourceType) => {
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      if (type === 'booking') {
+        const res = await bookingService.getBookings({ search: q, per_page: 8 });
+        setSearchResults(
+          res.success ? (res.data.bookings ?? []).map((d) => ({ kind: 'booking' as const, data: d })) : [],
+        );
+      } else if (type === 'attraction_purchase') {
+        const res = await attractionPurchaseService.getPurchases({ search: q, per_page: 8 });
+        setSearchResults(
+          res.success ? (res.data.purchases ?? []).map((d) => ({ kind: 'attraction_purchase' as const, data: d })) : [],
+        );
+      } else if (type === 'event_purchase') {
+        const res = await eventPurchaseService.getPurchases({ search: q, per_page: 8 });
+        setSearchResults(
+          res.success ? (res.data ?? []).map((d) => ({ kind: 'event_purchase' as const, data: d })) : [],
+        );
       }
-    }, 350);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const handleQueryChange = (q: string) => {
+    setSearchQuery(q);
+    setSelectedResult(null);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => runSearch(q, sourceType), 300);
   };
+
+  const getResultDisplay = (r: SearchResult) => {
+    if (r.kind === 'booking') {
+      const name = r.data.guest_name || r.data.guest_email || '—';
+      const sub = [r.data.reference_number, r.data.booking_date, r.data.package?.name].filter(Boolean).join(' · ');
+      return { name, sub, badge: 'Booking', badgeColor: 'bg-blue-100 text-blue-700' };
+    }
+    if (r.kind === 'attraction_purchase') {
+      const name =
+        r.data.guest_name ||
+        r.data.guest_email ||
+        (r.data.customer ? `${r.data.customer.first_name} ${r.data.customer.last_name}` : '—');
+      const sub = [`#${r.data.id}`, r.data.purchase_date, r.data.attraction?.name].filter(Boolean).join(' · ');
+      return { name, sub, badge: 'Attraction', badgeColor: 'bg-violet-100 text-violet-700' };
+    }
+    const name =
+      r.data.guest_name ||
+      r.data.guest_email ||
+      (r.data.customer ? `${r.data.customer.first_name} ${r.data.customer.last_name}` : '—');
+    const sub = [r.data.reference_number, r.data.purchase_date, r.data.event?.name].filter(Boolean).join(' · ');
+    return { name, sub, badge: 'Event', badgeColor: 'bg-amber-100 text-amber-700' };
+  };
+
+  const searchPlaceholder =
+    sourceType === 'booking'
+      ? 'Ref #, guest name, or email…'
+      : sourceType === 'attraction_purchase'
+        ? 'Guest name, email, or attraction name…'
+        : 'Guest name, email, or event name…';
 
   const canLaunch = () => {
     if (mode === 'generic') return true;
-    if (sourceType === 'booking') return selectedBooking !== null;
-    if (sourceType === 'attraction_purchase' || sourceType === 'event_purchase')
-      return purchaseId.trim() !== '' && !isNaN(Number(purchaseId));
+    if (isPurchaseType(sourceType)) return selectedResult !== null;
     return selectedActivityId !== '';
   };
 
@@ -117,11 +171,9 @@ export default function KioskSessionModal({
     }
     setLaunching(true);
     try {
-      let sourceId: number;
-      if (sourceType === 'booking') sourceId = selectedBooking!.id;
-      else if (sourceType === 'attraction_purchase' || sourceType === 'event_purchase')
-        sourceId = Number(purchaseId);
-      else sourceId = Number(selectedActivityId);
+      const sourceId = isPurchaseType(sourceType)
+        ? selectedResult!.data.id
+        : Number(selectedActivityId);
 
       const res = await waiverService.createKioskSession(sourceType, sourceId, { template_id: templateId });
       if (!res.success || !res.data?.kiosk_url) throw new Error(res.data?.status ?? 'Failed to create session');
@@ -135,15 +187,14 @@ export default function KioskSessionModal({
   };
 
   const fieldCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`;
+  const activityOptions = sourceType === 'package' ? packages : sourceType === 'attraction' ? attractions : events;
 
-  const visibleSourceOptions = SOURCE_OPTIONS.filter((opt) => {
+  const visibleActivityOptions = ACTIVITY_SOURCE_OPTIONS.filter((opt) => {
     if (opt.value === 'package') return assignedPackageIds == null || assignedPackageIds.length > 0;
     if (opt.value === 'attraction') return assignedAttractionIds == null || assignedAttractionIds.length > 0;
     if (opt.value === 'event') return assignedEventIds == null || assignedEventIds.length > 0;
     return true;
   });
-
-  const activityOptions = sourceType === 'package' ? packages : sourceType === 'attraction' ? attractions : events;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -161,7 +212,18 @@ export default function KioskSessionModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[70vh]">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[72vh]">
+          {isPreview && (
+            <div className="flex gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
+              <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                This template is <span className="font-semibold">not active</span> — the kiosk will open in preview mode and submissions will be blocked. Activate the template from the templates list to accept real waivers.
+              </p>
+            </div>
+          )}
+          {/* Mode toggle */}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setMode('generic')}
@@ -180,106 +242,141 @@ export default function KioskSessionModal({
           </div>
 
           {mode === 'bound' && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                {visibleSourceOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setSourceType(opt.value)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-left transition-all ${sourceType === opt.value ? `border-${themeColor}-400 bg-${themeColor}-50` : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
-                  >
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{opt.label}</span>
-                      <span className="text-xs text-gray-400 ml-2">{opt.hint}</span>
-                    </div>
-                    {sourceType === opt.value && <ChevronRight className={`w-4 h-4 text-${fullColor} flex-shrink-0`} />}
-                  </button>
-                ))}
+            <div className="space-y-4">
+              {/* Purchase type picker */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Link to a purchase</p>
+                <div className="space-y-1.5">
+                  {PURCHASE_SOURCE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSourceType(opt.value)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-left transition-all ${sourceType === opt.value ? `border-${themeColor}-400 bg-${themeColor}-50` : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${opt.badge}`}>{opt.label}</span>
+                        <span className="text-xs text-gray-400 truncate">{opt.hint}</span>
+                      </div>
+                      {sourceType === opt.value && <ChevronRight className={`w-4 h-4 text-${fullColor} flex-shrink-0 ml-2`} />}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="pt-1">
-                {sourceType === 'booking' && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-600">Search booking by reference # or guest name</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={bookingQuery}
-                        onChange={(e) => handleBookingSearch(e.target.value)}
-                        placeholder="e.g. ZZ-00123 or John Smith"
-                        className={`${fieldCls} pl-9`}
-                      />
-                      {bookingSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />}
-                    </div>
-                    {selectedBooking && (
-                      <div className={`flex items-center justify-between px-3 py-2 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200 text-sm`}>
-                        <div>
-                          <span className="font-medium text-gray-900">{selectedBooking.guest_name || selectedBooking.guest_email}</span>
-                          <span className="text-gray-400 ml-2 text-xs">{selectedBooking.reference_number}</span>
+              {/* Search input for purchase types */}
+              {isPurchaseType(sourceType) && (
+                <div className="space-y-2">
+                  {selectedResult ? (
+                    <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${getResultDisplay(selectedResult).badgeColor}`}>
+                          {getResultDisplay(selectedResult).badge}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{getResultDisplay(selectedResult).name}</div>
+                          <div className="text-xs text-gray-400 truncate">{getResultDisplay(selectedResult).sub}</div>
                         </div>
-                        <button onClick={() => { setSelectedBooking(null); setBookingQuery(''); }} className="text-gray-400 hover:text-gray-600 ml-2">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
                       </div>
-                    )}
-                    {!selectedBooking && bookingResults.length > 0 && (
-                      <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
-                        {bookingResults.map((b) => (
-                          <button
-                            key={b.id}
-                            onClick={() => { setSelectedBooking(b); setBookingResults([]); setBookingQuery(b.reference_number); }}
-                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left transition-colors"
-                          >
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{b.guest_name || b.guest_email || '—'}</div>
-                              <div className="text-xs text-gray-400">{b.reference_number} · {b.booking_date}</div>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(sourceType === 'attraction_purchase' || sourceType === 'event_purchase') && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-600">
-                      {sourceType === 'attraction_purchase' ? 'Attraction Purchase' : 'Event Purchase'} ID
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={purchaseId}
-                      onChange={(e) => setPurchaseId(e.target.value)}
-                      placeholder="Enter purchase ID"
-                      className={fieldCls}
-                    />
-                    <p className="text-xs text-gray-400">Find the ID in the purchases list for this {sourceType === 'attraction_purchase' ? 'attraction' : 'event'}.</p>
-                  </div>
-                )}
-
-                {(sourceType === 'package' || sourceType === 'attraction' || sourceType === 'event') && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-600">Select {sourceType}</label>
-                    {activityOptions.length === 0 ? (
-                      <p className="text-xs text-gray-400 italic">No {sourceType}s found{assignedPackageIds?.length || assignedAttractionIds?.length || assignedEventIds?.length ? ' assigned to this template' : ''}.</p>
-                    ) : (
-                      <select
-                        value={selectedActivityId}
-                        onChange={(e) => setSelectedActivityId(e.target.value === '' ? '' : Number(e.target.value))}
-                        className={fieldCls}
+                      <button
+                        onClick={() => { setSelectedResult(null); setSearchQuery(''); setSearchResults([]); }}
+                        className="text-gray-400 hover:text-gray-600 ml-3 flex-shrink-0"
                       >
-                        <option value="">— select —</option>
-                        {activityOptions.map((a) => (
-                          <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                      </select>
-                    )}
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => handleQueryChange(e.target.value)}
+                          placeholder={searchPlaceholder}
+                          className={`${fieldCls} pl-9`}
+                          autoComplete="off"
+                        />
+                        {searching && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+                        )}
+                      </div>
+
+                      {searchResults.length > 0 && (
+                        <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 shadow-sm">
+                          {searchResults.map((r, i) => {
+                            const d = getResultDisplay(r);
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => { setSelectedResult(r); setSearchResults([]); setSearchQuery(''); }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left transition-colors"
+                              >
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${d.badgeColor}`}>{d.badge}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 truncate">{d.name}</div>
+                                  <div className="text-xs text-gray-400 truncate">{d.sub}</div>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {!searching && searchQuery.trim().length > 0 && searchResults.length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-2">No results found — try a different name, email, or ref #.</p>
+                      )}
+
+                      {searchQuery.trim().length === 0 && (
+                        <p className="text-xs text-gray-400">Start typing to search — name, email, or reference number.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Activity-only source types */}
+              {visibleActivityOptions.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Or link to an activity (no customer prefill)</p>
+                  <div className="space-y-1.5">
+                    {visibleActivityOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSourceType(opt.value)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-left transition-all ${sourceType === opt.value ? `border-${themeColor}-400 bg-${themeColor}-50` : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{opt.label}</span>
+                          <span className="text-xs text-gray-400 ml-2">{opt.hint}</span>
+                        </div>
+                        {sourceType === opt.value && <ChevronRight className={`w-4 h-4 text-${fullColor} flex-shrink-0`} />}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
+
+                  {!isPurchaseType(sourceType) && (
+                    <div className="mt-3">
+                      {activityOptions.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">
+                          No {sourceType}s found{assignedPackageIds?.length || assignedAttractionIds?.length || assignedEventIds?.length ? ' assigned to this template' : ''}.
+                        </p>
+                      ) : (
+                        <select
+                          value={selectedActivityId}
+                          onChange={(e) => setSelectedActivityId(e.target.value === '' ? '' : Number(e.target.value))}
+                          className={fieldCls}
+                        >
+                          <option value="">— select a {sourceType} —</option>
+                          {activityOptions.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -25,6 +25,10 @@ import { getStoredUser } from '../../../utils/storage';
 import waiverService from '../../../services/waiverService';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
+import attractionPurchaseService from '../../../services/AttractionPurchaseService';
+import type { AttractionPurchase } from '../../../services/AttractionPurchaseService';
+import eventPurchaseService from '../../../services/EventPurchaseService';
+import type { EventPurchase } from '../../../types/event.types';
 import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -450,6 +454,18 @@ const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiv
 };
 
 /* ---------- Assign modal ---------- */
+type LinkType = 'booking' | 'attraction_purchase' | 'event_purchase';
+type LinkResult =
+  | { kind: 'booking'; data: Booking }
+  | { kind: 'attraction_purchase'; data: AttractionPurchase }
+  | { kind: 'event_purchase'; data: EventPurchase };
+
+const LINK_TABS: Array<{ type: LinkType; label: string; pill: string }> = [
+  { type: 'booking', label: 'Booking', pill: 'bg-blue-100 text-blue-700' },
+  { type: 'attraction_purchase', label: 'Attraction', pill: 'bg-violet-100 text-violet-700' },
+  { type: 'event_purchase', label: 'Event', pill: 'bg-amber-100 text-amber-700' },
+];
+
 interface ActivityOption { key: string; type: ActivityType; id: number; name: string }
 
 const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => void; onSaved: () => void; themeColor: string }) => {
@@ -461,10 +477,11 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [bookingQuery, setBookingQuery] = useState('');
-  const [bookingResults, setBookingResults] = useState<Booking[]>([]);
-  const [bookingSearching, setBookingSearching] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [linkTab, setLinkTab] = useState<LinkType>('booking');
+  const [linkQuery, setLinkQuery] = useState('');
+  const [linkResults, setLinkResults] = useState<LinkResult[]>([]);
+  const [linkSearching, setLinkSearching] = useState(false);
+  const [selected, setSelected] = useState<LinkResult | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -502,29 +519,75 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
       .finally(() => setLoadingActivities(false));
   }, [form.waiver_template_id, templates]);
 
-  const handleBookingSearch = (q: string) => {
-    setBookingQuery(q);
-    setSelectedBooking(null);
+  const runSearch = useCallback((tab: LinkType, q: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!q.trim()) { setBookingResults([]); return; }
+    if (!q.trim()) { setLinkResults([]); return; }
     searchTimer.current = setTimeout(async () => {
-      setBookingSearching(true);
+      setLinkSearching(true);
       try {
-        const res = await bookingService.searchBookings(q);
-        setBookingResults(res.success ? res.data.slice(0, 5) : []);
+        if (tab === 'booking') {
+          const res = await bookingService.searchBookings(q);
+          const rows: LinkResult[] = (res.success ? res.data : []).slice(0, 8).map((d) => ({ kind: 'booking', data: d }));
+          setLinkResults(rows);
+        } else if (tab === 'attraction_purchase') {
+          const res = await attractionPurchaseService.getPurchases({ search: q, per_page: 8 });
+          const rows: LinkResult[] = (res.success ? res.data.purchases ?? [] : []).map((d) => ({ kind: 'attraction_purchase', data: d }));
+          setLinkResults(rows);
+        } else {
+          const res = await eventPurchaseService.getPurchases({ search: q, per_page: 8 });
+          const rows: LinkResult[] = (res.success ? res.data ?? [] : []).map((d) => ({ kind: 'event_purchase', data: d }));
+          setLinkResults(rows);
+        }
       } catch {
-        setBookingResults([]);
+        setLinkResults([]);
       } finally {
-        setBookingSearching(false);
+        setLinkSearching(false);
       }
     }, 350);
+  }, []);
+
+  const handleQueryChange = (q: string) => {
+    setLinkQuery(q);
+    setSelected(null);
+    runSearch(linkTab, q);
   };
 
-  const selectBooking = (b: Booking) => {
-    setSelectedBooking(b);
-    setBookingResults([]);
-    setBookingQuery(`${b.reference_number} — ${b.guest_name || b.guest_email || ''}`);
-    setForm((f) => ({ ...f, selected_date: b.booking_date || f.selected_date }));
+  const handleTabChange = (tab: LinkType) => {
+    setLinkTab(tab);
+    setLinkQuery('');
+    setLinkResults([]);
+    setSelected(null);
+  };
+
+  const selectResult = (r: LinkResult) => {
+    setSelected(r);
+    setLinkResults([]);
+    let date = '';
+    if (r.kind === 'booking') date = r.data.booking_date || '';
+    else if (r.kind === 'attraction_purchase') date = r.data.purchase_date || '';
+    else date = r.data.purchase_date || '';
+    if (date) setForm((f) => ({ ...f, selected_date: date }));
+  };
+
+  const clearSelected = () => { setSelected(null); setLinkQuery(''); setLinkResults([]); };
+
+  const resultLabel = (r: LinkResult): { name: string; sub: string } => {
+    if (r.kind === 'booking') {
+      return {
+        name: r.data.guest_name || r.data.guest_email || '—',
+        sub: `${r.data.reference_number} · ${r.data.booking_date}${r.data.package?.name ? ` · ${r.data.package.name}` : ''}`,
+      };
+    }
+    if (r.kind === 'attraction_purchase') {
+      return {
+        name: r.data.guest_name || r.data.guest_email || '—',
+        sub: `#${r.data.id} · ${r.data.purchase_date}${r.data.attraction?.name ? ` · ${r.data.attraction.name}` : ''}`,
+      };
+    }
+    return {
+      name: r.data.guest_name || r.data.guest_email || '—',
+      sub: `${r.data.reference_number} · ${r.data.purchase_date}${r.data.event?.name ? ` · ${r.data.event.name}` : ''}`,
+    };
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -540,8 +603,9 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
         selected_date: form.selected_date,
         adult_email: form.adult_email || undefined,
         adult_phone: form.adult_phone || undefined,
-        booking_id: selectedBooking?.id,
-        event_id: chosen?.type === 'event' ? chosen.id : undefined,
+        booking_id: selected?.kind === 'booking' ? selected.data.id : undefined,
+        attraction_purchase_id: selected?.kind === 'attraction_purchase' ? selected.data.id : undefined,
+        event_id: selected?.kind === 'event_purchase' ? selected.data.event_id : (chosen?.type === 'event' ? chosen.id : undefined),
         activity_name: chosen && chosen.type !== 'event' ? chosen.name : undefined,
       });
       onSaved();
@@ -554,9 +618,11 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
   };
 
   const fieldCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`;
+  const activeTab = LINK_TABS.find((t) => t.type === linkTab)!;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-900">Assign Waiver</h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
@@ -583,52 +649,73 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Link to booking <span className="text-gray-400 font-normal">(optional — ties this waiver to a specific booking)</span>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Link to purchase <span className="text-gray-400 font-normal">(optional — ties this waiver to a specific transaction)</span>
             </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={bookingQuery}
-                onChange={(e) => handleBookingSearch(e.target.value)}
-                placeholder="Search by ref # or guest name…"
-                className={`${fieldCls} pl-9`}
-              />
-              {bookingSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />}
+            <div className="flex gap-1.5 mb-2.5 mt-1.5">
+              {LINK_TABS.map((tab) => (
+                <button
+                  key={tab.type}
+                  type="button"
+                  onClick={() => handleTabChange(tab.type)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${linkTab === tab.type ? tab.pill : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            {selectedBooking && (
-              <div className={`mt-1.5 flex items-center justify-between px-3 py-2 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200 text-sm`}>
-                <div>
-                  <span className="font-medium text-gray-900">{selectedBooking.guest_name || selectedBooking.guest_email}</span>
-                  <span className="text-gray-400 ml-2 text-xs">{selectedBooking.reference_number} · {selectedBooking.booking_date}</span>
+            {selected ? (
+              <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${activeTab.pill}`}>{activeTab.label}</span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{resultLabel(selected).name}</div>
+                    <div className="text-xs text-gray-400 truncate">{resultLabel(selected).sub}</div>
+                  </div>
                 </div>
-                <button type="button" onClick={() => { setSelectedBooking(null); setBookingQuery(''); }} className="text-gray-400 hover:text-gray-600 ml-2">
+                <button type="button" onClick={clearSelected} className="text-gray-400 hover:text-gray-600 ml-3 flex-shrink-0">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={linkQuery}
+                  onChange={(e) => handleQueryChange(e.target.value)}
+                  placeholder={`Search ${activeTab.label.toLowerCase()} by ref # or guest name…`}
+                  className={`${fieldCls} pl-9`}
+                />
+                {linkSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />}
+              </div>
             )}
-            {!selectedBooking && bookingResults.length > 0 && (
-              <div className="mt-1.5 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
-                {bookingResults.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => selectBooking(b)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                  >
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{b.guest_name || b.guest_email || '—'}</div>
-                      <div className="text-xs text-gray-400">{b.reference_number} · {b.booking_date}{b.package?.name ? ` · ${b.package.name}` : ''}</div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                  </button>
-                ))}
+            {!selected && linkResults.length > 0 && (
+              <div className="mt-1.5 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                {linkResults.map((r, i) => {
+                  const lbl = resultLabel(r);
+                  const tab = LINK_TABS.find((t) => t.type === r.kind)!;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => selectResult(r)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left transition-colors"
+                    >
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${tab.pill}`}>{tab.label}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-gray-900 truncate">{lbl.name}</div>
+                        <div className="text-xs text-gray-400 truncate">{lbl.sub}</div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Booking date *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Visit date *</label>
             <input type="date" value={form.selected_date} onChange={(e) => setForm((f) => ({ ...f, selected_date: e.target.value }))} className={fieldCls} />
           </div>
           <div>

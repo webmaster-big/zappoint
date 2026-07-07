@@ -209,10 +209,10 @@ const WaiverTemplates = () => {
         </div>
       </div>
 
-      <div data-tour="templates-table" className="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead data-tour="templates-table" className="bg-gray-50 border-b border-gray-100">
               <tr>
                 {['Title', 'Status', 'Version', 'Default', 'Assignments', 'Updated', ''].map((h) => (
                   <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>

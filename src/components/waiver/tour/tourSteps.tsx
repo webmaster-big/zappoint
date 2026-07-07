@@ -1,12 +1,12 @@
 import type { Step } from 'react-joyride';
 
 const row = (label: string, desc: string) => (
-  <div style={{ display: 'flex', gap: 7, marginBottom: 7, lineHeight: 1.45 }}>
-    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#6366f1', flexShrink: 0, marginTop: 5 }} />
-    <span style={{ fontSize: 13 }}>
-      <span style={{ fontWeight: 600, color: '#1e293b' }}>{label}</span>
-      <span style={{ color: '#64748b' }}> — {desc}</span>
-    </span>
+  <div style={{ marginBottom: 12, textAlign: 'left' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+      <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#6366f1', flexShrink: 0 }} />
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{label}</span>
+    </div>
+    <div style={{ paddingLeft: 15, fontSize: 12, color: '#64748b', lineHeight: 1.55, textAlign: 'left' }}>{desc}</div>
   </div>
 );
 
@@ -165,7 +165,7 @@ export const WAIVER_TEMPLATES_STEPS: Step[] = [
   },
   {
     target: '[data-tour="templates-table"]',
-    placement: 'top',
+    placement: 'bottom',
     disableBeacon: true,
     title: 'Templates table',
     content: (
@@ -222,27 +222,38 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
     placement: 'center',
     disableBeacon: true,
     title: 'Waiver Builder tour',
-    content: 'This tour covers every section of the Builder — where you compose and version legal templates. Use Next / Back to move through it, or skip any time.',
+    content: (
+      <>
+        <p style={{ margin: 0, marginBottom: 8 }}>This tour walks through every section of the Builder — the tool you use to compose, version, and activate legal waiver templates.</p>
+        <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>Use Next / Back to move through each section, or skip at any time. The tour takes about 2 minutes.</p>
+      </>
+    ),
   },
   {
     target: '[data-tour="builder-header"]',
-    placement: 'auto',
+    placement: 'bottom',
     disableBeacon: true,
-    title: 'Builder overview',
-    content: 'All changes are saved as versioned snapshots. Signed waivers always reference the version that was live when signed, so updating the legal text never changes historical records.',
+    title: 'Builder heading & versioning',
+    content: (
+      <>
+        <p style={{ margin: 0, marginBottom: 8 }}>The page header shows whether you are creating a new template or editing an existing one.</p>
+        <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>Every time you save changes to the <strong style={{ color: '#1e293b' }}>Waiver Text</strong>, the system creates a new version automatically. Guests who already signed keep their original version — historical records are never altered.</p>
+      </>
+    ),
   },
   {
     target: '[data-tour="builder-save"]',
-    placement: 'auto',
+    placement: 'bottom',
     disableBeacon: true,
-    title: 'Save & kiosk launch',
+    title: 'Save & kiosk buttons',
     content: (
       <>
         <div>
-          {row('Save Template', 'persists all changes; bumps the version if body text changed')}
-          {row('Launch Kiosk', 'opens this active template in a full-screen signing session')}
-          {row('Test Kiosk', 'previews a draft template without publishing it')}
+          {row('Save Template', 'saves all fields; increments the version number only when the waiver text has changed')}
+          {row('Launch Kiosk', 'opens an active template in a full-screen kiosk signing session (visible only on edit)')}
+          {row('Test Kiosk', 'opens a draft / inactive template so you can preview signing without publishing it')}
         </div>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>A second Save button also appears at the very bottom of the form for convenience.</p>
       </>
     ),
   },
@@ -253,12 +264,13 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
     title: 'Basics — identity & scope',
     content: (
       <>
+        <p style={{ margin: 0, marginBottom: 8 }}>These fields identify the template and control where it applies.</p>
         <div>
-          {row('Title', 'shown to guests on the signing form')}
-          {row('Internal description', 'staff-only notes, never shown to guests')}
-          {row('Status', 'Active / Draft / Inactive / Archived')}
-          {row('Use as default', 'catch-all when no activity-specific template matches')}
-          {row('Location', 'restrict to one location, or leave blank for company-wide')}
+          {row('Title', 'the name shown to guests at the top of the signing form — required')}
+          {row('Internal description', 'private staff notes; never visible to guests')}
+          {row('Status', 'Draft (hidden), Active (live), Inactive (paused), or Archived (retired)')}
+          {row('Use as default', 'makes this the catch-all template when no activity-specific one matches')}
+          {row('Location', 'restrict to a single venue, or leave blank to apply company-wide')}
         </div>
       </>
     ),
@@ -267,21 +279,32 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
     target: '[data-tour="builder-body"]',
     placement: 'auto',
     disableBeacon: true,
-    title: 'Waiver text — the legal content',
-    content: 'This is the actual legal text your attorney drafts. Type or paste it here. Use the Preview toggle to see how tokens render with real data. Saving a change to this field increments the version — prior signed waivers are never altered.',
+    title: 'Waiver text — the legal body',
+    content: (
+      <>
+        <p style={{ margin: 0, marginBottom: 8 }}>This is the full legal text your attorney drafts. Type or paste it here.</p>
+        <div>
+          {row('Text area', 'write the waiver; insert tokens (see the right panel) to auto-fill guest data when signing')}
+          {row('Preview toggle', 'switches between edit mode and a rendered preview where tokens are replaced with their labels — e.g. {{adult_first_name}} shows as "John"')}
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>Changing this field on save creates a new version. Previous signed waivers always reference the version they were signed on.</p>
+      </>
+    ),
   },
   {
     target: '[data-tour="builder-tokens"]',
-    placement: 'auto',
+    placement: 'left',
     disableBeacon: true,
-    title: 'Token / field picker',
+    title: 'Insert a field (tokens)',
     content: (
       <>
-        <p style={{ margin: 0, marginBottom: 8 }}>Tokens become live data when a guest opens the waiver. Click any token to insert it at your cursor position.</p>
+        <p style={{ margin: 0, marginBottom: 8 }}>Tokens are placeholders that fill in with real guest and booking data at signing time. Click any token to insert it at your cursor in the text area.</p>
         <div>
-          {row('{{adult_name}}', 'replaced with the signer\'s full name')}
-          {row('{{visit_date}}', 'replaced with the guest\'s visit date')}
-          {row('{{location_name}}', 'replaced with the venue\'s location name')}
+          {row('Company group', 'business name, email, phone')}
+          {row('Location group', 'location name and address')}
+          {row('Activity & date group', 'activity name, booking date, visit date')}
+          {row('Guardian / signer group', 'full name, first/last name, email, phone, relationship')}
+          {row('General group', 'current date, current year')}
         </div>
       </>
     ),
@@ -293,11 +316,12 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
     title: 'Rules — validity, minors & duplicates',
     content: (
       <>
+        <p style={{ margin: 0, marginBottom: 8 }}>These settings control how the waiver behaves over time and who can sign it.</p>
         <div>
-          {row('Validity days', 'how long a signed waiver stays current (blank = never expires)')}
-          {row('Max minors', 'maximum children an adult can add (0 disables the minors section)')}
-          {row('Duplicate rule', 'Block, Manager-only, or Allow re-signing within the window')}
-          {row('Reminder', 'sends a nudge to guests with unsigned pending waivers')}
+          {row('Validity (days)', 'how many days a signed waiver stays valid; leave blank for no expiry')}
+          {row('Max minors', 'maximum number of children an adult can add in one signing; set to 0 to hide the minors section entirely')}
+          {row('Duplicate rule', '"Block" prevents re-signing; "Manager-assigned only" lets managers assign a new one; "Allow" permits guests to sign again')}
+          {row('24-hour reminder', 'when checked, an automatic reminder is sent to guests whose pending waiver is still unsigned the day before their visit')}
         </div>
       </>
     ),
@@ -306,15 +330,19 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
     target: '[data-tour="builder-clauses"]',
     placement: 'auto',
     disableBeacon: true,
-    title: 'Clauses — additional acknowledgments',
+    title: 'Clauses & fields',
     content: (
       <>
-        <p style={{ margin: 0, marginBottom: 8 }}>Toggle pre-built clauses that add checkboxes guests must tick:</p>
+        <p style={{ margin: 0, marginBottom: 8 }}>Toggle optional sections that add specific fields or checkboxes to the signing form.</p>
         <div>
-          {row('Photo / video release', 'consent to use images from the visit')}
-          {row('Medical acknowledgment', 'confirms awareness of health requirements')}
-          {row('Property damage', 'liability for damage caused during the visit')}
-          {row('Group leader', 'the signer accepts responsibility for their group')}
+          {row('Minor section', 'shows the "Add a child" panel; required if you want minors on waivers')}
+          {row('Require minor date of birth', 'makes the DOB field mandatory for each child added')}
+          {row('Require minor relationship', 'makes the relationship field (e.g. Parent, Guardian) mandatory per child')}
+          {row('Photo / video release', 'adds a consent checkbox for the venue to use images from the visit')}
+          {row('Medical acknowledgment', 'adds a checkbox confirming the guest is aware of health requirements')}
+          {row('Property damage', 'adds a liability clause for damage the guest may cause')}
+          {row('Group leader clause', 'the signer accepts responsibility for everyone in their group')}
+          {row('Electronic signature consent', 'requires the guest to explicitly confirm their typed name is a legal signature')}
         </div>
       </>
     ),
@@ -326,21 +354,33 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
     title: 'Marketing consent opt-in',
     content: (
       <>
+        <p style={{ margin: 0, marginBottom: 8 }}>When the toggle is on, a marketing opt-in checkbox appears at the bottom of the signing form.</p>
         <div>
-          {row('Enable toggle', 'adds a marketing checkbox to the signing form')}
-          {row('Consent label', 'the main opt-in sentence guests see')}
-          {row('Fine print', 'optional smaller helper text below the label')}
+          {row('Marketing consent opt-in toggle', 'enables or disables the entire marketing section on the form')}
+          {row('Consent text', 'the main sentence guests see next to the checkbox — e.g. "Keep me updated on events and offers"')}
+          {row('Helper text (fine print)', 'optional smaller text shown below the consent sentence for extra detail')}
         </div>
-        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>Always unchecked by default — guests must actively opt in.</p>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>The checkbox is always unchecked by default — guests must actively opt in.</p>
       </>
     ),
   },
   {
     target: '[data-tour="builder-assignments"]',
-    placement: 'auto',
+    placement: 'top',
     disableBeacon: true,
     title: 'Activity assignments',
-    content: 'Link this template to packages, attractions, or events. When a guest books a linked activity, this waiver is triggered automatically at checkout, in confirmation emails, or on the kiosk. Each activity can only belong to one template — already-claimed ones are hidden.',
+    content: (
+      <>
+        <p style={{ margin: 0, marginBottom: 8 }}>Link this template to activities so the waiver triggers automatically when a guest books.</p>
+        <div>
+          {row('Packages', 'tick any packages that should require this waiver at checkout or on the kiosk')}
+          {row('Attractions', 'tick any attractions (day-pass, pay-per-ride, etc.) that require this waiver')}
+          {row('Events', 'tick any events that should collect this waiver from attendees')}
+          {row('Select all / Clear', 'quick links to check or uncheck all items in a category at once')}
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>Each activity can only belong to one template. Activities already claimed by another template do not appear in the list.</p>
+      </>
+    ),
   },
 ];
 
