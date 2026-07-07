@@ -123,7 +123,7 @@ export default function KioskSessionModal({
         sourceId = Number(purchaseId);
       else sourceId = Number(selectedActivityId);
 
-      const res = await waiverService.createKioskSession(sourceType, sourceId);
+      const res = await waiverService.createKioskSession(sourceType, sourceId, { template_id: templateId });
       if (!res.success || !res.data?.kiosk_url) throw new Error(res.data?.status ?? 'Failed to create session');
       window.open(res.data.kiosk_url, '_blank', 'noopener');
       onClose();

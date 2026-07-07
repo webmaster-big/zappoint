@@ -128,7 +128,7 @@ const waiverService = {
   createKioskSession: async (
     sourceType: 'booking' | 'attraction_purchase' | 'event_purchase' | 'package' | 'attraction' | 'event',
     sourceId: number,
-    opts: { selected_date?: string; location_id?: number } = {},
+    opts: { template_id?: number; selected_date?: string; location_id?: number } = {},
   ): Promise<ApiResponse<{ access_token: string; kiosk_url: string; status: string; already_completed: boolean }>> =>
     (await api.post('/waivers/kiosk-session', { source_type: sourceType, source_id: sourceId, ...opts })).data,
 
