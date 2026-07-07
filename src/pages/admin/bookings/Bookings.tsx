@@ -811,12 +811,12 @@ const Bookings: React.FC = () => {
       const dateB = parseLocalDate(b.date);
       dateA.setHours(0, 0, 0, 0);
       dateB.setHours(0, 0, 0, 0);
-      const dateComparison = dateA.getTime() - dateB.getTime();
+      const dateComparison = dateB.getTime() - dateA.getTime();
       if (dateComparison !== 0) return dateComparison;
 
       const timeA = (a.time || '00:00').split(':').map(Number);
       const timeB = (b.time || '00:00').split(':').map(Number);
-      return (timeA[0] * 60 + (timeA[1] || 0)) - (timeB[0] * 60 + (timeB[1] || 0));
+      return (timeB[0] * 60 + (timeB[1] || 0)) - (timeA[0] * 60 + (timeA[1] || 0));
     });
   };
 

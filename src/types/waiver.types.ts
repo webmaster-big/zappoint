@@ -97,6 +97,7 @@ export interface Waiver {
   location?: { id: number; name: string };
   minors?: WaiverMinor[];
   booking?: { id: number; reference_number?: string };
+  attraction_purchase?: { id: number };
   event?: { id: number; name: string };
 }
 

@@ -16,10 +16,15 @@ import {
   X,
   ShieldCheck,
   BarChart3,
+  Loader2,
+  ChevronRight,
+  Link2,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
 import waiverService from '../../../services/waiverService';
+import bookingService from '../../../services/bookingService';
+import type { Booking } from '../../../services/bookingService';
 import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -302,22 +307,39 @@ const WaiversSearch = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Name', 'Minors', 'Date', 'Template', 'Location', 'Source', 'Marketing', 'Submitted', ''].map((h) => (
+                {['Name', 'Linked to', 'Minors', 'Date', 'Template', 'Location', 'Source', 'Marketing', 'Submitted', ''].map((h) => (
                   <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-6 py-12 text-center"><div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor} mx-auto`} /></td></tr>
+                <tr><td colSpan={10} className="px-6 py-12 text-center"><div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor} mx-auto`} /></td></tr>
               ) : waivers.length === 0 ? (
-                <tr><td colSpan={9} className="px-6 py-12 text-center"><ShieldCheck className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">No waivers found for this filter.</p></td></tr>
+                <tr><td colSpan={10} className="px-6 py-12 text-center"><ShieldCheck className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">No waivers found for this filter.</p></td></tr>
               ) : (
                 waivers.map((w) => (
                   <tr key={w.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <span className="text-sm font-medium text-gray-900">{[w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || '—'}</span>
                       <div className="text-xs text-gray-400">{w.adult_email || w.adult_phone || ''}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {w.booking ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                          <Link2 className="w-3 h-3" />{w.booking.reference_number || `#${w.booking.id}`}
+                        </span>
+                      ) : w.attraction_purchase ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full">
+                          <Link2 className="w-3 h-3" />AP-{w.attraction_purchase.id}
+                        </span>
+                      ) : w.event ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+                          <Link2 className="w-3 h-3" />{w.event.name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{w.minors?.length || 0}</td>
                     <td className="px-4 py-3 text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{w.selected_date}</td>
@@ -432,14 +454,18 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [bookingQuery, setBookingQuery] = useState('');
+  const [bookingResults, setBookingResults] = useState<Booking[]>([]);
+  const [bookingSearching, setBookingSearching] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     waiverService.listTemplates({ status: 'active', per_page: 100 }).then((r) => {
       if (r.success) setTemplates((r.data.waiver_templates as WaiverTemplate[]) || []);
     }).catch(() => {});
   }, []);
 
-  // When a template is chosen, resolve its assigned activities to names so staff can
-  // pick which one this waiver is for (drives {{activity_name}} autofill).
   useEffect(() => {
     setActivityKey('');
     setActivityOptions([]);
@@ -469,6 +495,31 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
       .finally(() => setLoadingActivities(false));
   }, [form.waiver_template_id, templates]);
 
+  const handleBookingSearch = (q: string) => {
+    setBookingQuery(q);
+    setSelectedBooking(null);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (!q.trim()) { setBookingResults([]); return; }
+    searchTimer.current = setTimeout(async () => {
+      setBookingSearching(true);
+      try {
+        const res = await bookingService.searchBookings(q);
+        setBookingResults(res.success ? res.data.slice(0, 5) : []);
+      } catch {
+        setBookingResults([]);
+      } finally {
+        setBookingSearching(false);
+      }
+    }, 350);
+  };
+
+  const selectBooking = (b: Booking) => {
+    setSelectedBooking(b);
+    setBookingResults([]);
+    setBookingQuery(`${b.reference_number} — ${b.guest_name || b.guest_email || ''}`);
+    setForm((f) => ({ ...f, selected_date: b.booking_date || f.selected_date }));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.waiver_template_id) { setError('Choose a template'); return; }
@@ -482,7 +533,7 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
         selected_date: form.selected_date,
         adult_email: form.adult_email || undefined,
         adult_phone: form.adult_phone || undefined,
-        // an event links by id (full autofill); package/attraction carry the name
+        booking_id: selectedBooking?.id,
         event_id: chosen?.type === 'event' ? chosen.id : undefined,
         activity_name: chosen && chosen.type !== 'event' ? chosen.name : undefined,
       });
@@ -498,12 +549,12 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
   const fieldCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-900">Assign Waiver</h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
+        <form onSubmit={submit} className="p-6 space-y-4 overflow-y-auto">
           {error && <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Template *</label>
@@ -524,6 +575,51 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
               <p className="text-[11px] text-gray-400 mt-1">If this template covers one activity it fills in automatically; pick here when it covers several.</p>
             </div>
           )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Link to booking <span className="text-gray-400 font-normal">(optional — ties this waiver to a specific booking)</span>
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={bookingQuery}
+                onChange={(e) => handleBookingSearch(e.target.value)}
+                placeholder="Search by ref # or guest name…"
+                className={`${fieldCls} pl-9`}
+              />
+              {bookingSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />}
+            </div>
+            {selectedBooking && (
+              <div className={`mt-1.5 flex items-center justify-between px-3 py-2 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200 text-sm`}>
+                <div>
+                  <span className="font-medium text-gray-900">{selectedBooking.guest_name || selectedBooking.guest_email}</span>
+                  <span className="text-gray-400 ml-2 text-xs">{selectedBooking.reference_number} · {selectedBooking.booking_date}</span>
+                </div>
+                <button type="button" onClick={() => { setSelectedBooking(null); setBookingQuery(''); }} className="text-gray-400 hover:text-gray-600 ml-2">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            {!selectedBooking && bookingResults.length > 0 && (
+              <div className="mt-1.5 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                {bookingResults.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => selectBooking(b)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 text-left transition-colors"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{b.guest_name || b.guest_email || '—'}</div>
+                      <div className="text-xs text-gray-400">{b.reference_number} · {b.booking_date}{b.package?.name ? ` · ${b.package.name}` : ''}</div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Booking date *</label>
             <input type="date" value={form.selected_date} onChange={(e) => setForm((f) => ({ ...f, selected_date: e.target.value }))} className={fieldCls} />
