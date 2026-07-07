@@ -13,6 +13,7 @@ const getBestToken = (): string | null => {
       return customer?.token || null;
     }
   } catch {
+    return null;
   }
   return null;
 };
@@ -481,7 +482,7 @@ const bookingService = {
   }): Promise<{
     success: boolean;
     data: {
-      bookings: any[];
+      bookings: Booking[];
     };
   }> {
     const response = await api.get('/bookings/export', { params: filters });
@@ -499,7 +500,7 @@ const bookingService = {
   async updateInternalNotes(bookingId: number, internalNotes: string): Promise<{
     success: boolean;
     message: string;
-    data?: any;
+    data?: Booking;
   }> {
     const response = await api.patch(`/bookings/${bookingId}/internal-notes`, { internal_notes: internalNotes });
     return response.data;
@@ -511,7 +512,7 @@ const bookingService = {
   }): Promise<{
     success: boolean;
     message: string;
-    data: any;
+    data: { id: number; room_id: number };
   }> {
     const response = await api.post('/packages/room/create', data);
     return response.data;
