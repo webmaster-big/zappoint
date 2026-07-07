@@ -6,6 +6,7 @@ import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate, TemplateStatus } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
 
 const statusStyles: Record<TemplateStatus, string> = {
   active: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -22,6 +23,7 @@ const WaiverTemplates = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [kioskTarget, setKioskTarget] = useState<WaiverTemplate | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -112,7 +114,7 @@ const WaiverTemplates = () => {
                       <td className="px-4 py-3 text-sm text-gray-400">{t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => window.open(`/waiver/kiosk/${t.id}${t.status === 'active' ? '' : '?preview=1'}`, '_blank', 'noopener')} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
+                          <button onClick={() => setKioskTarget(t)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
                           <button onClick={() => cycleStatus(t)} className={`p-2 rounded-lg transition-colors ${t.status === 'active' ? `text-${fullColor} hover:bg-${themeColor}-50` : 'text-gray-400 hover:bg-gray-100'}`} title={t.status === 'active' ? 'Deactivate' : 'Activate'}><Power className="w-4 h-4" /></button>
                           <button onClick={() => navigate(`/waivers/templates/${t.id}/edit`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit"><Pencil className="w-4 h-4" /></button>
                         </div>
@@ -127,6 +129,16 @@ const WaiverTemplates = () => {
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {kioskTarget && (
+        <KioskSessionModal
+          templateId={kioskTarget.id}
+          isPreview={kioskTarget.status !== 'active'}
+          assignedPackageIds={kioskTarget.assigned_package_ids}
+          assignedAttractionIds={kioskTarget.assigned_attraction_ids}
+          assignedEventIds={kioskTarget.assigned_event_ids}
+          onClose={() => setKioskTarget(null)}
+        />
+      )}
     </div>
   );
 };

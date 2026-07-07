@@ -6,6 +6,7 @@ import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate, WaiverTemplatePayload, ActivityType, AvailableActivities } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
 
 type ClauseKey =
   | 'minor_section_enabled' | 'dob_required' | 'relationship_required'
@@ -77,6 +78,7 @@ const WaiverBuilder = () => {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [preview, setPreview] = useState(false);
+  const [kioskModal, setKioskModal] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const set = <K extends keyof WaiverTemplatePayload>(key: K, value: WaiverTemplatePayload[K]) =>
@@ -224,7 +226,7 @@ const WaiverBuilder = () => {
             <StandardButton
               variant="secondary"
               icon={Tablet}
-              onClick={() => window.open(`/waiver/kiosk/${id}${form.status === 'active' ? '' : '?preview=1'}`, '_blank', 'noopener')}
+              onClick={() => setKioskModal(true)}
             >
               {form.status === 'active' ? 'Launch Kiosk' : 'Test Kiosk'}
             </StandardButton>
@@ -423,6 +425,16 @@ const WaiverBuilder = () => {
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {kioskModal && isEdit && (
+        <KioskSessionModal
+          templateId={Number(id)}
+          isPreview={form.status !== 'active'}
+          assignedPackageIds={form.assigned_package_ids}
+          assignedAttractionIds={form.assigned_attraction_ids}
+          assignedEventIds={form.assigned_event_ids}
+          onClose={() => setKioskModal(false)}
+        />
+      )}
     </div>
   );
 };
