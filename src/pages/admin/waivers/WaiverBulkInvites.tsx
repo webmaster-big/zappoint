@@ -113,7 +113,7 @@ const WaiverBulkInvites = () => {
                     <td className="px-4 py-3 text-sm text-gray-600">{inv.recipients_count ?? 0}</td>
                     <td className="px-4 py-3">{inv.allow_shareable_link ? <span className="text-xs text-emerald-600 font-medium">Enabled</span> : <span className="text-xs text-gray-300">—</span>}</td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div data-tour="bulk-row-actions" className="flex items-center justify-end gap-1">
                         <button onClick={() => copyManageLink(inv.manage_token)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Copy chaperone link"><Link2 className="w-4 h-4" /></button>
                         <button onClick={() => resend(inv.id)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Resend to chaperone"><Send className="w-4 h-4" /></button>
                       </div>

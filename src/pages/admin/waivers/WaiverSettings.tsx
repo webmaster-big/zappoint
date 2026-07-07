@@ -78,11 +78,11 @@ const WaiverSettings = () => {
             <p className="text-gray-500 text-sm mt-0.5">Company-wide defaults for waivers.</p>
           </div>
         </div>
-        <StandardButton variant="primary" icon={Save} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</StandardButton>
+        <span data-tour="settings-save-btn"><StandardButton variant="primary" icon={Save} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</StandardButton></span>
       </div>
 
       <div data-tour="settings-cards" className="space-y-5">
-        <div className={card}>
+        <div data-tour="settings-validity-card" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Validity & Duplicates</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {num('default_validity_days', 'Default validity (days)', 'Blank = no expiry', 1)}
@@ -102,7 +102,7 @@ const WaiverSettings = () => {
           </div>
         </div>
 
-        <div className={card}>
+        <div data-tour="settings-reminders-card" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Reminders & Confirmations</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {num('reminder_window_hours', 'Reminder window (hours)', 'Send a reminder this long before the visit', 1, 168)}
@@ -112,7 +112,7 @@ const WaiverSettings = () => {
           </div>
         </div>
 
-        <div className={card}>
+        <div data-tour="settings-kiosk-card" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Search & Kiosk</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {num('search_auto_refresh_seconds', 'Search auto-refresh (s)', '0 disables auto-refresh', 0, 600)}
@@ -123,7 +123,7 @@ const WaiverSettings = () => {
           </div>
         </div>
 
-        <div className={card}>
+        <div data-tour="settings-permissions-card" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Permissions</h2>
           {toggle('admin_delete_enabled', 'Allow admins to delete waivers')}
           {toggle('manager_print_export_enabled', 'Allow managers to print & export')}
@@ -131,7 +131,7 @@ const WaiverSettings = () => {
           {toggle('manager_can_view_deletion_log', 'Allow managers to view the deletion log')}
         </div>
 
-        <div className={card}>
+        <div data-tour="settings-marketing-card" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Marketing & CRM</h2>
           {toggle('marketing_consent_enabled', 'Enable marketing consent on waivers')}
           {toggle('crm_sync_only_when_consented', 'Only sync to CRM when the guest opts in')}

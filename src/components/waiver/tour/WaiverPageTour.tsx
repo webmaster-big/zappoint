@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Joyride, type CallBackProps, EVENTS, STATUS, type Step } from 'react-joyride';
+import { Joyride, type CallBackProps, STATUS, type Step } from 'react-joyride';
 
 interface Props {
   steps: Step[];
@@ -9,38 +9,57 @@ interface Props {
 const joyrideStyles = {
   options: {
     primaryColor: '#6366f1',
-    backgroundColor: '#1e1b4b',
-    textColor: '#ede9fe',
-    arrowColor: '#1e1b4b',
-    overlayColor: 'rgba(15, 10, 40, 0.5)',
-    zIndex: 10000,
+    overlayColor: 'rgba(0, 0, 0, 0.45)',
+    zIndex: 1000,
     width: 380,
   },
-  buttonNext: { backgroundColor: '#6366f1', color: '#fff', borderRadius: 8, fontWeight: 600 },
-  buttonBack: { color: '#a5b4fc', marginRight: 8, fontWeight: 500 },
-  buttonSkip: { color: '#7c83a4', fontSize: 13 },
-  buttonClose: { color: '#a5b4fc' },
-  tooltip: { borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' },
-  tooltipTitle: { fontSize: 15, fontWeight: 700, color: '#fff' },
-  tooltipContent: { fontSize: 14, lineHeight: 1.6, color: '#c7d2fe' },
+  buttonNext: {
+    backgroundColor: '#6366f1',
+    color: '#fff',
+    borderRadius: 8,
+    fontWeight: 600,
+    fontSize: 14,
+    padding: '8px 18px',
+  },
+  buttonBack: {
+    color: '#6366f1',
+    marginRight: 8,
+    fontWeight: 500,
+    fontSize: 14,
+  },
+  buttonSkip: { color: '#94a3b8', fontSize: 13 },
+  buttonClose: { color: '#64748b' },
+  tooltip: {
+    borderRadius: 14,
+    padding: '20px 24px',
+    boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+    fontSize: 14,
+  },
+  tooltipTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  tooltipContent: {
+    fontSize: 14,
+    lineHeight: 1.65,
+    color: '#475569',
+  },
+  tooltipFooter: { marginTop: 16 },
+  spotlight: { borderRadius: 8 },
 };
 
 const WaiverPageTour = ({ steps, storageKey }: Props) => {
   const [run, setRun] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
-
-  const hasDone = !!localStorage.getItem(storageKey);
+  const [hasDone, setHasDone] = useState(() => !!localStorage.getItem(storageKey));
 
   const handleCallback = useCallback(
     (data: CallBackProps) => {
-      const { type, status, index, action } = data;
-      if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
-        setStepIndex(index + (action === 'prev' ? -1 : 1));
-      }
-      if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
         localStorage.setItem(storageKey, '1');
+        setHasDone(true);
         setRun(false);
-        setStepIndex(0);
       }
     },
     [storageKey],
@@ -51,28 +70,20 @@ const WaiverPageTour = ({ steps, storageKey }: Props) => {
       <Joyride
         steps={steps}
         run={run}
-        stepIndex={stepIndex}
         continuous
         showSkipButton
         showProgress
         disableScrolling={false}
         scrollToFirstStep
+        spotlightClicks={false}
         styles={joyrideStyles}
         callback={handleCallback}
         locale={{ back: 'Back', close: 'Close', last: 'Finish', next: 'Next', skip: 'Skip tour' }}
       />
 
       <button
-        onClick={() => {
-          if (run) {
-            setRun(false);
-            setStepIndex(0);
-          } else {
-            setStepIndex(0);
-            setRun(true);
-          }
-        }}
-        className="fixed bottom-6 right-6 z-[9998] flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold shadow-lg transition-all duration-200 bg-indigo-600 hover:bg-indigo-700 text-white select-none"
+        onClick={() => setRun((r) => !r)}
+        className="fixed bottom-6 right-6 z-[999] flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold shadow-lg transition-all duration-200 bg-indigo-600 hover:bg-indigo-700 text-white select-none"
         style={{ boxShadow: '0 4px 20px rgba(99,102,241,0.45)' }}
       >
         {run ? (

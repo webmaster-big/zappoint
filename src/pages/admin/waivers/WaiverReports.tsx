@@ -74,14 +74,14 @@ const WaiverReports = () => {
       </div>
 
       <div data-tour="reports-controls" className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap items-end gap-3">
-        <div>
+        <div data-tour="reports-type-select">
           <label className="block text-xs font-medium text-gray-600 mb-1">Report</label>
           <select value={type} onChange={(e) => { setType(e.target.value); setResult(null); }} className={fieldCls}>
             {REPORT_TYPES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
         {current.dated && (
-          <>
+          <div data-tour="reports-date-range" className="flex flex-wrap items-end gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Start date</label>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={fieldCls} />
@@ -91,7 +91,7 @@ const WaiverReports = () => {
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={fieldCls} />
             </div>
             <StandardButton variant="secondary" size="sm" onClick={() => { setStartDate(todayStr()); setEndDate(todayStr()); }}>Today</StandardButton>
-          </>
+          </div>
         )}
         <StandardButton variant="primary" size="sm" icon={RefreshCcw} onClick={run}>Run</StandardButton>
       </div>
