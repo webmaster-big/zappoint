@@ -155,15 +155,24 @@ const ManagePurchases = () => {
         }
       }
 
-      const response = await attractionPurchaseService.getPurchases(filters);
-      const rawPurchases = response.data.purchases || [];
+      let allRawPurchases: any[] = [];
+      let currentPage = 1;
+      let lastPage = 1;
 
-      await attractionPurchaseCacheService.cachePurchases(rawPurchases, {
+      do {
+        const response = await attractionPurchaseService.getPurchases({ ...filters, page: currentPage });
+        const batch = response.data.purchases || [];
+        allRawPurchases = allRawPurchases.concat(batch);
+        lastPage = response.data.pagination?.last_page ?? 1;
+        currentPage++;
+      } while (currentPage <= lastPage);
+
+      await attractionPurchaseCacheService.cachePurchases(allRawPurchases, {
         locationId: selectedLocation ? Number(selectedLocation) : undefined,
         userId: getStoredUser()?.id,
       });
 
-      setPurchases(convertPurchases(rawPurchases));
+      setPurchases(convertPurchases(allRawPurchases));
     } catch (error) {
       console.error('Error loading purchases:', error);
       const cached = await attractionPurchaseCacheService.getCachedPurchases();

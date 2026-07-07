@@ -556,8 +556,9 @@ const Bookings: React.FC = () => {
       setLoading(true);
       
       const hasCachedData = await bookingCacheService.hasCachedData();
+      const isCacheStale = hasCachedData ? await bookingCacheService.isCacheStale(2) : true;
       
-      if (hasCachedData) {
+      if (hasCachedData && !isCacheStale) {
         console.log('[Bookings] Loading from cache...');
         
         const cacheFilters: any = {};
