@@ -112,9 +112,7 @@ const WaiverTemplates = () => {
                       <td className="px-4 py-3 text-sm text-gray-400">{t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {t.status === 'active' && (
-                            <button onClick={() => window.open(`/waiver/kiosk/${t.id}`, '_blank', 'noopener')} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Launch kiosk mode (opens in a new tab)"><Tablet className="w-4 h-4" /></button>
-                          )}
+                          <button onClick={() => window.open(`/waiver/kiosk/${t.id}${t.status === 'active' ? '' : '?preview=1'}`, '_blank', 'noopener')} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
                           <button onClick={() => cycleStatus(t)} className={`p-2 rounded-lg transition-colors ${t.status === 'active' ? `text-${fullColor} hover:bg-${themeColor}-50` : 'text-gray-400 hover:bg-gray-100'}`} title={t.status === 'active' ? 'Deactivate' : 'Activate'}><Power className="w-4 h-4" /></button>
                           <button onClick={() => navigate(`/waivers/templates/${t.id}/edit`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit"><Pencil className="w-4 h-4" /></button>
                         </div>

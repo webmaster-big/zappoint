@@ -7,7 +7,7 @@ import { formatMembershipPrice } from '../../utils/membershipFormat';
 import { isCustomerAuthenticated } from '../../utils/auth';
 
 // Set to true once membership feature testing is complete
-const CAROUSEL_ENABLED = false;
+const CAROUSEL_ENABLED = true;
 
 const CARD_GRADIENTS = [
   'linear-gradient(145deg, #8b5cf6 0%, #6d28d9 100%)',

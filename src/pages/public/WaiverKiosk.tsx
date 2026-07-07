@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import type { WaiverFormContext, WaiverSubmission } from '../../types/waiver.types';
 import waiverService from '../../services/waiverService';
 import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError } from '../../components/waiver/WaiverStates';
 
-/**
- * Kiosk / iPad mode: /waiver/kiosk/:id — a blank form for an active template, no autofill.
- * After submit it auto-resets to a fresh form; an inactivity timer resets a partially
- * filled form so the next walk-in never sees the previous person's entries.
- */
 const WaiverKiosk = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const preview = searchParams.get('preview') === '1';
   const templateId = Number(id);
 
   const [context, setContext] = useState<WaiverFormContext | null>(null);
@@ -36,7 +33,9 @@ const WaiverKiosk = () => {
     }
     try {
       setLoading(true);
-      const ctx = await waiverService.getKioskForm(templateId);
+      const ctx = preview
+        ? await waiverService.getKioskPreview(templateId)
+        : await waiverService.getKioskForm(templateId);
       setContext(ctx);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -44,7 +43,7 @@ const WaiverKiosk = () => {
     } finally {
       setLoading(false);
     }
-  }, [templateId]);
+  }, [templateId, preview]);
 
   useEffect(() => {
     load();
@@ -80,12 +79,16 @@ const WaiverKiosk = () => {
   );
 
   const handleSubmit = async (data: WaiverSubmission) => {
+    if (preview) {
+      setSubmitError('Preview mode — activate this template to accept real waivers.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
       await waiverService.kioskSubmit(templateId, data);
       setJustCompleted(true);
-      // Auto-return to a fresh form for the next guest.
       completeTimer.current = setTimeout(resetForm, 4000);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -130,6 +133,12 @@ const WaiverKiosk = () => {
 
   return (
     <WaiverShell title={context.template?.title || 'Waiver'} subtitle="Please complete the waiver below to continue">
+      {preview && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+          <p className="text-sm font-semibold text-amber-800">Preview mode</p>
+          <p className="text-xs text-amber-700 mt-0.5">This is a test view. Submitting is disabled until the template is active.</p>
+        </div>
+      )}
       <WaiverFormBody
         key={formKey}
         context={context}

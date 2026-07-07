@@ -15,6 +15,7 @@ import {
   Users,
   X,
   ShieldCheck,
+  BarChart3,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
@@ -210,6 +211,7 @@ const WaiversSearch = () => {
             items={[
               { label: 'Templates', icon: FileText, onClick: () => navigate('/waivers/templates') },
               { label: 'Group Invites', icon: Users, onClick: () => navigate('/waivers/bulk') },
+              { label: 'Reports', icon: BarChart3, onClick: () => navigate('/waivers/reports') },
               { label: 'Deletion Log', icon: ClipboardList, onClick: () => navigate('/waivers/deletion-log'), hidden: !(isAdmin || isManager), dividerBefore: true },
               { label: 'Settings', icon: SettingsIcon, onClick: () => navigate('/waivers/settings'), hidden: !isAdmin },
             ]}

@@ -180,9 +180,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
         { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
-          { label: 'Waiver Records', href: '/waivers', icon: List },
-          { label: 'Templates', href: '/waivers/templates', icon: FileText },
-          { label: 'Group Invites', href: '/waivers/bulk', icon: Users }
+          { label: 'Waiver Records', href: '/waivers', icon: List }
         ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },

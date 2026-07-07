@@ -16,22 +16,16 @@ interface MinorRow extends WaiverMinor {
 
 interface Props {
   context: WaiverFormContext;
-  /** When true, never seed fields from prefill (kiosk / shared device). */
   noAutofill?: boolean;
+  disableBrowserAutofill?: boolean;
   submitting: boolean;
   error?: string | null;
-  /** Submit handler — resolves when the API call settles. */
   onSubmit: (data: WaiverSubmission) => void | Promise<void>;
 }
 
 let minorKeySeq = 1;
 
-/**
- * Shared waiver completion form: renders the frozen legal body plus the adult,
- * minor, consent and typed-name fields. Used by both the token-addressed customer
- * page and the kiosk page (which passes noAutofill).
- */
-const WaiverFormBody = ({ context, noAutofill = false, submitting, error, onSubmit }: Props) => {
+const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = false, submitting, error, onSubmit }: Props) => {
   const tpl = context.template;
   const prefill = noAutofill ? undefined : context.prefill;
 
@@ -44,11 +38,11 @@ const WaiverFormBody = ({ context, noAutofill = false, submitting, error, onSubm
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [electronicConsent, setElectronicConsent] = useState(false);
   const [photoVideoConsent, setPhotoVideoConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false); // unchecked by default
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [minors, setMinors] = useState<MinorRow[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const autoCompleteOff = noAutofill ? 'off' : undefined;
+  const autoCompleteOff = noAutofill || disableBrowserAutofill ? 'off' : undefined;
 
   const addMinor = () => {
     if (tpl && minors.length >= tpl.max_minors) return;

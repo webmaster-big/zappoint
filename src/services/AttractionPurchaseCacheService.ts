@@ -1,5 +1,6 @@
 
 import { attractionPurchaseService, type AttractionPurchase, type PurchaseFilters } from './AttractionPurchaseService';
+import { metricsCacheService } from './MetricsCacheService';
 
 const CACHE_NAME = 'zapzone-attraction-purchases-cache-v1';
 const PURCHASES_CACHE_KEY = '/api/attraction-purchases/cached';
@@ -215,6 +216,7 @@ class AttractionPurchaseCacheService {
     window.dispatchEvent(new CustomEvent('purchases-cache-updated', {
       detail: { purchase: updatedPurchase, source: 'update' }
     }));
+    void metricsCacheService.clearAllCaches();
   }
 
   async addPurchaseToCache(newPurchase: AttractionPurchase): Promise<void> {
@@ -230,6 +232,7 @@ class AttractionPurchaseCacheService {
     window.dispatchEvent(new CustomEvent('purchases-cache-updated', {
       detail: { purchase: newPurchase, source: 'create' }
     }));
+    void metricsCacheService.clearAllCaches();
   }
 
   async removePurchaseFromCache(purchaseId: number): Promise<void> {
@@ -242,6 +245,7 @@ class AttractionPurchaseCacheService {
     window.dispatchEvent(new CustomEvent('purchases-cache-updated', {
       detail: { purchaseId, source: 'delete' }
     }));
+    void metricsCacheService.clearAllCaches();
   }
 
   async getPurchaseFromCache(purchaseId: number): Promise<AttractionPurchase | null> {

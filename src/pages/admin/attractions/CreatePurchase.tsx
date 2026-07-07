@@ -18,6 +18,8 @@ import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo, CreatePurcha
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import { attractionPurchaseCacheService } from '../../../services/AttractionPurchaseCacheService';
+import { metricsCacheService } from '../../../services/MetricsCacheService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -613,6 +615,8 @@ const CreatePurchase = () => {
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
+      void attractionPurchaseCacheService.clearCache();
+      void metricsCacheService.clearAllCaches();
 
       if (isCardPayment) {
         const cardData = {

@@ -83,6 +83,7 @@ import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
 import RsvpPage from "./pages/public/RsvpPage";
 import WaiverForm from "./pages/public/WaiverForm";
 import WaiverKiosk from "./pages/public/WaiverKiosk";
+import WaiverKioskSession from "./pages/public/WaiverKioskSession";
 import WaiverBulk from "./pages/public/WaiverBulk";
 import WaiversSearch from "./pages/admin/waivers/WaiversSearch";
 import WaiverTemplates from "./pages/admin/waivers/WaiverTemplates";
@@ -90,6 +91,7 @@ import WaiverBuilder from "./pages/admin/waivers/WaiverBuilder";
 import WaiverBulkInvites from "./pages/admin/waivers/WaiverBulkInvites";
 import WaiverSettings from "./pages/admin/waivers/WaiverSettings";
 import WaiverDeletionLog from "./pages/admin/waivers/WaiverDeletionLog";
+import WaiverReports from "./pages/admin/waivers/WaiverReports";
 import Events from "./pages/admin/events/Events";
 import CreateEvent from "./pages/admin/events/CreateEvent";
 import EditEvent from "./pages/admin/events/EditEvent";
@@ -153,6 +155,7 @@ function App() {
         <Route path="/events/:eventId/purchase" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdParam="eventId" /><PurchaseEvent /></>} />
         <Route path="/rsvp/:token" element={<><PageViewBeacon pageType="rsvp" /><RsvpPage /></>} />
         <Route path="/waiver/kiosk/:id" element={<><PageViewBeacon pageType="waiver_kiosk" /><WaiverKiosk /></>} />
+        <Route path="/waiver/kiosk-session/:token" element={<><PageViewBeacon pageType="waiver_kiosk_session" /><WaiverKioskSession /></>} />
         <Route path="/waiver/bulk/:manageToken" element={<><PageViewBeacon pageType="waiver_bulk" /><WaiverBulk /></>} />
         <Route path="/waiver/:token" element={<><PageViewBeacon pageType="waiver_sign" /><WaiverForm /></>} />
         
@@ -211,6 +214,7 @@ function App() {
           <Route path="/waivers/templates/:id/edit" element={<WaiverBuilder />} />
           <Route path="/waivers/bulk" element={<WaiverBulkInvites />} />
           <Route path="/waivers/deletion-log" element={<WaiverDeletionLog />} />
+          <Route path="/waivers/reports" element={<WaiverReports />} />
           <Route path="/waivers/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><WaiverSettings /></ProtectedRoute>} />
 
           <Route path="/bookings" element={<Bookings />} />

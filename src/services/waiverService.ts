@@ -61,6 +61,9 @@ const waiverService = {
   getKioskForm: async (templateId: number): Promise<WaiverFormContext> =>
     (await publicApi.get<ApiResponse<WaiverFormContext>>(`/waivers/kiosk/${templateId}`)).data.data,
 
+  getKioskPreview: async (templateId: number): Promise<WaiverFormContext> =>
+    (await api.get<ApiResponse<WaiverFormContext>>(`/waiver-templates/${templateId}/kiosk-preview`)).data.data,
+
   kioskSubmit: async (templateId: number, data: WaiverSubmission) =>
     (await publicApi.post(`/waivers/kiosk/${templateId}/submit`, data)).data,
 
@@ -121,6 +124,13 @@ const waiverService = {
     id: number,
   ): Promise<ApiResponse<{ waivers: ConnectedWaiver[]; summary: { total: number; completed: number; pending: number } }>> =>
     (await api.get('/waivers/for', { params: { type, id } })).data,
+
+  createKioskSession: async (
+    sourceType: 'booking' | 'attraction_purchase' | 'event_purchase' | 'package' | 'attraction' | 'event',
+    sourceId: number,
+    opts: { selected_date?: string; location_id?: number } = {},
+  ): Promise<ApiResponse<{ access_token: string; kiosk_url: string; status: string; already_completed: boolean }>> =>
+    (await api.post('/waivers/kiosk-session', { source_type: sourceType, source_id: sourceId, ...opts })).data,
 
   // ---- staff: templates (builder) ----
   listTemplates: async (params: { status?: string; search?: string; per_page?: number; page?: number } = {}): Promise<Paginated<WaiverTemplate>> =>

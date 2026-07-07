@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
+import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import QRCode from 'qrcode';
 import { 
   Calendar, 
@@ -673,6 +674,10 @@ const ViewBooking: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <WaiverConnectionPanel type="booking" id={booking.id} title="Waivers" />
         </div>
 
         {showQRModal && qrCodeData && (

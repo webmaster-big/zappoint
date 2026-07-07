@@ -1,5 +1,6 @@
 
 import bookingService, { type Booking, type BookingFilters, type PaginatedBookingResponse } from './bookingService';
+import { metricsCacheService } from './MetricsCacheService';
 
 const CACHE_NAME = 'zapzone-bookings-cache-v1';
 const BOOKINGS_CACHE_KEY = '/api/bookings/cached';
@@ -228,6 +229,7 @@ class BookingCacheService {
     window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
       detail: { booking: updatedBooking, source: 'update' }
     }));
+    void metricsCacheService.clearAllCaches();
   }
 
   async addBookingToCache(newBooking: Booking): Promise<void> {
@@ -243,6 +245,7 @@ class BookingCacheService {
     window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
       detail: { booking: newBooking, source: 'create' }
     }));
+    void metricsCacheService.clearAllCaches();
   }
 
   async removeBookingFromCache(bookingId: number): Promise<void> {
@@ -255,6 +258,7 @@ class BookingCacheService {
     window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
       detail: { bookingId, source: 'delete' }
     }));
+    void metricsCacheService.clearAllCaches();
   }
 
   async getBookingFromCache(bookingId: number): Promise<Booking | null> {

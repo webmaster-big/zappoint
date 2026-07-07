@@ -193,6 +193,7 @@ const BookPackage: React.FC = () => {
     referenceNumber: string;
     qrCode: string;
     bookingId: number;
+    waiverUrl?: string | null;
   } | null>(null);
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
@@ -1149,6 +1150,7 @@ const BookPackage: React.FC = () => {
       
       const bookingId = response.data.id;
       const referenceNumber = response.data.reference_number;
+      const waiverUrl = response.data.waiver_signing_url ?? null;
       console.log('✅ Booking created, ID:', bookingId, 'Ref:', referenceNumber);
       
       let qrCodeBase64: string;
@@ -1223,7 +1225,8 @@ const BookPackage: React.FC = () => {
       setConfirmationData({
         referenceNumber,
         qrCode: qrCodeBase64,
-        bookingId
+        bookingId,
+        waiverUrl
       });
       setShowConfirmation(true);
     } catch (err: any) {
@@ -1314,6 +1317,30 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
+            {confirmationData.waiverUrl && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 sm:p-5 mb-4 sm:mb-6 text-center">
+                <p className="text-sm font-semibold text-gray-800 mb-1">Save time when you arrive</p>
+                <p className="text-xs text-gray-500 mb-3">Complete your waiver now so you're ready to go on arrival. We've also emailed you the link.</p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <a
+                    href={confirmationData.waiverUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-lg hover:bg-blue-800 transition"
+                  >
+                    Complete Waiver Now
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmationData((prev) => (prev ? { ...prev, waiverUrl: null } : prev))}
+                    className="inline-flex items-center justify-center px-5 py-2.5 bg-white text-gray-600 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+                  >
+                    Skip for Now
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <h3 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4 text-gray-800">Booking Details</h3>
               <div className="space-y-2 sm:space-y-3">

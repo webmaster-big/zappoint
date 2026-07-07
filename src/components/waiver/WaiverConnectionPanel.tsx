@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Clock, Link2, FileText } from 'lucide-react';
+import { ShieldCheck, Clock, Link2, FileText, Tablet } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import waiverService from '../../services/waiverService';
 import type { ConnectedWaiver } from '../../types/waiver.types';
@@ -39,6 +39,24 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false }:
   const [summary, setSummary] = useState({ total: 0, completed: 0, pending: 0 });
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<number | null>(null);
+  const [launching, setLaunching] = useState(false);
+
+  const canKiosk = type !== 'customer';
+
+  const launchKiosk = async () => {
+    if (!canKiosk) return;
+    setLaunching(true);
+    try {
+      const res = await waiverService.createKioskSession(type as 'booking' | 'attraction_purchase' | 'event_purchase', id);
+      if (res.success && res.data.kiosk_url) {
+        window.open(res.data.kiosk_url, '_blank', 'noopener');
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLaunching(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -74,7 +92,14 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false }:
   if (summary.total === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-1"><ShieldCheck className={`w-4 h-4 text-${fullColor}`} /><h3 className="text-sm font-bold text-gray-900">{title}</h3></div>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2"><ShieldCheck className={`w-4 h-4 text-${fullColor}`} /><h3 className="text-sm font-bold text-gray-900">{title}</h3></div>
+          {canKiosk && (
+            <button type="button" onClick={launchKiosk} disabled={launching} className={`inline-flex items-center gap-1 text-[11px] font-semibold text-${fullColor} hover:bg-${themeColor}-50 px-2 py-1 rounded transition disabled:opacity-50`}>
+              <Tablet className="w-3 h-3" />{launching ? '…' : 'Prefilled kiosk'}
+            </button>
+          )}
+        </div>
         <p className="text-xs text-gray-400">No waiver connected to this {type.replace('_', ' ')}.</p>
       </div>
     );
@@ -90,6 +115,11 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false }:
         <div className="flex items-center gap-2 text-[11px]">
           <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><ShieldCheck className="w-3 h-3" />{summary.completed} complete</span>
           {summary.pending > 0 && <span className="inline-flex items-center gap-1 text-amber-600 font-medium"><Clock className="w-3 h-3" />{summary.pending} pending</span>}
+          {canKiosk && (
+            <button type="button" onClick={launchKiosk} disabled={launching} className={`inline-flex items-center gap-1 font-semibold text-${fullColor} hover:bg-${themeColor}-50 px-2 py-1 rounded transition disabled:opacity-50`}>
+              <Tablet className="w-3 h-3" />{launching ? '…' : 'Kiosk'}
+            </button>
+          )}
         </div>
       </div>
       <div className="divide-y divide-gray-50">

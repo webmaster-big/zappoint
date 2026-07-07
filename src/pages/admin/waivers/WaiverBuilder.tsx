@@ -220,8 +220,14 @@ const WaiverBuilder = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isEdit && form.status === 'active' && (
-            <StandardButton variant="secondary" icon={Tablet} onClick={() => window.open(`/waiver/kiosk/${id}`, '_blank', 'noopener')}>Launch Kiosk</StandardButton>
+          {isEdit && (
+            <StandardButton
+              variant="secondary"
+              icon={Tablet}
+              onClick={() => window.open(`/waiver/kiosk/${id}${form.status === 'active' ? '' : '?preview=1'}`, '_blank', 'noopener')}
+            >
+              {form.status === 'active' ? 'Launch Kiosk' : 'Test Kiosk'}
+            </StandardButton>
           )}
           <StandardButton variant="primary" icon={Save} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Template'}</StandardButton>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import {
   ArrowLeft,
   User,
@@ -383,6 +384,10 @@ const ViewEventPurchase = () => {
               )}
             </div>
           )}
+        </div>
+
+        <div className="mt-6">
+          <WaiverConnectionPanel type="event_purchase" id={purchase.id} title="Waivers" />
         </div>
       </div>
 
