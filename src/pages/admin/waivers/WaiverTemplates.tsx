@@ -7,6 +7,8 @@ import type { WaiverTemplate, TemplateStatus } from '../../../types/waiver.types
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
+import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
+import { WAIVER_TEMPLATES_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 const statusStyles: Record<TemplateStatus, string> = {
   active: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -176,18 +178,21 @@ const WaiverTemplates = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
+      <WaiverPageTour steps={WAIVER_TEMPLATES_STEPS} storageKey="tour_waiver_templates" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
-          <div>
+          <div data-tour="templates-heading">
             <h1 className="text-3xl font-bold text-gray-900">Waiver Templates</h1>
             <p className="text-gray-600 mt-1">Build legal waivers and assign them to packages, attractions, and events.</p>
           </div>
         </div>
-        <StandardButton variant="primary" size="md" icon={Plus} onClick={() => navigate('/waivers/templates/create')}>New Template</StandardButton>
+        <span data-tour="templates-new-btn">
+          <StandardButton variant="primary" size="md" icon={Plus} onClick={() => navigate('/waivers/templates/create')}>New Template</StandardButton>
+        </span>
       </div>
 
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+      <div data-tour="templates-search" className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-lg w-full">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <input type="text" placeholder="Search templates…" value={search} onChange={(e) => setSearch(e.target.value)} className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600`} />
@@ -204,7 +209,7 @@ const WaiverTemplates = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div data-tour="templates-table" className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -234,7 +239,7 @@ const WaiverTemplates = () => {
                       <td className="px-4 py-3 text-sm text-gray-600">{assignments} item(s)</td>
                       <td className="px-4 py-3 text-sm text-gray-400">{t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}</td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div data-tour="templates-row-actions" className="flex items-center justify-end gap-1">
                           <button onClick={() => setKioskTarget(t)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
                           <button onClick={() => cycleStatus(t)} className={`p-2 rounded-lg transition-colors ${t.status === 'active' ? `text-${fullColor} hover:bg-${themeColor}-50` : 'text-gray-400 hover:bg-gray-100'}`} title={t.status === 'active' ? 'Deactivate' : 'Activate'}><Power className="w-4 h-4" /></button>
                           <button onClick={() => navigate(`/waivers/templates/${t.id}/edit`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit"><Pencil className="w-4 h-4" /></button>
@@ -252,6 +257,7 @@ const WaiverTemplates = () => {
 
       <div className="mt-4">
         <button
+          data-tour="templates-deleted-section"
           onClick={() => setShowTrashed((v) => !v)}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors px-1 py-1"
         >

@@ -10,6 +10,8 @@ import type { WaiverTemplate, WaiverTemplatePayload, ActivityType, AvailableActi
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
+import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
+import { WAIVER_BUILDER_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 type ClauseKey =
   | 'minor_section_enabled' | 'dob_required' | 'relationship_required'
@@ -239,7 +241,8 @@ const WaiverBuilder = () => {
 
   return (
     <div className="min-h-screen px-6 py-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6 gap-3">
+      <WaiverPageTour steps={WAIVER_BUILDER_STEPS} storageKey="tour_waiver_builder" />
+      <div data-tour="builder-header" className="flex items-center justify-between mb-6 gap-3">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers/templates')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
           <div>
@@ -247,7 +250,7 @@ const WaiverBuilder = () => {
             <p className="text-gray-500 text-sm mt-0.5">Editing the legal text creates a new version automatically.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div data-tour="builder-save" className="flex items-center gap-2">
           {isEdit && (
             <StandardButton
               variant="secondary"
@@ -263,7 +266,7 @@ const WaiverBuilder = () => {
 
       <div className="space-y-5">
         {/* Basics */}
-        <div className={card}>
+        <div data-tour="builder-basics" className={card}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className={labelCls}>Title *</label>
@@ -313,7 +316,7 @@ const WaiverBuilder = () => {
         </div>
 
         {/* Legal body */}
-        <div className={card}>
+        <div data-tour="builder-body" className={card}>
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-sm font-bold text-gray-900">Waiver Text *</h2>
@@ -329,7 +332,7 @@ const WaiverBuilder = () => {
                 <textarea ref={bodyRef} value={form.body_text} onChange={(e) => set('body_text', e.target.value)} rows={18} className={`${fieldCls} font-mono leading-relaxed`} placeholder="Enter the full legal waiver text. Use the fields on the right to insert auto-filled details." />
               )}
             </div>
-            <div className="lg:col-span-1">
+            <div data-tour="builder-tokens" className="lg:col-span-1">
               <div className="flex items-center gap-1.5 mb-2">
                 <Code2 className={`w-4 h-4 text-${fullColor}`} />
                 <span className="text-xs font-bold text-gray-900">Insert a field</span>
@@ -367,7 +370,7 @@ const WaiverBuilder = () => {
         </div>
 
         {/* Rules */}
-        <div className={card}>
+        <div data-tour="builder-rules" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Rules</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -394,7 +397,7 @@ const WaiverBuilder = () => {
         </div>
 
         {/* Clauses */}
-        <div className={card}>
+        <div data-tour="builder-clauses" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Clauses & Fields</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6">
             {clauseFields.map((c) => (
@@ -407,7 +410,7 @@ const WaiverBuilder = () => {
         </div>
 
         {/* Marketing */}
-        <div className={card}>
+        <div data-tour="builder-marketing" className={card}>
           <label className="flex items-center gap-2 text-sm font-bold text-gray-900 cursor-pointer mb-3">
             <input type="checkbox" checked={!!form.marketing_consent_enabled} onChange={(e) => set('marketing_consent_enabled', e.target.checked)} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
             Marketing consent opt-in
@@ -428,7 +431,7 @@ const WaiverBuilder = () => {
         </div>
 
         {/* Assignment (exclusivity-aware) */}
-        <div className={card}>
+        <div data-tour="builder-assignments" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-1">Assign to activities</h2>
           <p className="text-xs text-gray-400 mb-4">Activities already assigned to another template don't appear here — each can belong to only one waiver.</p>
           <div className="space-y-5">

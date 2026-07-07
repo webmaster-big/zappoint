@@ -5,6 +5,7 @@ import type {
   WaiverSubmission,
   WaiverMinor,
 } from '../../types/waiver.types';
+import WaiverFormTour from './tour/WaiverFormTour';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -106,10 +107,12 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
   };
 
   return (
+    <>
+    <WaiverFormTour />
     <form onSubmit={handleSubmit} className="space-y-5" autoComplete={autoCompleteOff}>
       {/* Legal body */}
       {context.body && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div data-tour="wf-legal-body" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-sm font-bold text-gray-900">{tpl?.title || 'Waiver Agreement'}</h2>
             {tpl?.version != null && (
@@ -130,12 +133,12 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       )}
 
       {/* Adult / signer */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div data-tour="wf-adult-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100">
           <h2 className="text-sm font-bold text-gray-900">Your Information</h2>
         </div>
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
+          <div data-tour="wf-adult-names">
             <label className={labelClass}>First Name *</label>
             <input
               type="text"
@@ -157,7 +160,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             />
             {formErrors.adultLastName && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultLastName}</p>}
           </div>
-          <div>
+          <div data-tour="wf-adult-contact">
             <label className={labelClass}>
               Email <span className="text-gray-400 font-normal">(optional)</span>
             </label>
@@ -182,7 +185,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
               className={inputClass}
             />
           </div>
-          <div>
+          <div data-tour="wf-adult-dob">
             <label className={labelClass}>
               Date of Birth <span className="text-gray-400 font-normal">(optional)</span>
             </label>
@@ -199,7 +202,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
 
       {/* Minors */}
       {tpl?.minor_section_enabled && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div data-tour="wf-minors-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-gray-900">Minors</h2>
@@ -286,13 +289,13 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       )}
 
       {/* Consents + signature */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <div data-tour="wf-consent-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100">
           <h2 className="text-sm font-bold text-gray-900">Acknowledgment & Consent</h2>
         </div>
         <div className="p-5 space-y-4">
           {tpl?.photo_video_release_enabled && (
-            <label className="flex items-start gap-2.5 cursor-pointer">
+            <label data-tour="wf-photo-consent" className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={photoVideoConsent}
@@ -306,7 +309,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           )}
 
           {tpl?.marketing_consent_enabled && (
-            <div className="bg-gray-50 border border-gray-100 rounded-lg p-3.5">
+            <div data-tour="wf-marketing-consent" className="bg-gray-50 border border-gray-100 rounded-lg p-3.5">
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -324,7 +327,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             </div>
           )}
 
-          <div className="pt-1">
+          <div data-tour="wf-legal-name" className="pt-1">
             <label className={labelClass}>Type your full legal name *</label>
             <input
               type="text"
@@ -343,7 +346,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           </div>
 
           {tpl?.electronic_consent_enabled && (
-            <label className="flex items-start gap-2.5 cursor-pointer">
+            <label data-tour="wf-electronic-consent" className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={electronicConsent}
@@ -359,7 +362,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             <p className="text-[11px] text-red-600 -mt-2">{formErrors.electronicConsent}</p>
           )}
 
-          <label className="flex items-start gap-2.5 cursor-pointer pt-1 border-t border-gray-100 mt-1">
+          <label data-tour="wf-agreement" className="flex items-start gap-2.5 cursor-pointer pt-1 border-t border-gray-100 mt-1">
             <input
               type="checkbox"
               checked={agreementAccepted}
@@ -375,6 +378,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       </div>
 
       <button
+        data-tour="wf-submit"
         type="submit"
         disabled={submitting}
         className="w-full py-3 bg-blue-700 text-white text-sm font-semibold rounded-lg hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -389,6 +393,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
         )}
       </button>
     </form>
+    </>
   );
 };
 

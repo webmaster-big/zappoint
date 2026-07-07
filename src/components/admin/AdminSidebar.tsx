@@ -921,7 +921,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     };
 
     return (
-      <div className="relative" ref={itemRef}>
+      <div className="relative" ref={itemRef} {...(item.label === 'Waivers' ? { 'data-tour': 'waivers-sidebar' } : {})}>
         {hasItems ? (
           <div
             className={`flex items-center p-2 rounded-lg cursor-pointer transition-all duration-200 ease-in-out ${isActive || isChildActive ? `bg-${themeColor}-100 text-${fullColor} font-semibold` : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 ? 'pl-8' : ''} ${isMinimized && depth === 0 ? 'justify-center' : ''}`}

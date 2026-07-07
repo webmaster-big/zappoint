@@ -6,6 +6,8 @@ import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
+import { WAIVER_BULK_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 interface BulkInvite {
   id: number;
@@ -67,21 +69,24 @@ const WaiverBulkInvites = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
+      <WaiverPageTour steps={WAIVER_BULK_STEPS} storageKey="tour_waiver_bulk" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
-          <div>
+          <div data-tour="bulk-heading">
             <h1 className="text-3xl font-bold text-gray-900">Group Waiver Invites</h1>
             <p className="text-gray-600 mt-1">Invite a chaperone or group leader to collect each parent's waiver.</p>
           </div>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">
           <StandardButton variant="secondary" size="md" icon={RefreshCcw} onClick={load}>{''}</StandardButton>
-          <StandardButton variant="primary" size="md" icon={Plus} onClick={() => setShowCreate(true)}>New Invite</StandardButton>
+          <span data-tour="bulk-new-btn">
+            <StandardButton variant="primary" size="md" icon={Plus} onClick={() => setShowCreate(true)}>New Invite</StandardButton>
+          </span>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div data-tour="bulk-table" className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">

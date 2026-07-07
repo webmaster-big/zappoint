@@ -30,6 +30,8 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import ActionMenu from '../../../components/ui/ActionMenu';
+import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
+import { WAIVER_RECORDS_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 const sourceLabels: Record<string, string> = {
   checkout: 'Checkout',
@@ -205,12 +207,14 @@ const WaiversSearch = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
+      <WaiverPageTour steps={WAIVER_RECORDS_STEPS} storageKey="tour_waiver_records" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-        <div>
+        <div data-tour="waivers-heading">
           <h1 className="text-3xl font-bold text-gray-900">Waivers</h1>
           <p className="text-gray-600 mt-1">Look up signed waivers, assign new ones, and manage records.</p>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">
+          <span data-tour="waivers-manage-menu">
           <ActionMenu
             label="Manage"
             items={[
@@ -221,14 +225,17 @@ const WaiversSearch = () => {
               { label: 'Settings', icon: SettingsIcon, onClick: () => navigate('/waivers/settings'), hidden: !isAdmin },
             ]}
           />
+          </span>
+          <span data-tour="waivers-assign-btn">
           <StandardButton variant="primary" size="md" icon={Plus} onClick={() => setShowAssign(true)}>Assign Waiver</StandardButton>
+          </span>
         </div>
       </div>
 
       {/* Controls */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3" data-tour="waivers-date-controls">
             <div className="relative">
               <input
                 type="date"
@@ -247,7 +254,7 @@ const WaiversSearch = () => {
               Auto-refresh ({refreshSeconds}s)
             </label>
           </div>
-          <div className="flex gap-1.5">
+          <div data-tour="waivers-filter-btns" className="flex gap-1.5">
             <StandardButton variant="secondary" size="sm" icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filters</StandardButton>
             <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={load}>{''}</StandardButton>
             <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleExport}>Export</StandardButton>
@@ -302,7 +309,7 @@ const WaiversSearch = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div data-tour="waivers-table" className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -355,7 +362,7 @@ const WaiversSearch = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(w.submitted_at)}</td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div data-tour="waivers-row-actions" className="flex items-center justify-end gap-1">
                         <button onClick={() => openDetail(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="View"><Eye className="w-4 h-4" /></button>
                         <button onClick={() => handlePrint(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Print"><Printer className="w-4 h-4" /></button>
                         {isAdmin && (

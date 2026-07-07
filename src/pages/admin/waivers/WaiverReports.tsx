@@ -5,6 +5,8 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
+import { WAIVER_REPORTS_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 const REPORT_TYPES: Array<{ value: string; label: string; dated: boolean }> = [
   { value: 'completed-by-date', label: 'Completed by date', dated: true },
@@ -62,15 +64,16 @@ const WaiverReports = () => {
 
   return (
     <div className="min-h-screen px-6 py-8">
+      <WaiverPageTour steps={WAIVER_REPORTS_STEPS} storageKey="tour_waiver_reports" />
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => navigate('/waivers')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
-        <div>
+        <div data-tour="reports-heading">
           <h1 className="text-3xl font-bold text-gray-900">Waiver Reports</h1>
           <p className="text-gray-600 mt-1">Completion, sources, marketing consent, group invites, and deletions.</p>
         </div>
       </div>
 
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap items-end gap-3">
+      <div data-tour="reports-controls" className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Report</label>
           <select value={type} onChange={(e) => { setType(e.target.value); setResult(null); }} className={fieldCls}>
@@ -93,7 +96,7 @@ const WaiverReports = () => {
         <StandardButton variant="primary" size="sm" icon={RefreshCcw} onClick={run}>Run</StandardButton>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div data-tour="reports-results" className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         {loading ? (
           <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor} mx-auto my-8`} />
         ) : (

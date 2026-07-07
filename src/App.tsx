@@ -102,7 +102,6 @@ import PurchaseEvent from "./pages/customer/PurchaseEvent";
 import MyEvents from "./pages/customer/MyEvents";
 import MyAttractions from "./pages/customer/MyAttractions";
 import PageViewBeacon from "./components/PageViewBeacon";
-
 import MyMembership from "./pages/customer/MyMembership";
 import PurchaseMembership from "./pages/customer/PurchaseMembership";
 import UpdatePaymentMethod from "./pages/customer/UpdatePaymentMethod";
@@ -141,8 +140,8 @@ const GoogleCalendarRedirect = () => {
 function App() {
   return (
     <ThemeProvider>
-      <PageTitleSetter />
-      <Routes>
+        <PageTitleSetter />
+        <Routes>
         <Route path="/admin" element={<PublicRoute restricted><Login /></PublicRoute>} />
         <Route path="/admin/register" element={<PublicRoute restricted><CompanyAdminRegistration /></PublicRoute>} />
         <Route path="/customer/login" element={<PublicRoute restricted><><PageViewBeacon pageType="customer_login" /><CustomerLogin /></></PublicRoute>} />

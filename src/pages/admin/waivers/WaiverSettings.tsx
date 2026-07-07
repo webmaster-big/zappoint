@@ -6,6 +6,8 @@ import waiverService from '../../../services/waiverService';
 import type { WaiverSettings as WaiverSettingsType } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
+import { WAIVER_SETTINGS_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 const WaiverSettings = () => {
   const navigate = useNavigate();
@@ -67,10 +69,11 @@ const WaiverSettings = () => {
 
   return (
     <div className="min-h-screen px-6 py-8 max-w-3xl mx-auto">
+      <WaiverPageTour steps={WAIVER_SETTINGS_STEPS} storageKey="tour_waiver_settings" />
       <div className="flex items-center justify-between mb-6 gap-3">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
-          <div>
+          <div data-tour="settings-heading">
             <h1 className="text-2xl font-bold text-gray-900">Waiver Settings</h1>
             <p className="text-gray-500 text-sm mt-0.5">Company-wide defaults for waivers.</p>
           </div>
@@ -78,7 +81,7 @@ const WaiverSettings = () => {
         <StandardButton variant="primary" icon={Save} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</StandardButton>
       </div>
 
-      <div className="space-y-5">
+      <div data-tour="settings-cards" className="space-y-5">
         <div className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Validity & Duplicates</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
