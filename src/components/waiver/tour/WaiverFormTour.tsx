@@ -9,7 +9,7 @@ const joyrideStyles = {
     primaryColor: '#2563eb',
     overlayColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 1000,
-    width: 360,
+    width: 380,
   },
   buttonNext: {
     backgroundColor: '#2563eb',
@@ -29,19 +29,21 @@ const joyrideStyles = {
   buttonClose: { color: '#64748b' },
   tooltip: {
     borderRadius: 14,
-    padding: '20px 24px',
+    padding: '18px 22px',
     boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+    maxWidth: 400,
   },
   tooltipTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 700,
     color: '#1e293b',
     marginBottom: 8,
   },
   tooltipContent: {
     fontSize: 14,
-    lineHeight: 1.65,
+    lineHeight: 1.6,
     color: '#475569',
+    padding: '0 0 4px',
   },
   tooltipFooter: { marginTop: 16 },
   spotlight: { borderRadius: 8 },
@@ -69,6 +71,7 @@ const WaiverFormTour = () => {
         showProgress
         disableScrolling={false}
         scrollToFirstStep
+        scrollOffset={120}
         spotlightClicks={false}
         styles={joyrideStyles}
         callback={handleCallback}
