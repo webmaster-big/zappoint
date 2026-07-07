@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Tablet, Search, Loader2, ChevronRight } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import waiverService from '../../services/waiverService';
-import { bookingService } from '../../services/bookingService';
+import bookingService from '../../services/bookingService';
 import { packageCacheService } from '../../services/PackageCacheService';
 import { attractionCacheService } from '../../services/AttractionCacheService';
 import { eventCacheService } from '../../services/EventCacheService';
