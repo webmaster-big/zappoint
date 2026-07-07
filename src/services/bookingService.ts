@@ -246,7 +246,9 @@ export interface Booking {
   };
   completed_at?: string;
   cancelled_at?: string;
-  deleted_at?: string; // Soft delete timestamp
+  deleted_at?: string;
+  waiver_signing_url?: string | null;
+  waiver_status?: string | null;
   created_at: string;
   updated_at: string;
   customer?: unknown;
