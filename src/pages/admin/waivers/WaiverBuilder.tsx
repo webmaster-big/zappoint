@@ -170,6 +170,14 @@ const WaiverBuilder = () => {
     set(column, next as WaiverTemplatePayload[typeof column]);
   };
 
+  const selectAllAssignment = (column: keyof WaiverTemplatePayload, allIds: number[]) => {
+    set(column, allIds as WaiverTemplatePayload[typeof column]);
+  };
+
+  const clearAssignment = (column: keyof WaiverTemplatePayload) => {
+    set(column, [] as WaiverTemplatePayload[typeof column]);
+  };
+
   const renderPreview = (): string => {
     let body = form.body_text ?? '';
     Object.keys(tokens).forEach((key) => {
@@ -392,7 +400,18 @@ const WaiverBuilder = () => {
                 <div key={a.type}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-gray-700">{a.label}</label>
-                    {selected.length > 0 && <span className={`text-xs font-medium text-${fullColor}`}>{selected.length} selected</span>}
+                    <div className="flex items-center gap-2">
+                      {list.length > 0 && selected.length < list.length && (
+                        <button type="button" onClick={() => selectAllAssignment(a.column, list.map((i) => i.id))} className={`text-xs font-medium text-${fullColor} hover:underline`}>Select all</button>
+                      )}
+                      {selected.length > 0 && (
+                        <>
+                          {list.length > 0 && selected.length < list.length && <span className="text-gray-300 text-xs">·</span>}
+                          <span className={`text-xs font-medium text-${fullColor}`}>{selected.length} selected</span>
+                          <button type="button" onClick={() => clearAssignment(a.column)} className="text-xs text-gray-400 hover:text-red-500 hover:underline">Clear</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {list.length === 0 ? (
                     <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg border border-gray-200">No available {a.label.toLowerCase()}.</div>

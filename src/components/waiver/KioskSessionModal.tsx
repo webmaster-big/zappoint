@@ -67,9 +67,9 @@ export default function KioskSessionModal({
         attractionCacheService.getAttractions().catch(() => [] as Attraction[]),
         eventCacheService.getEvents().catch(() => [] as Event[]),
       ]);
-      setPackages(assignedPackageIds?.length ? pkgs.filter((p) => assignedPackageIds.includes(p.id)) : pkgs);
-      setAttractions(assignedAttractionIds?.length ? attrs.filter((a) => assignedAttractionIds.includes(a.id)) : attrs);
-      setEvents(assignedEventIds?.length ? evts.filter((e) => assignedEventIds.includes(e.id)) : evts);
+      setPackages(assignedPackageIds != null ? pkgs.filter((p) => assignedPackageIds.includes(p.id)) : pkgs);
+      setAttractions(assignedAttractionIds != null ? attrs.filter((a) => assignedAttractionIds.includes(a.id)) : attrs);
+      setEvents(assignedEventIds != null ? evts.filter((e) => assignedEventIds.includes(e.id)) : evts);
     })();
   }, [assignedPackageIds, assignedAttractionIds, assignedEventIds]);
 
@@ -136,6 +136,13 @@ export default function KioskSessionModal({
 
   const fieldCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`;
 
+  const visibleSourceOptions = SOURCE_OPTIONS.filter((opt) => {
+    if (opt.value === 'package') return assignedPackageIds == null || assignedPackageIds.length > 0;
+    if (opt.value === 'attraction') return assignedAttractionIds == null || assignedAttractionIds.length > 0;
+    if (opt.value === 'event') return assignedEventIds == null || assignedEventIds.length > 0;
+    return true;
+  });
+
   const activityOptions = sourceType === 'package' ? packages : sourceType === 'attraction' ? attractions : events;
 
   return (
@@ -175,7 +182,7 @@ export default function KioskSessionModal({
           {mode === 'bound' && (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                {SOURCE_OPTIONS.map((opt) => (
+                {visibleSourceOptions.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => setSourceType(opt.value)}
