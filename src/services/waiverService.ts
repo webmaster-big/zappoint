@@ -136,6 +136,9 @@ const waiverService = {
   listTemplates: async (params: { status?: string; search?: string; per_page?: number; page?: number } = {}): Promise<Paginated<WaiverTemplate>> =>
     (await api.get('/waiver-templates', { params })).data,
 
+  listTrashedTemplates: async (): Promise<Paginated<WaiverTemplate>> =>
+    (await api.get('/waiver-templates', { params: { trashed: 1, per_page: 200 } })).data,
+
   getTemplate: async (id: number): Promise<ApiResponse<WaiverTemplate>> =>
     (await api.get(`/waiver-templates/${id}`)).data,
 
@@ -144,6 +147,15 @@ const waiverService = {
 
   updateTemplate: async (id: number, data: WaiverTemplatePayload): Promise<ApiResponse<WaiverTemplate>> =>
     (await api.put(`/waiver-templates/${id}`, data)).data,
+
+  deleteTemplate: async (id: number) =>
+    (await api.delete(`/waiver-templates/${id}`)).data,
+
+  restoreTemplate: async (id: number) =>
+    (await api.post(`/waiver-templates/${id}/restore`, {})).data,
+
+  forceDeleteTemplate: async (id: number) =>
+    (await api.delete(`/waiver-templates/${id}/force-delete`)).data,
 
   setTemplateStatus: async (id: number, status: string): Promise<ApiResponse<WaiverTemplate>> =>
     (await api.patch(`/waiver-templates/${id}/status`, { status })).data,

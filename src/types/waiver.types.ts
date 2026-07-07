@@ -72,6 +72,7 @@ export interface WaiverTemplate {
   crm_sync_minor: boolean;
   attorney_reviewed: boolean;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export type WaiverTemplatePayload = Partial<Omit<WaiverTemplate, 'id' | 'company_id' | 'current_version'>>;
