@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Code2, CheckSquare, Square, Eye, Tablet } from 'lucide-react';
+import { ArrowLeft, Save, Code2, CheckSquare, Square, Eye, Tablet, MapPin } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
+import { locationService } from '../../../services/LocationService';
+import type { Location } from '../../../services/LocationService';
+import { getStoredUser } from '../../../utils/storage';
 import type { WaiverTemplate, WaiverTemplatePayload, ActivityType, AvailableActivities } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -44,6 +47,7 @@ const defaultForm: WaiverTemplatePayload = {
   internal_description: '',
   status: 'draft',
   is_default: false,
+  location_id: null,
   body_text: '',
   validity_duration_days: null,
   max_minors: 10,
@@ -71,7 +75,12 @@ const WaiverBuilder = () => {
   const isEdit = Boolean(id);
   const { themeColor, fullColor } = useThemeColor();
 
+  const currentUser = getStoredUser();
+  const isAdmin = currentUser?.role === 'company_admin' || currentUser?.role === 'admin';
+  const isManager = currentUser?.role === 'location_manager';
+
   const [form, setForm] = useState<WaiverTemplatePayload>(defaultForm);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [activities, setActivities] = useState<Record<ActivityType, AvailableActivities['available']>>({ package: [], attraction: [], event: [], party_type: [] });
   const [loading, setLoading] = useState(isEdit);
@@ -104,6 +113,14 @@ const WaiverBuilder = () => {
   }, []);
 
   useEffect(() => {
+    if (isAdmin) {
+      locationService.getLocations({ per_page: 200 })
+        .then((r) => setLocations(r.data || []))
+        .catch(() => {});
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
     const exceptId = id ? Number(id) : undefined;
     if (isEdit && id) {
       (async () => {
@@ -116,6 +133,7 @@ const WaiverBuilder = () => {
               internal_description: t.internal_description ?? '',
               status: t.status,
               is_default: t.is_default,
+              location_id: t.location_id ?? null,
               body_text: t.body_text,
               validity_duration_days: t.validity_duration_days,
               max_minors: t.max_minors,
@@ -270,6 +288,27 @@ const WaiverBuilder = () => {
                 Use as default (catch-all) waiver
               </label>
             </div>
+            {isAdmin && (
+              <div className="sm:col-span-2">
+                <label className={labelCls}><MapPin className="inline w-3.5 h-3.5 mr-1 text-gray-400" />Location <span className="text-gray-400 font-normal">(optional — leave blank for all locations)</span></label>
+                <select
+                  value={form.location_id ?? ''}
+                  onChange={(e) => set('location_id', e.target.value ? Number(e.target.value) : null)}
+                  className={fieldCls}
+                >
+                  <option value="">All locations (company-wide)</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {isManager && currentUser?.location_name && (
+              <div className="sm:col-span-2 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                This template will be assigned to <span className="font-medium text-gray-700">{currentUser.location_name}</span>
+              </div>
+            )}
           </div>
         </div>
 
