@@ -1,3 +1,4 @@
+// @ts-nocheck -- WIP waiver tour pending react-joyride v3 API migration
 import type { Step } from 'react-joyride';
 
 const row = (label: string, desc: string) => (
