@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Users,
-  Search,
-  Filter,
   Mail,
   Phone,
   Building2,
@@ -11,7 +9,6 @@ import {
   Download,
   Tag,
   X,
-  RefreshCcw,
   CheckSquare,
   MapPin,
   Edit3,
@@ -26,38 +23,32 @@ import {
   Calendar,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
-import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import contactService, { 
-  type Contact, 
-  type ContactFilters, 
-  type ContactStatistics 
+import contactService, {
+  type Contact,
+  type ContactFilters,
+  type ContactStatistics
 } from '../../../services/ContactService';
 import { getStoredUser } from '../../../utils/storage';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
 const CustomerListing: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [tagFilter, setTagFilter] = useState<string>('');
-  const [sourceFilter, setSourceFilter] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [_loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [totalContacts, setTotalContacts] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const currentUser = getStoredUser();
-  const [showFilters, setShowFilters] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showBulkActionsModal, setShowBulkActionsModal] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [statistics, setStatistics] = useState<ContactStatistics | null>(null);
   const [bulkAction, setBulkAction] = useState<string>('');
@@ -118,57 +109,47 @@ const CustomerListing: React.FC = () => {
     { key: 'notes', label: 'Notes', type: 'text', apiField: 'notes' },
   ];
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  const fetchContacts = useCallback(async (_forceRefresh: boolean = false) => {
+  const loadContacts = useCallback(async () => {
     if (!currentUser?.company_id) return;
-    
+
     try {
-      if (contacts.length === 0) {
-        setInitialLoading(true);
-      }
       setLoading(true);
-      
-      const filters: ContactFilters = {
+
+      const baseFilters: ContactFilters = {
         company_id: currentUser.company_id,
-        page: currentPage,
-        per_page: itemsPerPage,
-        search: debouncedSearchTerm || undefined,
-        status: statusFilter !== 'all' ? statusFilter as 'active' | 'inactive' : undefined,
-        tag: tagFilter || undefined,
-        source: sourceFilter || undefined,
-        sort_by: sortBy as ContactFilters['sort_by'],
-        sort_order: sortOrder,
+        per_page: 200,
+        sort_by: 'created_at',
+        sort_order: 'desc',
       };
 
       if (currentUser.location_id) {
-        filters.location_id = currentUser.location_id;
+        baseFilters.location_id = currentUser.location_id;
       }
 
-      const response = await contactService.getContacts(filters);
-      
-      if (response.success && response.data) {
-        setContacts(response.data.contacts);
-        setTotalContacts(response.data.pagination.total);
-        setTotalPages(response.data.pagination.last_page);
-      }
+      let allContacts: Contact[] = [];
+      let page = 1;
+      let lastPage = 1;
+
+      do {
+        const response = await contactService.getContacts({ ...baseFilters, page });
+        if (!response.success || !response.data) break;
+        allContacts = allContacts.concat(response.data.contacts);
+        lastPage = response.data.pagination.last_page;
+        page++;
+      } while (page <= lastPage);
+
+      setContacts(allContacts);
     } catch (error) {
       console.error('Error fetching contacts:', error);
     } finally {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [currentUser?.company_id, currentUser?.location_id, currentPage, itemsPerPage, debouncedSearchTerm, statusFilter, tagFilter, sourceFilter, sortBy, sortOrder]);
+  }, [currentUser?.company_id, currentUser?.location_id]);
 
   const fetchTags = useCallback(async () => {
     if (!currentUser?.company_id) return;
-    
+
     try {
       const response = await contactService.getTags({ company_id: currentUser.company_id });
       if (response.success) {
@@ -181,7 +162,7 @@ const CustomerListing: React.FC = () => {
 
   const fetchStatistics = useCallback(async () => {
     if (!currentUser?.company_id) return;
-    
+
     try {
       const response = await contactService.getStatistics({ company_id: currentUser.company_id });
       if (response.success) {
@@ -193,8 +174,8 @@ const CustomerListing: React.FC = () => {
   }, [currentUser?.company_id]);
 
   useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+    loadContacts();
+  }, [loadContacts]);
 
   useEffect(() => {
     fetchTags();
@@ -203,10 +184,10 @@ const CustomerListing: React.FC = () => {
 
   const handleExport = async () => {
     if (!currentUser?.company_id) return;
-    
+
     try {
       setExporting(true);
-      
+
       const response = await contactService.exportForCampaign({
         company_id: currentUser.company_id,
         location_id: currentUser.location_id,
@@ -214,10 +195,10 @@ const CustomerListing: React.FC = () => {
         status: exportFilters.statuses.length === 1 ? exportFilters.statuses[0] as 'active' | 'inactive' : undefined,
         active_only: exportFilters.activeOnly || undefined
       });
-      
+
       if (response.success && response.data) {
         const csvData = convertToCSV(response.data.contacts);
-        
+
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -227,7 +208,7 @@ const CustomerListing: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         setShowExportModal(false);
         setExportFilters({
           statuses: [],
@@ -243,66 +224,13 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  const handleBulkAction = async () => {
-    if (!selectedContacts.length || !bulkAction) return;
-    
-    try {
-      setProcessingBulk(true);
-      
-      let response;
-      switch (bulkAction) {
-        case 'add_tags':
-          response = await contactService.bulkUpdate({
-            ids: selectedContacts,
-            action: 'add_tags',
-            tags: bulkTags
-          });
-          break;
-        case 'remove_tags':
-          response = await contactService.bulkUpdate({
-            ids: selectedContacts,
-            action: 'remove_tags',
-            tags: bulkTags
-          });
-          break;
-        case 'set_status':
-          response = await contactService.bulkUpdate({
-            ids: selectedContacts,
-            action: 'set_status',
-            status: bulkStatus
-          });
-          break;
-        case 'delete':
-          response = await contactService.bulkDelete(selectedContacts);
-          break;
-        default:
-          return;
-      }
-      
-      if (response?.success) {
-        setSelectedContacts([]);
-        setBulkAction('');
-        setBulkTags([]);
-        setShowBulkActionsModal(false);
-        fetchContacts();
-        fetchTags();
-        fetchStatistics();
-      }
-    } catch (error) {
-      console.error('Error performing bulk action:', error);
-      alert('Failed to perform bulk action. Please try again.');
-    } finally {
-      setProcessingBulk(false);
-    }
-  };
-
   const handleDeleteContact = async (contactId: number) => {
     if (!confirm('Are you sure you want to delete this customer?')) return;
-    
+
     try {
       const response = await contactService.deleteContact(contactId);
       if (response.success) {
-        fetchContacts();
+        loadContacts();
         fetchStatistics();
       }
     } catch (error) {
@@ -311,7 +239,7 @@ const CustomerListing: React.FC = () => {
     }
   };
 
-  const convertToCSV = (contacts: Array<{ id: number; email: string; name: string; first_name: string | null; last_name: string | null; variables: Record<string, string> }>): string => {
+  const convertToCSV = (rows: Array<{ id: number; email: string; name: string; first_name: string | null; last_name: string | null; variables: Record<string, string> }>): string => {
     const headers = [
       'ID',
       'Name',
@@ -319,37 +247,21 @@ const CustomerListing: React.FC = () => {
       'First Name',
       'Last Name'
     ];
-    
-    const rows = contacts.map(contact => [
+
+    const csvRows = rows.map(contact => [
       contact.id,
       contact.name,
       contact.email,
       contact.first_name || '',
       contact.last_name || ''
     ]);
-    
+
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ...csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     ].join('\n');
-    
+
     return csvContent;
-  };
-
-  const toggleContactSelection = (contactId: number) => {
-    setSelectedContacts(prev => 
-      prev.includes(contactId) 
-        ? prev.filter(id => id !== contactId)
-        : [...prev, contactId]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedContacts.length === contacts.length) {
-      setSelectedContacts([]);
-    } else {
-      setSelectedContacts(contacts.map(c => c.id));
-    }
   };
 
   const startEditing = (contactId: number, field: string, currentValue: string | number | null) => {
@@ -421,7 +333,7 @@ const CustomerListing: React.FC = () => {
 
   const handleAddTag = async () => {
     if (!selectedContactForTag || !newTag.trim()) return;
-    
+
     setAddingTag(true);
     try {
       const response = await contactService.addTag(selectedContactForTag.id, newTag.trim());
@@ -438,7 +350,7 @@ const CustomerListing: React.FC = () => {
         setNewTag('');
         setShowAddTagModal(false);
         setSelectedContactForTag(null);
-        fetchTags(); // Refresh available tags
+        fetchTags();
       }
     } catch (error) {
       console.error('Error adding tag:', error);
@@ -485,7 +397,7 @@ const CustomerListing: React.FC = () => {
 
   const handleCreateContact = async () => {
     if (!currentUser?.company_id || !newContact.email.trim()) return;
-    
+
     setCreatingContact(true);
     try {
       const response = await contactService.createContact({
@@ -507,7 +419,7 @@ const CustomerListing: React.FC = () => {
         source: newContact.source.trim() || undefined,
         tags: newContact.tags.length > 0 ? newContact.tags : undefined,
       });
-      
+
       if (response.success) {
         setShowCreateModal(false);
         setNewContact({
@@ -527,7 +439,7 @@ const CustomerListing: React.FC = () => {
           tags: [],
           status: 'active'
         });
-        fetchContacts();
+        loadContacts();
         fetchStatistics();
         fetchTags();
       }
@@ -562,7 +474,7 @@ const CustomerListing: React.FC = () => {
 
   const saveViewEdit = async () => {
     if (!selectedContactForView) return;
-    
+
     setSavingViewEdit(true);
     try {
       const updateData: Record<string, string | undefined> = {};
@@ -580,7 +492,7 @@ const CustomerListing: React.FC = () => {
       if (viewEditData.notes !== undefined) updateData.notes = viewEditData.notes || undefined;
       if (viewEditData.source !== undefined) updateData.source = viewEditData.source || undefined;
       if (viewEditData.status !== undefined) updateData.status = viewEditData.status;
-      
+
       const response = await contactService.updateContact(selectedContactForView.id, updateData);
       if (response.success) {
         const updatedContact = { ...selectedContactForView, ...viewEditData };
@@ -603,8 +515,8 @@ const CustomerListing: React.FC = () => {
   };
 
   const renderEditableCell = (
-    contact: Contact, 
-    field: string, 
+    contact: Contact,
+    field: string,
     displayValue: React.ReactNode,
     className: string = ''
   ) => {
@@ -655,17 +567,6 @@ const CustomerListing: React.FC = () => {
     );
   };
 
-  const startIndex = (currentPage - 1) * itemsPerPage;
-
-  const goToPage = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  const handleItemsPerPageChange = (value: number) => {
-    setItemsPerPage(value);
-    setCurrentPage(1);
-  };
-
   const StatusBadge = ({ status }: { status: string }) => {
     const statusConfig = {
       active: { color: 'bg-green-100 text-green-800', label: 'Active' },
@@ -685,6 +586,483 @@ const CustomerListing: React.FC = () => {
     return name || contact.email || 'Unknown';
   };
 
+  const formatDateTime = (value: string): string => {
+    return new Date(value).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const columns: AdminColumn<Contact>[] = [
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: c => c.id,
+      exportValue: c => c.id,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => <span className="text-sm text-gray-900">#{c.id}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      group: 'Customer',
+      sortable: true,
+      sortValue: c => `${c.first_name || ''} ${c.last_name || ''}`.trim().toLowerCase(),
+      exportValue: c => getContactName(c),
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2 text-sm">
+            {renderEditableCell(c, 'first_name', c.first_name, 'font-medium text-gray-900')}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            {renderEditableCell(c, 'last_name', c.last_name, 'text-gray-600')}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      group: 'Customer',
+      sortable: true,
+      sortValue: c => c.email || '',
+      exportValue: c => c.email,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          {renderEditableCell(c, 'email', c.email, 'text-gray-600 max-w-[180px]')}
+        </div>
+      ),
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      group: 'Customer',
+      sortable: true,
+      sortValue: c => c.phone || '',
+      exportValue: c => c.phone,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          {renderEditableCell(c, 'phone', c.phone, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'company',
+      label: 'Company',
+      group: 'Work',
+      sortable: true,
+      sortValue: c => c.company_name || '',
+      exportValue: c => c.company_name,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          {renderEditableCell(c, 'company_name', c.company_name, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'jobTitle',
+      label: 'Job Title',
+      group: 'Work',
+      sortable: true,
+      sortValue: c => c.job_title || '',
+      exportValue: c => c.job_title,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Briefcase className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          {renderEditableCell(c, 'job_title', c.job_title, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Details',
+      sortable: true,
+      sortValue: c => c.location?.name || '',
+      exportValue: c => c.location?.name || '',
+      cellClassName: 'whitespace-nowrap',
+      render: c => c.location ? (
+        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <span className="truncate">{c.location.name}</span>
+        </div>
+      ) : (
+        <span className="text-sm text-gray-400 italic">—</span>
+      ),
+    },
+    {
+      key: 'tags',
+      label: 'Tags',
+      group: 'Details',
+      sortable: true,
+      sortValue: c => (c.tags || []).join(', '),
+      exportValue: c => (c.tags || []).join('; '),
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="flex flex-wrap gap-1 max-w-[150px]">
+          {c.tags && c.tags.length > 0 ? (
+            <>
+              {c.tags.slice(0, 2).map((tag, idx) => (
+                <span
+                  key={idx}
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 group cursor-pointer`}
+                  title="Click to remove"
+                  onClick={() => handleRemoveTag(c.id, tag)}
+                >
+                  <Tag className="w-2.5 h-2.5" />
+                  {tag}
+                  <X className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />
+                </span>
+              ))}
+              {c.tags.length > 2 && (
+                <span className="text-xs text-gray-500">+{c.tags.length - 2}</span>
+              )}
+            </>
+          ) : null}
+          <button
+            onClick={() => {
+              setSelectedContactForTag(c);
+              setShowAddTagModal(true);
+            }}
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs text-gray-500 hover:bg-gray-100 border border-dashed border-gray-300"
+            title="Add tag"
+          >
+            <Plus className="w-2.5 h-2.5" />
+          </button>
+        </div>
+      ),
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      group: 'Details',
+      sortable: true,
+      sortValue: c => c.source || '',
+      exportValue: c => c.source,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <span className="text-sm text-gray-600">
+          {c.source || <span className="text-gray-400 italic">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: c => c.status,
+      exportValue: c => c.status,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <button
+          onClick={() => handleToggleStatus(c)}
+          title={`Click to ${c.status === 'active' ? 'deactivate' : 'activate'}`}
+        >
+          <StatusBadge status={c.status} />
+        </button>
+      ),
+    },
+    {
+      key: 'sms',
+      label: 'SMS',
+      group: 'Status',
+      sortable: true,
+      sortValue: c => (c.sms_consent ? 1 : 0),
+      exportValue: c => (c.sms_consent ? 'Opted In' : 'No'),
+      cellClassName: 'whitespace-nowrap',
+      render: c => c.sms_consent ? (
+        <span className="text-green-600 font-medium text-xs">Opted In</span>
+      ) : (
+        <span className="text-gray-400 text-xs">No</span>
+      ),
+    },
+    {
+      key: 'address',
+      label: 'Address',
+      group: 'Address',
+      sortable: true,
+      sortValue: c => c.address || '',
+      exportValue: c => c.address,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="text-sm">
+          {renderEditableCell(c, 'address', c.address, 'text-gray-600 max-w-[180px]')}
+        </div>
+      ),
+    },
+    {
+      key: 'city',
+      label: 'City',
+      group: 'Address',
+      sortable: true,
+      sortValue: c => c.city || '',
+      exportValue: c => c.city,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="text-sm">
+          {renderEditableCell(c, 'city', c.city, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'state',
+      label: 'State',
+      group: 'Address',
+      sortable: true,
+      sortValue: c => c.state || '',
+      exportValue: c => c.state,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="text-sm">
+          {renderEditableCell(c, 'state', c.state, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'zip',
+      label: 'ZIP',
+      group: 'Address',
+      sortable: true,
+      sortValue: c => c.zip || '',
+      exportValue: c => c.zip,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="text-sm">
+          {renderEditableCell(c, 'zip', c.zip, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'country',
+      label: 'Country',
+      group: 'Address',
+      sortable: true,
+      sortValue: c => c.country || '',
+      exportValue: c => c.country,
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => (
+        <div className="text-sm">
+          {renderEditableCell(c, 'country', c.country, 'text-gray-600')}
+        </div>
+      ),
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      group: 'Details',
+      sortable: true,
+      sortValue: c => c.notes || '',
+      exportValue: c => c.notes,
+      defaultVisible: false,
+      render: c => (
+        <div className="text-sm">
+          {renderEditableCell(c, 'notes', c.notes, 'text-gray-600 max-w-[200px]')}
+        </div>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => new Date(c.created_at || 0).getTime(),
+      exportValue: c => (c.created_at ? new Date(c.created_at).toLocaleString() : ''),
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => <span className="text-sm text-gray-500">{formatDateTime(c.created_at)}</span>,
+    },
+    {
+      key: 'updated',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => new Date(c.updated_at || 0).getTime(),
+      exportValue: c => (c.updated_at ? new Date(c.updated_at).toLocaleString() : ''),
+      defaultVisible: false,
+      cellClassName: 'whitespace-nowrap',
+      render: c => <span className="text-sm text-gray-500">{formatDateTime(c.updated_at)}</span>,
+    },
+  ];
+
+  const tagOptions = useMemo(
+    () => availableTags.map(tag => ({ value: tag, label: tag })),
+    [availableTags]
+  );
+
+  const sourceOptions = useMemo(() => {
+    const unique = [...new Set(contacts.map(c => c.source).filter((s): s is string => !!s))].sort();
+    return unique.map(source => ({ value: source, label: source }));
+  }, [contacts]);
+
+  const companyOptions = useMemo(() => {
+    const unique = [...new Set(contacts.map(c => c.company_name).filter((s): s is string => !!s))].sort();
+    return unique.map(name => ({ value: name, label: name }));
+  }, [contacts]);
+
+  const filterDefs: AdminFilterDef<Contact>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (c, value) => c.status === value,
+    },
+    {
+      type: 'select',
+      key: 'tag',
+      label: 'Tag',
+      allLabel: 'All Tags',
+      options: tagOptions,
+      predicate: (c, value) => (c.tags || []).includes(value),
+    },
+    {
+      type: 'select',
+      key: 'source',
+      label: 'Source',
+      allLabel: 'All Sources',
+      options: sourceOptions,
+      predicate: (c, value) => c.source === value,
+    },
+    {
+      type: 'select',
+      key: 'company',
+      label: 'Company',
+      allLabel: 'All Companies',
+      options: companyOptions,
+      predicate: (c, value) => c.company_name === value,
+    },
+    {
+      type: 'select',
+      key: 'sms',
+      label: 'SMS Consent',
+      allLabel: 'All SMS Consent',
+      options: [
+        { value: 'opted_in', label: 'Opted In' },
+        { value: 'not_opted_in', label: 'Not Opted In' },
+      ],
+      predicate: (c, value) => (value === 'opted_in' ? c.sms_consent : !c.sms_consent),
+    },
+    {
+      type: 'daterange',
+      key: 'created',
+      label: 'Created Date',
+      getDate: c => c.created_at,
+    },
+  ], [tagOptions, sourceOptions, companyOptions]);
+
+  const table = useAdminTable<Contact>({
+    data: contacts,
+    columns,
+    getRowId: c => String(c.id),
+    storageKey: 'customers',
+    filterDefs,
+    searchFields: c => [
+      c.id,
+      c.first_name,
+      c.last_name,
+      c.email,
+      c.phone,
+      c.company_name,
+      c.job_title,
+      c.source,
+      (c.tags || []).join(' '),
+      c.location?.name,
+    ],
+    defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
+  const handleBulkAction = async () => {
+    const ids = table.selectedIds.map(Number);
+    if (!ids.length || !bulkAction) return;
+
+    try {
+      setProcessingBulk(true);
+
+      let response;
+      switch (bulkAction) {
+        case 'add_tags':
+          response = await contactService.bulkUpdate({
+            ids,
+            action: 'add_tags',
+            tags: bulkTags
+          });
+          break;
+        case 'remove_tags':
+          response = await contactService.bulkUpdate({
+            ids,
+            action: 'remove_tags',
+            tags: bulkTags
+          });
+          break;
+        case 'set_status':
+          response = await contactService.bulkUpdate({
+            ids,
+            action: 'set_status',
+            status: bulkStatus
+          });
+          break;
+        case 'delete':
+          response = await contactService.bulkDelete(ids);
+          break;
+        default:
+          return;
+      }
+
+      if (response?.success) {
+        table.clearSelection();
+        setBulkAction('');
+        setBulkTags([]);
+        setShowBulkActionsModal(false);
+        loadContacts();
+        fetchTags();
+        fetchStatistics();
+      }
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      alert('Failed to perform bulk action. Please try again.');
+    } finally {
+      setProcessingBulk(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `customers-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'First Name', value: c => c.first_name || '' },
+        { label: 'Last Name', value: c => c.last_name || '' },
+      ],
+    });
+  };
+
   if (initialLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -697,7 +1075,7 @@ const CustomerListing: React.FC = () => {
     {
       icon: Users,
       title: 'Total Customers',
-      value: totalContacts,
+      value: contacts.length,
       change: 'All registered customers',
       accentColor: themeColor,
     },
@@ -733,26 +1111,34 @@ const CustomerListing: React.FC = () => {
             Manage and view all customer contacts
           </p>
         </div>
-        <div className="flex gap-2 mt-4 sm:mt-0">
-          {selectedContacts.length > 0 && (
-            <StandardButton 
+        <div className="flex gap-2 mt-4 sm:mt-0 flex-wrap">
+          {table.selectedIds.length > 0 && (
+            <StandardButton
               variant="secondary"
               size="md"
               onClick={() => setShowBulkActionsModal(true)}
               icon={CheckSquare}
             >
-              Bulk Actions ({selectedContacts.length})
+              Bulk Actions ({table.selectedIds.length})
             </StandardButton>
           )}
-          <StandardButton 
+          <StandardButton
+            variant="secondary"
+            size="md"
+            onClick={exportToCSV}
+            icon={Download}
+          >
+            Export CSV
+          </StandardButton>
+          <StandardButton
             variant="secondary"
             size="md"
             onClick={() => setShowExportModal(true)}
             icon={Download}
           >
-            Export
+            Campaign Export
           </StandardButton>
-          <StandardButton 
+          <StandardButton
             variant="primary"
             size="md"
             onClick={() => setShowCreateModal(true)}
@@ -784,335 +1170,68 @@ const CustomerListing: React.FC = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search customers..."
+        onRefresh={() => {
+          loadContacts();
+          fetchStatistics();
+          fetchTags();
+        }}
+      />
+
+      <BulkActionsBar table={table} itemLabel="customer(s)">
+        <StandardButton
+          variant="secondary"
+          size="sm"
+          icon={CheckSquare}
+          onClick={() => setShowBulkActionsModal(true)}
+        >
+          Bulk Actions
+        </StandardButton>
+      </BulkActionsBar>
+
+      <AdminDataTable
+        table={table}
+        loading={loading && contacts.length === 0}
+        selectable
+        itemLabel="customers"
+        emptyState={
+          <div className="flex flex-col items-center justify-center">
+            <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+              <Users className={`h-12 w-12 text-${themeColor}-400`} />
             </div>
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
+            <p className="text-gray-500 text-sm">
+              {table.searchInput || table.activeFilterCount > 0
+                ? 'Try adjusting your search or filters'
+                : 'No customers have been added yet'}
+            </p>
           </div>
-          <div className="flex gap-1">
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              icon={Filter}
+        }
+        renderActions={(contact) => (
+          <div className="flex items-center gap-1">
+            <button
+              className={`p-1 text-${themeColor}-600 hover:text-${fullColor}`}
+              title="View Details"
+              onClick={() => {
+                setSelectedContactForView(contact);
+                setShowViewModal(true);
+              }}
             >
-              Filters
-            </StandardButton>
+              <Eye className="h-4 w-4" />
+            </button>
             <StandardButton
-              variant="secondary"
+              variant="danger"
               size="sm"
-              onClick={() => fetchContacts(true)}
-              icon={RefreshCcw}
+              icon={Trash2}
+              onClick={() => handleDeleteContact(contact.id)}
             >
               {''}
             </StandardButton>
           </div>
-        </div>
-        
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Tag</label>
-                <select
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="">All Tags</option>
-                  {availableTags.map(tag => (
-                    <option key={tag} value={tag}>{tag}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Items Per Page</label>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="5">5 per page</option>
-                  <option value="10">10 per page</option>
-                  <option value="20">20 per page</option>
-                  <option value="50">50 per page</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Sort By</label>
-                <select
-                  value={`${sortBy}-${sortOrder}`}
-                  onChange={(e) => {
-                    const [column, order] = e.target.value.split('-');
-                    setSortBy(column);
-                    setSortOrder(order as 'asc' | 'desc');
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="first_name-asc">Name (A-Z)</option>
-                  <option value="first_name-desc">Name (Z-A)</option>
-                  <option value="email-asc">Email (A-Z)</option>
-                  <option value="email-desc">Email (Z-A)</option>
-                  <option value="created_at-desc">Newest First</option>
-                  <option value="created_at-asc">Oldest First</option>
-                  <option value="company_name-asc">Company (A-Z)</option>
-                  <option value="company_name-desc">Company (Z-A)</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setStatusFilter('all');
-                  setTagFilter('');
-                  setSourceFilter('');
-                  setSearchTerm('');
-                  setSortBy('created_at');
-                  setSortOrder('desc');
-                }}
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
         )}
-      </div>
-
-      {selectedContacts.length > 0 && (
-        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
-          <span className={`text-${fullColor} font-medium`}>
-            {selectedContacts.length} customer(s) selected
-          </span>
-          <div className="flex gap-2">
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              icon={CheckSquare}
-              onClick={() => setShowBulkActionsModal(true)}
-            >
-              Bulk Actions
-            </StandardButton>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            Showing <span className="font-medium">{totalContacts > 0 ? startIndex + 1 : 0}</span> to{' '}
-            <span className="font-medium">{Math.min(startIndex + itemsPerPage, totalContacts)}</span>{' '}
-            of <span className="font-medium">{totalContacts}</span> customers
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedContacts.length === contacts.length && contacts.length > 0}
-                    onChange={toggleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
-                  />
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">Name</th>
-                <th scope="col" className="px-4 py-3 font-medium">Email</th>
-                <th scope="col" className="px-4 py-3 font-medium">Phone</th>
-                <th scope="col" className="px-4 py-3 font-medium">Company</th>
-                <th scope="col" className="px-4 py-3 font-medium">Job Title</th>
-                <th scope="col" className="px-4 py-3 font-medium">Location</th>
-                <th scope="col" className="px-4 py-3 font-medium">Tags</th>
-                <th scope="col" className="px-4 py-3 font-medium">Status</th>
-                <th scope="col" className="px-4 py-3 font-medium">SMS</th>
-                <th scope="col" className="px-4 py-3 font-medium w-20">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {contacts.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-                        <Users className={`h-12 w-12 text-${themeColor}-400`} />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
-                      <p className="text-gray-500 text-sm">
-                        {searchTerm || statusFilter !== 'all' || tagFilter
-                          ? 'Try adjusting your search or filters' 
-                          : 'No customers have been added yet'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                contacts.map((contact) => (
-                  <tr key={contact.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedContacts.includes(contact.id)}
-                        onChange={() => toggleContactSelection(contact.id)}
-                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
-                      />
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          {renderEditableCell(contact, 'first_name', contact.first_name, 'font-medium text-gray-900')}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          {renderEditableCell(contact, 'last_name', contact.last_name, 'text-gray-600')}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        {renderEditableCell(contact, 'email', contact.email, 'text-gray-600 max-w-[180px]')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        {renderEditableCell(contact, 'phone', contact.phone, 'text-gray-600')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        {renderEditableCell(contact, 'company_name', contact.company_name, 'text-gray-600')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Briefcase className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        {renderEditableCell(contact, 'job_title', contact.job_title, 'text-gray-600')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {contact.location ? (
-                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                          <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                          <span className="truncate">{contact.location.name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400 italic">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex flex-wrap gap-1 max-w-[150px]">
-                        {contact.tags && contact.tags.length > 0 ? (
-                          <>
-                            {contact.tags.slice(0, 2).map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 group cursor-pointer`}
-                                title="Click to remove"
-                                onClick={() => handleRemoveTag(contact.id, tag)}
-                              >
-                                <Tag className="w-2.5 h-2.5" />
-                                {tag}
-                                <X className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />
-                              </span>
-                            ))}
-                            {contact.tags.length > 2 && (
-                              <span className="text-xs text-gray-500">+{contact.tags.length - 2}</span>
-                            )}
-                          </>
-                        ) : null}
-                        <button
-                          onClick={() => {
-                            setSelectedContactForTag(contact);
-                            setShowAddTagModal(true);
-                          }}
-                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs text-gray-500 hover:bg-gray-100 border border-dashed border-gray-300`}
-                          title="Add tag"
-                        >
-                          <Plus className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={() => handleToggleStatus(contact)}
-                        title={`Click to ${contact.status === 'active' ? 'deactivate' : 'activate'}`}
-                      >
-                        <StatusBadge status={contact.status} />
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {contact.sms_consent ? (
-                        <span className="text-green-600 font-medium text-xs">Opted In</span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">No</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-1">
-                        <button 
-                          className={`p-1 text-${themeColor}-600 hover:text-${fullColor}`}
-                          title="View Details"
-                          onClick={() => {
-                            setSelectedContactForView(contact);
-                            setShowViewModal(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <StandardButton
-                          variant="danger"
-                          size="sm"
-                          icon={Trash2}
-                          onClick={() => handleDeleteContact(contact.id)}
-                        >
-                          {''}
-                        </StandardButton>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="bg-white px-6 py-4 border-t border-gray-100">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={goToPage}
-              totalItems={totalContacts}
-              showingFrom={startIndex + 1}
-              showingTo={Math.min(startIndex + itemsPerPage, totalContacts)}
-            />
-          </div>
-        )}
-      </div>
+      />
 
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1265,7 +1384,7 @@ const CustomerListing: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">Bulk Actions</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Apply action to {selectedContacts.length} selected customer{selectedContacts.length !== 1 ? 's' : ''}
+                    Apply action to {table.selectedIds.length} selected customer{table.selectedIds.length !== 1 ? 's' : ''}
                   </p>
                 </div>
                 <StandardButton
@@ -1307,8 +1426,8 @@ const CustomerListing: React.FC = () => {
                           type="checkbox"
                           checked={bulkTags.includes(tag)}
                           onChange={(e) => {
-                            setBulkTags(prev => 
-                              e.target.checked 
+                            setBulkTags(prev =>
+                              e.target.checked
                                 ? [...prev, tag]
                                 : prev.filter(t => t !== tag)
                             );
@@ -1342,7 +1461,7 @@ const CustomerListing: React.FC = () => {
               {bulkAction === 'delete' && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <p className="text-sm text-red-700">
-                    <strong>Warning:</strong> This action will permanently delete {selectedContacts.length} customer{selectedContacts.length !== 1 ? 's' : ''}. This cannot be undone.
+                    <strong>Warning:</strong> This action will permanently delete {table.selectedIds.length} customer{table.selectedIds.length !== 1 ? 's' : ''}. This cannot be undone.
                   </p>
                 </div>
               )}

@@ -54,6 +54,7 @@ import { roomService, type Room } from '../../../services/RoomService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import BulkImportModal from '../../../components/admin/bookings/BulkImportModal';
+import { toCsv } from '../../../components/admin/table';
 
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -2394,61 +2395,103 @@ const Bookings: React.FC = () => {
 
   const convertToCSV = (bookings: any[]): string => {
     const headers = [
+      'Booking ID',
       'Reference Number',
       'Customer Name',
       'Email',
       'Phone',
+      'Address',
+      'City',
+      'State',
+      'Zip',
+      'Country',
       'Package',
       'Room',
       'Location',
-      'Date',
-      'Time',
+      'Booking Date',
+      'Booking Time',
       'Participants',
       'Duration',
       'Status',
       'Payment Method',
       'Payment Status',
+      'Transaction ID',
       'Total Amount',
       'Amount Paid',
+      'Discount Amount',
+      'Applied Fees',
       'Attractions',
       'Add-ons',
+      'Guest of Honor',
+      'Guest of Honor Age',
+      'Guest of Honor Gender',
       'Notes',
-      'Created At'
+      'Special Requests',
+      'Internal Notes',
+      'Checked In At',
+      'Checked In By',
+      'Created By',
+      'Created Date',
+      'Created Time',
+      'Updated At'
     ];
 
+    const formatDateCell = (value: any): string => {
+      if (!value) return '';
+      return String(value).split('T')[0];
+    };
+    const formatDateTimeCell = (value: any): string => {
+      if (!value) return '';
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+    };
+
     const rows = bookings.map(booking => [
+      booking.id ?? '',
       booking.reference_number || '',
       booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : booking.guest_name || '',
       booking.customer?.email || booking.guest_email || '',
       booking.customer?.phone || booking.guest_phone || '',
+      booking.guest_address || '',
+      booking.guest_city || '',
+      booking.guest_state || '',
+      booking.guest_zip || '',
+      booking.guest_country || '',
       booking.package?.name || '',
       booking.room?.name || '',
       booking.location?.name || '',
-      booking.booking_date || '',
+      formatDateCell(booking.booking_date),
       booking.booking_time ? formatTime12Hour(booking.booking_time) : '',
       booking.participants || 0,
       booking.duration && booking.duration_unit ? formatDurationDisplay(booking.duration, booking.duration_unit) : '',
       booking.status || '',
       booking.payment_method || '',
-      booking.payment_status || '',
+      booking.payment_status || derivePaymentStatus(Number(booking.amount_paid || 0), Number(booking.total_amount || 0)),
+      booking.transaction_id || '',
       booking.total_amount || 0,
       booking.amount_paid || 0,
+      booking.discount_amount || 0,
+      (Array.isArray(booking.applied_fees) ? booking.applied_fees : [])
+        .map((f: any) => `${f.fee_name}: ${f.fee_amount}`).join('; '),
       booking.attractions?.map((a: any) => `${a.name} (${a.pivot?.quantity || 1})`).join('; ') || '',
       booking.add_ons?.map((a: any) => `${a.name} (${a.pivot?.quantity || 1})`).join('; ') || '',
+      booking.guest_of_honor_name || '',
+      booking.guest_of_honor_age ?? '',
+      booking.guest_of_honor_gender || '',
       booking.notes || '',
-      booking.created_at || ''
+      booking.special_requests || '',
+      booking.internal_notes || '',
+      formatDateTimeCell(booking.checked_in_at),
+      booking.checked_in_by_user
+        ? `${booking.checked_in_by_user.first_name || ''} ${booking.checked_in_by_user.last_name || ''}`.trim() || booking.checked_in_by_user.name || ''
+        : '',
+      booking.creator ? `${booking.creator.first_name || ''} ${booking.creator.last_name || ''}`.trim() : '',
+      booking.created_at ? new Date(booking.created_at).toLocaleDateString() : '',
+      booking.created_at ? new Date(booking.created_at).toLocaleTimeString() : '',
+      formatDateTimeCell(booking.updated_at)
     ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => 
-        row.map(cell => 
-          `"${String(cell).replace(/"/g, '""')}"`
-        ).join(',')
-      )
-    ].join('\n');
-
-    return csvContent;
+    return toCsv(headers, rows);
   };
 
   const handleSubmitPayment = async () => {

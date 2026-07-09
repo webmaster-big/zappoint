@@ -1,9 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Trash2,
-  Search,
-  Filter,
   RefreshCcw,
   Download,
   User,
@@ -28,13 +26,14 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import type { EventPurchase } from '../../../types/event.types';
-
-interface FilterOptions {
-  status: string;
-  paymentMethod: string;
-  search: string;
-  dateRange: string;
-}
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
 interface DisplayPurchase {
   id: string;
@@ -53,8 +52,19 @@ interface DisplayPurchase {
   purchaseTime: string;
   createdAt: string;
   locationId: number;
+  isGuest: boolean;
   deletedAt?: string;
 }
+
+const statusPriority: Record<string, number> = {
+  confirmed: 0,
+  pending: 1,
+  completed: 2,
+  'checked-in': 3,
+  cancelled: 4,
+  refunded: 5,
+  voided: 6,
+};
 
 const EventPurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -64,18 +74,7 @@ const EventPurchases = () => {
   const [purchases, setPurchases] = useState<DisplayPurchase[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [filteredPurchases, setFilteredPurchases] = useState<DisplayPurchase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPurchases, setSelectedPurchases] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
-    status: 'all',
-    paymentMethod: 'all',
-    search: '',
-    dateRange: 'all',
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [showTrashed, setShowTrashed] = useState(false);
@@ -85,6 +84,7 @@ const EventPurchases = () => {
   const [trashedTotalPages, setTrashedTotalPages] = useState(1);
   const [trashedTotal, setTrashedTotal] = useState(0);
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
+  const itemsPerPage = 10;
 
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
@@ -149,6 +149,7 @@ const EventPurchases = () => {
       purchaseTime: purchase.purchase_time,
       createdAt: purchase.created_at,
       locationId: purchase.location_id,
+      isGuest: !purchase.customer,
     }));
   };
 
@@ -161,7 +162,6 @@ const EventPurchases = () => {
         ...(selectedLocation && { location_id: Number(selectedLocation) }),
       };
       const result = await eventPurchaseService.getPurchases(apiFilters as never);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = result as any;
       const rawPurchases: EventPurchase[] = Array.isArray(raw)
         ? raw
@@ -189,98 +189,13 @@ const EventPurchases = () => {
     }
   };
 
-  const applyFilters = useCallback(() => {
-    let result = [...purchases];
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.customerName.toLowerCase().includes(searchTerm) ||
-          p.email.toLowerCase().includes(searchTerm) ||
-          p.eventName.toLowerCase().includes(searchTerm) ||
-          p.referenceNumber.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    if (filters.status !== 'all') {
-      result = result.filter((p) => p.status === filters.status);
-    }
-
-    if (filters.paymentMethod !== 'all') {
-      result = result.filter((p) => p.paymentMethod === filters.paymentMethod);
-    }
-
-    if (filters.dateRange !== 'all') {
-      const startDate = new Date();
-      switch (filters.dateRange) {
-        case 'today':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          startDate.setDate(startDate.getDate() - 7);
-          break;
-        case 'month':
-          startDate.setMonth(startDate.getMonth() - 1);
-          break;
-      }
-      result = result.filter((p) => new Date(p.createdAt) >= startDate);
-    }
-
-    const statusPriority: Record<string, number> = {
-      confirmed: 0,
-      pending: 1,
-      completed: 2,
-      'checked-in': 3,
-      cancelled: 4,
-      refunded: 5,
-      voided: 6,
-    };
-    result.sort((a, b) => {
-      const priorityDiff = (statusPriority[a.status] ?? 3) - (statusPriority[b.status] ?? 3);
-      if (priorityDiff !== 0) return priorityDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
-    setFilteredPurchases(result);
-  }, [purchases, filters]);
-
   useEffect(() => {
     loadPurchases();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
 
   useEffect(() => {
     fetchLocations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
-  const handleFilterChange = (key: keyof FilterOptions, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setCurrentPage(1);
-  };
-
-  const clearFilters = () => {
-    setFilters({ status: 'all', paymentMethod: 'all', search: '', dateRange: 'all' });
-  };
-
-  const handleSelectPurchase = (id: string) => {
-    setSelectedPurchases((prev) =>
-      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedPurchases.length === currentPurchases.length) {
-      setSelectedPurchases([]);
-    } else {
-      setSelectedPurchases(currentPurchases.map((p) => p.id));
-    }
-  };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
@@ -306,13 +221,313 @@ const EventPurchases = () => {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const columns: AdminColumn<DisplayPurchase>[] = [
+    {
+      key: 'reference',
+      label: 'Reference',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: p => p.referenceNumber,
+      exportValue: p => p.referenceNumber,
+      render: p => <span className="whitespace-nowrap text-sm font-mono text-gray-700">{p.referenceNumber}</span>,
+    },
+    {
+      key: 'id',
+      label: 'Purchase #',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: p => Number(p.id),
+      exportValue: p => p.id,
+      defaultVisible: false,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">#{p.id}</span>,
+    },
+    {
+      key: 'customer',
+      label: 'Customer',
+      group: 'Customer',
+      sortable: true,
+      sortValue: p => p.customerName,
+      exportValue: p => p.customerName,
+      render: p => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">{p.customerName}</div>
+          <div className="text-xs text-gray-600 mt-1">{p.email}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'customerType',
+      label: 'Customer Type',
+      group: 'Customer',
+      sortable: true,
+      sortValue: p => (p.isGuest ? 'Guest' : 'Registered'),
+      exportValue: p => (p.isGuest ? 'Guest' : 'Registered'),
+      defaultVisible: false,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-700">{p.isGuest ? 'Guest' : 'Registered'}</span>,
+    },
+    {
+      key: 'event',
+      label: 'Event',
+      group: 'Purchase',
+      sortable: true,
+      sortValue: p => p.eventName,
+      exportValue: p => p.eventName,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.eventName}</span>,
+    },
+    {
+      key: 'quantity',
+      label: 'Qty',
+      group: 'Purchase',
+      sortable: true,
+      sortValue: p => p.quantity,
+      exportValue: p => p.quantity,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.quantity}</span>,
+    },
+    {
+      key: 'total',
+      label: 'Total',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.totalAmount,
+      exportValue: p => p.totalAmount.toFixed(2),
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">${p.totalAmount.toFixed(2)}</span>,
+    },
+    {
+      key: 'paid',
+      label: 'Paid',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.amountPaid,
+      exportValue: p => p.amountPaid.toFixed(2),
+      render: p => (
+        <span className={`whitespace-nowrap text-sm ${p.amountPaid >= p.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}`}>
+          ${p.amountPaid.toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: 'method',
+      label: 'Method',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.paymentMethod || '',
+      exportValue: p => p.paymentMethod,
+      render: p => (
+        <span className="whitespace-nowrap text-sm text-gray-700 capitalize">
+          {p.paymentMethod?.replace('_', ' ').replace('.', ' ') || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'paymentStatus',
+      label: 'Payment Status',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.paymentStatus || '',
+      exportValue: p => p.paymentStatus,
+      render: p => (
+        <span className={`whitespace-nowrap text-xs font-medium px-2 py-1 rounded-full ${
+          p.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+          p.paymentStatus === 'partial' ? 'bg-orange-100 text-orange-800' :
+          p.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          {p.paymentStatus === 'paid' ? 'Paid' :
+           p.paymentStatus === 'partial' ? 'Partial' :
+           p.paymentStatus === 'pending' ? 'Pending' :
+           p.paymentStatus || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'scheduled',
+      label: 'Scheduled',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => (p.purchaseDate ? `${p.purchaseDate.substring(0, 10)} ${p.purchaseTime || ''}` : ''),
+      exportValue: p => (p.purchaseDate
+        ? `${p.purchaseDate.substring(0, 10)}${p.purchaseTime ? ` ${convertTo12Hour(p.purchaseTime)}` : ''}`
+        : ''),
+      render: p => p.purchaseDate ? (
+        <div className="whitespace-nowrap text-sm text-gray-500">
+          <div>{new Date(p.purchaseDate.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+          {p.purchaseTime && (
+            <div className="text-xs text-gray-400">{convertTo12Hour(p.purchaseTime)}</div>
+          )}
+        </div>
+      ) : (
+        <span className="text-gray-300">—</span>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => new Date(p.createdAt || 0).getTime(),
+      exportValue: p => (p.createdAt ? new Date(p.createdAt).toLocaleString() : ''),
+      render: p => <span className="whitespace-nowrap text-sm text-gray-500">{formatDate(p.createdAt)}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: p => p.status,
+      exportValue: p => p.status,
+      render: p => (
+        <select
+          value={p.status}
+          onChange={(e) => handleStatusChange(p.id, e.target.value)}
+          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[p.status]?.color || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
+        >
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+          <option value="checked-in">Checked In</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      ),
+    },
+  ];
+
+  const eventOptions = useMemo(() => {
+    const unique = [...new Set(purchases.map(p => p.eventName).filter(Boolean))].sort();
+    return unique.map(name => ({ value: name, label: name }));
+  }, [purchases]);
+
+  const filterDefs: AdminFilterDef<DisplayPurchase>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'confirmed', label: 'Confirmed' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'checked-in', label: 'Checked In' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'refunded', label: 'Refunded' },
+        { value: 'voided', label: 'Voided' },
+      ],
+      predicate: (p, value) => p.status === value,
+    },
+    {
+      type: 'select',
+      key: 'event',
+      label: 'Event',
+      allLabel: 'All Events',
+      options: eventOptions,
+      predicate: (p, value) => p.eventName === value,
+    },
+    {
+      type: 'select',
+      key: 'paymentMethod',
+      label: 'Payment Method',
+      allLabel: 'All Methods',
+      options: [
+        { value: 'in-store', label: 'In-Store' },
+        { value: 'paylater', label: 'Pay Later' },
+        { value: 'authorize.net', label: 'Authorize.net' },
+      ],
+      predicate: (p, value) => p.paymentMethod === value,
+    },
+    {
+      type: 'select',
+      key: 'paymentStatus',
+      label: 'Payment Status',
+      allLabel: 'All Payment Statuses',
+      options: [
+        { value: 'paid', label: 'Paid' },
+        { value: 'partial', label: 'Partial' },
+        { value: 'pending', label: 'Pending' },
+      ],
+      predicate: (p, value) => p.paymentStatus === value,
+    },
+    {
+      type: 'select',
+      key: 'customerType',
+      label: 'Customer Type',
+      allLabel: 'All Customer Types',
+      options: [
+        { value: 'registered', label: 'Registered' },
+        { value: 'guest', label: 'Guest / Walk-in' },
+      ],
+      predicate: (p, value) => (value === 'guest' ? p.isGuest : !p.isGuest),
+    },
+    {
+      type: 'select',
+      key: 'balance',
+      label: 'Balance',
+      allLabel: 'All Balances',
+      options: [
+        { value: 'due', label: 'Balance Due' },
+        { value: 'paid', label: 'Paid in Full' },
+      ],
+      predicate: (p, value) => (value === 'due' ? p.amountPaid < p.totalAmount : p.amountPaid >= p.totalAmount),
+    },
+    {
+      type: 'daterange',
+      key: 'createdDate',
+      label: 'Created Date',
+      getDate: p => p.createdAt,
+    },
+    {
+      type: 'daterange',
+      key: 'scheduledDate',
+      label: 'Scheduled Date',
+      getDate: p => p.purchaseDate,
+    },
+    {
+      type: 'numberrange',
+      key: 'amount',
+      label: 'Total Amount ($)',
+      getValue: p => p.totalAmount,
+    },
+  ], [eventOptions]);
+
+  const table = useAdminTable<DisplayPurchase>({
+    data: purchases,
+    columns,
+    getRowId: p => p.id,
+    storageKey: 'event_purchases',
+    filterDefs,
+    searchFields: p => [
+      p.id,
+      p.referenceNumber,
+      p.customerName,
+      p.email,
+      p.phone,
+      p.eventName,
+      p.paymentMethod,
+      p.status,
+    ],
+    defaultSort: (a, b) => {
+      const priorityDiff = (statusPriority[a.status] ?? 3) - (statusPriority[b.status] ?? 3);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    },
+    itemsPerPage,
+  });
+
   const handleBulkDelete = async () => {
-    if (selectedPurchases.length === 0) return;
-    if (window.confirm(`Are you sure you want to delete ${selectedPurchases.length} purchase record(s)?`)) {
+    if (table.selectedIds.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${table.selectedIds.length} purchase record(s)?`)) {
       try {
-        await Promise.all(selectedPurchases.map((id) => eventPurchaseService.deletePurchase(Number(id))));
-        setToast({ message: `${selectedPurchases.length} purchase(s) deleted successfully`, type: 'success' });
-        setSelectedPurchases([]);
+        await Promise.all(table.selectedIds.map((id) => eventPurchaseService.deletePurchase(Number(id))));
+        setToast({ message: `${table.selectedIds.length} purchase(s) deleted successfully`, type: 'success' });
+        table.clearSelection();
         loadPurchases();
       } catch (error) {
         console.error('Error deleting purchases:', error);
@@ -322,11 +537,11 @@ const EventPurchases = () => {
   };
 
   const handleBulkStatusChange = async (newStatus: string) => {
-    if (selectedPurchases.length === 0 || !newStatus) return;
+    if (table.selectedIds.length === 0 || !newStatus) return;
     try {
-      await Promise.all(selectedPurchases.map((id) => eventPurchaseService.updateStatus(Number(id), newStatus)));
-      setToast({ message: `${selectedPurchases.length} purchase(s) updated successfully`, type: 'success' });
-      setSelectedPurchases([]);
+      await Promise.all(table.selectedIds.map((id) => eventPurchaseService.updateStatus(Number(id), newStatus)));
+      setToast({ message: `${table.selectedIds.length} purchase(s) updated successfully`, type: 'success' });
+      table.clearSelection();
       loadPurchases();
     } catch (error) {
       console.error('Error updating purchases:', error);
@@ -334,10 +549,21 @@ const EventPurchases = () => {
     }
   };
 
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `event-purchases-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Email', value: p => p.email },
+        { label: 'Phone', value: p => p.phone },
+        { label: 'Balance Due', value: p => (p.totalAmount - p.amountPaid).toFixed(2) },
+        { label: 'Location', value: p => locations.find(l => String(l.id) === String(p.locationId))?.name || p.locationId || '' },
+      ],
+    });
+  };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const convertTrashedPurchases = (rawPurchases: any[]): DisplayPurchase[] => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return rawPurchases.map((purchase: any) => ({
       id: purchase.id.toString(),
       referenceNumber: purchase.reference_number,
@@ -357,6 +583,7 @@ const EventPurchases = () => {
       purchaseTime: purchase.purchase_time,
       createdAt: purchase.created_at,
       locationId: purchase.location_id,
+      isGuest: !purchase.customer,
       deletedAt: purchase.deleted_at,
     }));
   };
@@ -367,15 +594,13 @@ const EventPurchases = () => {
       const result = await eventPurchaseService.getTrashedPurchases({
         page,
         per_page: itemsPerPage,
-        search: filters.search,
+        search: table.searchInput,
         ...(selectedLocation && { location_id: Number(selectedLocation) }),
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = result as any;
       const innerData = Array.isArray(raw) ? raw : (raw?.data ?? raw);
       const rawPurchases = Array.isArray(innerData) ? innerData : (innerData?.purchases || innerData?.data || []);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pagination = (innerData as any)?.pagination || (raw as any)?.meta || (result as any)?.meta;
 
       setTrashedPurchases(convertTrashedPurchases(rawPurchases));
@@ -463,45 +688,6 @@ const EventPurchases = () => {
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ['Reference', 'Customer Name', 'Email', 'Phone', 'Event', 'Quantity', 'Total Amount', 'Status', 'Payment Method', 'Date'];
-    const csvData = filteredPurchases.map((p) => [
-      p.referenceNumber,
-      p.customerName,
-      p.email,
-      p.phone,
-      p.eventName,
-      p.quantity,
-      p.totalAmount,
-      p.status,
-      p.paymentMethod,
-      new Date(p.createdAt).toLocaleString(),
-    ]);
-    const csvContent = [headers.join(','), ...csvData.map((row) => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `event-purchases-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentPurchases = filteredPurchases.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -546,114 +732,37 @@ const EventPurchases = () => {
       </div>
 
       {!showTrashed && (
-      <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {metrics.map((metric, index) => {
-          const Icon = metric.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`p-2 rounded-lg ${metric.accent}`}>
-                  <Icon size={20} />
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {metrics.map((metric, index) => {
+              const Icon = metric.icon;
+              return (
+                <div
+                  key={index}
+                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`p-2 rounded-lg ${metric.accent}`}>
+                      <Icon size={20} />
+                    </div>
+                    <span className="text-base font-semibold text-gray-800">{metric.title}</span>
+                  </div>
+                  <div className="flex items-end gap-2 mt-2">
+                    <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
+                  </div>
+                  <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
                 </div>
-                <span className="text-base font-semibold text-gray-800">{metric.title}</span>
-              </div>
-              <div className="flex items-end gap-2 mt-2">
-                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
-              </div>
-              <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search by name, email, event, or reference..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
+              );
+            })}
           </div>
-          <div className="flex gap-1">
-            <StandardButton variant="secondary" size="sm" onClick={() => setShowFilters(!showFilters)} icon={Filter}>
-              Filters
-            </StandardButton>
-            <StandardButton variant="secondary" size="sm" onClick={() => loadPurchases()} icon={RefreshCcw}>
-              {''}
-            </StandardButton>
-          </div>
-        </div>
 
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="pending">Pending</option>
-                  <option value="checked-in">Checked In</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Payment Method</label>
-                <select
-                  value={filters.paymentMethod}
-                  onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Methods</option>
-                  <option value="in-store">In-Store</option>
-                  <option value="paylater">Pay Later</option>
-                  <option value="authorize.net">Authorize.net</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
-                <select
-                  value={filters.dateRange}
-                  onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">Last 30 Days</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton variant="ghost" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
-        )}
-      </div>
+          <AdminTableToolbar
+            table={table}
+            searchPlaceholder="Search by name, email, event, or reference..."
+            onRefresh={() => loadPurchases()}
+          />
 
-      {selectedPurchases.length > 0 && (
-        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
-          <span className={`text-${fullColor} font-medium`}>
-            {selectedPurchases.length} purchase(s) selected
-          </span>
-          <div className="flex gap-2">
+          <BulkActionsBar table={table} itemLabel="purchase(s)">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value)}
               className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
@@ -668,159 +777,33 @@ const EventPurchases = () => {
             <StandardButton variant="danger" size="md" onClick={handleBulkDelete} icon={Trash2}>
               Delete
             </StandardButton>
-          </div>
-        </div>
-      )}
+          </BulkActionsBar>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedPurchases.length === currentPurchases.length && currentPurchases.length > 0}
-                    onChange={handleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
-                  />
-                </th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reference</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Event</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Method</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Scheduled</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentPurchases.length === 0 ? (
-                <tr>
-                    <td colSpan={13} className="px-4 py-8 text-center text-sm text-gray-600">
-                    No event purchases found
-                  </td>
-                </tr>
-              ) : (
-                currentPurchases.map((purchase) => (
-                  <tr key={purchase.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedPurchases.includes(purchase.id)}
-                        onChange={() => handleSelectPurchase(purchase.id)}
-                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
-                      />
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
-                      {purchase.referenceNumber}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{purchase.customerName}</div>
-                        <div className="text-xs text-gray-600 mt-1">{purchase.email}</div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {purchase.eventName}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {purchase.quantity}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${purchase.totalAmount.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      <span className={purchase.amountPaid >= purchase.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}>
-                        ${purchase.amountPaid.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">
-                      {purchase.paymentMethod?.replace('_', ' ').replace('.', ' ') || 'N/A'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        purchase.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                        purchase.paymentStatus === 'partial' ? 'bg-orange-100 text-orange-800' :
-                        purchase.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {purchase.paymentStatus === 'paid' ? 'Paid' :
-                         purchase.paymentStatus === 'partial' ? 'Partial' :
-                         purchase.paymentStatus === 'pending' ? 'Pending' :
-                         purchase.paymentStatus || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {purchase.purchaseDate ? (
-                        <div>
-                          <div>{new Date(purchase.purchaseDate.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                          {purchase.purchaseTime && (
-                            <div className="text-xs text-gray-400">{convertTo12Hour(purchase.purchaseTime)}</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(purchase.createdAt)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <select
-                        value={purchase.status}
-                        onChange={(e) => handleStatusChange(purchase.id, e.target.value)}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status]?.color || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
-                      >
-                        <option value="confirmed">Confirmed</option>
-                        <option value="pending">Pending</option>
-                        <option value="checked-in">Checked In</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <Link
-                          to={`/events/purchases/${purchase.id}?from=purchases`}
-                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        <button
-                          onClick={() => handleDeletePurchase(purchase.id)}
-                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-white px-4 py-4 border-t border-gray-100">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => setCurrentPage(page)}
-            totalItems={filteredPurchases.length}
-            showingFrom={indexOfFirstItem + 1}
-            showingTo={Math.min(indexOfLastItem, filteredPurchases.length)}
+          <AdminDataTable
+            table={table}
+            selectable
+            itemLabel="purchases"
+            emptyMessage="No event purchases found"
+            renderActions={(purchase) => (
+              <div className="flex items-center gap-1">
+                <Link
+                  to={`/events/purchases/${purchase.id}?from=purchases`}
+                  className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="View Details"
+                >
+                  <Eye className="h-4 w-4" />
+                </Link>
+                <button
+                  onClick={() => handleDeletePurchase(purchase.id)}
+                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           />
-        </div>
-      </div>
-      </>
+        </>
       )}
 
       {showTrashed && (

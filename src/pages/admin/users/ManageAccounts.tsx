@@ -1,12 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  Eye, 
-  Pencil, 
-  Trash2, 
-  Plus, 
-  Search, 
-  Filter, 
-  RefreshCcw,
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  Plus,
   Users,
   Mail,
   Phone,
@@ -19,13 +16,13 @@ import {
   CheckCircle,
   UserPlus,
   Building2,
-  KeyRound
+  KeyRound,
+  Download
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
-import Pagination from '../../../components/ui/Pagination';
 import { API_BASE_URL } from '../../../utils/storage';
 import { locationService } from '../../../services';
 import { userService } from '../../../services/UserService';
@@ -38,15 +35,22 @@ import ResendCredentialsModal from '../../../components/admin/users/ResendCreden
 import AccountViewModal from '../../../components/admin/users/AccountViewModal';
 import AccountEditModal from '../../../components/admin/users/AccountEditModal';
 import type { Location } from '../../../services/LocationService';
-import type { 
-  ManageAccountsAccount, 
-  ManageAccountsFilterOptions, 
-  ManageAccountsInvitationModalProps 
+import type {
+  ManageAccountsAccount,
+  ManageAccountsInvitationModalProps
 } from '../../../types/ManageAccounts.types';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
-const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({ 
-  isOpen, 
-  onClose, 
+const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
+  isOpen,
+  onClose,
   onSendInvitation,
   defaultEmail = '',
   defaultUserType = 'attendant'
@@ -69,7 +73,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
       setGeneratedLink('');
       setError('');
       setSuccess(false);
-      
+
       fetchLocations();
     }
   }, [isOpen, defaultEmail, defaultUserType]);
@@ -77,11 +81,9 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
   const fetchLocations = async () => {
     try {
       const response = await locationService.getLocations({ per_page: 100 });
-      console.log('Location API Response:', response);
 
       if (response.success) {
         const locationsList = Array.isArray(response.data) ? response.data : [];
-        console.log('Locations list:', locationsList);
         setLocations(locationsList);
       }
     } catch (error) {
@@ -134,7 +136,6 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
       });
 
       const data = await response.json();
-      console.log(data)
 
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to create invitation');
@@ -208,7 +209,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
               value={userType}
               onChange={(e) => {
                 setUserType(e.target.value as 'attendant' | 'manager' | 'company_admin');
-                setSelectedLocationId(''); // Reset location when user type changes
+                setSelectedLocationId('');
               }}
               disabled={isSending || success}
               className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
@@ -313,19 +314,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
 const ManageAccounts = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [accounts, setAccounts] = useState<ManageAccountsAccount[]>([]);
-  const [filteredAccounts, setFilteredAccounts] = useState<ManageAccountsAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [filters, setFilters] = useState<ManageAccountsFilterOptions>({
-    status: 'all',
-    department: 'all',
-    userType: 'all',
-    location: 'all',
-    search: ''
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
   const [showCreateLocationModal, setShowCreateLocationModal] = useState(false);
@@ -339,12 +328,7 @@ const ManageAccounts = () => {
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [editLocationTarget, setEditLocationTarget] = useState<Location | null>(null);
 
-  const locations = [
-    'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor',
-    'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti', 'Escape Room Zone'
-  ];
-
-  const statusColors = {
+  const statusColors: Record<ManageAccountsAccount['status'], string> = {
     active: 'bg-green-100 text-green-800',
     inactive: 'bg-gray-100 text-gray-800'
   };
@@ -400,26 +384,13 @@ const ManageAccounts = () => {
         setLocationsData(Array.isArray(res.data) ? res.data : []);
       }
     } catch {
-      // location section will simply not render
+      setLocationsData([]);
     } finally {
       setLocationsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadAccounts();
-    if (isCompanyAdmin) {
-      loadLocations();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts, filters]);
-
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = async () => {
     try {
       const userData = localStorage.getItem('zapzone_user');
       const authToken = userData ? JSON.parse(userData).token : null;
@@ -430,20 +401,7 @@ const ManageAccounts = () => {
         return;
       }
 
-      const params = new URLSearchParams();
-      if (filters.status !== 'all') params.append('status', filters.status);
-      if (filters.userType !== 'all') {
-        const roleMap: Record<string, string> = {
-          'manager': 'location_manager',
-          'attendant': 'attendant',
-          'company_admin': 'company_admin'
-        };
-        params.append('role', roleMap[filters.userType] || filters.userType);
-      }
-      if (filters.location !== 'all') params.append('location_id', filters.location);
-      if (filters.search) params.append('search', filters.search);
-
-      const response = await fetch(`${API_BASE_URL}/users?${params.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -485,75 +443,14 @@ const ManageAccounts = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.status, filters.userType, filters.location, filters.search]);
-
-  const applyFilters = () => {
-    let result = [...accounts];
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(account =>
-        account.firstName.toLowerCase().includes(searchTerm) ||
-        account.lastName.toLowerCase().includes(searchTerm) ||
-        account.email.toLowerCase().includes(searchTerm) ||
-        account.employeeId.toLowerCase().includes(searchTerm) ||
-        account.department.toLowerCase().includes(searchTerm) ||
-        account.location.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    if (filters.status !== 'all') {
-      result = result.filter(account => account.status === filters.status);
-    }
-
-    if (filters.department !== 'all') {
-      result = result.filter(account => account.department === filters.department);
-    }
-
-    if (filters.userType !== 'all') {
-      result = result.filter(account => account.userType === filters.userType);
-    }
-
-    if (filters.location !== 'all') {
-      result = result.filter(account => account.location === filters.location);
-    }
-
-    setFilteredAccounts(result);
-    setCurrentPage(1);
   };
 
-  const handleFilterChange = (key: keyof ManageAccountsFilterOptions, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      department: 'all',
-      userType: 'all',
-      location: 'all',
-      search: ''
-    });
-  };
-
-  const handleSelectAccount = (id: string) => {
-    setSelectedAccounts(prev =>
-      prev.includes(id)
-        ? prev.filter(accountId => accountId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedAccounts.length === currentAccounts.length) {
-      setSelectedAccounts([]);
-    } else {
-      setSelectedAccounts(currentAccounts.map(account => account.id));
+  useEffect(() => {
+    loadAccounts();
+    if (isCompanyAdmin) {
+      loadLocations();
     }
-  };
+  }, []);
 
   const handleStatusChange = async (id: string, newStatus: ManageAccountsAccount['status']) => {
     try {
@@ -579,10 +476,9 @@ const ManageAccounts = () => {
         throw new Error(data.message || 'Failed to update status');
       }
 
-      const updatedAccounts = accounts.map(account =>
+      setAccounts(prev => prev.map(account =>
         account.id === id ? { ...account, status: newStatus } : account
-      );
-      setAccounts(updatedAccounts);
+      ));
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update account status. Please try again.');
@@ -617,71 +513,10 @@ const ManageAccounts = () => {
         throw new Error(data.message || 'Failed to delete account');
       }
 
-      const updatedAccounts = accounts.filter(account => account.id !== id);
-      setAccounts(updatedAccounts);
+      setAccounts(prev => prev.filter(account => account.id !== id));
     } catch (error) {
       console.error('Error deleting account:', error);
       alert('Failed to delete account. Please try again.');
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedAccounts.length === 0) return;
-    
-    if (!window.confirm(`Are you sure you want to delete ${selectedAccounts.length} account(s)? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const ids = selectedAccounts.map(id => parseInt(id));
-      
-      const response = await userService.bulkDelete(ids);
-
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to delete accounts');
-      }
-
-      const updatedAccounts = accounts.filter(account => !selectedAccounts.includes(account.id));
-      setAccounts(updatedAccounts);
-      setSelectedAccounts([]);
-      
-      alert(`Successfully deleted ${selectedAccounts.length} account(s)`);
-    } catch (error) {
-      console.error('Error deleting accounts:', error);
-      alert('Failed to delete some accounts. Please try again.');
-    }
-  };
-
-  const handleBulkStatusChange = async (newStatus: ManageAccountsAccount['status']) => {
-    if (selectedAccounts.length === 0) return;
-    
-    try {
-      const userData = localStorage.getItem('zapzone_user');
-      const authToken = userData ? JSON.parse(userData).token : null;
-
-      if (!authToken) {
-        alert('Authentication required. Please log in again.');
-        return;
-      }
-
-      await Promise.all(selectedAccounts.map(id => 
-        fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-        })
-      ));
-
-      const updatedAccounts = accounts.map(account =>
-        selectedAccounts.includes(account.id) ? { ...account, status: newStatus } : account
-      );
-      setAccounts(updatedAccounts);
-      setSelectedAccounts([]);
-    } catch (error) {
-      console.error('Error updating account status:', error);
-      alert('Failed to update some account statuses. Please try again.');
     }
   };
 
@@ -693,33 +528,348 @@ const ManageAccounts = () => {
     setShowInvitationModal(true);
   };
 
-  const getUniqueDepartments = () => {
-    const departments = accounts.map(account => account.department);
-    return [...new Set(departments)];
-  };
-
   const formatLastLogin = (lastLogin?: string) => {
     if (!lastLogin) return 'Never';
     const date = new Date(lastLogin);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    
+
     return date.toLocaleDateString();
   };
 
-  console.log('Filtered Accounts:', filteredAccounts);
+  const roleLabel = (account: ManageAccountsAccount) =>
+    account.userType === 'manager' ? 'Location Manager' : account.userType === 'company_admin' ? 'Company Admin' : 'Attendant';
 
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentAccounts = filteredAccounts.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredAccounts.length / itemsPerPage);
+  const columns: AdminColumn<ManageAccountsAccount>[] = [
+    {
+      key: 'employeeId',
+      label: 'Employee ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: a => a.employeeId,
+      exportValue: a => a.employeeId,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{a.employeeId}</span>,
+    },
+    {
+      key: 'account',
+      label: 'Account',
+      group: 'Account',
+      sortable: true,
+      sortValue: a => `${a.firstName} ${a.lastName}`,
+      exportValue: a => `${a.firstName} ${a.lastName}`,
+      render: a => (
+        <div className="font-medium text-gray-900">
+          {a.firstName} {a.lastName}
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      label: 'Contact',
+      group: 'Contact',
+      sortable: true,
+      sortValue: a => a.email,
+      exportValue: a => a.email,
+      render: a => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <Mail className="h-3 w-3 text-gray-400" />
+            <span className="text-gray-900">{a.email}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            {a.phone ? <><Phone className="h-3 w-3 text-gray-400" />
+            <span className="text-gray-600">{a.phone}</span></> : null}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'typeLocation',
+      label: 'Type & Location',
+      group: 'Role & Location',
+      sortable: true,
+      sortValue: a => `${roleLabel(a)} ${a.location}`,
+      exportValue: a => roleLabel(a),
+      render: a => (
+        <div className="space-y-2">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${userTypeBadgeColor}`}>
+            {roleLabel(a)}
+          </span>
+          {a.location !== 'Unknown' ? <div className="flex items-center gap-1 text-xs text-gray-600">
+            <MapPin className="h-3 w-3" />
+            {a.location}
+          </div> : null}
+        </div>
+      ),
+    },
+    {
+      key: 'department',
+      label: 'Department',
+      group: 'Account',
+      sortable: true,
+      sortValue: a => a.department,
+      exportValue: a => a.department,
+      render: a => (
+        <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${a.department === 'Food & Beverage' ? foodBeverageBadgeColor : departmentBadgeColor}`}>
+          {a.department}
+        </span>
+      ),
+    },
+    {
+      key: 'position',
+      label: 'Position',
+      group: 'Account',
+      sortable: true,
+      sortValue: a => a.position,
+      exportValue: a => a.position,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{a.position || '—'}</span>,
+    },
+    {
+      key: 'lastLogin',
+      label: 'Last Login',
+      group: 'Activity',
+      sortable: true,
+      sortValue: a => (a.lastLogin ? new Date(a.lastLogin).getTime() : 0),
+      exportValue: a => (a.lastLogin ? new Date(a.lastLogin).toLocaleString() : 'Never'),
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{formatLastLogin(a.lastLogin)}</span>,
+    },
+    {
+      key: 'createdAt',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: a => new Date(a.createdAt || 0).getTime(),
+      exportValue: a => (a.createdAt ? new Date(a.createdAt).toLocaleString() : ''),
+      defaultVisible: false,
+      render: a => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'hireDate',
+      label: 'Hire Date',
+      group: 'Dates',
+      sortable: true,
+      sortValue: a => a.hireDate,
+      exportValue: a => a.hireDate,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-500">{a.hireDate || '—'}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: a => a.status,
+      exportValue: a => a.status,
+      render: a => (
+        <select
+          value={a.status}
+          onChange={(e) => handleStatusChange(a.id, e.target.value as ManageAccountsAccount['status'])}
+          className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[a.status]} border-none focus:ring-2 focus:ring-${themeColor}-500`}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      ),
+    },
+  ];
 
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const departmentOptions = useMemo(() => {
+    const unique = [...new Set(accounts.map(a => a.department).filter(Boolean))].sort();
+    return unique.map(dept => ({ value: dept, label: dept }));
+  }, [accounts]);
+
+  const locationOptions = useMemo(() => {
+    const names = new Set<string>();
+    accounts.forEach(a => {
+      if (a.location && a.location !== 'Unknown') names.add(a.location);
+    });
+    locationsData.forEach(l => {
+      if (l.name) names.add(l.name);
+    });
+    return [...names].sort().map(name => ({ value: name, label: name }));
+  }, [accounts, locationsData]);
+
+  const filterDefs: AdminFilterDef<ManageAccountsAccount>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (a, value) => a.status === value,
+    },
+    {
+      type: 'select',
+      key: 'userType',
+      label: 'User Type',
+      allLabel: 'All Types',
+      options: [
+        { value: 'company_admin', label: 'Company Admins' },
+        { value: 'manager', label: 'Location Managers' },
+        { value: 'attendant', label: 'Attendants' },
+      ],
+      predicate: (a, value) => a.userType === value,
+    },
+    {
+      type: 'select',
+      key: 'department',
+      label: 'Department',
+      allLabel: 'All Departments',
+      options: departmentOptions,
+      predicate: (a, value) => a.department === value,
+    },
+    {
+      type: 'select',
+      key: 'location',
+      label: 'Location',
+      allLabel: 'All Locations',
+      options: locationOptions,
+      predicate: (a, value) => a.location === value,
+    },
+    {
+      type: 'select',
+      key: 'lastLogin',
+      label: 'Last Login',
+      allLabel: 'Any Time',
+      options: [
+        { value: 'never', label: 'Never' },
+        { value: 'today', label: 'Today' },
+        { value: '7', label: 'Last 7 Days' },
+        { value: '30', label: 'Last 30 Days' },
+      ],
+      predicate: (a, value) => {
+        if (value === 'never') return !a.lastLogin;
+        if (!a.lastLogin) return false;
+        const diffDays = Math.floor((Date.now() - new Date(a.lastLogin).getTime()) / (1000 * 60 * 60 * 24));
+        if (value === 'today') return diffDays === 0;
+        if (value === '7') return diffDays <= 7;
+        if (value === '30') return diffDays <= 30;
+        return true;
+      },
+    },
+    {
+      type: 'daterange',
+      key: 'createdDate',
+      label: 'Created Date',
+      getDate: a => a.createdAt,
+    },
+    {
+      type: 'daterange',
+      key: 'hireDate',
+      label: 'Hire Date',
+      getDate: a => a.hireDate,
+    },
+  ], [departmentOptions, locationOptions]);
+
+  const table = useAdminTable<ManageAccountsAccount>({
+    data: accounts,
+    columns,
+    getRowId: a => a.id,
+    storageKey: 'accounts',
+    filterDefs,
+    searchFields: a => [
+      a.firstName,
+      a.lastName,
+      a.email,
+      a.phone,
+      a.employeeId,
+      a.department,
+      a.location,
+      a.position,
+    ],
+    defaultSort: (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
+  const handleBulkDelete = async () => {
+    if (table.selectedIds.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to delete ${table.selectedIds.length} account(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const ids = table.selectedIds.map(id => parseInt(id));
+
+      const response = await userService.bulkDelete(ids);
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete accounts');
+      }
+
+      const deletedCount = table.selectedIds.length;
+      setAccounts(prev => prev.filter(account => !table.selectedIds.includes(account.id)));
+      table.clearSelection();
+
+      alert(`Successfully deleted ${deletedCount} account(s)`);
+    } catch (error) {
+      console.error('Error deleting accounts:', error);
+      alert('Failed to delete some accounts. Please try again.');
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus: ManageAccountsAccount['status']) => {
+    if (table.selectedIds.length === 0) return;
+
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      await Promise.all(table.selectedIds.map(id =>
+        fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+        })
+      ));
+
+      setAccounts(prev => prev.map(account =>
+        table.selectedIds.includes(account.id) ? { ...account, status: newStatus } : account
+      ));
+      table.clearSelection();
+    } catch (error) {
+      console.error('Error updating account status:', error);
+      alert('Failed to update some account statuses. Please try again.');
+    }
+  };
+
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `accounts-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'User ID', value: a => a.id },
+        { label: 'First Name', value: a => a.firstName },
+        { label: 'Last Name', value: a => a.lastName },
+        { label: 'Phone', value: a => a.phone },
+        { label: 'Location', value: a => (a.location !== 'Unknown' ? a.location : '') },
+        { label: 'Username', value: a => a.username },
+        { label: 'Shift', value: a => a.shift || '' },
+      ],
+    });
+  };
 
   if (loading) {
     return (
@@ -789,283 +939,88 @@ const ManageAccounts = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search accounts..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton
-              onClick={() => setShowFilters(!showFilters)}
-              variant="secondary"
-              size="sm"
-              icon={Filter}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              onClick={loadAccounts}
-              variant="secondary"
-              size="sm"
-              icon={RefreshCcw}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search accounts..."
+        onRefresh={() => loadAccounts()}
+        actions={
+          <StandardButton
+            onClick={exportToCSV}
+            variant="secondary"
+            size="sm"
+            icon={Download}
+          >
+            Export CSV
+          </StandardButton>
+        }
+      />
 
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">User Type</label>
-                <select
-                  value={filters.userType}
-                  onChange={(e) => handleFilterChange('userType', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Types</option>
-                  <option value="manager">Managers</option>
-                  <option value="attendant">Attendants</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Department</label>
-                <select
-                  value={filters.department}
-                  onChange={(e) => handleFilterChange('department', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Departments</option>
-                  {getUniqueDepartments().map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                <select
-                  value={filters.location}
-                  onChange={(e) => handleFilterChange('location', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Locations</option>
-                  {locations.map(location => (
-                    <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
+      <BulkActionsBar table={table} itemLabel="account(s)">
+        <select
+          onChange={(e) => handleBulkStatusChange(e.target.value as ManageAccountsAccount['status'])}
+          className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500`}
+        >
+          <option value="">Change Status</option>
+          <option value="active">Activate</option>
+          <option value="inactive">Deactivate</option>
+        </select>
+        <StandardButton
+          onClick={handleBulkDelete}
+          variant="danger"
+          size="sm"
+          icon={Trash2}
+        >
+          Delete
+        </StandardButton>
+      </BulkActionsBar>
+
+      <AdminDataTable
+        table={table}
+        selectable
+        itemLabel="accounts"
+        emptyMessage="No accounts found"
+        renderActions={(account) => (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setViewTarget(account)}
+              className={`text-${themeColor}-600 hover:text-${themeColor}-800`}
+              title="View Profile"
+            >
+              <Eye className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setEditTarget(account)}
+              className="text-gray-600 hover:text-gray-800"
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            {isCompanyAdmin && (
               <StandardButton
-                onClick={clearFilters}
+                onClick={() => setResendTarget({
+                  id: parseInt(account.id, 10),
+                  first_name: account.firstName,
+                  last_name: account.lastName,
+                  email: account.email,
+                })}
                 variant="ghost"
                 size="sm"
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {selectedAccounts.length > 0 && (
-        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
-          <span className={`text-${fullColor} font-medium`}>
-            {selectedAccounts.length} account(s) selected
-          </span>
-          <div className="flex gap-2">
-            <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as ManageAccountsAccount['status'])}
-              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500`}
-            >
-              <option value="">Change Status</option>
-              <option value="active">Activate</option>
-              <option value="inactive">Deactivate</option>
-            </select>
+                icon={KeyRound}
+                className="text-amber-600 hover:text-amber-800"
+                title="Resend credentials"
+              />
+            )}
             <StandardButton
-              onClick={handleBulkDelete}
-              variant="danger"
+              onClick={() => handleDeleteAccount(account.id)}
+              variant="ghost"
               size="sm"
               icon={Trash2}
-            >
-              Delete
-            </StandardButton>
+              className="text-red-600 hover:text-red-800"
+              title="Delete"
+            />
           </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
-              <tr>
-                <th scope="col" className="px-6 py-4 font-medium w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedAccounts.length === currentAccounts.length && currentAccounts.length > 0}
-                    onChange={handleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
-                  />
-                </th>
-                <th scope="col" className="px-6 py-4 font-medium">Account</th>
-                <th scope="col" className="px-6 py-4 font-medium">Contact</th>
-                <th scope="col" className="px-6 py-4 font-medium">Type & Location</th>
-                <th scope="col" className="px-6 py-4 font-medium">Department</th>
-                <th scope="col" className="px-6 py-4 font-medium">Last Login</th>
-                <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                <th scope="col" className="px-6 py-4 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentAccounts.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-800">
-                    No accounts found
-                  </td>
-                </tr>
-              ) : (
-                currentAccounts.map((account) => (
-                  <tr key={account.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedAccounts.includes(account.id)}
-                        onChange={() => handleSelectAccount(account.id)}
-                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {account.firstName} {account.lastName}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-3 w-3 text-gray-400" />
-                          <span className="text-gray-900">{account.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          {account.phone ? <><Phone className="h-3 w-3 text-gray-400" />
-                          <span className="text-gray-600">{account.phone}</span></> : null}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${userTypeBadgeColor}`}>
-                          {account.userType === 'manager' ? 'Location Manager' : account.userType === 'company_admin' ? 'Company Admin' : 'Attendant'}
-                        </span>
-                       
-                       {account.location !== 'Unknown' ? <div className="flex items-center gap-1 text-xs text-gray-600">
-                          <MapPin className="h-3 w-3" />
-                          {account.location}
-                        </div> : null} 
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${account.department === 'Food & Beverage' ? foodBeverageBadgeColor : departmentBadgeColor}`}>
-                        {account.department}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatLastLogin(account.lastLogin)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={account.status}
-                        onChange={(e) => handleStatusChange(account.id, e.target.value as ManageAccountsAccount['status'])}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[account.status]} border-none focus:ring-2 focus:ring-${themeColor}-500`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setViewTarget(account)}
-                          className={`text-${themeColor}-600 hover:text-${themeColor}-800`}
-                          title="View Profile"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setEditTarget(account)}
-                          className="text-gray-600 hover:text-gray-800"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        {isCompanyAdmin && (
-                          <StandardButton
-                            onClick={() => setResendTarget({
-                              id: parseInt(account.id, 10),
-                              first_name: account.firstName,
-                              last_name: account.lastName,
-                              email: account.email,
-                            })}
-                            variant="ghost"
-                            size="sm"
-                            icon={KeyRound}
-                            className="text-amber-600 hover:text-amber-800"
-                            title="Resend credentials"
-                          />
-                        )}
-                        <StandardButton
-                          onClick={() => handleDeleteAccount(account.id)}
-                          variant="ghost"
-                          size="sm"
-                          icon={Trash2}
-                          className="text-red-600 hover:text-red-800"
-                          title="Delete"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-white px-6 py-4 border-t border-gray-100">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={paginate}
-            totalItems={filteredAccounts.length}
-            showingFrom={indexOfFirstItem + 1}
-            showingTo={Math.min(indexOfLastItem, filteredAccounts.length)}
-          />
-        </div>
-      </div>
+        )}
+      />
 
       <InvitationModal
         isOpen={showInvitationModal}

@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search,
   Plus,
-  Filter,
   RefreshCcw,
   Bell,
   Edit,
@@ -21,7 +19,8 @@ import {
   XCircle,
   RotateCcw,
   Shield,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -31,40 +30,42 @@ import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../../utils/storage';
-import type { 
-  EmailNotification, 
-  EmailNotificationFilters, 
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import type {
+  EmailNotification,
   TriggerType,
   EntityType
 } from '../../../types/EmailNotification.types';
 
-const EmailNotifications: React.FC = () => {
+const FALLBACK_TRIGGER_OPTIONS = [
+  { value: 'booking_created', label: 'Booking Created' },
+  { value: 'booking_confirmed', label: 'Booking Confirmed' },
+  { value: 'booking_updated', label: 'Booking Updated' },
+  { value: 'booking_cancelled', label: 'Booking Cancelled' },
+  { value: 'booking_reminder', label: 'Booking Reminder' },
+  { value: 'purchase_created', label: 'Purchase Created' },
+  { value: 'purchase_confirmed', label: 'Purchase Confirmed' },
+  { value: 'purchase_cancelled', label: 'Purchase Cancelled' },
+  { value: 'payment_received', label: 'Payment Received' },
+  { value: 'payment_failed', label: 'Payment Failed' },
+  { value: 'payment_refunded', label: 'Payment Refunded' },
+];
+
+const EmailNotifications = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
   const [notifications, setNotifications] = useState<EmailNotification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [filters, setFilters] = useState<{
-    triggerType: TriggerType | 'all';
-    entityType: EntityType | 'all';
-    isActive: 'all' | 'true' | 'false';
-    isDefault: 'all' | 'true' | 'false';
-    search: string;
-  }>({
-    triggerType: 'all',
-    entityType: 'all',
-    isActive: 'all',
-    isDefault: 'all',
-    search: ''
-  });
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [resetConfirm, setResetConfirm] = useState<EmailNotification | null>(null);
@@ -72,14 +73,13 @@ const EmailNotifications: React.FC = () => {
   const [testEmail, setTestEmail] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
   const [triggerTypes, setTriggerTypes] = useState<Record<string, string>>({});
+  const itemsPerPage = 10;
 
   const stats = {
-    total: totalItems,
+    total: notifications.length,
     active: notifications.filter(n => n.is_active).length,
-    inactive: notifications.filter(n => !n.is_active).length,
     booking: notifications.filter(n => n.trigger_type.startsWith('booking_')).length,
     purchase: notifications.filter(n => n.trigger_type.startsWith('purchase_')).length,
-    payment: notifications.filter(n => n.trigger_type.startsWith('payment_')).length,
   };
 
   const getTriggerIcon = (triggerType: TriggerType) => {
@@ -97,6 +97,10 @@ const EmailNotifications: React.FC = () => {
     if (entityType === 'package') return Package;
     if (entityType === 'attraction') return Ticket;
     return Users;
+  };
+
+  const formatTriggerType = (triggerType: TriggerType) => {
+    return triggerTypes[triggerType] || triggerType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   useEffect(() => {
@@ -129,59 +133,40 @@ const EmailNotifications: React.FC = () => {
     fetchLocations();
   }, [isCompanyAdmin]);
 
-  const fetchNotifications = useCallback(async () => {
+  const loadNotifications = async () => {
     try {
       setLoading(true);
-      
-      const apiFilters: EmailNotificationFilters = {
-        page: currentPage,
-        per_page: itemsPerPage
-      };
+      let all: EmailNotification[] = [];
+      let page = 1;
+      let lastPage = 1;
 
-      if (filters.triggerType !== 'all') {
-        apiFilters.trigger_type = filters.triggerType;
-      }
-      if (filters.entityType !== 'all') {
-        apiFilters.entity_type = filters.entityType;
-      }
-      if (filters.isActive !== 'all') {
-        apiFilters.is_active = filters.isActive === 'true';
-      }
-      if (filters.isDefault !== 'all') {
-        apiFilters.is_default = filters.isDefault === 'true';
-      }
-      if (filters.search.trim()) {
-        apiFilters.search = filters.search.trim();
-      }
-      if (selectedLocation) {
-        apiFilters.location_id = parseInt(selectedLocation);
-      }
+      do {
+        const response = await emailNotificationService.getAll({ page, per_page: 100 });
+        if (!response.success) break;
+        all = all.concat(response.data.data);
+        lastPage = response.data.last_page;
+        page++;
+      } while (page <= lastPage);
 
-      const response = await emailNotificationService.getAll(apiFilters);
-      
-      if (response.success) {
-        setNotifications(response.data.data);
-        setTotalPages(response.data.last_page);
-        setTotalItems(response.data.total);
-      }
+      setNotifications(all);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setToast({ message: 'Failed to load email notifications', type: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, filters, selectedLocation]);
+  };
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    loadNotifications();
+  }, []);
 
   const handleDelete = async (id: number) => {
     try {
       const response = await emailNotificationService.delete(id);
       if (response.success) {
         setToast({ message: 'Notification deleted successfully', type: 'success' });
-        fetchNotifications();
+        loadNotifications();
       }
     } catch (error: unknown) {
       console.error('Error deleting notification:', error);
@@ -199,7 +184,7 @@ const EmailNotifications: React.FC = () => {
       const response = await emailNotificationService.resetDefault(notification.id);
       if (response.success) {
         setToast({ message: 'Reset to default template', type: 'success' });
-        fetchNotifications();
+        loadNotifications();
       }
     } catch (error) {
       console.error('Error resetting notification:', error);
@@ -213,11 +198,11 @@ const EmailNotifications: React.FC = () => {
     try {
       const response = await emailNotificationService.toggleStatus(notification.id);
       if (response.success) {
-        setToast({ 
-          message: `Notification ${response.data.is_active ? 'activated' : 'deactivated'} successfully`, 
-          type: 'success' 
+        setToast({
+          message: `Notification ${response.data.is_active ? 'activated' : 'deactivated'} successfully`,
+          type: 'success'
         });
-        fetchNotifications();
+        loadNotifications();
       }
     } catch (error) {
       console.error('Error toggling status:', error);
@@ -230,7 +215,7 @@ const EmailNotifications: React.FC = () => {
       const response = await emailNotificationService.duplicate(id);
       if (response.success) {
         setToast({ message: 'Notification duplicated successfully', type: 'success' });
-        fetchNotifications();
+        loadNotifications();
       }
     } catch (error) {
       console.error('Error duplicating notification:', error);
@@ -259,9 +244,358 @@ const EmailNotifications: React.FC = () => {
     }
   };
 
-  const formatTriggerType = (triggerType: TriggerType) => {
-    return triggerTypes[triggerType] || triggerType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const columns: AdminColumn<EmailNotification>[] = [
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: n => n.id,
+      exportValue: n => n.id,
+      defaultVisible: false,
+      render: n => <span className="text-sm text-gray-900">#{n.id}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Notification',
+      group: 'Identifiers',
+      sortable: true,
+      lockVisible: true,
+      sortValue: n => n.name,
+      exportValue: n => n.name,
+      render: n => (
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-gray-900 text-sm">{n.name}</p>
+            {n.is_default ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                <Shield className="w-3 h-3" />
+                Default
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                <Sparkles className="w-3 h-3" />
+                Custom
+              </span>
+            )}
+            {n.is_default && (n.is_body_customized || n.is_subject_customized) && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                Edited
+              </span>
+            )}
+          </div>
+          {n.location && (
+            <p className="text-xs text-gray-500 mt-0.5">{n.location.name}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: n => (n.is_default ? 'Default' : 'Custom'),
+      exportValue: n => (n.is_default ? 'Default' : 'Custom'),
+      defaultVisible: false,
+      render: n => (
+        <span className="text-sm text-gray-900">{n.is_default ? 'Default' : 'Custom'}</span>
+      ),
+    },
+    {
+      key: 'trigger',
+      label: 'Trigger',
+      group: 'Configuration',
+      sortable: true,
+      sortValue: n => formatTriggerType(n.trigger_type),
+      exportValue: n => formatTriggerType(n.trigger_type),
+      render: n => {
+        const TriggerIcon = getTriggerIcon(n.trigger_type);
+        return (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getTriggerColor()} border whitespace-nowrap`}>
+            <TriggerIcon className="w-3.5 h-3.5" />
+            {formatTriggerType(n.trigger_type)}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'entity',
+      label: 'Entity',
+      group: 'Configuration',
+      sortable: true,
+      sortValue: n => n.entity_type,
+      exportValue: n => n.entity_type,
+      render: n => {
+        const EntityIcon = getEntityIcon(n.entity_type);
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 capitalize whitespace-nowrap">
+            <EntityIcon className="w-3.5 h-3.5" />
+            {n.entity_type}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Configuration',
+      sortable: true,
+      sortValue: n => n.location?.name || '',
+      exportValue: n => n.location?.name || 'All Locations',
+      defaultVisible: false,
+      render: n => (
+        <span className="whitespace-nowrap text-sm text-gray-900">{n.location?.name || 'All Locations'}</span>
+      ),
+    },
+    {
+      key: 'recipients',
+      label: 'Recipients',
+      group: 'Recipients',
+      sortable: true,
+      sortValue: n => n.recipient_types.length,
+      exportValue: n => n.recipient_types.join('; '),
+      render: n => (
+        <div className="flex items-center gap-1">
+          <Users className="w-3.5 h-3.5 text-gray-400" />
+          <span className="text-sm text-gray-600">
+            {n.recipient_types.length} type{n.recipient_types.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'subject',
+      label: 'Subject',
+      group: 'Content',
+      sortable: true,
+      sortValue: n => n.effective_subject || n.subject || '',
+      exportValue: n => n.effective_subject || n.subject || '',
+      defaultVisible: false,
+      render: n => (
+        <span className="text-sm text-gray-600 block max-w-xs truncate">
+          {n.effective_subject || n.subject || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: n => (n.is_active ? 'Active' : 'Inactive'),
+      exportValue: n => (n.is_active ? 'Active' : 'Inactive'),
+      render: n => (
+        <button
+          onClick={() => handleToggleStatus(n)}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+            n.is_active
+              ? `bg-${themeColor}-100 text-${themeColor}-700 hover:bg-${themeColor}-200`
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          {n.is_active ? (
+            <>
+              <CheckCircle className="w-3.5 h-3.5" />
+              Active
+            </>
+          ) : (
+            <>
+              <XCircle className="w-3.5 h-3.5" />
+              Inactive
+            </>
+          )}
+        </button>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: n => new Date(n.created_at || 0).getTime(),
+      exportValue: n => (n.created_at ? new Date(n.created_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: n => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {n.created_at
+            ? new Date(n.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+            : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'updated',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: n => new Date(n.updated_at || 0).getTime(),
+      exportValue: n => (n.updated_at ? new Date(n.updated_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: n => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {n.updated_at
+            ? new Date(n.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+            : '—'}
+        </span>
+      ),
+    },
+  ];
+
+  const triggerOptions = useMemo(() => {
+    const entries = Object.entries(triggerTypes);
+    if (entries.length > 0) {
+      return entries.map(([value, label]) => ({ value, label }));
+    }
+    return FALLBACK_TRIGGER_OPTIONS;
+  }, [triggerTypes]);
+
+  const filterDefs: AdminFilterDef<EmailNotification>[] = useMemo(() => {
+    const defs: AdminFilterDef<EmailNotification>[] = [];
+    if (isCompanyAdmin && locations.length > 0) {
+      defs.push({
+        type: 'select',
+        key: 'location',
+        label: 'Location',
+        allLabel: 'All Locations',
+        options: locations.map(loc => ({ value: String(loc.id), label: loc.name })),
+        predicate: (n, value) => String(n.location_id ?? '') === value,
+      });
+    }
+    defs.push({
+      type: 'select',
+      key: 'trigger',
+      label: 'Trigger Type',
+      allLabel: 'All Triggers',
+      options: triggerOptions,
+      predicate: (n, value) => n.trigger_type === value,
+    });
+    defs.push({
+      type: 'select',
+      key: 'entity',
+      label: 'Entity Type',
+      allLabel: 'All Entities',
+      options: [
+        { value: 'package', label: 'Packages Only' },
+        { value: 'attraction', label: 'Attractions Only' },
+      ],
+      predicate: (n, value) => n.entity_type === value,
+    });
+    defs.push({
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (n, value) => (value === 'active' ? n.is_active : !n.is_active),
+    });
+    defs.push({
+      type: 'select',
+      key: 'type',
+      label: 'Type',
+      allLabel: 'All Types',
+      options: [
+        { value: 'default', label: 'Default Only' },
+        { value: 'custom', label: 'Custom Only' },
+      ],
+      predicate: (n, value) => (value === 'default' ? !!n.is_default : !n.is_default),
+    });
+    defs.push({
+      type: 'daterange',
+      key: 'created',
+      label: 'Created Date',
+      getDate: n => n.created_at,
+    });
+    return defs;
+  }, [isCompanyAdmin, locations, triggerOptions]);
+
+  const table = useAdminTable<EmailNotification>({
+    data: notifications,
+    columns,
+    getRowId: n => String(n.id),
+    storageKey: 'email_notifications',
+    filterDefs,
+    searchFields: n => [
+      n.id,
+      n.name,
+      n.description,
+      n.trigger_type,
+      formatTriggerType(n.trigger_type),
+      n.entity_type,
+      n.effective_subject || n.subject,
+      n.location?.name,
+      n.recipient_types.join(' '),
+    ],
+    defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    itemsPerPage,
+  });
+
+  const handleBulkSetActive = async (active: boolean) => {
+    if (table.selectedIds.length === 0) return;
+    const targets = notifications.filter(
+      n => table.selectedIds.includes(String(n.id)) && n.is_active !== active
+    );
+    if (targets.length === 0) {
+      setToast({ message: `Selected notifications are already ${active ? 'active' : 'inactive'}`, type: 'info' });
+      table.clearSelection();
+      return;
+    }
+    try {
+      await Promise.all(targets.map(n => emailNotificationService.toggleStatus(n.id)));
+      setToast({
+        message: `${targets.length} notification(s) ${active ? 'activated' : 'deactivated'} successfully`,
+        type: 'success'
+      });
+      table.clearSelection();
+      loadNotifications();
+    } catch (error) {
+      console.error('Error updating notifications:', error);
+      setToast({ message: 'Failed to update some notifications', type: 'error' });
+      loadNotifications();
+    }
   };
+
+  const exportToCsv = () => {
+    exportTableCsv({
+      filename: `email-notifications-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Description', value: n => n.description || '' },
+        { label: 'Default Key', value: n => n.default_key || '' },
+        { label: 'Edited', value: n => (n.is_default && (n.is_body_customized || n.is_subject_customized) ? 'Yes' : 'No') },
+        { label: 'Custom Emails', value: n => n.custom_emails?.join('; ') || '' },
+        { label: 'Include QR Code', value: n => (n.include_qr_code ? 'Yes' : 'No') },
+        { label: 'Send Before (hours)', value: n => n.send_before_hours ?? '' },
+        { label: 'Send After (hours)', value: n => n.send_after_hours ?? '' },
+        { label: 'Email Template', value: n => n.email_template?.name || '' },
+        { label: 'Entity IDs', value: n => n.entity_ids?.join('; ') || '' },
+        { label: 'Logs Count', value: n => n.logs_count ?? '' },
+      ],
+    });
+  };
+
+  const emptyState = (
+    <div className="flex flex-col items-center justify-center py-4">
+      <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+        <Bell className={`h-12 w-12 text-${themeColor}-400`} />
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications found</h3>
+      <p className="text-gray-500 mb-6">
+        {table.searchInput || table.activeFilterCount > 0
+          ? 'Try adjusting your search or filters'
+          : 'Get started by creating your first email notification'}
+      </p>
+      <Link to="/admin/email/notifications/create">
+        <StandardButton variant="primary" icon={Plus}>
+          Create Notification
+        </StandardButton>
+      </Link>
+    </div>
+  );
 
   return (
     <div className="px-6 py-8">
@@ -274,10 +608,17 @@ const EmailNotifications: React.FC = () => {
           <StandardButton
             variant="secondary"
             icon={RefreshCcw}
-            onClick={() => fetchNotifications()}
+            onClick={() => loadNotifications()}
             disabled={loading}
           >
             Refresh
+          </StandardButton>
+          <StandardButton
+            variant="secondary"
+            icon={Download}
+            onClick={exportToCsv}
+          >
+            Export CSV
           </StandardButton>
           <Link to="/admin/email/notifications/create">
             <StandardButton variant="primary" icon={Plus}>
@@ -377,337 +718,104 @@ const EmailNotifications: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search notifications by name..."
-              value={filters.search}
-              onChange={(e) => {
-                setFilters(prev => ({ ...prev, search: e.target.value }));
-                setCurrentPage(1);
-              }}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton
-              onClick={() => setShowFilters(!showFilters)}
-              variant="secondary"
-              size="sm"
-              icon={Filter}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              onClick={fetchNotifications}
-              variant="secondary"
-              size="sm"
-              icon={RefreshCcw}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
-        
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCompanyAdmin && locations.length > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
-              {isCompanyAdmin && locations.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                  <select
-                    value={selectedLocation}
-                    onChange={(e) => {
-                      setSelectedLocation(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                  >
-                    <option value="">All Locations</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search notifications by name, trigger, subject..."
+        onRefresh={() => loadNotifications()}
+      />
 
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Trigger Type</label>
-                <select
-                  value={filters.triggerType}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, triggerType: e.target.value as TriggerType | 'all' }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Triggers</option>
-                  <optgroup label="Booking">
-                    <option value="booking_created">Booking Created</option>
-                    <option value="booking_confirmed">Booking Confirmed</option>
-                    <option value="booking_updated">Booking Updated</option>
-                    <option value="booking_cancelled">Booking Cancelled</option>
-                    <option value="booking_reminder">Booking Reminder</option>
-                  </optgroup>
-                  <optgroup label="Purchase">
-                    <option value="purchase_created">Purchase Created</option>
-                    <option value="purchase_confirmed">Purchase Confirmed</option>
-                    <option value="purchase_cancelled">Purchase Cancelled</option>
-                  </optgroup>
-                  <optgroup label="Payment">
-                    <option value="payment_received">Payment Received</option>
-                    <option value="payment_failed">Payment Failed</option>
-                    <option value="payment_refunded">Payment Refunded</option>
-                  </optgroup>
-                </select>
-              </div>
+      <BulkActionsBar table={table} itemLabel="notification(s)">
+        <StandardButton
+          variant="primary"
+          size="sm"
+          icon={CheckCircle}
+          onClick={() => handleBulkSetActive(true)}
+        >
+          Activate
+        </StandardButton>
+        <StandardButton
+          variant="secondary"
+          size="sm"
+          icon={XCircle}
+          onClick={() => handleBulkSetActive(false)}
+        >
+          Deactivate
+        </StandardButton>
+      </BulkActionsBar>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Entity Type</label>
-                <select
-                  value={filters.entityType}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, entityType: e.target.value as EntityType | 'all' }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Entities</option>
-                  <option value="package">Packages Only</option>
-                  <option value="attraction">Attractions Only</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.isActive}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, isActive: e.target.value as 'all' | 'true' | 'false' }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
-                <select
-                  value={filters.isDefault}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, isDefault: e.target.value as 'all' | 'true' | 'false' }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Types</option>
-                  <option value="true">Default Only</option>
-                  <option value="false">Custom Only</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                onClick={() => {
-                  setFilters({ triggerType: 'all', entityType: 'all', isActive: 'all', isDefault: 'all', search: '' });
-                  setSelectedLocation('');
-                  setCurrentPage(1);
-                }}
-                variant="ghost"
-                size="sm"
+      <div className="hidden md:block">
+        <AdminDataTable
+          table={table}
+          loading={loading && notifications.length === 0}
+          selectable
+          itemLabel="notifications"
+          emptyState={emptyState}
+          renderActions={(notification) => (
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={() => setTestEmailModal(notification)}
+                className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                title="Send Test Email"
               >
-                Clear Filters
-              </StandardButton>
+                <Send className="w-4 h-4" />
+              </button>
+              {notification.is_default &&
+                (notification.is_body_customized || notification.is_subject_customized) && (
+                  <button
+                    onClick={() => setResetConfirm(notification)}
+                    className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                    title="Reset to default template"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
+              <button
+                onClick={() => handleDuplicate(notification.id)}
+                className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                title="Duplicate"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+              <Link
+                to={`/admin/email/notifications/${notification.id}`}
+                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                title="View Details"
+              >
+                <Eye className="w-4 h-4" />
+              </Link>
+              <Link
+                to={`/admin/email/notifications/edit/${notification.id}`}
+                className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                title="Edit"
+              >
+                <Edit className="w-4 h-4" />
+              </Link>
+              {!notification.is_default && (
+                <button
+                  onClick={() => setDeleteConfirm(notification.id)}
+                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          </div>
-        )}
+          )}
+        />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
+      <div className="md:hidden bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading && notifications.length === 0 ? (
           <div className="p-8 text-center">
             <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
             <p className="text-gray-500">Loading notifications...</p>
           </div>
-        ) : notifications.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <div className="flex flex-col items-center justify-center">
-              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-                <Bell className={`h-12 w-12 text-${themeColor}-400`} />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications found</h3>
-              <p className="text-gray-500 mb-6">
-                {filters.search || filters.triggerType !== 'all' || filters.entityType !== 'all' || filters.isActive !== 'all'
-                  ? 'Try adjusting your search or filters'
-                  : 'Get started by creating your first email notification'}
-              </p>
-              <Link to="/admin/email/notifications/create">
-                <StandardButton variant="primary" icon={Plus}>
-                  Create Notification
-                </StandardButton>
-              </Link>
-            </div>
-          </div>
+        ) : table.rows.length === 0 ? (
+          <div className="px-6 py-12 text-center">{emptyState}</div>
         ) : (
           <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Notification</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Trigger</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Entity</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Recipients</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {notifications.map((notification) => {
-                    const TriggerIcon = getTriggerIcon(notification.trigger_type);
-                    const EntityIcon = getEntityIcon(notification.entity_type);
-                    return (
-                      <tr key={notification.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-4">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium text-gray-900 text-sm">{notification.name}</p>
-                              {notification.is_default ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-                                  <Shield className="w-3 h-3" />
-                                  Default
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                                  <Sparkles className="w-3 h-3" />
-                                  Custom
-                                </span>
-                              )}
-                              {notification.is_default &&
-                                (notification.is_body_customized || notification.is_subject_customized) && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                    Edited
-                                  </span>
-                                )}
-                            </div>
-                            {notification.location && (
-                              <p className="text-xs text-gray-500 mt-0.5">{notification.location.name}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getTriggerColor()} border`}>
-                            <TriggerIcon className="w-3.5 h-3.5" />
-                            {formatTriggerType(notification.trigger_type)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 capitalize`}>
-                            <EntityIcon className="w-3.5 h-3.5" />
-                            {notification.entity_type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-gray-400" />
-                            <span className="text-sm text-gray-600">
-                              {notification.recipient_types.length} type{notification.recipient_types.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <button
-                            onClick={() => handleToggleStatus(notification)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                              notification.is_active
-                                ? `bg-${themeColor}-100 text-${themeColor}-700 hover:bg-${themeColor}-200`
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            {notification.is_active ? (
-                              <>
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                Active
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="w-3.5 h-3.5" />
-                                Inactive
-                              </>
-                            )}
-                          </button>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => setTestEmailModal(notification)}
-                              className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                              title="Send Test Email"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                            {notification.is_default &&
-                              (notification.is_body_customized || notification.is_subject_customized) && (
-                                <button
-                                  onClick={() => setResetConfirm(notification)}
-                                  className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-                                  title="Reset to default template"
-                                >
-                                  <RotateCcw className="w-4 h-4" />
-                                </button>
-                              )}
-                            <button
-                              onClick={() => handleDuplicate(notification.id)}
-                              className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                              title="Duplicate"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </button>
-                            <Link
-                              to={`/admin/email/notifications/${notification.id}`}
-                              className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                              title="View Details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Link>
-                            <Link
-                              to={`/admin/email/notifications/edit/${notification.id}`}
-                              className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                              title="Edit"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                            {!notification.is_default && (
-                              <button
-                                onClick={() => setDeleteConfirm(notification.id)}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="md:hidden divide-y divide-gray-100">
-              {notifications.map((notification) => {
+            <div className="divide-y divide-gray-100">
+              {table.rows.map((notification) => {
                 const TriggerIcon = getTriggerIcon(notification.trigger_type);
                 return (
                   <div key={notification.id} className="p-4">
@@ -761,29 +869,28 @@ const EmailNotifications: React.FC = () => {
                           <Edit className="w-4 h-4" />
                         </Link>
                         <button
-                  onClick={() => setDeleteConfirm(notification.id)}
-                  className="p-2 text-red-500 hover:text-red-700"
-                  disabled={notification.is_default}
-                  style={notification.is_default ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
-                  title={notification.is_default ? 'Default templates cannot be deleted' : 'Delete'}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                          onClick={() => setDeleteConfirm(notification.id)}
+                          className="p-2 text-red-500 hover:text-red-700"
+                          disabled={notification.is_default}
+                          style={notification.is_default ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
+                          title={notification.is_default ? 'Default templates cannot be deleted' : 'Delete'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {totalPages > 1 && (
-              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            {table.totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-gray-100">
                 <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
+                  currentPage={table.page}
+                  totalPages={table.totalPages}
+                  onPageChange={table.setPage}
+                  totalItems={table.totalItems}
+                  itemsPerPage={table.itemsPerPage}
                   itemLabel="notifications"
                 />
               </div>
@@ -875,8 +982,8 @@ const EmailNotifications: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3 justify-end">
-              <StandardButton 
-                variant="secondary" 
+              <StandardButton
+                variant="secondary"
                 onClick={() => {
                   setTestEmailModal(null);
                   setTestEmail('');
@@ -884,8 +991,8 @@ const EmailNotifications: React.FC = () => {
               >
                 Cancel
               </StandardButton>
-              <StandardButton 
-                variant="primary" 
+              <StandardButton
+                variant="primary"
                 icon={Send}
                 onClick={handleSendTestEmail}
                 disabled={!testEmail.trim() || sendingTest}

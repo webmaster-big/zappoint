@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
-  Filter,
-  RefreshCcw,
-  FileText,
+  Download,
   Printer,
   Trash2,
   Eye,
-  Download,
   Plus,
   ClipboardList,
+  FileText,
   Settings as SettingsIcon,
   Users,
   X,
@@ -29,13 +27,19 @@ import attractionPurchaseService from '../../../services/AttractionPurchaseServi
 import type { AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
-import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType } from '../../../types/waiver.types';
+import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import Pagination from '../../../components/ui/Pagination';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_RECORDS_STEPS } from '../../../components/waiver/tour/tourSteps';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
 const sourceLabels: Record<string, string> = {
   checkout: 'Checkout',
@@ -44,6 +48,12 @@ const sourceLabels: Record<string, string> = {
   kiosk: 'Kiosk',
   staff_sent: 'Staff sent',
   bulk_invite: 'Group invite',
+};
+
+const marketingLabels: Record<string, string> = {
+  opted_in: 'Opted in',
+  not_opted_in: 'Not opted in',
+  withdrawn: 'Withdrawn',
 };
 
 const todayStr = () => {
@@ -57,6 +67,15 @@ const formatDateTime = (iso?: string | null) => {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
+const adultName = (w: Waiver) => [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ');
+const minorNames = (w: Waiver) => (w.minors || []).map((m) => [m.first_name, m.last_name].filter(Boolean).join(' ')).join(', ');
+const linkedLabel = (w: Waiver) => {
+  if (w.booking) return `Booking ${w.booking.reference_number || `#${w.booking.id}`}`;
+  if (w.attraction_purchase) return `Attraction AP-${w.attraction_purchase.id}`;
+  if (w.event) return `Event ${w.event.name}`;
+  return '';
+};
+
 const WaiversSearch = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
@@ -65,20 +84,17 @@ const WaiversSearch = () => {
   const isManager = currentUser?.role === 'location_manager';
 
   const [waivers, setWaivers] = useState<Waiver[]>([]);
-  const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [page, setPage] = useState(1);
   const [settings, setSettings] = useState<WaiverSettings | null>(null);
 
-  const [filters, setFilters] = useState<WaiverSearchFilters>({ date: todayStr(), status: undefined });
+  const [scopeDate, setScopeDate] = useState<string>(todayStr());
+  const [scopeStatus, setScopeStatus] = useState<string>('');
   const [allDates, setAllDates] = useState(false);
 
   const [autoRefresh, setAutoRefresh] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // detail / assign / delete modals
   const [detail, setDetail] = useState<{ waiver: Waiver; rendered_body: string } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -89,26 +105,29 @@ const WaiversSearch = () => {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const params: WaiverSearchFilters = { ...filters, per_page: 25, page };
-      if (allDates) {
-        params.all = 1;
-        delete params.date;
-      }
-      Object.keys(params).forEach((k) => {
-        const key = k as keyof WaiverSearchFilters;
-        if (params[key] === '' || params[key] === undefined) delete params[key];
-      });
-      const res = await waiverService.list(params);
-      if (res.success) {
-        setWaivers((res.data.waivers as Waiver[]) || []);
-        setPagination(res.data.pagination as typeof pagination);
-      }
+      const base: WaiverSearchFilters = { per_page: 200 };
+      if (allDates) base.all = 1;
+      else if (scopeDate) base.date = scopeDate;
+      if (scopeStatus) base.status = scopeStatus as WaiverStatus;
+
+      const collected: Waiver[] = [];
+      let currentPage = 1;
+      let lastPage = 1;
+      do {
+        const res = await waiverService.list({ ...base, page: currentPage });
+        if (!res.success) break;
+        collected.push(...((res.data.waivers as Waiver[]) || []));
+        lastPage = res.data.pagination?.last_page ?? 1;
+        currentPage++;
+      } while (currentPage <= lastPage);
+
+      setWaivers(collected);
     } catch {
       setToast({ message: 'Failed to load waivers', type: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [filters, allDates, page]);
+  }, [scopeDate, scopeStatus, allDates]);
 
   useEffect(() => {
     load();
@@ -118,7 +137,6 @@ const WaiversSearch = () => {
     waiverService.getSettings().then((r) => r.success && setSettings(r.data)).catch(() => {});
   }, []);
 
-  // Auto-refresh polling
   useEffect(() => {
     if (autoRefresh && refreshSeconds > 0) {
       refreshTimer.current = setInterval(() => load(), refreshSeconds * 1000);
@@ -128,16 +146,217 @@ const WaiversSearch = () => {
     };
   }, [autoRefresh, refreshSeconds, load]);
 
-  const setFilter = (key: keyof WaiverSearchFilters, value: unknown) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setPage(1);
-  };
+  const templateOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    waivers.forEach((w) => { if (w.template?.title) map.set(w.template.title, w.template.title); });
+    return [...map.keys()].sort().map((t) => ({ value: t, label: t }));
+  }, [waivers]);
 
-  const clearFilters = () => {
-    setFilters({ date: todayStr(), status: undefined });
-    setAllDates(false);
-    setPage(1);
-  };
+  const locationOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    waivers.forEach((w) => { if (w.location?.name) map.set(w.location.name, w.location.name); });
+    return [...map.keys()].sort().map((l) => ({ value: l, label: l }));
+  }, [waivers]);
+
+  const columns: AdminColumn<Waiver>[] = [
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: (w) => w.id,
+      exportValue: (w) => w.id,
+      defaultVisible: false,
+      render: (w) => <span className="text-sm text-gray-500">#{w.id}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      group: 'Customer',
+      sortable: true,
+      sortValue: (w) => `${w.adult_last_name || ''} ${w.adult_first_name || ''}`.trim().toLowerCase(),
+      exportValue: (w) => adultName(w) || '',
+      render: (w) => (
+        <div>
+          <span className="text-sm font-medium text-gray-900">{adultName(w) || '—'}</span>
+          <div className="text-xs text-gray-400">{w.adult_email || w.adult_phone || ''}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'linked',
+      label: 'Linked to',
+      group: 'Details',
+      sortable: true,
+      sortValue: (w) => linkedLabel(w).toLowerCase(),
+      exportValue: (w) => linkedLabel(w),
+      render: (w) => (
+        w.booking ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+            <Link2 className="w-3 h-3" />{w.booking.reference_number || `#${w.booking.id}`}
+          </span>
+        ) : w.attraction_purchase ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full">
+            <Link2 className="w-3 h-3" />AP-{w.attraction_purchase.id}
+          </span>
+        ) : w.event ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+            <Link2 className="w-3 h-3" />{w.event.name}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        )
+      ),
+    },
+    {
+      key: 'minors',
+      label: 'Minors',
+      group: 'Details',
+      sortable: true,
+      sortValue: (w) => w.minors?.length || 0,
+      exportValue: (w) => w.minors?.length || 0,
+      render: (w) => <span className="text-sm text-gray-600">{w.minors?.length || 0}</span>,
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (w) => w.selected_date || '',
+      exportValue: (w) => w.selected_date || '',
+      render: (w) => <span className="text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{w.selected_date}</span>,
+    },
+    {
+      key: 'template',
+      label: 'Template',
+      group: 'Details',
+      sortable: true,
+      sortValue: (w) => w.template?.title || '',
+      exportValue: (w) => w.template?.title || '',
+      render: (w) => <span className="text-sm text-gray-600">{w.template?.title || '—'}</span>,
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Details',
+      sortable: true,
+      sortValue: (w) => w.location?.name || '',
+      exportValue: (w) => w.location?.name || '',
+      render: (w) => <span className="text-sm text-gray-600">{w.location?.name || '—'}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: (w) => w.status || '',
+      exportValue: (w) => w.status || '',
+      defaultVisible: false,
+      render: (w) => <span className="text-xs text-gray-600 capitalize">{w.status}</span>,
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      group: 'Details',
+      sortable: true,
+      sortValue: (w) => sourceLabels[w.source] || w.source || '',
+      exportValue: (w) => sourceLabels[w.source] || w.source || '',
+      render: (w) => <span className="text-xs text-gray-500">{sourceLabels[w.source] || w.source}</span>,
+    },
+    {
+      key: 'marketing',
+      label: 'Marketing',
+      group: 'Consent',
+      sortable: true,
+      sortValue: (w) => w.marketing_consent_status || '',
+      exportValue: (w) => marketingLabels[w.marketing_consent_status] || w.marketing_consent_status || '',
+      render: (w) => (
+        w.marketing_consent_status === 'opted_in' ? (
+          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Opted in</span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        )
+      ),
+    },
+    {
+      key: 'submitted',
+      label: 'Submitted',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (w) => (w.submitted_at ? new Date(w.submitted_at).getTime() : 0),
+      exportValue: (w) => (w.submitted_at ? new Date(w.submitted_at).toLocaleString() : ''),
+      render: (w) => <span className="text-sm text-gray-500">{formatDateTime(w.submitted_at)}</span>,
+    },
+  ];
+
+  const filterDefs: AdminFilterDef<Waiver>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'source',
+      label: 'Source',
+      allLabel: 'Any source',
+      options: Object.entries(sourceLabels).map(([value, label]) => ({ value, label })),
+      predicate: (w, value) => w.source === value,
+    },
+    {
+      type: 'select',
+      key: 'marketing',
+      label: 'Marketing Consent',
+      allLabel: 'Any marketing consent',
+      options: [
+        { value: 'opted_in', label: 'Opted in' },
+        { value: 'not_opted_in', label: 'Not opted in' },
+        { value: 'withdrawn', label: 'Withdrawn' },
+      ],
+      predicate: (w, value) => w.marketing_consent_status === value,
+    },
+    {
+      type: 'select',
+      key: 'template',
+      label: 'Template',
+      allLabel: 'Any template',
+      options: templateOptions,
+      predicate: (w, value) => (w.template?.title || '') === value,
+    },
+    {
+      type: 'select',
+      key: 'location',
+      label: 'Location',
+      allLabel: 'Any location',
+      options: locationOptions,
+      predicate: (w, value) => (w.location?.name || '') === value,
+    },
+    {
+      type: 'daterange',
+      key: 'submitted',
+      label: 'Submitted Date',
+      getDate: (w) => w.submitted_at,
+    },
+  ], [templateOptions, locationOptions]);
+
+  const table = useAdminTable<Waiver>({
+    data: waivers,
+    columns,
+    getRowId: (w) => String(w.id),
+    storageKey: 'waivers_search',
+    filterDefs,
+    searchFields: (w) => [
+      w.id,
+      adultName(w),
+      w.adult_email,
+      w.adult_phone,
+      minorNames(w),
+      w.template?.title,
+      w.location?.name,
+      sourceLabels[w.source] || w.source,
+      w.status,
+      w.booking?.reference_number,
+      w.event?.name,
+      linkedLabel(w),
+    ],
+    defaultSort: (a, b) => (b.submitted_at ? new Date(b.submitted_at).getTime() : 0) - (a.submitted_at ? new Date(a.submitted_at).getTime() : 0),
+    itemsPerPage: 25,
+  });
 
   const openDetail = async (w: Waiver) => {
     setDetailLoading(true);
@@ -162,36 +381,28 @@ const WaiversSearch = () => {
     }
   };
 
-  const handleExport = async () => {
-    try {
-      const params: WaiverSearchFilters = { ...filters };
-      if (allDates) {
-        params.all = 1;
-        delete params.date;
-      }
-      const res = await waiverService.export(params);
-      const rows = res?.data?.waivers || [];
-      if (!rows.length) {
-        setToast({ message: 'Nothing to export for this filter.', type: 'info' });
-        return;
-      }
-      const headers = ['id', 'adult_name', 'email', 'phone', 'selected_date', 'status', 'marketing_consent', 'source', 'template', 'location', 'submitted_at', 'minors'];
-      const csv = [
-        headers.join(','),
-        ...rows.map((r: Record<string, unknown>) =>
-          headers.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','),
-        ),
-      ].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `waivers-${allDates ? 'all' : filters.date}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setToast({ message: 'Export failed — you may not have permission.', type: 'error' });
+  const handleExport = () => {
+    if (!table.filteredRows.length) {
+      setToast({ message: 'Nothing to export for this filter.', type: 'info' });
+      return;
     }
+    exportTableCsv({
+      filename: `waivers-${allDates ? 'all' : scopeDate}-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Email', value: (w) => w.adult_email || '' },
+        { label: 'Phone', value: (w) => w.adult_phone || '' },
+        { label: 'Adult DOB', value: (w) => w.adult_dob || '' },
+        { label: 'Relationship', value: (w) => w.relationship || '' },
+        { label: 'Typed Legal Name', value: (w) => w.typed_legal_name || '' },
+        { label: 'Agreement Accepted', value: (w) => (w.agreement_accepted ? 'Yes' : 'No') },
+        { label: 'Electronic Consent', value: (w) => (w.electronic_consent_accepted ? 'Yes' : 'No') },
+        { label: 'Photo/Video Consent', value: (w) => (w.photo_video_consent ? 'Yes' : 'No') },
+        { label: 'Minor Names', value: (w) => minorNames(w) },
+        { label: 'Minor Details', value: (w) => (w.minors || []).map((m) => `${[m.first_name, m.last_name].filter(Boolean).join(' ')}${m.date_of_birth ? ` (DOB ${m.date_of_birth})` : ''}${m.relationship ? ` [${m.relationship}]` : ''}`).join('; ') },
+      ],
+    });
   };
 
   const confirmDelete = async (reason: string) => {
@@ -206,8 +417,14 @@ const WaiversSearch = () => {
     }
   };
 
-  const inputCls = `pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`;
-  const fieldCls = `w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`;
+  const clearScope = () => {
+    setScopeDate(todayStr());
+    setScopeStatus('');
+    setAllDates(false);
+    table.setSearchInput('');
+    table.clearFilters();
+    table.setPage(1);
+  };
 
   return (
     <div className="min-h-screen px-6 py-8">
@@ -236,155 +453,74 @@ const WaiversSearch = () => {
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
-          <div className="flex flex-wrap items-center gap-3" data-tour="waivers-date-controls">
-            <div className="relative">
-              <input
-                type="date"
-                value={filters.date || ''}
-                disabled={allDates}
-                onChange={(e) => setFilter('date', e.target.value)}
-                className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 disabled:bg-gray-50 disabled:text-gray-400`}
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input type="checkbox" checked={allDates} onChange={(e) => { setAllDates(e.target.checked); setPage(1); }} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
-              All dates
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
-              Auto-refresh ({refreshSeconds}s)
-            </label>
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
+        <div className="flex flex-wrap items-center gap-3" data-tour="waivers-date-controls">
+          <div className="relative">
+            <input
+              type="date"
+              value={scopeDate}
+              disabled={allDates}
+              onChange={(e) => { setScopeDate(e.target.value); table.setPage(1); }}
+              className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 disabled:bg-gray-50 disabled:text-gray-400`}
+            />
           </div>
-          <div data-tour="waivers-filter-btns" className="flex gap-1.5">
-            <StandardButton variant="secondary" size="sm" icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filters</StandardButton>
-            <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={load}>{''}</StandardButton>
-            <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleExport}>Export</StandardButton>
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={allDates} onChange={(e) => { setAllDates(e.target.checked); table.setPage(1); }} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
+            All dates
+          </label>
+          <div>
+            <select
+              value={scopeStatus}
+              onChange={(e) => { setScopeStatus(e.target.value); table.setPage(1); }}
+              className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
+              title="Waiver status scope"
+            >
+              <option value="">Completed (default)</option>
+              <option value="pending">Pending</option>
+              <option value="expired">Expired</option>
+              <option value="replaced">Replaced</option>
+            </select>
           </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
+            Auto-refresh ({refreshSeconds}s)
+          </label>
+          <StandardButton variant="ghost" size="sm" onClick={clearScope}>Reset</StandardButton>
         </div>
-
-        {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input type="text" placeholder="Adult name" value={filters.adult_name || ''} onChange={(e) => setFilter('adult_name', e.target.value)} className={inputCls} />
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input type="text" placeholder="Minor name" value={filters.minor_name || ''} onChange={(e) => setFilter('minor_name', e.target.value)} className={inputCls} />
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input type="text" placeholder="Email" value={filters.email || ''} onChange={(e) => setFilter('email', e.target.value)} className={inputCls} />
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input type="text" placeholder="Phone" value={filters.phone || ''} onChange={(e) => setFilter('phone', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <select value={filters.status || ''} onChange={(e) => setFilter('status', e.target.value || undefined)} className={fieldCls}>
-                <option value="">Completed (default)</option>
-                <option value="pending">Pending</option>
-                <option value="expired">Expired</option>
-                <option value="replaced">Replaced</option>
-              </select>
-            </div>
-            <div>
-              <select value={filters.source || ''} onChange={(e) => setFilter('source', (e.target.value || undefined) as WaiverSearchFilters['source'])} className={fieldCls}>
-                <option value="">Any source</option>
-                {Object.entries(sourceLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </div>
-            <div>
-              <select value={filters.marketing_consent_status || ''} onChange={(e) => setFilter('marketing_consent_status', (e.target.value || undefined) as WaiverSearchFilters['marketing_consent_status'])} className={fieldCls}>
-                <option value="">Any marketing consent</option>
-                <option value="opted_in">Opted in</option>
-                <option value="not_opted_in">Not opted in</option>
-                <option value="withdrawn">Withdrawn</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <StandardButton variant="ghost" size="sm" onClick={clearFilters}>Clear</StandardButton>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Table */}
-      <div data-tour="waivers-table" className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {['Name', 'Linked to', 'Minors', 'Date', 'Template', 'Location', 'Source', 'Marketing', 'Submitted', ''].map((h) => (
-                  <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr><td colSpan={10} className="px-6 py-12 text-center"><div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor} mx-auto`} /></td></tr>
-              ) : waivers.length === 0 ? (
-                <tr><td colSpan={10} className="px-6 py-12 text-center"><ShieldCheck className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">No waivers found for this filter.</p></td></tr>
-              ) : (
-                waivers.map((w) => (
-                  <tr key={w.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <span className="text-sm font-medium text-gray-900">{[w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || '—'}</span>
-                      <div className="text-xs text-gray-400">{w.adult_email || w.adult_phone || ''}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {w.booking ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
-                          <Link2 className="w-3 h-3" />{w.booking.reference_number || `#${w.booking.id}`}
-                        </span>
-                      ) : w.attraction_purchase ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full">
-                          <Link2 className="w-3 h-3" />AP-{w.attraction_purchase.id}
-                        </span>
-                      ) : w.event ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
-                          <Link2 className="w-3 h-3" />{w.event.name}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{w.minors?.length || 0}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{w.selected_date}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{w.template?.title || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{w.location?.name || '—'}</td>
-                    <td className="px-4 py-3"><span className="text-xs text-gray-500">{sourceLabels[w.source] || w.source}</span></td>
-                    <td className="px-4 py-3">
-                      {w.marketing_consent_status === 'opted_in' ? (
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Opted in</span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(w.submitted_at)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div data-tour="waivers-row-actions" className="flex items-center justify-end gap-1">
-                        <button onClick={() => openDetail(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="View"><Eye className="w-4 h-4" /></button>
-                        <button onClick={() => handlePrint(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Print"><Printer className="w-4 h-4" /></button>
-                        {isAdmin && (
-                          <button onClick={() => setDeleteTarget(w)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+      <div data-tour="waivers-filter-btns">
+        <AdminTableToolbar
+          table={table}
+          searchPlaceholder="Search waivers by name, email, phone, minor, reference…"
+          onRefresh={load}
+          actions={
+            <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleExport}>Export</StandardButton>
+          }
+        />
+      </div>
+
+      <div data-tour="waivers-table">
+        <AdminDataTable
+          table={table}
+          loading={loading}
+          itemLabel="waivers"
+          emptyState={
+            <div className="flex flex-col items-center">
+              <ShieldCheck className="w-10 h-10 text-gray-300 mb-3" />
+              <p className="text-gray-500">No waivers found for this filter.</p>
+            </div>
+          }
+          renderActions={(w) => (
+            <div data-tour="waivers-row-actions" className="flex items-center justify-end gap-1">
+              <button onClick={() => openDetail(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="View"><Eye className="w-4 h-4" /></button>
+              <button onClick={() => handlePrint(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Print"><Printer className="w-4 h-4" /></button>
+              {isAdmin && (
+                <button onClick={() => setDeleteTarget(w)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
               )}
-            </tbody>
-          </table>
-        </div>
-        {pagination.last_page > 1 && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <Pagination currentPage={pagination.current_page} totalPages={pagination.last_page} onPageChange={setPage} totalItems={pagination.total} showingFrom={pagination.from} showingTo={pagination.to} />
-          </div>
-        )}
+            </div>
+          )}
+        />
       </div>
 
       {detailLoading && (

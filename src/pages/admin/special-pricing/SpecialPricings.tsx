@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Search,
-  Filter,
   Plus,
   Trash2,
   Pencil,
@@ -10,7 +8,7 @@ import {
   DollarSign,
   Percent,
   ArrowLeft,
-  RefreshCcw,
+  Download,
   CheckSquare,
   Square,
   Package as PackageIcon,
@@ -30,11 +28,17 @@ import { locationService } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 import type {
   SpecialPricing,
-  SpecialPricingListFilters,
   SpecialPricingFormData,
   RecurrenceType,
 } from '../../../types/SpecialPricing.types';
@@ -61,12 +65,37 @@ const getOrdinalSuffix = (n: number): string => {
   }
 };
 
+const formatDiscountAmount = (sp: SpecialPricing) => {
+  if (sp.discount_type === 'percentage') return `${parseFloat(sp.discount_amount)}%`;
+  return `$${parseFloat(sp.discount_amount).toFixed(2)}`;
+};
+
+const formatRecurrence = (sp: SpecialPricing) => {
+  if (sp.recurrence_display) return sp.recurrence_display;
+  if (sp.recurrence_type === 'one_time' && sp.specific_date) {
+    return new Date(sp.specific_date).toLocaleDateString();
+  }
+  if (sp.recurrence_type === 'weekly' && sp.recurrence_value !== null) {
+    return `Every ${DAY_OF_WEEK[sp.recurrence_value]?.label || ''}`;
+  }
+  if (sp.recurrence_type === 'monthly' && sp.recurrence_value !== null) {
+    return `${sp.recurrence_value}${getOrdinalSuffix(sp.recurrence_value)} of month`;
+  }
+  return sp.recurrence_type;
+};
+
+const entityTypeLabel = (sp: SpecialPricing) =>
+  sp.entity_type === 'package' ? 'Package' : sp.entity_type === 'attraction' ? 'Attraction' : sp.entity_type === 'event' ? 'Event' : 'All';
+
+const formatShortDate = (dateString: string) =>
+  new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
 const SpecialPricings: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  
+
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const userLocationId = currentUser?.location_id || null;
 
@@ -75,13 +104,8 @@ const SpecialPricings: React.FC = () => {
     entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' ? entityTypeParam : 'all';
 
   const [specialPricings, setSpecialPricings] = useState<SpecialPricing[]>([]);
-  const [filteredSpecialPricings, setFilteredSpecialPricings] = useState<SpecialPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
 
   const [showModal, setShowModal] = useState(false);
   const [editingSpecialPricing, setEditingSpecialPricing] = useState<SpecialPricing | null>(null);
@@ -101,7 +125,7 @@ const SpecialPricings: React.FC = () => {
     discount_amount: 10,
     discount_type: 'percentage',
     recurrence_type: 'weekly',
-    recurrence_value: 2, // Tuesday by default
+    recurrence_value: 2,
     specific_date: null,
     start_date: null,
     end_date: null,
@@ -112,14 +136,6 @@ const SpecialPricings: React.FC = () => {
     priority: 0,
     is_stackable: false,
     is_active: true,
-  });
-
-  const [filters, setFilters] = useState<SpecialPricingListFilters>({
-    entity_type: initialEntityType,
-    recurrence_type: 'all',
-    discount_type: 'all',
-    status: 'all',
-    search: '',
   });
 
   const loadSpecialPricings = useCallback(async () => {
@@ -192,35 +208,7 @@ const SpecialPricings: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  const applyFilters = useCallback(() => {
-    let result = [...specialPricings];
-
-    if (filters.search) {
-      const term = filters.search.toLowerCase();
-      result = result.filter(sp =>
-        sp.name.toLowerCase().includes(term) ||
-        sp.description?.toLowerCase().includes(term)
-      );
-    }
-    if (filters.entity_type !== 'all') {
-      result = result.filter(sp => sp.entity_type === filters.entity_type || sp.entity_type === 'all');
-    }
-    if (filters.recurrence_type !== 'all') {
-      result = result.filter(sp => sp.recurrence_type === filters.recurrence_type);
-    }
-    if (filters.discount_type !== 'all') {
-      result = result.filter(sp => sp.discount_type === filters.discount_type);
-    }
-    if (filters.status !== 'all') {
-      result = result.filter(sp => (filters.status === 'active' ? sp.is_active : !sp.is_active));
-    }
-
-    setFilteredSpecialPricings(result);
-  }, [specialPricings, filters]);
-
   useEffect(() => { loadSpecialPricings(); loadLocations(); }, [loadSpecialPricings, loadLocations]);
-  useEffect(() => { applyFilters(); }, [applyFilters]);
-  useEffect(() => { setCurrentPage(1); }, [filters]);
 
   useEffect(() => {
     if (showModal) {
@@ -228,13 +216,10 @@ const SpecialPricings: React.FC = () => {
     }
   }, [showModal, form.entity_type, loadEntities]);
 
-  const handleFilterChange = (key: keyof SpecialPricingListFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const clearFilters = () => {
-    setFilters({ entity_type: 'all', recurrence_type: 'all', discount_type: 'all', status: 'all', search: '' });
-  };
+  const locationName = useCallback((sp: SpecialPricing) => {
+    if (sp.location_id === null) return 'All Locations';
+    return sp.location?.name || locations.find(l => l.id === sp.location_id)?.name || `Location #${sp.location_id}`;
+  }, [locations]);
 
   const handleToggleStatus = async (id: number) => {
     try {
@@ -246,12 +231,308 @@ const SpecialPricings: React.FC = () => {
     }
   };
 
+  const columns: AdminColumn<SpecialPricing>[] = [
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: sp => sp.id,
+      exportValue: sp => sp.id,
+      defaultVisible: false,
+      render: sp => <span className="text-sm text-gray-900">#{sp.id}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      group: 'Details',
+      sortable: true,
+      sortValue: sp => sp.name,
+      exportValue: sp => sp.name,
+      render: sp => (
+        <div>
+          <span className="text-sm font-medium text-gray-900">{sp.name}</span>
+          {sp.description && <p className="text-xs text-gray-500 truncate max-w-[200px]">{sp.description}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      group: 'Details',
+      sortable: true,
+      sortValue: sp => sp.description || '',
+      exportValue: sp => sp.description || '',
+      defaultVisible: false,
+      render: sp => <span className="text-sm text-gray-600">{sp.description || '—'}</span>,
+    },
+    {
+      key: 'discount',
+      label: 'Discount',
+      group: 'Discount',
+      sortable: true,
+      sortValue: sp => parseFloat(sp.discount_amount) || 0,
+      exportValue: sp => formatDiscountAmount(sp),
+      render: sp => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
+          {sp.discount_type === 'fixed' ? <DollarSign className="w-3 h-3" /> : <Percent className="w-3 h-3" />}
+          {formatDiscountAmount(sp)}
+        </span>
+      ),
+    },
+    {
+      key: 'discountType',
+      label: 'Discount Type',
+      group: 'Discount',
+      sortable: true,
+      sortValue: sp => sp.discount_type,
+      exportValue: sp => sp.discount_type === 'fixed' ? 'Fixed' : 'Percentage',
+      defaultVisible: false,
+      render: sp => <span className="text-sm text-gray-600 capitalize">{sp.discount_type}</span>,
+    },
+    {
+      key: 'recurrence',
+      label: 'Recurrence',
+      group: 'Schedule',
+      sortable: true,
+      sortValue: sp => formatRecurrence(sp),
+      exportValue: sp => formatRecurrence(sp),
+      render: sp => (
+        <div>
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+            sp.recurrence_type === 'one_time' ? `bg-${themeColor}-100 text-${fullColor}` :
+            'bg-gray-100 text-gray-600'
+          }`}>
+            {sp.recurrence_type === 'one_time' ? <Calendar className="w-3 h-3" /> : <Repeat className="w-3 h-3" />}
+            {formatRecurrence(sp)}
+          </span>
+          {(sp.time_start || sp.time_end) && (
+            <p className="text-[11px] text-gray-400 mt-1 pl-0.5">
+              🕐 {sp.time_start?.slice(0, 5) || '—'} – {sp.time_end?.slice(0, 5) || '—'}
+            </p>
+          )}
+          {sp.recurrence_type !== 'one_time' && (sp.start_date || sp.end_date) && (
+            <p className="text-[11px] text-gray-400 mt-0.5 pl-0.5">
+              📅 {sp.start_date ? new Date(sp.start_date + 'T00:00:00').toLocaleDateString() : 'No start'} – {sp.end_date ? new Date(sp.end_date + 'T00:00:00').toLocaleDateString() : 'No end'}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'entityType',
+      label: 'Entity Type',
+      group: 'Scope',
+      sortable: true,
+      sortValue: sp => entityTypeLabel(sp),
+      exportValue: sp => entityTypeLabel(sp),
+      render: sp => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+          sp.entity_type === 'package' ? `bg-${themeColor}-100 text-${fullColor}` :
+          sp.entity_type === 'attraction' ? `bg-${themeColor}-100 text-${fullColor}` :
+          sp.entity_type === 'event' ? 'bg-amber-100 text-amber-800' :
+          'bg-gray-100 text-gray-600'
+        }`}>
+          {sp.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> :
+           sp.entity_type === 'attraction' ? <Ticket className="w-3 h-3" /> :
+           sp.entity_type === 'event' ? <Calendar className="w-3 h-3" /> :
+           <Layers className="w-3 h-3" />}
+          {entityTypeLabel(sp)}
+        </span>
+      ),
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Scope',
+      sortable: true,
+      sortValue: sp => locationName(sp),
+      exportValue: sp => locationName(sp),
+      defaultVisible: false,
+      render: sp => <span className="text-sm text-gray-600">{locationName(sp)}</span>,
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      group: 'Rules',
+      sortable: true,
+      sortValue: sp => sp.priority,
+      exportValue: sp => sp.priority,
+      render: sp => <span className="text-sm text-gray-600">{sp.priority}</span>,
+    },
+    {
+      key: 'stackable',
+      label: 'Stackable',
+      group: 'Rules',
+      sortable: true,
+      sortValue: sp => sp.is_stackable ? 'Yes' : 'No',
+      exportValue: sp => sp.is_stackable ? 'Yes' : 'No',
+      render: sp => (
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${sp.is_stackable ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-500'}`}>
+          {sp.is_stackable ? 'Yes' : 'No'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: sp => sp.is_active ? 'Active' : 'Inactive',
+      exportValue: sp => sp.is_active ? 'Active' : 'Inactive',
+      render: sp => (
+        <button
+          onClick={() => handleToggleStatus(sp.id)}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${sp.is_active ? `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200` : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+        >
+          <Power className="w-3 h-3" />
+          {sp.is_active ? 'Active' : 'Inactive'}
+        </button>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: sp => new Date(sp.created_at || 0).getTime(),
+      exportValue: sp => sp.created_at ? new Date(sp.created_at).toLocaleString() : '',
+      defaultVisible: false,
+      render: sp => <span className="whitespace-nowrap text-sm text-gray-500">{sp.created_at ? formatShortDate(sp.created_at) : '—'}</span>,
+    },
+    {
+      key: 'updated',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: sp => new Date(sp.updated_at || 0).getTime(),
+      exportValue: sp => sp.updated_at ? new Date(sp.updated_at).toLocaleString() : '',
+      defaultVisible: false,
+      render: sp => <span className="whitespace-nowrap text-sm text-gray-500">{sp.updated_at ? formatShortDate(sp.updated_at) : '—'}</span>,
+    },
+  ];
+
+  const filterDefs: AdminFilterDef<SpecialPricing>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'entity_type',
+      label: 'Entity Type',
+      allLabel: 'All Types',
+      options: [
+        { value: 'package', label: 'Package' },
+        { value: 'attraction', label: 'Attraction' },
+        { value: 'event', label: 'Event' },
+      ],
+      predicate: (sp, value) => sp.entity_type === value || sp.entity_type === 'all',
+    },
+    {
+      type: 'select',
+      key: 'recurrence_type',
+      label: 'Recurrence',
+      allLabel: 'All Recurrences',
+      options: [
+        { value: 'one_time', label: 'One-Time' },
+        { value: 'weekly', label: 'Weekly' },
+        { value: 'monthly', label: 'Monthly' },
+      ],
+      predicate: (sp, value) => sp.recurrence_type === value,
+    },
+    {
+      type: 'select',
+      key: 'discount_type',
+      label: 'Discount Type',
+      allLabel: 'All Discount Types',
+      options: [
+        { value: 'fixed', label: 'Fixed ($)' },
+        { value: 'percentage', label: 'Percentage (%)' },
+      ],
+      predicate: (sp, value) => sp.discount_type === value,
+    },
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (sp, value) => (value === 'active') === sp.is_active,
+    },
+    {
+      type: 'select',
+      key: 'location',
+      label: 'Location',
+      allLabel: 'All Locations',
+      options: [
+        { value: 'company', label: 'Company-wide Only' },
+        ...locations.map(l => ({ value: String(l.id), label: l.name })),
+      ],
+      predicate: (sp, value) => value === 'company' ? sp.location_id === null : sp.location_id === Number(value) || sp.location_id === null,
+    },
+    {
+      type: 'select',
+      key: 'stackable',
+      label: 'Stackable',
+      allLabel: 'All',
+      options: [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+      ],
+      predicate: (sp, value) => (value === 'yes') === sp.is_stackable,
+    },
+    {
+      type: 'daterange',
+      key: 'effective_date',
+      label: 'Effective / Start Date',
+      getDate: sp => sp.recurrence_type === 'one_time' ? sp.specific_date : sp.start_date,
+    },
+    {
+      type: 'daterange',
+      key: 'created',
+      label: 'Created Date',
+      getDate: sp => sp.created_at,
+    },
+    {
+      type: 'numberrange',
+      key: 'discount_amount',
+      label: 'Discount Amount',
+      getValue: sp => parseFloat(sp.discount_amount) || 0,
+    },
+  ], [locations]);
+
+  const table = useAdminTable<SpecialPricing>({
+    data: specialPricings,
+    columns,
+    getRowId: sp => String(sp.id),
+    storageKey: 'special_pricings',
+    filterDefs,
+    searchFields: sp => [
+      sp.id,
+      sp.name,
+      sp.description,
+      entityTypeLabel(sp),
+      locationName(sp),
+      formatRecurrence(sp),
+    ],
+    itemsPerPage: 10,
+  });
+
+  const entitySeedRef = useRef(false);
+  useEffect(() => {
+    if (entitySeedRef.current) return;
+    entitySeedRef.current = true;
+    if (initialEntityType !== 'all') {
+      table.setFilterValue('entity_type', initialEntityType);
+    }
+  }, [initialEntityType, table]);
+
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this special pricing?')) return;
     try {
       await specialPricingService.deleteSpecialPricing(id);
       setSpecialPricings(prev => prev.filter(sp => sp.id !== id));
-      setSelectedItems(prev => { const n = new Set(prev); n.delete(id); return n; });
+      table.setSelectedIds(table.selectedIds.filter(x => x !== String(id)));
       setToast({ message: 'Special pricing deleted', type: 'success' });
     } catch {
       setToast({ message: 'Failed to delete special pricing', type: 'error' });
@@ -259,58 +540,45 @@ const SpecialPricings: React.FC = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedItems.size === 0) return;
-    if (!window.confirm(`Delete ${selectedItems.size} special pricing(s)?`)) return;
+    if (table.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${table.selectedIds.length} special pricing(s)?`)) return;
+    const ids = table.selectedIds.map(Number);
     try {
-      await specialPricingService.bulkDelete(Array.from(selectedItems));
-      setSpecialPricings(prev => prev.filter(sp => !selectedItems.has(sp.id)));
-      setSelectedItems(new Set());
-      setToast({ message: `${selectedItems.size} special pricing(s) deleted`, type: 'success' });
+      await specialPricingService.bulkDelete(ids);
+      setSpecialPricings(prev => prev.filter(sp => !ids.includes(sp.id)));
+      table.clearSelection();
+      setToast({ message: `${ids.length} special pricing(s) deleted`, type: 'success' });
     } catch {
       setToast({ message: 'Failed to delete special pricings', type: 'error' });
     }
   };
 
-  const toggleSelectItem = (id: number) => {
-    setSelectedItems(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `special-pricings-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Discount Amount (Raw)', value: sp => sp.discount_amount },
+        { label: 'Recurrence Type', value: sp => sp.recurrence_type },
+        { label: 'Recurrence Value', value: sp => sp.recurrence_value },
+        { label: 'Specific Date', value: sp => sp.specific_date },
+        { label: 'Start Date', value: sp => sp.start_date },
+        { label: 'End Date', value: sp => sp.end_date },
+        { label: 'Time Start', value: sp => sp.time_start },
+        { label: 'Time End', value: sp => sp.time_end },
+        { label: 'Entity IDs', value: sp => sp.entity_ids && sp.entity_ids.length > 0 ? sp.entity_ids.join('; ') : 'All' },
+        { label: 'Location ID', value: sp => sp.location_id },
+        { label: 'Company ID', value: sp => sp.company_id },
+      ],
     });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedItems.size === currentItems.length) {
-      setSelectedItems(new Set());
-    } else {
-      setSelectedItems(new Set(currentItems.map(sp => sp.id)));
-    }
-  };
-
-  const formatDiscountAmount = (sp: SpecialPricing) => {
-    if (sp.discount_type === 'percentage') return `${parseFloat(sp.discount_amount)}%`;
-    return `$${parseFloat(sp.discount_amount).toFixed(2)}`;
-  };
-
-  const formatRecurrence = (sp: SpecialPricing) => {
-    if (sp.recurrence_display) return sp.recurrence_display;
-    if (sp.recurrence_type === 'one_time' && sp.specific_date) {
-      return new Date(sp.specific_date).toLocaleDateString();
-    }
-    if (sp.recurrence_type === 'weekly' && sp.recurrence_value !== null) {
-      return `Every ${DAY_OF_WEEK[sp.recurrence_value]?.label || ''}`;
-    }
-    if (sp.recurrence_type === 'monthly' && sp.recurrence_value !== null) {
-      return `${sp.recurrence_value}${getOrdinalSuffix(sp.recurrence_value)} of month`;
-    }
-    return sp.recurrence_type;
   };
 
   const openCreateModal = () => {
     setEditingSpecialPricing(null);
     setForm({
       company_id: currentUser?.company_id || 1,
-      location_id: isCompanyAdmin ? null : userLocationId, // Auto-set location for non-admins
+      location_id: isCompanyAdmin ? null : userLocationId,
       name: '',
       description: '',
       discount_amount: 10,
@@ -439,11 +707,6 @@ const SpecialPricings: React.FC = () => {
   const weeklyCount = specialPricings.filter(sp => sp.recurrence_type === 'weekly').length;
   const oneTimeCount = specialPricings.filter(sp => sp.recurrence_type === 'one_time').length;
 
-  const indexOfLast = currentPage * itemsPerPage;
-  const indexOfFirst = indexOfLast - itemsPerPage;
-  const currentItems = filteredSpecialPricings.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(filteredSpecialPricings.length / itemsPerPage);
-
   const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
   const getEntitiesForSelection = () => {
@@ -478,6 +741,9 @@ const SpecialPricings: React.FC = () => {
           </div>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
+          <StandardButton variant="secondary" size="md" icon={Download} onClick={exportToCSV}>
+            Export CSV
+          </StandardButton>
           <StandardButton variant="primary" size="md" icon={Plus} onClick={openCreateModal}>
             Create Special Pricing
           </StandardButton>
@@ -504,217 +770,40 @@ const SpecialPricings: React.FC = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        {selectedItems.size > 0 && (
-          <div className={`flex items-center justify-between p-3 mb-4 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
-            <span className={`text-sm font-medium text-${themeColor}-800`}>{selectedItems.size} selected</span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedItems(new Set())} className={`text-sm text-${themeColor}-600 hover:text-${themeColor}-800 underline`}>Clear</button>
-              <StandardButton variant="danger" size="sm" icon={Trash2} onClick={handleBulkDelete}>Delete Selected</StandardButton>
-            </div>
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search special pricings..."
+        onRefresh={loadSpecialPricings}
+      />
+
+      <BulkActionsBar table={table} itemLabel="special pricing(s)">
+        <StandardButton variant="danger" size="sm" icon={Trash2} onClick={handleBulkDelete}>
+          Delete Selected
+        </StandardButton>
+      </BulkActionsBar>
+
+      <AdminDataTable
+        table={table}
+        selectable
+        itemLabel="special pricings"
+        emptyState={
+          <div>
+            <Tag className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No special pricings found</p>
+          </div>
+        }
+        rowClassName={sp => table.selectedIds.includes(String(sp.id)) ? `bg-${themeColor}-50` : ''}
+        renderActions={sp => (
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => openEditModal(sp)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit">
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button onClick={() => handleDelete(sp.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         )}
-
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search special pricings..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton variant="secondary" size="sm" icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filters</StandardButton>
-            <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={loadSpecialPricings}>{''}</StandardButton>
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Entity Type</label>
-                <select value={filters.entity_type} onChange={(e) => handleFilterChange('entity_type', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All Types</option>
-                  <option value="package">Package</option>
-                  <option value="attraction">Attraction</option>
-                  <option value="event">Event</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Recurrence</label>
-                <select value={filters.recurrence_type} onChange={(e) => handleFilterChange('recurrence_type', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All</option>
-                  <option value="one_time">One-Time</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Discount Type</label>
-                <select value={filters.discount_type} onChange={(e) => handleFilterChange('discount_type', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All</option>
-                  <option value="fixed">Fixed ($)</option>
-                  <option value="percentage">Percentage (%)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton variant="ghost" size="sm" onClick={clearFilters}>Clear Filters</StandardButton>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-4 text-left">
-                  <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
-                    {selectedItems.size === currentItems.length && currentItems.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                  </button>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Discount</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Recurrence</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Entity Type</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Priority</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stackable</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentItems.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
-                    <Tag className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">No special pricings found</p>
-                  </td>
-                </tr>
-              ) : (
-                currentItems.map((sp) => {
-                  const isSelected = selectedItems.has(sp.id);
-                  return (
-                    <tr key={sp.id} className={`hover:bg-gray-50 transition-colors ${isSelected ? `bg-${themeColor}-50` : ''}`}>
-                      <td className="px-4 py-3">
-                        <button onClick={() => toggleSelectItem(sp.id)} className="text-gray-400 hover:text-gray-600">
-                          {isSelected ? <CheckSquare className={`w-4 h-4 text-${fullColor}`} /> : <Square className="w-4 h-4" />}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <span className="text-sm font-medium text-gray-900">{sp.name}</span>
-                          {sp.description && <p className="text-xs text-gray-500 truncate max-w-[200px]">{sp.description}</p>}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
-                          {sp.discount_type === 'fixed' ? <DollarSign className="w-3 h-3" /> : <Percent className="w-3 h-3" />}
-                          {formatDiscountAmount(sp)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                            sp.recurrence_type === 'one_time' ? `bg-${themeColor}-100 text-${fullColor}` :
-                            sp.recurrence_type === 'weekly' ? 'bg-gray-100 text-gray-600' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {sp.recurrence_type === 'one_time' ? <Calendar className="w-3 h-3" /> :
-                             sp.recurrence_type === 'weekly' ? <Repeat className="w-3 h-3" /> :
-                             <Repeat className="w-3 h-3" />}
-                            {formatRecurrence(sp)}
-                          </span>
-                          {(sp.time_start || sp.time_end) && (
-                            <p className="text-[11px] text-gray-400 mt-1 pl-0.5">
-                              🕐 {sp.time_start?.slice(0, 5) || '—'} – {sp.time_end?.slice(0, 5) || '—'}
-                            </p>
-                          )}
-                          {sp.recurrence_type !== 'one_time' && (sp.start_date || sp.end_date) && (
-                            <p className="text-[11px] text-gray-400 mt-0.5 pl-0.5">
-                              📅 {sp.start_date ? new Date(sp.start_date + 'T00:00:00').toLocaleDateString() : 'No start'} – {sp.end_date ? new Date(sp.end_date + 'T00:00:00').toLocaleDateString() : 'No end'}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          sp.entity_type === 'package' ? `bg-${themeColor}-100 text-${fullColor}` :
-                          sp.entity_type === 'attraction' ? `bg-${themeColor}-100 text-${fullColor}` :
-                          sp.entity_type === 'event' ? 'bg-amber-100 text-amber-800' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
-                          {sp.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> :
-                           sp.entity_type === 'attraction' ? <Ticket className="w-3 h-3" /> :
-                           sp.entity_type === 'event' ? <Calendar className="w-3 h-3" /> :
-                           <Layers className="w-3 h-3" />}
-                          {sp.entity_type === 'package' ? 'Package' : sp.entity_type === 'attraction' ? 'Attraction' : sp.entity_type === 'event' ? 'Event' : 'All'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600">{sp.priority}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${sp.is_stackable ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-500'}`}>
-                          {sp.is_stackable ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleToggleStatus(sp.id)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${sp.is_active ? `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200` : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                        >
-                          <Power className="w-3 h-3" />
-                          {sp.is_active ? 'Active' : 'Inactive'}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEditModal(sp)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit">
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDelete(sp.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredSpecialPricings.length > itemsPerPage && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalItems={filteredSpecialPricings.length}
-              showingFrom={indexOfFirst + 1}
-              showingTo={Math.min(indexOfLast, filteredSpecialPricings.length)}
-            />
-          </div>
-        )}
-      </div>
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeModal}>
@@ -783,7 +872,7 @@ const SpecialPricings: React.FC = () => {
                     <DollarSign className={`w-4 h-4 text-${fullColor}`} /> Discount Settings
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">Configure how much your customers save on each booking.</p>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
@@ -817,7 +906,7 @@ const SpecialPricings: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className={`mt-3 bg-${themeColor}-50 border border-${themeColor}-100 rounded-lg p-3 text-sm`}>
                     <span className="text-gray-600">Preview: </span>
                     <span className="text-gray-400 line-through">${samplePrice.toFixed(2)}</span>
@@ -832,7 +921,7 @@ const SpecialPricings: React.FC = () => {
                     <Calendar className={`w-4 h-4 text-${fullColor}`} /> Schedule
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">Control when this discount is active — one-time, weekly, or monthly.</p>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Recurrence</label>
                     <select
@@ -873,8 +962,8 @@ const SpecialPricings: React.FC = () => {
                             type="button"
                             onClick={() => handleFormChange('recurrence_value', day.value)}
                             className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                              form.recurrence_value === day.value 
-                                ? `bg-${fullColor} text-white` 
+                              form.recurrence_value === day.value
+                                ? `bg-${fullColor} text-white`
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                           >
@@ -897,8 +986,8 @@ const SpecialPricings: React.FC = () => {
                             type="button"
                             onClick={() => handleFormChange('recurrence_value', day)}
                             className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                              form.recurrence_value === day 
-                                ? `bg-${fullColor} text-white` 
+                              form.recurrence_value === day
+                                ? `bg-${fullColor} text-white`
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                           >
@@ -960,7 +1049,7 @@ const SpecialPricings: React.FC = () => {
                     <Layers className={`w-4 h-4 text-${fullColor}`} /> Apply To
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">Choose which items receive this discount.</p>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Entity Type</label>
                     <select
@@ -1022,7 +1111,7 @@ const SpecialPricings: React.FC = () => {
                     <Settings className={`w-4 h-4 text-${fullColor}`} /> Advanced
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">Fine-tune priority and stacking behavior.</p>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
@@ -1048,7 +1137,7 @@ const SpecialPricings: React.FC = () => {
                       <p className="text-xs text-gray-500 mt-1">Can combine with others</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center mt-4">
                     <input
                       type="checkbox"

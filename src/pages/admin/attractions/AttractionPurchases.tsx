@@ -1,9 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Trash2, 
-  Search, 
-  Filter, 
+import {
+  Trash2,
   RefreshCcw,
   Download,
   User,
@@ -19,7 +17,7 @@ import {
 import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
-import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
+import type { AttractionPurchasesPurchase } from '../../../types/AttractionPurchases.types';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { attractionPurchaseCacheService } from '../../../services/AttractionPurchaseCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -30,6 +28,14 @@ import type { Location } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -39,18 +45,7 @@ const ManagePurchases = () => {
   const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [filteredPurchases, setFilteredPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPurchases, setSelectedPurchases] = useState<string[]>([]);
-  const [filters, setFilters] = useState<AttractionPurchasesFilterOptions>({
-    status: 'all',
-    paymentMethod: 'all',
-    search: '',
-    dateRange: 'all'
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPurchaseForPayment, setSelectedPurchaseForPayment] = useState<AttractionPurchasesPurchase | null>(null);
@@ -58,7 +53,7 @@ const ManagePurchases = () => {
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
-  
+
   const [showTrashed, setShowTrashed] = useState(false);
   const [trashedPurchases, setTrashedPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [trashedLoading, setTrashedLoading] = useState(false);
@@ -66,6 +61,7 @@ const ManagePurchases = () => {
   const [trashedTotalPages, setTrashedTotalPages] = useState(1);
   const [trashedTotal, setTrashedTotal] = useState(0);
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
+  const itemsPerPage = 10;
 
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: `bg-blue-100 text-blue-800`, icon: CheckCircle },
@@ -93,8 +89,8 @@ const ManagePurchases = () => {
     },
     {
       title: 'Avg. Purchase',
-      value: purchases.length > 0 
-        ? `$${(purchases.reduce((sum, p) => sum + p.amountPaid, 0) / purchases.length).toFixed(2)}` 
+      value: purchases.length > 0
+        ? `$${(purchases.reduce((sum, p) => sum + p.amountPaid, 0) / purchases.length).toFixed(2)}`
         : '$0.00',
       change: 'Per transaction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -114,7 +110,7 @@ const ManagePurchases = () => {
       id: purchase.id.toString(),
       type: 'attraction',
       attractionName: purchase.attraction?.name || 'Unknown Attraction',
-      customerName: purchase.customer 
+      customerName: purchase.customer
         ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
         : purchase.guest_name || 'Walk-in Customer',
       email: purchase.customer?.email || purchase.guest_email || '',
@@ -134,7 +130,7 @@ const ManagePurchases = () => {
   };
 
   const loadPurchases = async (skipCache: boolean = false) => {
-    const filters: any = {
+    const params: any = {
       per_page: 100,
       user_id: getStoredUser()?.id,
       ...(selectedLocation && { location_id: Number(selectedLocation) })
@@ -160,7 +156,7 @@ const ManagePurchases = () => {
       let lastPage = 1;
 
       do {
-        const response = await attractionPurchaseService.getPurchases({ ...filters, page: currentPage });
+        const response = await attractionPurchaseService.getPurchases({ ...params, page: currentPage });
         const batch = response.data.purchases || [];
         allRawPurchases = allRawPurchases.concat(batch);
         lastPage = response.data.pagination?.last_page ?? 1;
@@ -188,7 +184,7 @@ const ManagePurchases = () => {
 
   const fetchLocations = async () => {
     if (!isCompanyAdmin) return;
-    
+
     try {
       const response = await locationService.getLocations();
       const locationsArray = Array.isArray(response.data) ? response.data : [];
@@ -198,54 +194,6 @@ const ManagePurchases = () => {
       setLocations([]);
     }
   };
-
-  const applyFilters = useCallback(() => {
-    let result = [...purchases];
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(purchase =>
-        purchase.customerName.toLowerCase().includes(searchTerm) ||
-        purchase.email.toLowerCase().includes(searchTerm) ||
-        purchase.attractionName.toLowerCase().includes(searchTerm) ||
-        purchase.phone.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    if (filters.status !== 'all') {
-      result = result.filter(purchase => purchase.status === filters.status);
-    }
-
-    if (filters.paymentMethod !== 'all') {
-      result = result.filter(purchase => purchase.paymentMethod === filters.paymentMethod);
-    }
-
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      const startDate = new Date();
-
-      switch (filters.dateRange) {
-        case 'today':
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case 'month':
-          startDate.setMonth(now.getMonth() - 1);
-          break;
-        default:
-          break;
-      }
-
-      result = result.filter(purchase => {
-        const purchaseDate = new Date(purchase.createdAt);
-        return purchaseDate >= startDate;
-      });
-    }
-
-    setFilteredPurchases(result);
-  }, [purchases, filters]);
 
   useEffect(() => {
     loadPurchases();
@@ -269,42 +217,6 @@ const ManagePurchases = () => {
     return unsubscribe;
   }, [selectedLocation]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
-  const handleFilterChange = (key: keyof AttractionPurchasesFilterOptions, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      paymentMethod: 'all',
-      search: '',
-      dateRange: 'all'
-    });
-  };
-
-  const handleSelectPurchase = (id: string) => {
-    setSelectedPurchases(prev =>
-      prev.includes(id)
-        ? prev.filter(purchaseId => purchaseId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedPurchases.length === currentPurchases.length) {
-      setSelectedPurchases([]);
-    } else {
-      setSelectedPurchases(currentPurchases.map(purchase => purchase.id));
-    }
-  };
-
   const handleStatusChange = async (id: string, newStatus: AttractionPurchasesPurchase['status']) => {
     try {
       const updateResponse = await attractionPurchaseService.updatePurchase(Number(id), {
@@ -316,7 +228,7 @@ const ManagePurchases = () => {
       }
 
       setToast({ message: 'Status updated successfully', type: 'success' });
-      loadPurchases(true); // Reload the list (skip cache since we just updated)
+      loadPurchases(true);
     } catch (error) {
       console.error('Error updating status:', error);
       setToast({ message: 'Failed to update status', type: 'error' });
@@ -329,7 +241,7 @@ const ManagePurchases = () => {
         await attractionPurchaseService.deletePurchase(Number(id));
         await attractionPurchaseCacheService.removePurchaseFromCache(Number(id));
         setToast({ message: 'Purchase deleted successfully', type: 'success' });
-        loadPurchases(true); // Reload the list
+        loadPurchases(true);
       } catch (error) {
         console.error('Error deleting purchase:', error);
         setToast({ message: 'Failed to delete purchase', type: 'error' });
@@ -337,20 +249,258 @@ const ManagePurchases = () => {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const columns: AdminColumn<AttractionPurchasesPurchase>[] = [
+    {
+      key: 'id',
+      label: 'Purchase #',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: p => Number(p.id),
+      exportValue: p => p.id,
+      defaultVisible: false,
+      render: p => <span className="text-sm text-gray-900">#{p.id}</span>,
+    },
+    {
+      key: 'customer',
+      label: 'Customer',
+      group: 'Customer',
+      sortable: true,
+      sortValue: p => p.customerName,
+      exportValue: p => p.customerName,
+      render: p => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">{p.customerName}</div>
+          <div className="text-xs text-gray-600 mt-1">{p.email}</div>
+          <div className="text-xs text-gray-500 mt-1">{p.phone}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'attraction',
+      label: 'Attraction',
+      group: 'Purchase',
+      sortable: true,
+      sortValue: p => p.attractionName,
+      exportValue: p => p.attractionName,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.attractionName}</span>,
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      group: 'Purchase',
+      sortable: true,
+      sortValue: p => p.activity,
+      exportValue: p => p.activity,
+      defaultVisible: false,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.activity || '—'}</span>,
+    },
+    {
+      key: 'quantity',
+      label: 'Quantity',
+      group: 'Purchase',
+      sortable: true,
+      sortValue: p => p.quantity,
+      exportValue: p => p.quantity,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.quantity}</span>,
+    },
+    {
+      key: 'duration',
+      label: 'Duration',
+      group: 'Purchase',
+      sortValue: p => p.duration,
+      exportValue: p => p.duration,
+      defaultVisible: false,
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.duration || '—'}</span>,
+    },
+    {
+      key: 'total',
+      label: 'Total',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.totalAmount,
+      exportValue: p => p.totalAmount.toFixed(2),
+      render: p => <span className="whitespace-nowrap text-sm text-gray-900">${p.totalAmount.toFixed(2)}</span>,
+    },
+    {
+      key: 'paid',
+      label: 'Paid',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.amountPaid,
+      exportValue: p => p.amountPaid.toFixed(2),
+      render: p => (
+        <span className={`whitespace-nowrap text-sm ${p.amountPaid >= p.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}`}>
+          ${p.amountPaid.toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: 'paymentMethod',
+      label: 'Payment',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.paymentMethod || '',
+      exportValue: p => p.paymentMethod,
+      render: p => <span className="capitalize whitespace-nowrap text-sm text-gray-900">{(p.paymentMethod || '').replace('_', ' ')}</span>,
+    },
+    {
+      key: 'purchaseDate',
+      label: 'Purchase Date',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => new Date(p.createdAt || 0).getTime(),
+      exportValue: p => p.createdAt ? new Date(p.createdAt).toLocaleString() : '',
+      render: p => <span className="whitespace-nowrap text-sm text-gray-500">{formatDate(p.createdAt)}</span>,
+    },
+    {
+      key: 'scheduled',
+      label: 'Scheduled',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => (p.scheduledDate ? `${p.scheduledDate.substring(0, 10)} ${p.scheduledTime || ''}` : ''),
+      exportValue: p => (p.scheduledDate
+        ? `${p.scheduledDate.substring(0, 10)}${p.scheduledTime ? ` ${convertTo12Hour(p.scheduledTime)}` : ''}`
+        : ''),
+      render: p => p.scheduledDate ? (
+        <div className="whitespace-nowrap text-sm text-gray-500">
+          <div>{new Date(p.scheduledDate.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+          {p.scheduledTime && (
+            <div className="text-xs text-gray-400">{convertTo12Hour(p.scheduledTime)}</div>
+          )}
+        </div>
+      ) : (
+        <span className="text-gray-300">—</span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: p => p.status,
+      exportValue: p => p.status,
+      render: p => (
+        <select
+          value={p.status}
+          onChange={(e) => handleStatusChange(p.id, e.target.value as AttractionPurchasesPurchase['status'])}
+          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[p.status]?.color || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
+          disabled={p.status === 'checked-in'}
+        >
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+          <option value="checked-in">Checked In</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="refunded">Refunded</option>
+        </select>
+      ),
+    },
+  ];
+
+  const attractionOptions = useMemo(() => {
+    const unique = [...new Set(purchases.map(p => p.attractionName).filter(Boolean))].sort();
+    return unique.map(name => ({ value: name, label: name }));
+  }, [purchases]);
+
+  const filterDefs: AdminFilterDef<AttractionPurchasesPurchase>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'confirmed', label: 'Confirmed' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'checked-in', label: 'Checked In' },
+        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'refunded', label: 'Refunded' },
+      ],
+      predicate: (p, value) => p.status === value,
+    },
+    {
+      type: 'select',
+      key: 'paymentMethod',
+      label: 'Payment Method',
+      allLabel: 'All Methods',
+      options: [
+        { value: 'card', label: 'Card' },
+        { value: 'authorize.net', label: 'Authorize.net' },
+        { value: 'in-store', label: 'In-Store' },
+        { value: 'paylater', label: 'Pay Later' },
+      ],
+      predicate: (p, value) => p.paymentMethod === value,
+    },
+    {
+      type: 'select',
+      key: 'attraction',
+      label: 'Attraction',
+      allLabel: 'All Attractions',
+      options: attractionOptions,
+      predicate: (p, value) => p.attractionName === value,
+    },
+    {
+      type: 'daterange',
+      key: 'purchaseDate',
+      label: 'Purchase Date',
+      getDate: p => p.createdAt,
+    },
+    {
+      type: 'daterange',
+      key: 'scheduledDate',
+      label: 'Scheduled Date',
+      getDate: p => p.scheduledDate,
+    },
+    {
+      type: 'numberrange',
+      key: 'amount',
+      label: 'Total Amount ($)',
+      getValue: p => p.totalAmount,
+    },
+  ], [attractionOptions]);
+
+  const table = useAdminTable<AttractionPurchasesPurchase>({
+    data: purchases,
+    columns,
+    getRowId: p => p.id,
+    storageKey: 'attraction_purchases',
+    filterDefs,
+    searchFields: p => [
+      p.id,
+      p.customerName,
+      p.email,
+      p.phone,
+      p.attractionName,
+      p.activity,
+      p.paymentMethod,
+      p.status,
+    ],
+    defaultSort: (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    itemsPerPage,
+  });
+
   const handleBulkDelete = async () => {
-    if (selectedPurchases.length === 0) return;
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedPurchases.length} purchase record(s)?`)) {
+    if (table.selectedIds.length === 0) return;
+
+    if (window.confirm(`Are you sure you want to delete ${table.selectedIds.length} purchase record(s)?`)) {
       try {
         await Promise.all(
-          selectedPurchases.map(id => attractionPurchaseService.deletePurchase(Number(id)))
+          table.selectedIds.map(id => attractionPurchaseService.deletePurchase(Number(id)))
         );
         await Promise.all(
-          selectedPurchases.map(id => attractionPurchaseCacheService.removePurchaseFromCache(Number(id)))
+          table.selectedIds.map(id => attractionPurchaseCacheService.removePurchaseFromCache(Number(id)))
         );
-        setToast({ message: `${selectedPurchases.length} purchase(s) deleted successfully`, type: 'success' });
-        setSelectedPurchases([]);
-        loadPurchases(true); // Reload the list
+        setToast({ message: `${table.selectedIds.length} purchase(s) deleted successfully`, type: 'success' });
+        table.clearSelection();
+        loadPurchases(true);
       } catch (error) {
         console.error('Error deleting purchases:', error);
         setToast({ message: 'Failed to delete some purchases', type: 'error' });
@@ -359,20 +509,19 @@ const ManagePurchases = () => {
   };
 
   const handleBulkStatusChange = async (newStatus: AttractionPurchasesPurchase['status']) => {
-    if (selectedPurchases.length === 0) return;
-    
-    try {
+    if (table.selectedIds.length === 0) return;
 
+    try {
       await Promise.all(
-        selectedPurchases.map(id => 
+        table.selectedIds.map(id =>
           attractionPurchaseService.updatePurchase(Number(id), {
             status: newStatus as any,
           })
         )
       );
-      setToast({ message: `${selectedPurchases.length} purchase(s) updated successfully`, type: 'success' });
-      setSelectedPurchases([]);
-      loadPurchases(true); // Reload the list and refresh cache
+      setToast({ message: `${table.selectedIds.length} purchase(s) updated successfully`, type: 'success' });
+      table.clearSelection();
+      loadPurchases(true);
     } catch (error) {
       console.error('Error updating purchases:', error);
       setToast({ message: 'Failed to update some purchases', type: 'error' });
@@ -380,32 +529,16 @@ const ManagePurchases = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['ID', 'Customer Name', 'Email', 'Phone', 'Attraction', 'Quantity', 'Total Amount', 'Status', 'Payment Method', 'Date'];
-    const csvData = filteredPurchases.map(purchase => [
-      purchase.id,
-      purchase.customerName,
-      purchase.email,
-      purchase.phone,
-      purchase.attractionName,
-      purchase.quantity,
-      purchase.totalAmount,
-      purchase.status,
-      purchase.paymentMethod,
-      new Date(purchase.createdAt).toLocaleString()
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `purchases-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportTableCsv({
+      filename: `purchases-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Email', value: p => p.email },
+        { label: 'Phone', value: p => p.phone },
+        { label: 'Location', value: p => locations.find(l => String(l.id) === String(p.locationId))?.name || p.locationId || '' },
+      ],
+    });
   };
 
   const handleOpenPaymentModal = (purchase: AttractionPurchasesPurchase) => {
@@ -426,7 +559,7 @@ const ManagePurchases = () => {
 
   const handleSubmitPayment = async () => {
     if (!selectedPurchaseForPayment) return;
-    
+
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
       setToast({ message: 'Please enter a valid payment amount', type: 'error' });
@@ -448,8 +581,8 @@ const ManagePurchases = () => {
 
       const purchase = purchaseResponse.data;
       const customerId = purchase.customer_id || null;
-      const locationId = purchase.location_id || 
-                        (selectedLocation ? Number(selectedLocation) : null) || 
+      const locationId = purchase.location_id ||
+                        (selectedLocation ? Number(selectedLocation) : null) ||
                         currentUser?.location_id;
 
       if (!locationId) {
@@ -465,7 +598,7 @@ const ManagePurchases = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
-        notes: paymentNotes || (paymentMethod === 'in-store' 
+        notes: paymentNotes || (paymentMethod === 'in-store'
           ? `In-store payment for attraction purchase #${selectedPurchaseForPayment.id}`
           : `Payment for attraction purchase #${selectedPurchaseForPayment.id}`),
       });
@@ -481,7 +614,7 @@ const ManagePurchases = () => {
 
       setToast({ message: 'Payment processed successfully!', type: 'success' });
       handleClosePaymentModal();
-      loadPurchases(true); // Reload to get fresh data and update cache
+      loadPurchases(true);
     } catch (error) {
       console.error('Error processing payment:', error);
       setToast({ message: 'Failed to process payment. Please try again.', type: 'error' });
@@ -490,13 +623,12 @@ const ManagePurchases = () => {
     }
   };
 
-
   const convertTrashedPurchases = (rawPurchases: any[]): AttractionPurchasesPurchase[] => {
     return rawPurchases.map((purchase: any) => ({
       id: purchase.id.toString(),
       type: 'attraction',
       attractionName: purchase.attraction?.name || 'Unknown Attraction',
-      customerName: purchase.customer 
+      customerName: purchase.customer
         ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
         : purchase.guest_name || 'Walk-in Customer',
       email: purchase.customer?.email || purchase.guest_email || '',
@@ -513,7 +645,7 @@ const ManagePurchases = () => {
       locationId: purchase.location_id,
       scheduledDate: purchase.scheduled_date || null,
       scheduledTime: purchase.scheduled_time || null,
-    }));
+    })) as AttractionPurchasesPurchase[];
   };
 
   const loadTrashedPurchases = async (page: number = 1) => {
@@ -522,7 +654,7 @@ const ManagePurchases = () => {
       const response = await attractionPurchaseService.getTrashedPurchases({
         page,
         per_page: itemsPerPage,
-        search: filters.search,
+        search: table.searchInput,
         user_id: getStoredUser()?.id,
         ...(selectedLocation && { location_id: Number(selectedLocation) })
       });
@@ -613,32 +745,6 @@ const ManagePurchases = () => {
     }
   };
 
-
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentPurchases = filteredPurchases.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
-
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -702,105 +808,15 @@ const ManagePurchases = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search purchases..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              icon={Filter}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              onClick={() => loadPurchases(true)}
-              icon={RefreshCcw}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
+      {!showTrashed && (
+        <>
+          <AdminTableToolbar
+            table={table}
+            searchPlaceholder="Search purchases..."
+            onRefresh={() => loadPurchases(true)}
+          />
 
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="pending">Pending</option>
-                  <option value="checked-in">Checked In</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="refunded">Refunded</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Payment Method</label>
-                <select
-                  value={filters.paymentMethod}
-                  onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Methods</option>
-                  <option value="card">Card</option>
-                  <option value="authorize.net">Authorize.net</option>
-                  <option value="in-store">In-Store</option>
-                  <option value="paylater">Pay Later</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
-                <select
-                  value={filters.dateRange}
-                  onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">Last 30 Days</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {!showTrashed && selectedPurchases.length > 0 && (
-        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
-          <span className={`text-${fullColor} font-medium`}>
-            {selectedPurchases.length} purchase(s) selected
-          </span>
-          <div className="flex gap-2">
+          <BulkActionsBar table={table} itemLabel="purchase(s)">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value as AttractionPurchasesPurchase['status'])}
               className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
@@ -819,154 +835,43 @@ const ManagePurchases = () => {
             >
               Delete
             </StandardButton>
-          </div>
-        </div>
-      )}
+          </BulkActionsBar>
 
-      {!showTrashed && (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedPurchases.length === currentPurchases.length && currentPurchases.length > 0}
-                    onChange={handleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
-                  />
-                </th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Attraction</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Scheduled</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentPurchases.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-600">
-                    No purchases found
-                  </td>
-                </tr>
-              ) : (
-                currentPurchases.map((purchase) => {
-                  return (
-                    <tr key={purchase.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={selectedPurchases.includes(purchase.id)}
-                          onChange={() => handleSelectPurchase(purchase.id)}
-                          className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
-                        />
-                      </td>
-                      <td className="px-4 py-4">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{purchase.customerName}</div>
-                          <div className="text-xs text-gray-600 mt-1">{purchase.email}</div>
-                          <div className="text-xs text-gray-500 mt-1">{purchase.phone}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {purchase.attractionName}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {purchase.quantity}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${purchase.totalAmount.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className={purchase.amountPaid >= purchase.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}>
-                          ${purchase.amountPaid.toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="capitalize">{purchase.paymentMethod.replace('_', ' ')}</span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(purchase.createdAt)}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {purchase.scheduledDate ? (
-                          <div>
-                            <div>{new Date(purchase.scheduledDate.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                            {purchase.scheduledTime && (
-                              <div className="text-xs text-gray-400">{convertTo12Hour(purchase.scheduledTime)}</div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <select
-                          value={purchase.status}
-                          onChange={(e) => handleStatusChange(purchase.id, e.target.value as AttractionPurchasesPurchase['status'])}
-                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status]?.color || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
-                          disabled={purchase.status === 'checked-in'}
-                        >
-                          <option value="confirmed">Confirmed</option>
-                          <option value="pending">Pending</option>
-                          <option value="checked-in">Checked In</option>
-                          <option value="cancelled">Cancelled</option>
-                          <option value="refunded">Refunded</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          {purchase.status === 'pending' && purchase.amountPaid < purchase.totalAmount && (
-                            <button
-                              onClick={() => handleOpenPaymentModal(purchase)}
-                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Process Payment"
-                            >
-                              <DollarSign className="h-4 w-4" />
-                            </button>
-                          )}
-                          <Link
-                            to={`/attractions/purchases/${purchase.id}?from=purchases`}
-                            className={`p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors`}
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDeletePurchase(purchase.id)}
-                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-white px-4 py-4 border-t border-gray-100">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={paginate}
-            totalItems={filteredPurchases.length}
-            showingFrom={indexOfFirstItem + 1}
-            showingTo={Math.min(indexOfLastItem, filteredPurchases.length)}
+          <AdminDataTable
+            table={table}
+            loading={loading && purchases.length === 0}
+            selectable
+            itemLabel="purchases"
+            emptyMessage="No purchases found"
+            renderActions={(purchase) => (
+              <div className="flex items-center gap-1">
+                {purchase.status === 'pending' && purchase.amountPaid < purchase.totalAmount && (
+                  <button
+                    onClick={() => handleOpenPaymentModal(purchase)}
+                    className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Process Payment"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                  </button>
+                )}
+                <Link
+                  to={`/attractions/purchases/${purchase.id}?from=purchases`}
+                  className={`p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors`}
+                  title="View Details"
+                >
+                  <Eye className="h-4 w-4" />
+                </Link>
+                <button
+                  onClick={() => handleDeletePurchase(purchase.id)}
+                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           />
-        </div>
-      </div>
+        </>
       )}
 
       {showTrashed && (

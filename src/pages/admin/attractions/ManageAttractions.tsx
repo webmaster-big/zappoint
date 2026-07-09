@@ -1,12 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Eye, 
-  Pencil, 
-  Trash2, 
-  Search, 
-  Filter, 
-  RefreshCcw,
+import {
+  Eye,
+  Pencil,
+  Trash2,
   Users,
   DollarSign,
   Zap,
@@ -20,27 +17,100 @@ import {
   Link2,
   Copy,
   Percent,
-  GripVertical,
-  CalendarDays
+  CalendarDays,
+  ChevronUp,
+  ChevronDown,
+  FileDown
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
-import Pagination from '../../../components/ui/Pagination';
-import type {
-  ManageAttractionsAttraction,
-  ManageAttractionsFilterOptions,
-} from '../../../types/manageAttractions.types';
+import type { ManageAttractionsAttraction } from '../../../types/manageAttractions.types';
 import { attractionService } from '../../../services/AttractionService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
-import type { Attraction, CreateAttractionData } from '../../../services/AttractionService';
+import type { Attraction, AttractionFilters, CreateAttractionData } from '../../../services/AttractionService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import { createSlugWithId } from '../../../utils/slug';
 import { getStoredUser } from '../../../utils/storage';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+
+type AttractionRow = ManageAttractionsAttraction & { updatedAt?: string };
+
+type RawAttraction = Attraction & { location?: { id: number; name: string } };
+
+const convertAttraction = (attr: RawAttraction): AttractionRow => ({
+  id: attr.id.toString(),
+  name: attr.name,
+  description: attr.description,
+  category: attr.category,
+  price: attr.price,
+  pricingType: attr.pricing_type,
+  maxCapacity: attr.max_capacity,
+  duration: attr.duration?.toString() || '',
+  durationUnit: attr.duration_unit || 'minutes',
+  location: attr.location?.name || '',
+  locationId: attr.location_id,
+  locationName: attr.location?.name || '',
+  images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
+  status: attr.is_active ? 'active' : 'inactive',
+  createdAt: attr.created_at,
+  updatedAt: attr.updated_at,
+  availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {
+    monday: true,
+    tuesday: true,
+    wednesday: true,
+    thursday: true,
+    friday: true,
+    saturday: true,
+    sunday: true
+  },
+  displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
+  displayOrder: attr.display_order ?? 0,
+});
+
+const formatCreatedAt = (dateStr: string): string => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const buildLocationSlug = (attraction: AttractionRow): string =>
+  attraction.locationName
+    ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    : `location-${attraction.locationId || '1'}`;
+
+const buildPurchaseLink = (attraction: AttractionRow): string =>
+  `${window.location.origin}/purchase/attraction/${buildLocationSlug(attraction)}/${createSlugWithId(attraction.name, attraction.id)}`;
+
+const pricingSuffix = (pricingType: string): string =>
+  pricingType === 'per_person' ? '/person' :
+  pricingType === 'per_group' ? '/group' :
+  pricingType === 'per_hour' ? '/hour' : '';
+
+const pricingTypeLabel = (pricingType: string): string =>
+  pricingType === 'per_person' ? 'Per Person' :
+  pricingType === 'per_group' ? 'Per Group' :
+  pricingType === 'per_hour' ? 'Per Hour' : pricingType;
+
+const isUnlimitedDuration = (attraction: AttractionRow): boolean =>
+  !attraction.duration || attraction.duration === '0';
+
+const durationMinutes = (attraction: AttractionRow): number => {
+  if (isUnlimitedDuration(attraction)) return 0;
+  const value = parseFloat(attraction.duration);
+  if (Number.isNaN(value)) return 0;
+  return attraction.durationUnit === 'hours' ? value * 60 : value;
+};
 
 const ManageAttractions = () => {
   const navigate = useNavigate();
@@ -49,32 +119,8 @@ const ManageAttractions = () => {
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
-  const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
-
-  const getAuthToken = () => {
-    const userData = localStorage.getItem('zapzone_user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        return user.token;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        return null;
-      }
-    }
-    return null;
-  };
-  const [filteredAttractions, setFilteredAttractions] = useState<ManageAttractionsAttraction[]>([]);
+  const [attractions, setAttractions] = useState<AttractionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAttractions, setSelectedAttractions] = useState<string[]>([]);
-  const [filters, setFilters] = useState<ManageAttractionsFilterOptions>({
-    status: 'all',
-    category: 'all',
-    search: ''
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [showFilters, setShowFilters] = useState(false);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -83,11 +129,637 @@ const ManageAttractions = () => {
   const [importLocationId, setImportLocationId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
 
-  const formatCreatedAt = (dateStr: string): string => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const statusColors = {
+    active: `bg-${themeColor}-100 text-${fullColor}`,
+    inactive: 'bg-gray-100 text-gray-800',
+    maintenance: 'bg-yellow-100 text-yellow-800',
+  };
+
+  useEffect(() => {
+    if (isCompanyAdmin) {
+      const fetchLocations = async () => {
+        try {
+          const response = await locationService.getLocations();
+          if (response.success && response.data) {
+            setLocations(Array.isArray(response.data) ? response.data : []);
+          }
+        } catch (error) {
+          console.error('Error fetching locations:', error);
+        }
+      };
+      fetchLocations();
+    }
+  }, [isCompanyAdmin]);
+
+  useEffect(() => {
+    loadAttractions();
+  }, [selectedLocation]);
+
+  useEffect(() => {
+    const unsubscribe = attractionCacheService.onCacheUpdate(async (event) => {
+      if (event.detail?.source === 'api') {
+        const fresh = await attractionCacheService.getCachedAttractions();
+        if (fresh && fresh.length > 0) {
+          const converted = (fresh as RawAttraction[])
+            .filter(attr => selectedLocation === null || attr.location_id === selectedLocation)
+            .map(convertAttraction);
+          setAttractions(converted);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [selectedLocation]);
+
+  const loadAttractions = async () => {
+    try {
+      if (attractions.length === 0) setLoading(true);
+
+      const cachedAttractions = await attractionCacheService.getCachedAttractions();
+
+      if (cachedAttractions && cachedAttractions.length > 0) {
+        const converted = (cachedAttractions as RawAttraction[])
+          .filter(attr => selectedLocation === null || attr.location_id === selectedLocation)
+          .map(convertAttraction);
+        setAttractions(converted);
+        setLoading(false);
+
+        attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
+        return;
+      }
+
+      const params: AttractionFilters = {
+        per_page: 100,
+        user_id: getStoredUser()?.id,
+      };
+
+      if (selectedLocation !== null) {
+        params.location_id = selectedLocation;
+      }
+
+      let allRaw: RawAttraction[] = [];
+      let page = 1;
+      let lastPage = 1;
+
+      do {
+        const response = await attractionService.getAttractions({ ...params, page });
+        allRaw = allRaw.concat((response.data.attractions || []) as RawAttraction[]);
+        lastPage = response.data.pagination?.last_page ?? 1;
+        page++;
+      } while (page <= lastPage);
+
+      await attractionCacheService.cacheAttractions(allRaw);
+
+      setAttractions(allRaw.map(convertAttraction));
+    } catch (error) {
+      console.error('Error loading attractions:', error);
+      setToast({ message: 'Failed to load attractions', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoveOrder = async (id: string, direction: 'up' | 'down') => {
+    if (reordering) return;
+    const ordered = [...attractions].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const index = ordered.findIndex(attr => attr.id === id);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (index === -1 || targetIndex < 0 || targetIndex >= ordered.length) return;
+
+    [ordered[index], ordered[targetIndex]] = [ordered[targetIndex], ordered[index]];
+    const reorderItems = ordered.map((attr, idx) => ({
+      id: Number(attr.id),
+      display_order: idx,
+    }));
+
+    const previous = attractions;
+    setReordering(true);
+    setAttractions(prev =>
+      prev.map(attr => {
+        const reordered = reorderItems.find(r => r.id === Number(attr.id));
+        return reordered ? { ...attr, displayOrder: reordered.display_order } : attr;
+      })
+    );
+
+    try {
+      await attractionService.reorderAttractions(reorderItems);
+      setToast({ message: 'Display order updated', type: 'success' });
+    } catch {
+      setAttractions(previous);
+      setToast({ message: 'Failed to update display order', type: 'error' });
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handleStatusChange = async (id: string, newStatus: AttractionRow['status']) => {
+    try {
+      if (newStatus === 'active') {
+        await attractionService.activateAttraction(Number(id));
+      } else {
+        await attractionService.deactivateAttraction(Number(id));
+      }
+
+      setAttractions(prev => prev.map(attraction =>
+        attraction.id === id ? { ...attraction, status: newStatus } : attraction
+      ));
+
+      const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
+      if (cachedAttraction) {
+        await attractionCacheService.updateAttractionInCache({
+          ...cachedAttraction,
+          is_active: newStatus === 'active'
+        });
+      }
+
+      setToast({ message: 'Status updated successfully', type: 'success' });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setToast({ message: 'Failed to update status', type: 'error' });
+    }
+  };
+
+  const handleDeleteAttraction = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this attraction? This action cannot be undone.')) {
+      try {
+        await attractionService.deleteAttraction(Number(id));
+
+        setAttractions(prev => prev.filter(attraction => attraction.id !== id));
+
+        await attractionCacheService.removeAttractionFromCache(Number(id));
+
+        setToast({ message: 'Attraction deleted successfully', type: 'success' });
+      } catch (error) {
+        console.error('Error deleting attraction:', error);
+        setToast({ message: 'Failed to delete attraction', type: 'error' });
+      }
+    }
+  };
+
+  const handleDuplicateAttraction = async (attraction: AttractionRow) => {
+    try {
+      setDuplicatingId(attraction.id);
+
+      const response = await attractionService.getAttraction(Number(attraction.id));
+      const original = response.data;
+
+      const duplicateData: CreateAttractionData = {
+        location_id: original.location_id,
+        name: `${original.name} (Copy)`,
+        description: original.description,
+        price: original.price,
+        pricing_type: original.pricing_type,
+        max_capacity: original.max_capacity,
+        category: original.category,
+        duration: original.duration ?? undefined,
+        duration_unit: original.duration_unit,
+        availability: Array.isArray(original.availability) ? original.availability : undefined,
+        image: original.image ?? undefined,
+        is_active: false,
+      };
+
+      const createResponse = await attractionService.createAttraction(duplicateData);
+
+      if (createResponse.success && createResponse.data) {
+        await attractionCacheService.addAttractionToCache(createResponse.data);
+
+        const newAttraction: AttractionRow = {
+          ...convertAttraction(createResponse.data as RawAttraction),
+          location: attraction.location,
+          locationName: attraction.locationName,
+        };
+        setAttractions(prev => [newAttraction, ...prev]);
+
+        setToast({ message: `"${original.name}" duplicated successfully!`, type: 'success' });
+      }
+    } catch (error) {
+      console.error('Error duplicating attraction:', error);
+      setToast({ message: 'Failed to duplicate attraction', type: 'error' });
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
+  const copyPurchaseLink = (attraction: AttractionRow) => {
+    navigator.clipboard.writeText(buildPurchaseLink(attraction));
+    setCopiedLink(attraction.id);
+    setTimeout(() => setCopiedLink(null), 2000);
+  };
+
+  const columns: AdminColumn<AttractionRow>[] = [
+    {
+      key: 'order',
+      label: 'Order',
+      group: 'Ordering',
+      sortable: true,
+      sortValue: attraction => attraction.displayOrder ?? 0,
+      exportValue: attraction => attraction.displayOrder ?? 0,
+      render: attraction => (
+        <div className="flex items-center gap-1.5">
+          <div className="flex flex-col">
+            <button
+              onClick={() => handleMoveOrder(attraction.id, 'up')}
+              disabled={reordering}
+              className="text-gray-400 hover:text-gray-700 disabled:opacity-40"
+              title="Move up"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => handleMoveOrder(attraction.id, 'down')}
+              disabled={reordering}
+              className="text-gray-400 hover:text-gray-700 disabled:opacity-40"
+              title="Move down"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <span className="text-xs text-gray-500">{(attraction.displayOrder ?? 0) + 1}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: attraction => Number(attraction.id),
+      exportValue: attraction => attraction.id,
+      defaultVisible: false,
+      render: attraction => <span className="text-sm text-gray-900">#{attraction.id}</span>,
+    },
+    {
+      key: 'attraction',
+      label: 'Attraction',
+      group: 'Attraction',
+      lockVisible: true,
+      sortable: true,
+      sortValue: attraction => attraction.name,
+      exportValue: attraction => attraction.name,
+      render: attraction => (
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-gray-900">{attraction.name}</span>
+            {attraction.name?.includes('(Copy)') && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-300 shrink-0">
+                <Copy className="w-2.5 h-2.5" />
+                Copy
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-600 mt-1">{attraction.location}</div>
+          <div className="text-xs text-gray-500 mt-1 line-clamp-2">{attraction.description}</div>
+          {attraction.createdAt && (
+            <div className="flex items-center gap-1 mt-1">
+              <CalendarDays className="w-3 h-3 text-gray-400" />
+              <span className="text-xs text-gray-400">{formatCreatedAt(attraction.createdAt)}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      group: 'Attraction',
+      sortable: true,
+      sortValue: attraction => attraction.category,
+      exportValue: attraction => attraction.category,
+      render: attraction => <span className="whitespace-nowrap text-sm text-gray-900">{attraction.category}</span>,
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      group: 'Attraction',
+      sortValue: attraction => attraction.description,
+      exportValue: attraction => attraction.description,
+      defaultVisible: false,
+      render: attraction => (
+        <span className="text-xs text-gray-600 line-clamp-2 max-w-xs block">{attraction.description}</span>
+      ),
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Location',
+      sortable: true,
+      sortValue: attraction => attraction.location,
+      exportValue: attraction => attraction.location,
+      defaultVisible: false,
+      render: attraction => <span className="whitespace-nowrap text-sm text-gray-900">{attraction.location || '—'}</span>,
+    },
+    {
+      key: 'price',
+      label: 'Price',
+      group: 'Pricing',
+      sortable: true,
+      sortValue: attraction => Number(attraction.price),
+      exportValue: attraction => Number(attraction.price).toFixed(2),
+      render: attraction => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          ${attraction.price}
+          <span className="text-xs text-gray-600 ml-1">{pricingSuffix(attraction.pricingType)}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'pricingType',
+      label: 'Pricing Type',
+      group: 'Pricing',
+      sortable: true,
+      sortValue: attraction => attraction.pricingType,
+      exportValue: attraction => pricingTypeLabel(attraction.pricingType),
+      defaultVisible: false,
+      render: attraction => <span className="whitespace-nowrap text-sm text-gray-900">{pricingTypeLabel(attraction.pricingType)}</span>,
+    },
+    {
+      key: 'capacity',
+      label: 'Capacity',
+      group: 'Capacity',
+      sortable: true,
+      sortValue: attraction => Number(attraction.maxCapacity),
+      exportValue: attraction => attraction.maxCapacity,
+      render: attraction => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          {attraction.maxCapacity} people
+          {!attraction.displayCapacityToCustomers && (
+            <span className="ml-1 text-xs text-gray-400" title="Hidden from customers">(hidden)</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'capacityVisibility',
+      label: 'Capacity Visibility',
+      group: 'Capacity',
+      sortable: true,
+      sortValue: attraction => (attraction.displayCapacityToCustomers === false ? 'Hidden' : 'Shown'),
+      exportValue: attraction => (attraction.displayCapacityToCustomers === false ? 'Hidden' : 'Shown'),
+      defaultVisible: false,
+      render: attraction => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          {attraction.displayCapacityToCustomers === false ? 'Hidden' : 'Shown'}
+        </span>
+      ),
+    },
+    {
+      key: 'duration',
+      label: 'Duration',
+      group: 'Details',
+      sortable: true,
+      sortValue: durationMinutes,
+      exportValue: attraction =>
+        isUnlimitedDuration(attraction)
+          ? 'Unlimited'
+          : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit),
+      render: attraction => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          {isUnlimitedDuration(attraction) ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: attraction => attraction.status,
+      exportValue: attraction => attraction.status,
+      render: attraction => (
+        <select
+          value={attraction.status}
+          onChange={(e) => handleStatusChange(attraction.id, e.target.value as AttractionRow['status'])}
+          className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-${themeColor}-400`}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      ),
+    },
+    {
+      key: 'purchaseLink',
+      label: 'Purchase Link',
+      group: 'Links',
+      exportValue: buildPurchaseLink,
+      render: attraction => (
+        <StandardButton
+          onClick={() => copyPurchaseLink(attraction)}
+          variant="ghost"
+          size="sm"
+          icon={ShoppingCart}
+          className={`bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200 text-xs`}
+          title="Copy purchase link"
+        >
+          {copiedLink === attraction.id ? 'Copied!' : 'Copy Link'}
+        </StandardButton>
+      ),
+    },
+    {
+      key: 'createdAt',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: attraction => new Date(attraction.createdAt || 0).getTime(),
+      exportValue: attraction => (attraction.createdAt ? new Date(attraction.createdAt).toLocaleString() : ''),
+      defaultVisible: false,
+      render: attraction => (
+        <span className="whitespace-nowrap text-sm text-gray-500">{formatCreatedAt(attraction.createdAt)}</span>
+      ),
+    },
+    {
+      key: 'updatedAt',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: attraction => new Date(attraction.updatedAt || 0).getTime(),
+      exportValue: attraction => (attraction.updatedAt ? new Date(attraction.updatedAt).toLocaleString() : ''),
+      defaultVisible: false,
+      render: attraction => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {attraction.updatedAt ? formatCreatedAt(attraction.updatedAt) : '—'}
+        </span>
+      ),
+    },
+  ];
+
+  const categoryOptions = useMemo(() => {
+    const unique = [...new Set(attractions.map(attraction => attraction.category).filter(Boolean))].sort();
+    return unique.map(category => ({ value: category, label: category }));
+  }, [attractions]);
+
+  const filterDefs: AdminFilterDef<AttractionRow>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (attraction, value) => attraction.status === value,
+    },
+    {
+      type: 'select',
+      key: 'category',
+      label: 'Category',
+      allLabel: 'All Categories',
+      options: categoryOptions,
+      predicate: (attraction, value) => attraction.category === value,
+    },
+    {
+      type: 'select',
+      key: 'pricingType',
+      label: 'Pricing Type',
+      allLabel: 'All Pricing Types',
+      options: [
+        { value: 'per_person', label: 'Per Person' },
+        { value: 'per_group', label: 'Per Group' },
+        { value: 'per_hour', label: 'Per Hour' },
+      ],
+      predicate: (attraction, value) => attraction.pricingType === value,
+    },
+    {
+      type: 'select',
+      key: 'durationType',
+      label: 'Duration',
+      allLabel: 'All Durations',
+      options: [
+        { value: 'unlimited', label: 'Unlimited' },
+        { value: 'timed', label: 'Timed' },
+      ],
+      predicate: (attraction, value) =>
+        value === 'unlimited' ? isUnlimitedDuration(attraction) : !isUnlimitedDuration(attraction),
+    },
+    {
+      type: 'select',
+      key: 'capacityVisibility',
+      label: 'Capacity Visibility',
+      allLabel: 'All Visibility',
+      options: [
+        { value: 'shown', label: 'Shown to Customers' },
+        { value: 'hidden', label: 'Hidden from Customers' },
+      ],
+      predicate: (attraction, value) =>
+        value === 'hidden'
+          ? attraction.displayCapacityToCustomers === false
+          : attraction.displayCapacityToCustomers !== false,
+    },
+    {
+      type: 'numberrange',
+      key: 'price',
+      label: 'Price ($)',
+      getValue: attraction => Number(attraction.price),
+    },
+    {
+      type: 'numberrange',
+      key: 'capacity',
+      label: 'Capacity',
+      getValue: attraction => Number(attraction.maxCapacity),
+    },
+    {
+      type: 'daterange',
+      key: 'createdAt',
+      label: 'Created Date',
+      getDate: attraction => attraction.createdAt,
+    },
+  ], [categoryOptions]);
+
+  const table = useAdminTable<AttractionRow>({
+    data: attractions,
+    columns,
+    getRowId: attraction => attraction.id,
+    storageKey: 'attractions',
+    filterDefs,
+    searchFields: attraction => [
+      attraction.id,
+      attraction.name,
+      attraction.description,
+      attraction.location,
+      attraction.category,
+      attraction.pricingType,
+      attraction.status,
+    ],
+    defaultSort: (a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0),
+    itemsPerPage: 10,
+  });
+
+  const handleBulkDelete = async () => {
+    if (table.selectedIds.length === 0) return;
+
+    if (window.confirm(`Are you sure you want to delete ${table.selectedIds.length} attraction(s)? This action cannot be undone.`)) {
+      try {
+        await Promise.all(
+          table.selectedIds.map(id => attractionService.deleteAttraction(Number(id)))
+        );
+
+        setAttractions(prev => prev.filter(attraction => !table.selectedIds.includes(attraction.id)));
+
+        await Promise.all(
+          table.selectedIds.map(id => attractionCacheService.removeAttractionFromCache(Number(id)))
+        );
+
+        setToast({ message: `${table.selectedIds.length} attraction(s) deleted successfully`, type: 'success' });
+        table.clearSelection();
+      } catch (error) {
+        console.error('Error deleting attractions:', error);
+        setToast({ message: 'Failed to delete some attractions', type: 'error' });
+      }
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus: AttractionRow['status']) => {
+    if (!newStatus || table.selectedIds.length === 0) return;
+
+    try {
+      await Promise.all(
+        table.selectedIds.map(id =>
+          newStatus === 'active'
+            ? attractionService.activateAttraction(Number(id))
+            : attractionService.deactivateAttraction(Number(id))
+        )
+      );
+
+      setAttractions(prev => prev.map(attraction =>
+        table.selectedIds.includes(attraction.id)
+          ? { ...attraction, status: newStatus }
+          : attraction
+      ));
+
+      await Promise.all(
+        table.selectedIds.map(async (id) => {
+          const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
+          if (cachedAttraction) {
+            await attractionCacheService.updateAttractionInCache({
+              ...cachedAttraction,
+              is_active: newStatus === 'active'
+            });
+          }
+        })
+      );
+
+      setToast({ message: `${table.selectedIds.length} attraction(s) updated successfully`, type: 'success' });
+      table.clearSelection();
+    } catch (error) {
+      console.error('Error updating attractions:', error);
+      setToast({ message: 'Failed to update some attractions', type: 'error' });
+    }
+  };
+
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `zapzone-attractions-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Location ID', value: attraction => attraction.locationId ?? '' },
+        { label: 'Duration Value', value: attraction => attraction.duration || '0' },
+        { label: 'Duration Unit', value: attraction => attraction.durationUnit },
+        { label: 'Images', value: attraction => (attraction.images || []).join(' | ') },
+        { label: 'Availability', value: attraction => JSON.stringify(attraction.availability ?? {}) },
+      ],
+    });
   };
 
   const handleOpenExportModal = () => {
@@ -112,8 +784,10 @@ const ManageAttractions = () => {
   const handleExport = () => {
     const attractionsToExport = attractions.filter(attraction => selectedForExport.includes(attraction.id || ''));
     const cleanedAttractions = attractionsToExport.map(attraction => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id: _id, location_id: _lid, location: _loc, ...clean } = attraction as any;
+      const clean = { ...(attraction as unknown as Record<string, unknown>) };
+      delete clean.id;
+      delete clean.location_id;
+      delete clean.location;
       return clean;
     });
     const jsonData = JSON.stringify(cleanedAttractions, null, 2);
@@ -137,10 +811,10 @@ const ManageAttractions = () => {
         return;
       }
 
-      const currentUser = getStoredUser();
-      const targetLocationId = importLocationId || currentUser?.location_id || 1;
+      const storedUser = getStoredUser();
+      const targetLocationId = importLocationId || storedUser?.location_id || 1;
 
-      const attractionsToImport = parsedData.map((attraction: ManageAttractionsAttraction) => ({
+      const attractionsToImport = parsedData.map((attraction: AttractionRow) => ({
         location_id: targetLocationId,
         name: attraction.name,
         description: attraction.description,
@@ -161,24 +835,24 @@ const ManageAttractions = () => {
 
       try {
         const response = await attractionService.bulkImport({ attractions: attractionsToImport });
-        
+
         setImportData("");
         setShowImportModal(false);
-        
+
         const successCount = response.data.imported_count || 0;
         const failedCount = response.data.failed_count || 0;
-        
+
         if (failedCount > 0) {
           console.error('Import errors:', response.errors);
           setToast({ message: `Imported ${successCount} attraction(s). ${failedCount} failed. Check console for details.`, type: 'info' });
         } else {
           setToast({ message: `Successfully imported ${successCount} attraction(s)!`, type: 'success' });
         }
-        
-        loadAttractions(); // Reload the list
+
+        loadAttractions();
       } catch (err) {
         console.error('Bulk import failed, trying individual imports...', err);
-        
+
         let successCount = 0;
         for (const attraction of attractionsToImport) {
           try {
@@ -212,12 +886,6 @@ const ManageAttractions = () => {
     }
   };
 
-  const statusColors = {
-    active: `bg-${themeColor}-100 text-${fullColor}`,
-    inactive: 'bg-gray-100 text-gray-800',
-    maintenance: 'bg-yellow-100 text-yellow-800',
-  };
-
   const metrics = [
     {
       title: 'Total Attractions',
@@ -235,8 +903,8 @@ const ManageAttractions = () => {
     },
     {
       title: 'Avg. Price',
-      value: attractions.length > 0 
-        ? `$${(attractions.reduce((sum, a) => sum + Number(a.price), 0) / attractions.length).toFixed(2)}` 
+      value: attractions.length > 0
+        ? `$${(attractions.reduce((sum, a) => sum + Number(a.price), 0) / attractions.length).toFixed(2)}`
         : '$0.00',
       change: 'Per attraction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -250,457 +918,6 @@ const ManageAttractions = () => {
       icon: Users,
     }
   ];
-
-  useEffect(() => {
-    if (isCompanyAdmin) {
-      const fetchLocations = async () => {
-        try {
-          const response = await locationService.getLocations();
-          if (response.success && response.data) {
-            setLocations(Array.isArray(response.data) ? response.data : []);
-          }
-        } catch (error) {
-          console.error('Error fetching locations:', error);
-        }
-      };
-      fetchLocations();
-    }
-  }, [isCompanyAdmin]);
-
-  useEffect(() => {
-    loadAttractions();
-  }, [selectedLocation]);
-
-  useEffect(() => {
-    const unsubscribe = attractionCacheService.onCacheUpdate(async (event) => {
-      if (event.detail?.source === 'api') {
-        const fresh = await attractionCacheService.getCachedAttractions();
-        if (fresh && fresh.length > 0) {
-          const converted: ManageAttractionsAttraction[] = fresh
-            .filter((attr: Attraction & { location?: { id: number; name: string } }) =>
-              selectedLocation === null || attr.location_id === selectedLocation
-            )
-            .map((attr: Attraction & { location?: { id: number; name: string } }) => ({
-              id: attr.id.toString(),
-              name: attr.name,
-              description: attr.description,
-              category: attr.category,
-              price: attr.price,
-              pricingType: attr.pricing_type,
-              maxCapacity: attr.max_capacity,
-              duration: attr.duration?.toString() || '',
-              durationUnit: attr.duration_unit || 'minutes',
-              location: attr.location?.name || '',
-              locationId: attr.location_id,
-              locationName: attr.location?.name || '',
-              images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
-              status: attr.is_active ? 'active' : 'inactive',
-              createdAt: attr.created_at,
-              availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
-              displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
-              displayOrder: attr.display_order ?? 0,
-            }));
-          setAttractions(converted);
-        }
-      }
-    });
-    return unsubscribe;
-  }, [selectedLocation]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [attractions, filters]);
-
-  const loadAttractions = async () => {
-    try {
-      if (attractions.length === 0) setLoading(true);
-      const authToken = getAuthToken();
-      console.log('🔐 Loading attractions - Auth Token:', authToken ? 'Present' : 'Missing');
-      
-      const cachedAttractions = await attractionCacheService.getCachedAttractions();
-      
-      if (cachedAttractions && cachedAttractions.length > 0) {
-        const convertedAttractions: ManageAttractionsAttraction[] = cachedAttractions
-          .filter((attr: Attraction & { location?: { id: number; name: string } }) => {
-            if (selectedLocation !== null && attr.location_id !== selectedLocation) {
-              return false;
-            }
-            return true;
-          })
-          .map((attr: Attraction & { location?: { id: number; name: string } }) => ({
-            id: attr.id.toString(),
-            name: attr.name,
-            description: attr.description,
-            category: attr.category,
-            price: attr.price,
-            pricingType: attr.pricing_type,
-            maxCapacity: attr.max_capacity,
-            duration: attr.duration?.toString() || '',
-            durationUnit: attr.duration_unit || 'minutes',
-            location: attr.location?.name || '',
-            locationId: attr.location_id,
-            locationName: attr.location?.name || '',
-            images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
-            status: attr.is_active ? 'active' : 'inactive',
-            createdAt: attr.created_at,
-            availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {
-              monday: true,
-              tuesday: true,
-              wednesday: true,
-              thursday: true,
-              friday: true,
-              saturday: true,
-              sunday: true
-            },
-            displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
-            displayOrder: attr.display_order ?? 0,
-          }));
-        setAttractions(convertedAttractions);
-        setLoading(false);
-
-        attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
-        return;
-      }
-      
-      const params: Record<string, string | number | boolean | undefined> = {
-        search: filters.search || undefined,
-        category: filters.category !== 'all' ? filters.category : undefined,
-        per_page: 100, 
-        user_id: getStoredUser()?.id
-      };
-      
-      if (filters.status !== 'all') {
-        params.is_active = filters.status === 'active';
-      }
-      
-      if (selectedLocation !== null) {
-        params.location_id = selectedLocation;
-      }
-      
-      const response = await attractionService.getAttractions(params);
-      
-      await attractionCacheService.cacheAttractions(response.data.attractions);
-
-      const convertedAttractions: ManageAttractionsAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
-        id: attr.id.toString(),
-        name: attr.name,
-        description: attr.description,
-        category: attr.category,
-        price: attr.price,
-        pricingType: attr.pricing_type,
-        maxCapacity: attr.max_capacity,
-        duration: attr.duration?.toString() || '',
-        durationUnit: attr.duration_unit || 'minutes',
-        location: attr.location?.name || '',
-        locationId: attr.location_id,
-        locationName: attr.location?.name || '',
-        images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
-        status: attr.is_active ? 'active' : 'inactive',
-        createdAt: attr.created_at,
-        availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {
-          monday: true,
-          tuesday: true,
-          wednesday: true,
-          thursday: true,
-          friday: true,
-          saturday: true,
-          sunday: true
-        },
-        displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
-        displayOrder: attr.display_order ?? 0,
-      }));
-
-      setAttractions(convertedAttractions);
-    } catch (error) {
-      console.error('Error loading attractions:', error);
-      setToast({ message: 'Failed to load attractions', type: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let result = [...attractions];
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(attraction =>
-        attraction.name.toLowerCase().includes(searchTerm) ||
-        attraction.description.toLowerCase().includes(searchTerm) ||
-        attraction.location.toLowerCase().includes(searchTerm) ||
-        attraction.category.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    if (filters.status !== 'all') {
-      result = result.filter(attraction => attraction.status === filters.status);
-    }
-
-    if (filters.category !== 'all') {
-      result = result.filter(attraction => attraction.category === filters.category);
-    }
-
-    result.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-
-    setFilteredAttractions(result);
-  };
-
-  const handleFilterChange = (key: keyof ManageAttractionsFilterOptions, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      category: 'all',
-      search: ''
-    });
-  };
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-
-    setFilteredAttractions(prev => {
-      const updated = [...prev];
-      const draggedItem = updated[draggedIndex];
-      updated.splice(draggedIndex, 1);
-      updated.splice(index, 0, draggedItem);
-      setDraggedIndex(index);
-      return updated;
-    });
-  };
-
-  const handleDragEnd = async () => {
-    setDraggedIndex(null);
-    const reorderItems = filteredAttractions.map((attr, idx) => ({
-      id: Number(attr.id),
-      display_order: idx,
-    }));
-    try {
-      await attractionService.reorderAttractions(reorderItems);
-      setAttractions(prev =>
-        prev.map(attr => {
-          const reordered = reorderItems.find(r => r.id === Number(attr.id));
-          return reordered ? { ...attr, displayOrder: reordered.display_order } : attr;
-        })
-      );
-      setToast({ message: 'Display order updated', type: 'success' });
-    } catch {
-      setToast({ message: 'Failed to update display order', type: 'error' });
-      applyFilters();
-    }
-  };
-
-  const handleSelectAttraction = (id: string) => {
-    setSelectedAttractions(prev =>
-      prev.includes(id)
-        ? prev.filter(attractionId => attractionId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedAttractions.length === currentAttractions.length) {
-      setSelectedAttractions([]);
-    } else {
-      setSelectedAttractions(currentAttractions.map(attraction => attraction.id));
-    }
-  };
-
-  const handleStatusChange = async (id: string, newStatus: ManageAttractionsAttraction['status']) => {
-    try {
-      if (newStatus === 'active') {
-        await attractionService.activateAttraction(Number(id));
-      } else {
-        await attractionService.deactivateAttraction(Number(id));
-      }
-      
-      setAttractions(prev => prev.map(attraction => 
-        attraction.id === id ? { ...attraction, status: newStatus } : attraction
-      ));
-      
-      const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
-      if (cachedAttraction) {
-        await attractionCacheService.updateAttractionInCache({
-          ...cachedAttraction,
-          is_active: newStatus === 'active'
-        });
-      }
-      
-      setToast({ message: 'Status updated successfully', type: 'success' });
-    } catch (error) {
-      console.error('Error updating status:', error);
-      setToast({ message: 'Failed to update status', type: 'error' });
-    }
-  };
-
-  const handleDeleteAttraction = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this attraction? This action cannot be undone.')) {
-      try {
-        await attractionService.deleteAttraction(Number(id));
-        
-        setAttractions(prev => prev.filter(attraction => attraction.id !== id));
-        
-        await attractionCacheService.removeAttractionFromCache(Number(id));
-        
-        setToast({ message: 'Attraction deleted successfully', type: 'success' });
-      } catch (error) {
-        console.error('Error deleting attraction:', error);
-        setToast({ message: 'Failed to delete attraction', type: 'error' });
-      }
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedAttractions.length === 0) return;
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedAttractions.length} attraction(s)? This action cannot be undone.`)) {
-      try {
-        await Promise.all(
-          selectedAttractions.map(id => attractionService.deleteAttraction(Number(id)))
-        );
-        
-        setAttractions(prev => prev.filter(attraction => !selectedAttractions.includes(attraction.id)));
-        
-        await Promise.all(
-          selectedAttractions.map(id => attractionCacheService.removeAttractionFromCache(Number(id)))
-        );
-        
-        setToast({ message: `${selectedAttractions.length} attraction(s) deleted successfully`, type: 'success' });
-        setSelectedAttractions([]);
-      } catch (error) {
-        console.error('Error deleting attractions:', error);
-        setToast({ message: 'Failed to delete some attractions', type: 'error' });
-      }
-    }
-  };
-
-  const handleBulkStatusChange = async (newStatus: ManageAttractionsAttraction['status']) => {
-    if (selectedAttractions.length === 0) return;
-    
-    try {
-      await Promise.all(
-        selectedAttractions.map(id => 
-          newStatus === 'active' 
-            ? attractionService.activateAttraction(Number(id))
-            : attractionService.deactivateAttraction(Number(id))
-        )
-      );
-      
-      setAttractions(prev => prev.map(attraction => 
-        selectedAttractions.includes(attraction.id) 
-          ? { ...attraction, status: newStatus }
-          : attraction
-      ));
-      
-      await Promise.all(
-        selectedAttractions.map(async (id) => {
-          const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
-          if (cachedAttraction) {
-            await attractionCacheService.updateAttractionInCache({
-              ...cachedAttraction,
-              is_active: newStatus === 'active'
-            });
-          }
-        })
-      );
-      
-      setToast({ message: `${selectedAttractions.length} attraction(s) updated successfully`, type: 'success' });
-      setSelectedAttractions([]);
-    } catch (error) {
-      console.error('Error updating attractions:', error);
-      setToast({ message: 'Failed to update some attractions', type: 'error' });
-    }
-  };
-
-  const handleDuplicateAttraction = async (attraction: ManageAttractionsAttraction) => {
-    try {
-      setDuplicatingId(attraction.id);
-
-      const response = await attractionService.getAttraction(Number(attraction.id));
-      const original = response.data;
-
-      const duplicateData: CreateAttractionData = {
-        location_id: original.location_id,
-        name: `${original.name} (Copy)`,
-        description: original.description,
-        price: original.price,
-        pricing_type: original.pricing_type,
-        max_capacity: original.max_capacity,
-        category: original.category,
-        duration: original.duration ?? undefined,
-        duration_unit: original.duration_unit,
-        availability: Array.isArray(original.availability) ? original.availability : undefined,
-        image: original.image ?? undefined,
-        is_active: false, // Duplicates start inactive
-      };
-
-      const createResponse = await attractionService.createAttraction(duplicateData);
-
-      if (createResponse.success && createResponse.data) {
-        await attractionCacheService.addAttractionToCache(createResponse.data);
-
-        const newAttraction: ManageAttractionsAttraction = {
-          id: createResponse.data.id.toString(),
-          name: createResponse.data.name,
-          description: createResponse.data.description,
-          category: createResponse.data.category,
-          price: createResponse.data.price,
-          pricingType: createResponse.data.pricing_type,
-          maxCapacity: createResponse.data.max_capacity,
-          duration: createResponse.data.duration?.toString() || '',
-          durationUnit: createResponse.data.duration_unit || 'minutes',
-          location: attraction.location,
-          locationId: createResponse.data.location_id,
-          locationName: attraction.locationName,
-          images: createResponse.data.image ? (Array.isArray(createResponse.data.image) ? createResponse.data.image : [createResponse.data.image]) : [],
-          status: createResponse.data.is_active ? 'active' : 'inactive',
-          createdAt: createResponse.data.created_at,
-          availability: typeof createResponse.data.availability === 'object' ? createResponse.data.availability as Record<string, boolean> : {},
-          displayCapacityToCustomers: createResponse.data.display_capacity_to_customers ?? true,
-        };
-        setAttractions(prev => [newAttraction, ...prev]);
-
-        setToast({ message: `"${original.name}" duplicated successfully!`, type: 'success' });
-      }
-    } catch (error) {
-      console.error('Error duplicating attraction:', error);
-      setToast({ message: 'Failed to duplicate attraction', type: 'error' });
-    } finally {
-      setDuplicatingId(null);
-    }
-  };
-
-  const copyPurchaseLink = (attraction: ManageAttractionsAttraction) => {
-    const locationSlug = attraction.locationName 
-      ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      : `location-${attraction.locationId || '1'}`;
-    const attractionSlug = createSlugWithId(attraction.name, attraction.id);
-    const fullPurchaseLink = `${window.location.origin}/purchase/attraction/${locationSlug}/${attractionSlug}`;
-    navigator.clipboard.writeText(fullPurchaseLink);
-    setCopiedLink(attraction.id);
-    setTimeout(() => setCopiedLink(null), 2000);
-  };
-
-  const getUniqueCategories = () => {
-    const categories = attractions.map(attraction => attraction.category);
-    return [...new Set(categories)];
-  };
-
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentAttractions = filteredAttractions.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredAttractions.length / itemsPerPage);
-
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   if (loading) {
     return (
@@ -735,6 +952,7 @@ const ManageAttractions = () => {
               { label: 'Special Pricing', icon: Percent, onClick: () => navigate('/special-pricings?entity_type=attraction') },
               { label: 'Import Attractions', icon: Upload, onClick: () => setShowImportModal(true), dividerBefore: true },
               { label: 'Export Attractions', icon: Download, onClick: handleOpenExportModal, disabled: attractions.length === 0 },
+              { label: 'Export CSV', icon: FileDown, onClick: exportToCSV, disabled: attractions.length === 0 },
             ]}
           />
           <StandardButton
@@ -770,289 +988,83 @@ const ManageAttractions = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search attractions..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search attractions..."
+        onRefresh={loadAttractions}
+      />
+
+      <BulkActionsBar table={table} itemLabel="attraction(s)">
+        <select
+          onChange={(e) => handleBulkStatusChange(e.target.value as AttractionRow['status'])}
+          className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+        >
+          <option value="">Change Status</option>
+          <option value="active">Activate</option>
+          <option value="inactive">Deactivate</option>
+        </select>
+        <StandardButton
+          onClick={handleBulkDelete}
+          variant="danger"
+          size="md"
+          icon={Trash2}
+        >
+          Delete
+        </StandardButton>
+      </BulkActionsBar>
+
+      <AdminDataTable
+        table={table}
+        selectable
+        itemLabel="attractions"
+        emptyMessage="No attractions found"
+        renderActions={(attraction) => (
+          <div className="flex items-center gap-3">
+            <Link
+              to={buildPurchaseLink(attraction)}
+              className={`text-${themeColor}-600 hover:text-${fullColor}`}
+              title="View Purchase Page"
+              target="_blank"
+            >
+              <Link2 className="h-4 w-4" />
+            </Link>
+            <Link
+              to={`/attractions/details/${createSlugWithId(attraction.name, attraction.id)}`}
+              className={`text-${fullColor} hover:text-${themeColor}-900`}
+              title="View Details"
+            >
+              <Eye className="h-4 w-4" />
+            </Link>
+            <Link
+              to={`/attractions/edit/${attraction.id}`}
+              className="text-gray-600 hover:text-gray-800"
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
+            <button
+              onClick={() => handleDuplicateAttraction(attraction)}
+              className={`text-${themeColor}-600 hover:text-${fullColor} disabled:opacity-50`}
+              title="Duplicate"
+              disabled={duplicatingId === attraction.id}
+            >
+              {duplicatingId === attraction.id ? (
+                <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+            <StandardButton
+              onClick={() => handleDeleteAttraction(attraction.id)}
+              variant="danger"
+              size="sm"
+              icon={Trash2}
+              className="text-red-600 hover:text-red-800 p-1"
+              title="Delete"
             />
           </div>
-          <div className="flex gap-1">
-            <StandardButton
-              onClick={() => setShowFilters(!showFilters)}
-              variant="secondary"
-              size="sm"
-              icon={Filter}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              onClick={loadAttractions}
-              variant="secondary"
-              size="sm"
-              icon={RefreshCcw}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Category</label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Categories</option>
-                  {getUniqueCategories().map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                onClick={clearFilters}
-                variant="ghost"
-                size="sm"
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
         )}
-      </div>
-
-      {selectedAttractions.length > 0 && (
-        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
-          <span className={`text-${fullColor} font-medium`}>
-            {selectedAttractions.length} attraction(s) selected
-          </span>
-          <div className="flex gap-2">
-            <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as ManageAttractionsAttraction['status'])}
-              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
-            >
-              <option value="">Change Status</option>
-              <option value="active">Activate</option>
-              <option value="inactive">Deactivate</option>
-            </select>
-            <StandardButton
-              onClick={handleBulkDelete}
-              variant="danger"
-              size="md"
-              icon={Trash2}
-            >
-              Delete
-            </StandardButton>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
-              <tr>
-                <th scope="col" className="px-2 py-4 font-medium w-10"></th>
-                <th scope="col" className="px-6 py-4 font-medium w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedAttractions.length === currentAttractions.length && currentAttractions.length > 0}
-                    onChange={handleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
-                  />
-                </th>
-                <th scope="col" className="px-6 py-4 font-medium">Attraction</th>
-                <th scope="col" className="px-6 py-4 font-medium">Category</th>
-                <th scope="col" className="px-6 py-4 font-medium">Price</th>
-                <th scope="col" className="px-6 py-4 font-medium">Capacity</th>
-                <th scope="col" className="px-6 py-4 font-medium">Duration</th>
-                <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                <th scope="col" className="px-6 py-4 font-medium">Purchase Link</th>
-                <th scope="col" className="px-6 py-4 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentAttractions.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-800">
-                    No attractions found
-                  </td>
-                </tr>
-              ) : (
-                currentAttractions.map((attraction, index) => (
-                  <tr
-                    key={attraction.id}
-                    className="hover:bg-gray-50"
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <td className="px-2 py-4 whitespace-nowrap cursor-grab">
-                      <GripVertical className="h-4 w-4 text-gray-400" />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedAttractions.includes(attraction.id)}
-                        onChange={() => handleSelectAttraction(attraction.id)}
-                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-gray-900">{attraction.name}</span>
-                          {attraction.name?.includes('(Copy)') && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-300 shrink-0">
-                              <Copy className="w-2.5 h-2.5" />
-                              Copy
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">{attraction.location}</div>
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">{attraction.description}</div>
-                        {attraction.createdAt && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <CalendarDays className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-400">{formatCreatedAt(attraction.createdAt)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {attraction.category}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${attraction.price}
-                      <span className="text-xs text-gray-600 ml-1">
-                        {attraction.pricingType === 'per_person' ? '/person' : 
-                         attraction.pricingType === 'per_group' ? '/group' : 
-                         attraction.pricingType === 'per_hour' ? '/hour' : ''}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {attraction.maxCapacity} people
-                      {!attraction.displayCapacityToCustomers && (
-                        <span className="ml-1 text-xs text-gray-400" title="Hidden from customers">(hidden)</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={attraction.status}
-                        onChange={(e) => handleStatusChange(attraction.id, e.target.value as ManageAttractionsAttraction['status'])}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-${themeColor}-400`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <StandardButton
-                          onClick={() => copyPurchaseLink(attraction)}
-                          variant="ghost"
-                          size="sm"
-                          icon={ShoppingCart}
-                          className={`bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200 text-xs`}
-                          title="Copy purchase link"
-                        >
-                          {copiedLink === attraction.id ? 'Copied!' : 'Copy Link'}
-                        </StandardButton>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <Link
-                          to={`${window.location.origin}/purchase/attraction/${attraction.locationName ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `location-${attraction.locationId || '1'}`}/${createSlugWithId(attraction.name, attraction.id)}`}
-                          className={`text-${themeColor}-600 hover:text-${fullColor}`}
-                          title="View Purchase Page"
-                          target="_blank"
-                        >
-                          <Link2 className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          to={`/attractions/details/${createSlugWithId(attraction.name, attraction.id)}`}
-                          className={`text-${fullColor} hover:text-${themeColor}-900`}
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          to={`/attractions/edit/${attraction.id}`}
-                          className="text-gray-600 hover:text-gray-800"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-                        <button
-                          onClick={() => handleDuplicateAttraction(attraction)}
-                          className={`text-${themeColor}-600 hover:text-${fullColor} disabled:opacity-50`}
-                          title="Duplicate"
-                          disabled={duplicatingId === attraction.id}
-                        >
-                          {duplicatingId === attraction.id ? (
-                            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </button>
-                        <StandardButton
-                          onClick={() => handleDeleteAttraction(attraction.id)}
-                          variant="danger"
-                          size="sm"
-                          icon={Trash2}
-                          className="text-red-600 hover:text-red-800 p-1"
-                          title="Delete"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-white px-6 py-4 border-t border-gray-100">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={paginate}
-            totalItems={filteredAttractions.length}
-            showingFrom={indexOfFirstItem + 1}
-            showingTo={Math.min(indexOfLastItem, filteredAttractions.length)}
-          />
-        </div>
-      </div>
+      />
 
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowExportModal(false)}>

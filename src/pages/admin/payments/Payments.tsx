@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search,
-  Filter,
   RefreshCcw,
   Download,
   CreditCard,
@@ -12,12 +10,9 @@ import {
   Eye,
   DollarSign,
   FileText,
-  ArrowUpDown,
   Package,
   Ticket,
   Printer,
-  CheckSquare,
-  Square,
   X,
   Calendar,
   RotateCcw,
@@ -30,8 +25,8 @@ import {
   Archive
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { 
-  getPayments, 
+import {
+  getPayments,
   PAYMENT_TYPE,
   getInvoice,
   exportInvoices,
@@ -62,8 +57,16 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import RefundModal from '../../../components/admin/payments/RefundModal';
 import VoidDialog from '../../../components/admin/payments/VoidDialog';
 import ManualRefundModal from '../../../components/admin/payments/ManualRefundModal';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef, DateRangeValue } from '../../../components/admin/table';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
-import type { PaymentsPagePayment, PaymentsFilterOptions, PaymentsMetrics } from '../../../types/Payments.types';
+import type { PaymentsPagePayment, PaymentsMetrics } from '../../../types/Payments.types';
 import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
 import type { PaymentPayableType } from '../../../types/Payment.types';
 
@@ -76,35 +79,111 @@ const normalizePayableType = (type?: string | null): PaymentPayableType | undefi
   return type as PaymentPayableType;
 };
 
-const Payments: React.FC = () => {
+const transformPayment = (payment: Payment): PaymentsPagePayment => {
+  const payableType = normalizePayableType(payment.payable_type as string);
+
+  const booking = payment.booking;
+  const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
+  const eventPurchase = payment.eventPurchase || payment.event_purchase;
+
+  let customerName = 'Guest';
+  let customerEmail = 'N/A';
+
+  if (payment.customer) {
+    customerName = `${payment.customer.first_name} ${payment.customer.last_name}`;
+    customerEmail = payment.customer.email || 'N/A';
+  } else if (payableType === PAYMENT_TYPE.BOOKING && booking) {
+    customerName = booking.guest_name || 'Guest';
+    customerEmail = booking.guest_email || 'N/A';
+  } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
+    customerName = attractionPurchase.guest_name || 'Guest';
+    customerEmail = attractionPurchase.guest_email || 'N/A';
+  } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
+    customerName = eventPurchase.guest_name || 'Guest';
+    customerEmail = eventPurchase.guest_email || 'N/A';
+  }
+
+  let payableReference = 'N/A';
+  let payableDescription = 'Unknown';
+
+  if (payableType === PAYMENT_TYPE.BOOKING && booking) {
+    payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
+    payableDescription = `Package Booking • ${booking.participants || 0} guests`;
+  } else if (payableType === PAYMENT_TYPE.BOOKING) {
+    payableReference = `Booking #${payment.payable_id}`;
+    payableDescription = 'Package Booking';
+  } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
+    payableReference = attractionPurchase.transaction_id || `Purchase #${payment.payable_id}`;
+    payableDescription = `Attraction • Qty: ${attractionPurchase.quantity || 1}`;
+  } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+    payableReference = `Purchase #${payment.payable_id}`;
+    payableDescription = 'Attraction Purchase';
+  } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
+    payableReference = eventPurchase.reference_number || `Event #${payment.payable_id}`;
+    payableDescription = `Event Purchase • Qty: ${eventPurchase.quantity || 1}`;
+  } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE) {
+    payableReference = `Event #${payment.payable_id}`;
+    payableDescription = 'Event Purchase';
+  }
+
+  return {
+    id: payment.id,
+    payable_id: payment.payable_id,
+    payable_type: payableType,
+    customer_id: payment.customer_id,
+    location_id: payment.location_id,
+    amount: Number(payment.amount),
+    currency: payment.currency,
+    method: payment.method,
+    status: payment.status,
+    transaction_id: payment.transaction_id,
+    payment_id: payment.payment_id,
+    notes: payment.notes,
+    paid_at: payment.paid_at,
+    refunded_at: payment.refunded_at,
+    created_at: payment.created_at,
+    updated_at: payment.updated_at,
+    deleted_at: payment.deleted_at,
+    booking: booking,
+    attractionPurchase: attractionPurchase,
+    customerName,
+    customerEmail,
+    locationName: payment.location?.name || 'N/A',
+    payableReference,
+    payableDescription,
+    bookingDate: booking?.booking_date,
+    bookingTime: booking?.booking_time,
+    participants: booking?.participants,
+    guestName: booking?.guest_name || attractionPurchase?.guest_name,
+    signature_image: payment.signature_image || null,
+    terms_accepted: payment.terms_accepted ?? null,
+  };
+};
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const Payments = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const isLocationManager = currentUser?.role === 'location_manager';
-  
+  const itemsPerPage = 10;
+
   const [payments, setPayments] = useState<PaymentsPagePayment[]>([]);
-  const [filteredPayments, setFilteredPayments] = useState<PaymentsPagePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [filters, setFilters] = useState<PaymentsFilterOptions>({
-    status: 'all',
-    method: 'all',
-    payable_type: 'all',
-    search: '',
-    dateRange: 'all',
-    startDate: '',
-    endDate: ''
-  });
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [sortField, setSortField] = useState<'created_at' | 'amount' | 'status'>('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [totalPages, setTotalPages] = useState(1);
-  
+
   const [viewMode, setViewMode] = useState<'active' | 'trashed'>('active');
   const [trashedPayments, setTrashedPayments] = useState<PaymentsPagePayment[]>([]);
   const [loadingTrashed, setLoadingTrashed] = useState(false);
@@ -114,9 +193,8 @@ const Payments: React.FC = () => {
     payment: PaymentsPagePayment;
   } | null>(null);
 
-  const [selectedPayments, setSelectedPayments] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
-  
+
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState<'custom' | 'today' | 'week' | 'current_week' | 'last_week'>('custom');
   const [exportFilters, setExportFilters] = useState<InvoiceExportFilters>({
@@ -130,6 +208,15 @@ const Payments: React.FC = () => {
   });
   const [availablePackages, setAvailablePackages] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
+
+  const [selectedPaymentForAction, setSelectedPaymentForAction] = useState<PaymentsPagePayment | null>(null);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [showManualRefundModal, setShowManualRefundModal] = useState(false);
+  const [openActionsMenu, setOpenActionsMenu] = useState<number | null>(null);
+
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureModalPayment, setSignatureModalPayment] = useState<PaymentsPagePayment | null>(null);
 
   const statusConfig = {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
@@ -199,11 +286,11 @@ const Payments: React.FC = () => {
   const loadPayments = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const params: PaymentFilters = {
-        per_page: 1000, // Load all for client-side filtering
+        per_page: 1000,
       };
-      
+
       if (selectedLocation) {
         params.location_id = parseInt(selectedLocation);
       } else if (isLocationManager && currentUser?.location_id) {
@@ -212,90 +299,8 @@ const Payments: React.FC = () => {
 
       const response = await getPayments(params);
 
-      console.log('Payments response:', response);
-      
       if (response.success && response.data) {
-        const transformedPayments: PaymentsPagePayment[] = response.data.payments.map((payment: Payment) => {
-          const payableType = normalizePayableType(payment.payable_type as string);
-          
-          const booking = payment.booking;
-          const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
-          const eventPurchase = payment.eventPurchase || payment.event_purchase;
-          
-          let customerName = 'Guest';
-          let customerEmail = 'N/A';
-          
-          if (payment.customer) {
-            customerName = `${payment.customer.first_name} ${payment.customer.last_name}`;
-            customerEmail = payment.customer.email || 'N/A';
-          } else if (payableType === PAYMENT_TYPE.BOOKING && booking) {
-            customerName = booking.guest_name || 'Guest';
-            customerEmail = booking.guest_email || 'N/A';
-          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
-            customerName = attractionPurchase.guest_name || 'Guest';
-            customerEmail = attractionPurchase.guest_email || 'N/A';
-          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
-            customerName = eventPurchase.guest_name || 'Guest';
-            customerEmail = eventPurchase.guest_email || 'N/A';
-          }
-          
-          let payableReference = 'N/A';
-          let payableDescription = 'Unknown';
-          
-          if (payableType === PAYMENT_TYPE.BOOKING && booking) {
-            payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
-            payableDescription = `Package Booking • ${booking.participants || 0} guests`;
-          } else if (payableType === PAYMENT_TYPE.BOOKING) {
-            payableReference = `Booking #${payment.payable_id}`;
-            payableDescription = 'Package Booking';
-          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
-            payableReference = attractionPurchase.transaction_id || `Purchase #${payment.payable_id}`;
-            payableDescription = `Attraction • Qty: ${attractionPurchase.quantity || 1}`;
-          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-            payableReference = `Purchase #${payment.payable_id}`;
-            payableDescription = 'Attraction Purchase';
-          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
-            payableReference = eventPurchase.reference_number || `Event #${payment.payable_id}`;
-            payableDescription = `Event Purchase • Qty: ${eventPurchase.quantity || 1}`;
-          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE) {
-            payableReference = `Event #${payment.payable_id}`;
-            payableDescription = 'Event Purchase';
-          }
-          
-          return {
-            id: payment.id,
-            payable_id: payment.payable_id,
-            payable_type: payableType,
-            customer_id: payment.customer_id,
-            location_id: payment.location_id,
-            amount: Number(payment.amount),
-            currency: payment.currency,
-            method: payment.method,
-            status: payment.status,
-            transaction_id: payment.transaction_id,
-            payment_id: payment.payment_id,
-            notes: payment.notes,
-            paid_at: payment.paid_at,
-            refunded_at: payment.refunded_at,
-            created_at: payment.created_at,
-            updated_at: payment.updated_at,
-            booking: booking,
-            attractionPurchase: attractionPurchase,
-            customerName,
-            customerEmail,
-            locationName: payment.location?.name || 'N/A',
-            payableReference,
-            payableDescription,
-            bookingDate: booking?.booking_date,
-            bookingTime: booking?.booking_time,
-            participants: booking?.participants,
-            guestName: booking?.guest_name || attractionPurchase?.guest_name,
-            signature_image: payment.signature_image || null,
-            terms_accepted: payment.terms_accepted ?? null,
-          };
-        });
-
-        setPayments(transformedPayments);
+        setPayments(response.data.payments.map(transformPayment));
       }
     } catch (error) {
       console.error('Error loading payments:', error);
@@ -304,95 +309,6 @@ const Payments: React.FC = () => {
       setLoading(false);
     }
   }, [selectedLocation, isLocationManager, currentUser?.location_id]);
-
-  const applyFilters = useCallback(() => {
-    let result = [...payments];
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(payment =>
-        payment.transaction_id?.toLowerCase().includes(searchTerm) ||
-        payment.customerName?.toLowerCase().includes(searchTerm) ||
-        payment.customerEmail?.toLowerCase().includes(searchTerm) ||
-        payment.notes?.toLowerCase().includes(searchTerm) ||
-        payment.payableReference?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    if (filters.status !== 'all') {
-      result = result.filter(payment => payment.status === filters.status);
-    }
-
-    if (filters.method !== 'all') {
-      result = result.filter(payment => payment.method === filters.method);
-    }
-
-    if (filters.payable_type !== 'all') {
-      result = result.filter(payment => payment.payable_type === filters.payable_type);
-    }
-
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      let startDate: Date;
-
-      switch (filters.dateRange) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'week':
-          startDate = new Date(now);
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case 'month':
-          startDate = new Date(now);
-          startDate.setMonth(now.getMonth() - 1);
-          break;
-        case 'year':
-          startDate = new Date(now);
-          startDate.setFullYear(now.getFullYear() - 1);
-          break;
-        default:
-          startDate = new Date(0);
-      }
-
-      result = result.filter(payment => new Date(payment.created_at) >= startDate);
-    }
-
-    if (filters.startDate) {
-      result = result.filter(payment => new Date(payment.created_at) >= new Date(filters.startDate));
-    }
-    if (filters.endDate) {
-      const endDate = new Date(filters.endDate);
-      endDate.setHours(23, 59, 59, 999);
-      result = result.filter(payment => new Date(payment.created_at) <= endDate);
-    }
-
-    result.sort((a, b) => {
-      let aVal: string | number, bVal: string | number;
-      switch (sortField) {
-        case 'amount':
-          aVal = a.amount;
-          bVal = b.amount;
-          break;
-        case 'status':
-          aVal = a.status;
-          bVal = b.status;
-          break;
-        default:
-          aVal = new Date(a.created_at).getTime();
-          bVal = new Date(b.created_at).getTime();
-      }
-
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
-    });
-
-    setFilteredPayments(result);
-    setTotalPages(Math.ceil(result.length / itemsPerPage));
-  }, [payments, filters, sortField, sortDirection, itemsPerPage]);
 
   const loadLocations = useCallback(async () => {
     if (isCompanyAdmin) {
@@ -411,6 +327,27 @@ const Payments: React.FC = () => {
     }
   }, [isCompanyAdmin]);
 
+  const loadTrashedPayments = useCallback(async () => {
+    try {
+      setLoadingTrashed(true);
+      const params: PaymentFilters = { per_page: 1000 };
+      if (selectedLocation) {
+        params.location_id = parseInt(selectedLocation);
+      } else if (isLocationManager && currentUser?.location_id) {
+        params.location_id = currentUser.location_id;
+      }
+      const response = await getTrashedPayments(params);
+      if (response.success && response.data) {
+        setTrashedPayments(response.data.payments.map(transformPayment));
+      }
+    } catch (error) {
+      console.error('Error loading trashed payments:', error);
+      setToast({ message: 'Failed to load deleted payments', type: 'error' });
+    } finally {
+      setLoadingTrashed(false);
+    }
+  }, [selectedLocation, isLocationManager, currentUser?.location_id]);
+
   useEffect(() => {
     loadLocations();
   }, [loadLocations]);
@@ -420,61 +357,10 @@ const Payments: React.FC = () => {
   }, [loadPayments]);
 
   useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters]);
-
-  const handleFilterChange = (key: keyof PaymentsFilterOptions, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      method: 'all',
-      payable_type: 'all',
-      search: '',
-      dateRange: 'all',
-      startDate: '',
-      endDate: ''
-    });
-  };
-
-  const handleSort = (field: 'created_at' | 'amount' | 'status') => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
+    if (viewMode === 'trashed') {
+      loadTrashedPayments();
     }
-  };
-
-  const togglePaymentSelection = (paymentId: number) => {
-    setSelectedPayments(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(paymentId)) {
-        newSet.delete(paymentId);
-      } else {
-        newSet.add(paymentId);
-      }
-      return newSet;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedPayments.size === currentPayments.length) {
-      setSelectedPayments(new Set());
-    } else {
-      setSelectedPayments(new Set(currentPayments.map(p => p.id)));
-    }
-  };
-
-  const clearSelection = () => {
-    setSelectedPayments(new Set());
-  };
+  }, [viewMode, loadTrashedPayments]);
 
   const handleInvoice = async (paymentId: number, stream: boolean = true) => {
     try {
@@ -489,93 +375,21 @@ const Payments: React.FC = () => {
     }
   };
 
-  const handleBulkExportInvoices = async (stream: boolean = false) => {
-    if (selectedPayments.size === 0) {
-      setToast({ message: 'Please select payments to export', type: 'error' });
-      return;
-    }
-
-    try {
-      setIsExporting(true);
-      setToast({ message: `${stream ? 'Opening' : 'Exporting'} ${selectedPayments.size} invoice(s)...`, type: 'info' });
-      await exportBulkInvoices(Array.from(selectedPayments), !stream);
-      setToast({ message: `Invoices ${stream ? 'opened' : 'exported'} successfully`, type: 'success' });
-      setSelectedPayments(new Set());
-    } catch (error) {
-      console.error('Error exporting invoices:', error);
-      setToast({ message: 'Failed to export invoices', type: 'error' });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const openExportModal = () => {
-    const newExportFilters: InvoiceExportFilters = {
-      view_mode: 'report'
-    };
-    
-    if (selectedLocation) {
-      newExportFilters.location_id = parseInt(selectedLocation);
-    } else if (isLocationManager && currentUser?.location_id) {
-      newExportFilters.location_id = currentUser.location_id;
-    }
-    
-    if (filters.status !== 'all') newExportFilters.status = filters.status as InvoiceExportFilters['status'];
-    if (filters.method !== 'all') newExportFilters.method = filters.method as InvoiceExportFilters['method'];
-    if (filters.payable_type !== 'all') newExportFilters.payable_type = filters.payable_type as InvoiceExportFilters['payable_type'];
-    if (filters.startDate) newExportFilters.start_date = filters.startDate;
-    if (filters.endDate) newExportFilters.end_date = filters.endDate;
-    
-    setExportFilters(newExportFilters);
-    setShowExportModal(true);
-  };
-
-  const handleExportFromModal = async (stream: boolean = false) => {
-    try {
-      setIsExporting(true);
-      setToast({ message: stream ? 'Opening invoices...' : 'Generating invoices...', type: 'info' });
-      
-      if (exportMode === 'today') {
-        const today = new Date().toISOString().split('T')[0];
-        await exportInvoicesForDay(today, stream);
-      } else if (exportMode === 'current_week') {
-        await exportInvoicesForWeek('current', stream);
-      } else if (exportMode === 'last_week') {
-        const lastWeekDate = new Date();
-        lastWeekDate.setDate(lastWeekDate.getDate() - 7);
-        await exportInvoicesForWeek(lastWeekDate.toISOString().split('T')[0], stream);
-      } else if (exportMode === 'week') {
-        await exportInvoicesForWeek(exportDate, stream);
-      } else {
-        await exportInvoices(exportFilters, stream);
-      }
-      
-      setToast({ message: `Invoices ${stream ? 'opened' : 'downloaded'} successfully`, type: 'success' });
-      setShowExportModal(false);
-    } catch (error: unknown) {
-      console.error('Error exporting invoices:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to export invoices';
-      setToast({ message: errorMessage, type: 'error' });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const handleOpenPackageInvoiceModal = async () => {
     setShowPackageInvoiceModal(true);
     setLoadingPackages(true);
-    
+
     try {
-      const locationId = selectedLocation 
-        ? parseInt(selectedLocation) 
+      const locationId = selectedLocation
+        ? parseInt(selectedLocation)
         : (isLocationManager && currentUser?.location_id ? currentUser.location_id : undefined);
-      
-      const response = await packageService.getPackages({ 
-        location_id: locationId, 
+
+      const response = await packageService.getPackages({
+        location_id: locationId,
         is_active: true,
         per_page: 100
       });
-      
+
       if (response.success && response.data) {
         setAvailablePackages(
           (response.data.packages || []).map((pkg: { id: number; name: string }) => ({
@@ -590,7 +404,7 @@ const Payments: React.FC = () => {
     } finally {
       setLoadingPackages(false);
     }
-    
+
     setPackageInvoiceFilters({
       package_id: 0
     });
@@ -601,13 +415,13 @@ const Payments: React.FC = () => {
       setToast({ message: 'Please select a package', type: 'error' });
       return;
     }
-    
+
     try {
       setIsExporting(true);
       setToast({ message: stream ? 'Opening package invoices...' : 'Generating package invoices...', type: 'info' });
-      
+
       await exportPackageInvoices(packageInvoiceFilters, stream);
-      
+
       setToast({ message: `Package invoices ${stream ? 'opened' : 'downloaded'} successfully`, type: 'success' });
       setShowPackageInvoiceModal(false);
     } catch (error: unknown) {
@@ -619,45 +433,36 @@ const Payments: React.FC = () => {
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ['ID', 'Transaction ID', 'Type', 'Customer', 'Email', 'Amount', 'Method', 'Status', 'Location', 'Date'];
-    const csvData = filteredPayments.map(payment => [
-      payment.id,
-      payment.transaction_id,
-      payment.payable_type === PAYMENT_TYPE.BOOKING ? 'Booking' : payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE ? 'Event Purchase' : 'Attraction Purchase',
-      payment.customerName,
-      payment.customerEmail,
-      payment.amount.toFixed(2),
-      payment.method,
-      payment.status,
-      payment.locationName,
-      new Date(payment.created_at).toLocaleString()
-    ]);
+  const handleExportFromModal = async (stream: boolean = false) => {
+    try {
+      setIsExporting(true);
+      setToast({ message: stream ? 'Opening invoices...' : 'Generating invoices...', type: 'info' });
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+      if (exportMode === 'today') {
+        const today = new Date().toISOString().split('T')[0];
+        await exportInvoicesForDay(today, stream);
+      } else if (exportMode === 'current_week') {
+        await exportInvoicesForWeek('current', stream);
+      } else if (exportMode === 'last_week') {
+        const lastWeekDate = new Date();
+        lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+        await exportInvoicesForWeek(lastWeekDate.toISOString().split('T')[0], stream);
+      } else if (exportMode === 'week') {
+        await exportInvoicesForWeek(exportDate, stream);
+      } else {
+        await exportInvoices(exportFilters, stream);
+      }
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `payments-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    setToast({ message: 'Payments exported successfully', type: 'success' });
+      setToast({ message: `Invoices ${stream ? 'opened' : 'downloaded'} successfully`, type: 'success' });
+      setShowExportModal(false);
+    } catch (error: unknown) {
+      console.error('Error exporting invoices:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export invoices';
+      setToast({ message: errorMessage, type: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
   };
-
-  const [selectedPaymentForAction, setSelectedPaymentForAction] = useState<PaymentsPagePayment | null>(null);
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [showVoidDialog, setShowVoidDialog] = useState(false);
-  const [showManualRefundModal, setShowManualRefundModal] = useState(false);
-  const [openActionsMenu, setOpenActionsMenu] = useState<number | null>(null);
-
-  const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [signatureModalPayment, setSignatureModalPayment] = useState<PaymentsPagePayment | null>(null);
 
   const handleRefundClick = (payment: PaymentsPagePayment) => {
     setSelectedPaymentForAction(payment);
@@ -803,116 +608,6 @@ const Payments: React.FC = () => {
     });
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const loadTrashedPayments = useCallback(async () => {
-    try {
-      setLoadingTrashed(true);
-      const params: PaymentFilters = { per_page: 1000 };
-      if (selectedLocation) {
-        params.location_id = parseInt(selectedLocation);
-      } else if (isLocationManager && currentUser?.location_id) {
-        params.location_id = currentUser.location_id;
-      }
-      const response = await getTrashedPayments(params);
-      if (response.success && response.data) {
-        const transformed: PaymentsPagePayment[] = response.data.payments.map((payment: Payment) => {
-          const payableType = normalizePayableType(payment.payable_type as string);
-          const booking = payment.booking;
-          const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
-          const eventPurchase = payment.eventPurchase || payment.event_purchase;
-          
-          let customerName = 'Guest';
-          let customerEmail = 'N/A';
-          
-          if (payment.customer) {
-            customerName = `${payment.customer.first_name} ${payment.customer.last_name}`;
-            customerEmail = payment.customer.email || 'N/A';
-          } else if (payableType === PAYMENT_TYPE.BOOKING && booking) {
-            customerName = booking.guest_name || 'Guest';
-            customerEmail = booking.guest_email || 'N/A';
-          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
-            customerName = attractionPurchase.guest_name || 'Guest';
-            customerEmail = attractionPurchase.guest_email || 'N/A';
-          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
-            customerName = eventPurchase.guest_name || 'Guest';
-            customerEmail = eventPurchase.guest_email || 'N/A';
-          }
-          
-          let payableReference = 'N/A';
-          let payableDescription = 'Unknown';
-          
-          if (payableType === PAYMENT_TYPE.BOOKING && booking) {
-            payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
-            payableDescription = `Package Booking • ${booking.participants || 0} guests`;
-          } else if (payableType === PAYMENT_TYPE.BOOKING) {
-            payableReference = `Booking #${payment.payable_id}`;
-            payableDescription = 'Package Booking';
-          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
-            payableReference = attractionPurchase.transaction_id || `Purchase #${payment.payable_id}`;
-            payableDescription = `Attraction • Qty: ${attractionPurchase.quantity || 1}`;
-          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-            payableReference = `Purchase #${payment.payable_id}`;
-            payableDescription = 'Attraction Purchase';
-          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
-            payableReference = eventPurchase.reference_number || `Event #${payment.payable_id}`;
-            payableDescription = `Event Purchase • Qty: ${eventPurchase.quantity || 1}`;
-          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE) {
-            payableReference = `Event #${payment.payable_id}`;
-            payableDescription = 'Event Purchase';
-          }
-          
-          return {
-            id: payment.id,
-            payable_id: payment.payable_id,
-            payable_type: payableType,
-            customer_id: payment.customer_id,
-            location_id: payment.location_id,
-            amount: Number(payment.amount),
-            currency: payment.currency,
-            method: payment.method,
-            status: payment.status,
-            transaction_id: payment.transaction_id,
-            payment_id: payment.payment_id,
-            notes: payment.notes,
-            paid_at: payment.paid_at,
-            refunded_at: payment.refunded_at,
-            created_at: payment.created_at,
-            updated_at: payment.updated_at,
-            deleted_at: payment.deleted_at,
-            booking: booking,
-            attractionPurchase: attractionPurchase,
-            customerName,
-            customerEmail,
-            locationName: payment.location?.name || 'N/A',
-            payableReference,
-            payableDescription,
-            bookingDate: booking?.booking_date,
-            bookingTime: booking?.booking_time,
-            participants: booking?.participants,
-            guestName: booking?.guest_name || attractionPurchase?.guest_name,
-            signature_image: payment.signature_image || null,
-            terms_accepted: payment.terms_accepted ?? null,
-          };
-        });
-        setTrashedPayments(transformed);
-      }
-    } catch (error) {
-      console.error('Error loading trashed payments:', error);
-      setToast({ message: 'Failed to load deleted payments', type: 'error' });
-    } finally {
-      setLoadingTrashed(false);
-    }
-  }, [selectedLocation, isLocationManager, currentUser?.location_id]);
-
   const handleSoftDelete = async (payment: PaymentsPagePayment) => {
     try {
       const response = await deletePayment(payment.id);
@@ -964,17 +659,428 @@ const Payments: React.FC = () => {
     setConfirmDialog(null);
   };
 
-  useEffect(() => {
-    if (viewMode === 'trashed') {
-      loadTrashedPayments();
+  const navigateToPayable = (payment: PaymentsPagePayment) => {
+    if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
+      navigate(`/bookings/${payment.payable_id}?from=payments`);
+    } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+      navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
+    } else if (payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE) {
+      navigate(`/events/purchases/${payment.payable_id}?from=payments`);
     }
-  }, [viewMode, loadTrashedPayments]);
+  };
 
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentPayments = filteredPayments.slice(indexOfFirstItem, indexOfLastItem);
+  const columns: AdminColumn<PaymentsPagePayment>[] = [
+    {
+      key: 'paymentId',
+      label: 'Payment ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: p => p.id,
+      exportValue: p => p.id,
+      defaultVisible: false,
+      render: p => <span className="text-sm font-mono text-gray-600">#{p.id}</span>,
+    },
+    {
+      key: 'transaction',
+      label: 'Transaction',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: p => p.transaction_id || `TXN-${p.id}`,
+      exportValue: p => p.transaction_id || `TXN-${p.id}`,
+      render: p => {
+        const isRefund = isRefundRecord(p);
+        const isVoid = isVoidRecord(p);
+        const originalId = extractOriginalPaymentId(p.notes);
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-900">
+              {p.transaction_id || `TXN-${p.id}`}
+            </span>
+            <span className="text-xs text-gray-500">
+              ID: {p.id}
+              {isRefund && originalId && (
+                <span className="ml-1 text-orange-600">(↩ from #{originalId})</span>
+              )}
+              {isVoid && originalId && (
+                <span className="ml-1 text-red-600">(✕ from #{originalId})</span>
+              )}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      group: 'Source',
+      sortable: true,
+      sortValue: p => p.payableReference || '',
+      exportValue: p => p.payableReference || '',
+      render: p => {
+        const isRefund = isRefundRecord(p);
+        const isVoid = isVoidRecord(p);
+        const TypeIcon = p.payable_type ? payableTypeConfig[p.payable_type]?.icon : FileText;
+        return (
+          <div className="flex items-center gap-2">
+            <div className={`p-1.5 rounded-lg ${
+              isRefund ? 'bg-orange-100 text-orange-600' :
+              isVoid ? 'bg-red-100 text-red-600' :
+              p.payable_type ? payableTypeConfig[p.payable_type]?.color : 'bg-gray-100 text-gray-600'
+            }`}>
+              {isRefund ? <RotateCcw className="w-4 h-4" /> :
+               isVoid ? <Ban className="w-4 h-4" /> :
+               TypeIcon && <TypeIcon className="w-4 h-4" />}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-gray-900">
+                {p.payableReference}
+              </span>
+              <span className="text-xs text-gray-500">
+                {isRefund ? 'Refund Record' : isVoid ? 'Void Record' : p.payableDescription}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'customer',
+      label: 'Customer',
+      group: 'Customer',
+      sortable: true,
+      sortValue: p => p.customerName || '',
+      exportValue: p => p.customerName || '',
+      render: p => (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-900">{p.customerName}</span>
+          <span className="text-xs text-gray-500">{p.customerEmail}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.amount,
+      exportValue: p => p.amount.toFixed(2),
+      render: p => (
+        p.status === 'refunded' || p.status === 'voided' ? (
+          <span className="text-sm font-bold text-red-600">
+            -${p.amount.toFixed(2)}
+          </span>
+        ) : (
+          <span className="text-sm font-bold text-gray-900">
+            ${p.amount.toFixed(2)}
+          </span>
+        )
+      ),
+    },
+    {
+      key: 'method',
+      label: 'Method',
+      group: 'Payment',
+      sortable: true,
+      sortValue: p => p.method,
+      exportValue: p => p.method,
+      render: p => {
+        const MethodIcon = methodConfig[p.method]?.icon || CreditCard;
+        return (
+          <div className="flex items-center gap-2">
+            <MethodIcon className="w-4 h-4 text-gray-500" />
+            <span className="text-sm text-gray-600 capitalize">{p.method}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: p => p.status,
+      exportValue: p => p.status,
+      render: p => {
+        const StatusIcon = statusConfig[p.status]?.icon || Clock;
+        return (
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[p.status]?.color}`}>
+            <StatusIcon className="w-3.5 h-3.5" />
+            {statusConfig[p.status]?.label}
+          </span>
+        );
+      },
+    },
+    ...(isCompanyAdmin ? [{
+      key: 'location',
+      label: 'Location',
+      group: 'Location',
+      sortable: true,
+      sortValue: (p: PaymentsPagePayment) => p.locationName || '',
+      exportValue: (p: PaymentsPagePayment) => p.locationName || '',
+      render: (p: PaymentsPagePayment) => <span className="text-sm text-gray-600">{p.locationName}</span>,
+    }] : []),
+    {
+      key: 'createdAt',
+      label: 'Date',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => new Date(p.created_at).getTime(),
+      exportValue: p => new Date(p.created_at).toLocaleString(),
+      cellClassName: 'min-w-[180px]',
+      render: p => <span className="text-sm text-gray-900 whitespace-nowrap">{formatDate(p.created_at)}</span>,
+    },
+    {
+      key: 'paidAt',
+      label: 'Paid At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => p.paid_at ? new Date(p.paid_at).getTime() : 0,
+      exportValue: p => p.paid_at ? new Date(p.paid_at).toLocaleString() : '',
+      defaultVisible: false,
+      render: p => p.paid_at
+        ? <span className="text-sm text-gray-600 whitespace-nowrap">{formatDate(p.paid_at)}</span>
+        : <span className="text-gray-300">—</span>,
+    },
+    {
+      key: 'refundedAt',
+      label: 'Refunded At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => p.refunded_at ? new Date(p.refunded_at).getTime() : 0,
+      exportValue: p => p.refunded_at ? new Date(p.refunded_at).toLocaleString() : '',
+      defaultVisible: false,
+      render: p => p.refunded_at
+        ? <span className="text-sm text-gray-600 whitespace-nowrap">{formatDate(p.refunded_at)}</span>
+        : <span className="text-gray-300">—</span>,
+    },
+    {
+      key: 'updatedAt',
+      label: 'Updated At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: p => p.updated_at ? new Date(p.updated_at).getTime() : 0,
+      exportValue: p => p.updated_at ? new Date(p.updated_at).toLocaleString() : '',
+      defaultVisible: false,
+      render: p => p.updated_at
+        ? <span className="text-sm text-gray-600 whitespace-nowrap">{formatDate(p.updated_at)}</span>
+        : <span className="text-gray-300">—</span>,
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      group: 'Details',
+      sortable: true,
+      sortValue: p => p.notes || '',
+      exportValue: p => p.notes || '',
+      defaultVisible: false,
+      render: p => p.notes
+        ? <span className="text-xs text-gray-600 block max-w-[240px] truncate" title={p.notes}>{p.notes}</span>
+        : <span className="text-gray-300">—</span>,
+    },
+  ];
 
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const filterDefs: AdminFilterDef<PaymentsPagePayment>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'completed', label: 'Completed' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'failed', label: 'Failed' },
+        { value: 'refunded', label: 'Refunded' },
+        { value: 'voided', label: 'Voided' },
+      ],
+      predicate: (p, value) => p.status === value,
+    },
+    {
+      type: 'select',
+      key: 'method',
+      label: 'Payment Method',
+      allLabel: 'All Methods',
+      options: [
+        { value: 'card', label: 'Card' },
+        { value: 'authorize.net', label: 'Authorize.net' },
+        { value: 'cash', label: 'Cash' },
+        { value: 'in-store', label: 'In-Store' },
+      ],
+      predicate: (p, value) => p.method === value,
+    },
+    {
+      type: 'select',
+      key: 'payableType',
+      label: 'Payment Type',
+      allLabel: 'All Types',
+      options: [
+        { value: 'booking', label: 'Bookings' },
+        { value: 'attraction_purchase', label: 'Attractions' },
+        { value: 'event_purchase', label: 'Events' },
+      ],
+      predicate: (p, value) => p.payable_type === value,
+    },
+    {
+      type: 'select',
+      key: 'recordType',
+      label: 'Record Type',
+      allLabel: 'All Records',
+      options: [
+        { value: 'payment', label: 'Payments' },
+        { value: 'refund', label: 'Refund Records' },
+        { value: 'void', label: 'Void Records' },
+      ],
+      predicate: (p, value) => {
+        if (value === 'refund') return isRefundRecord(p);
+        if (value === 'void') return isVoidRecord(p);
+        return !isRefundRecord(p) && !isVoidRecord(p);
+      },
+    },
+    {
+      type: 'select',
+      key: 'period',
+      label: 'Time Period',
+      allLabel: 'All Time',
+      options: [
+        { value: 'today', label: 'Today' },
+        { value: 'week', label: 'This Week' },
+        { value: 'month', label: 'This Month' },
+        { value: 'year', label: 'This Year' },
+      ],
+      predicate: (p, value) => {
+        const now = new Date();
+        let startDate: Date;
+        switch (value) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'week':
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 7);
+            break;
+          case 'month':
+            startDate = new Date(now);
+            startDate.setMonth(now.getMonth() - 1);
+            break;
+          case 'year':
+            startDate = new Date(now);
+            startDate.setFullYear(now.getFullYear() - 1);
+            break;
+          default:
+            startDate = new Date(0);
+        }
+        return new Date(p.created_at) >= startDate;
+      },
+    },
+    {
+      type: 'daterange',
+      key: 'createdDate',
+      label: 'Payment Date',
+      getDate: p => p.created_at,
+    },
+    {
+      type: 'numberrange',
+      key: 'amount',
+      label: 'Amount ($)',
+      getValue: p => p.amount,
+    },
+  ], []);
+
+  const table = useAdminTable<PaymentsPagePayment>({
+    data: payments,
+    columns,
+    getRowId: p => String(p.id),
+    storageKey: 'payments',
+    filterDefs,
+    searchFields: p => [
+      p.id,
+      p.transaction_id,
+      p.payment_id,
+      p.customerName,
+      p.customerEmail,
+      p.notes,
+      p.payableReference,
+    ],
+    defaultSort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    itemsPerPage,
+  });
+
+  const handleBulkExportInvoices = async (stream: boolean = false) => {
+    if (table.selectedIds.length === 0) {
+      setToast({ message: 'Please select payments to export', type: 'error' });
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setToast({ message: `${stream ? 'Opening' : 'Exporting'} ${table.selectedIds.length} invoice(s)...`, type: 'info' });
+      await exportBulkInvoices(table.selectedIds.map(Number), !stream);
+      setToast({ message: `Invoices ${stream ? 'opened' : 'exported'} successfully`, type: 'success' });
+      table.clearSelection();
+    } catch (error) {
+      console.error('Error exporting invoices:', error);
+      setToast({ message: 'Failed to export invoices', type: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const openExportModal = () => {
+    const newExportFilters: InvoiceExportFilters = {
+      view_mode: 'report'
+    };
+
+    if (selectedLocation) {
+      newExportFilters.location_id = parseInt(selectedLocation);
+    } else if (isLocationManager && currentUser?.location_id) {
+      newExportFilters.location_id = currentUser.location_id;
+    }
+
+    const statusValue = table.filterValues['status'];
+    if (typeof statusValue === 'string' && statusValue !== 'all') {
+      newExportFilters.status = statusValue as InvoiceExportFilters['status'];
+    }
+    const methodValue = table.filterValues['method'];
+    if (typeof methodValue === 'string' && methodValue !== 'all') {
+      newExportFilters.method = methodValue as InvoiceExportFilters['method'];
+    }
+    const typeValue = table.filterValues['payableType'];
+    if (typeof typeValue === 'string' && typeValue !== 'all') {
+      newExportFilters.payable_type = typeValue as InvoiceExportFilters['payable_type'];
+    }
+    const dateValue = table.filterValues['createdDate'] as DateRangeValue | undefined;
+    if (dateValue?.start) newExportFilters.start_date = dateValue.start;
+    if (dateValue?.end) newExportFilters.end_date = dateValue.end;
+
+    setExportFilters(newExportFilters);
+    setShowExportModal(true);
+  };
+
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `payments-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Payable Type', value: p => p.payable_type || '' },
+        { label: 'Payable ID', value: p => p.payable_id ?? '' },
+        { label: 'Description', value: p => p.payableDescription || '' },
+        { label: 'Customer Email', value: p => p.customerEmail || '' },
+        { label: 'Currency', value: p => p.currency },
+        { label: 'Gateway Payment ID', value: p => p.payment_id || '' },
+        { label: 'Record Type', value: p => isRefundRecord(p) ? 'Refund' : isVoidRecord(p) ? 'Void' : 'Payment' },
+        { label: 'Original Payment ID', value: p => extractOriginalPaymentId(p.notes) || '' },
+        ...(!isCompanyAdmin ? [{ label: 'Location', value: (p: PaymentsPagePayment) => p.locationName || '' }] : []),
+        { label: 'Booking Date', value: p => p.bookingDate || '' },
+        { label: 'Booking Time', value: p => p.bookingTime || '' },
+        { label: 'Participants', value: p => p.participants ?? '' },
+        { label: 'Guest Name', value: p => p.guestName || '' },
+        { label: 'Terms Accepted', value: p => p.terms_accepted === true ? 'Yes' : p.terms_accepted === false ? 'No' : '' },
+        { label: 'Signature On File', value: p => p.signature_image ? 'Yes' : 'No' },
+      ],
+    });
+
+    setToast({ message: 'Payments exported successfully', type: 'success' });
+  };
 
   if (loading) {
     return (
@@ -1064,8 +1170,6 @@ const Payments: React.FC = () => {
           );
         })}
       </div>
-
-
 
       {viewMode === 'trashed' ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -1197,506 +1301,178 @@ const Payments: React.FC = () => {
           )}
         </div>
       ) : (
-      <>
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        {selectedPayments.size > 0 && (
-          <div className={`flex items-center justify-between p-3 mb-4 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
-            <div className="flex items-center gap-3">
-              <span className={`text-sm font-medium text-${themeColor}-800`}>
-                {selectedPayments.size} payment(s) selected
-              </span>
-              <button
-                onClick={clearSelection}
-                className={`text-sm text-${themeColor}-600 hover:text-${themeColor}-800 underline`}
-              >
-                Clear selection
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <StandardButton
-                onClick={() => handleBulkExportInvoices(true)}
-                variant="secondary"
-                icon={Eye}
-                disabled={isExporting}
-                size="sm"
-              >
-                View Selected
-              </StandardButton>
-              <StandardButton
-                onClick={() => handleBulkExportInvoices(false)}
-                variant="primary"
-                icon={Printer}
-                disabled={isExporting}
-                size="sm"
-              >
-                Download Selected
-              </StandardButton>
-            </div>
-          </div>
-        )}
+        <>
+          <AdminTableToolbar
+            table={{
+              ...table,
+              clearFilters: () => {
+                table.clearFilters();
+                table.setSearchInput('');
+              },
+            }}
+            searchPlaceholder="Search payments..."
+            onRefresh={loadPayments}
+          />
 
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search payments..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
+          <BulkActionsBar table={table} itemLabel="payment(s)">
             <StandardButton
+              onClick={() => handleBulkExportInvoices(true)}
               variant="secondary"
+              icon={Eye}
+              disabled={isExporting}
               size="sm"
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
             >
-              Filters
+              View Selected
             </StandardButton>
             <StandardButton
-              variant="secondary"
+              onClick={() => handleBulkExportInvoices(false)}
+              variant="primary"
+              icon={Printer}
+              disabled={isExporting}
               size="sm"
-              icon={RefreshCcw}
-              onClick={loadPayments}
             >
-              {''}
+              Download Selected
             </StandardButton>
-          </div>
-        </div>
+          </BulkActionsBar>
 
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="failed">Failed</option>
-                  <option value="refunded">Refunded</option>
-                  <option value="voided">Voided</option>
-                </select>
+          <AdminDataTable
+            table={table}
+            loading={loading}
+            selectable
+            itemLabel="payments"
+            emptyState={
+              <div className="flex flex-col items-center">
+                <CreditCard className="w-12 h-12 text-gray-300 mb-3" />
+                <p className="text-gray-500 text-lg font-medium">No payments found</p>
+                <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Payment Method</label>
-                <select
-                  value={filters.method}
-                  onChange={(e) => handleFilterChange('method', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Methods</option>
-                  <option value="card">Card</option>
-                  <option value="authorize.net">Authorize.net</option>
-                  <option value="cash">Cash</option>
-                  <option value="in-store">In-Store</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Payment Type</label>
-                <select
-                  value={filters.payable_type}
-                  onChange={(e) => handleFilterChange('payable_type', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Types</option>
-                  <option value="booking">Bookings</option>
-                  <option value="attraction_purchase">Attractions</option>
-                  <option value="event_purchase">Events</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Time Period</label>
-                <select
-                  value={filters.dateRange}
-                  onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="year">This Year</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">From Date</label>
-                <input
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">To Date</label>
-                <input
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-4 text-left">
+            }
+            rowClassName={(p) =>
+              table.selectedIds.includes(String(p.id)) ? `bg-${themeColor}-50` :
+              isRefundRecord(p) ? 'bg-orange-50/50' :
+              isVoidRecord(p) ? 'bg-red-50/50' : ''
+            }
+            renderActions={(payment) => {
+              const rowIndex = table.rows.indexOf(payment);
+              return (
+                <div className="relative flex items-center justify-end gap-1">
                   <button
-                    onClick={toggleSelectAll}
-                    className={`p-1 rounded hover:bg-${themeColor}-100 transition-colors`}
-                    title={selectedPayments.size === currentPayments.length ? 'Deselect all' : 'Select all'}
+                    onClick={() => {
+                      setSignatureModalPayment(payment);
+                      setShowSignatureModal(true);
+                    }}
+                    className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                    title="View Signature & Terms"
                   >
-                    {selectedPayments.size === currentPayments.length && currentPayments.length > 0 ? (
-                      <CheckSquare className={`w-5 h-5 text-${fullColor}`} />
-                    ) : (
-                      <Square className="w-5 h-5 text-gray-400" />
-                    )}
+                    <PenLine className="w-4 h-4" />
                   </button>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Transaction
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th 
-                  className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('amount')}
-                >
-                  <div className="flex items-center gap-1">
-                    Amount
-                    <ArrowUpDown className={`w-4 h-4 ${sortField === 'amount' ? `text-${fullColor}` : ''}`} />
-                  </div>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Method
-                </th>
-                <th 
-                  className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('status')}
-                >
-                  <div className="flex items-center gap-1">
-                    Status
-                    <ArrowUpDown className={`w-4 h-4 ${sortField === 'status' ? `text-${fullColor}` : ''}`} />
-                  </div>
-                </th>
-                {isCompanyAdmin && (
-                  <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Location
-                  </th>
-                )}
-                <th 
-                  className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors min-w-[180px]"
-                  onClick={() => handleSort('created_at')}
-                >
-                  <div className="flex items-center gap-1">
-                    Date
-                    <ArrowUpDown className={`w-4 h-4 ${sortField === 'created_at' ? `text-${fullColor}` : ''}`} />
-                  </div>
-                </th>
-                <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={isCompanyAdmin ? 10 : 9} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center">
-                      <CreditCard className="w-12 h-12 text-gray-300 mb-3" />
-                      <p className="text-gray-500 text-lg font-medium">No payments found</p>
-                      <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                currentPayments.map((payment, paymentIndex) => {
-                  const StatusIcon = statusConfig[payment.status]?.icon || Clock;
-                  const MethodIcon = methodConfig[payment.method]?.icon || CreditCard;
-                  const TypeIcon = payment.payable_type ? payableTypeConfig[payment.payable_type]?.icon : FileText;
-                  const isSelected = selectedPayments.has(payment.id);
-                  const isRefund = isRefundRecord(payment);
-                  const isVoid = isVoidRecord(payment);
-                  const originalId = extractOriginalPaymentId(payment.notes);
-                  
-                  return (
-                    <tr 
-                      key={payment.id} 
-                      className={`hover:bg-gray-50 transition-colors ${
-                        isSelected ? `bg-${themeColor}-50` : 
-                        isRefund ? 'bg-orange-50/50' : 
-                        isVoid ? 'bg-red-50/50' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-4">
-                        <button
-                          onClick={() => togglePaymentSelection(payment.id)}
-                          className={`p-1 rounded hover:bg-${themeColor}-100 transition-colors`}
-                        >
-                          {isSelected ? (
-                            <CheckSquare className={`w-5 h-5 text-${fullColor}`} />
-                          ) : (
-                            <Square className="w-5 h-5 text-gray-400" />
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900">
-                            {payment.transaction_id || `TXN-${payment.id}`}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            ID: {payment.id}
-                            {isRefund && originalId && (
-                              <span className="ml-1 text-orange-600">(↩ from #{originalId})</span>
-                            )}
-                            {isVoid && originalId && (
-                              <span className="ml-1 text-red-600">(✕ from #{originalId})</span>
-                            )}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className={`p-1.5 rounded-lg ${
-                            isRefund ? 'bg-orange-100 text-orange-600' :
-                            isVoid ? 'bg-red-100 text-red-600' :
-                            payment.payable_type ? payableTypeConfig[payment.payable_type]?.color : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {isRefund ? <RotateCcw className="w-4 h-4" /> :
-                             isVoid ? <Ban className="w-4 h-4" /> :
-                             TypeIcon && <TypeIcon className="w-4 h-4" />}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">
-                              {payment.payableReference}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {isRefund ? 'Refund Record' : isVoid ? 'Void Record' : payment.payableDescription}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900">{payment.customerName}</span>
-                          <span className="text-xs text-gray-500">{payment.customerEmail}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        {payment.status === 'refunded' || payment.status === 'voided' ? (
-                          <span className="text-sm font-bold text-red-600">
-                            -${payment.amount.toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="text-sm font-bold text-gray-900">
-                            ${payment.amount.toFixed(2)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <MethodIcon className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-600 capitalize">{payment.method}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[payment.status]?.color}`}>
-                          <StatusIcon className="w-3.5 h-3.5" />
-                          {statusConfig[payment.status]?.label}
-                        </span>
-                      </td>
-                      {isCompanyAdmin && (
-                        <td className="px-4 py-4">
-                          <span className="text-sm text-gray-600">{payment.locationName}</span>
-                        </td>
-                      )}
-                      <td className="px-4 py-4 min-w-[180px]">
-                        <span className="text-sm text-gray-900 whitespace-nowrap">{formatDate(payment.created_at)}</span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="relative flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => {
-                              setSignatureModalPayment(payment);
-                              setShowSignatureModal(true);
-                            }}
-                            className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                            title="View Signature & Terms"
-                          >
-                            <PenLine className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleInvoice(payment.id, false)}
-                            className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                            title="Download Invoice"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          {(canRefund(payment) || canVoid(payment) || canManualRefund(payment) || payment.status === 'completed') && (
-                            <div className="relative">
+                  <button
+                    onClick={() => handleInvoice(payment.id, false)}
+                    className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                    title="Download Invoice"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  {(canRefund(payment) || canVoid(payment) || canManualRefund(payment) || payment.status === 'completed') && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setOpenActionsMenu(openActionsMenu === payment.id ? null : payment.id)}
+                        className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                        title="More actions"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      {openActionsMenu === payment.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenActionsMenu(null)} />
+                          <div className={`absolute right-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${rowIndex >= table.rows.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                            {canRefund(payment) && (
                               <button
-                                onClick={() => setOpenActionsMenu(openActionsMenu === payment.id ? null : payment.id)}
-                                className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                                title="More actions"
+                                onClick={() => handleRefundClick(payment)}
+                                className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
                               >
-                                <MoreVertical className="w-4 h-4" />
+                                <RotateCcw className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
+                                <span className="text-left">
+                                  <span className="block font-medium text-orange-600">Refund (Authorize.Net)</span>
+                                  <span className="block text-xs text-gray-500 mt-0.5">Returns money to the original card via the payment gateway. Use for settled transactions.</span>
+                                </span>
                               </button>
-                              {openActionsMenu === payment.id && (
-                                <>
-                                  <div className="fixed inset-0 z-40" onClick={() => setOpenActionsMenu(null)} />
-                                  <div className={`absolute right-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${paymentIndex >= currentPayments.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-                                    {canRefund(payment) && (
-                                      <button
-                                        onClick={() => handleRefundClick(payment)}
-                                        className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
-                                      >
-                                        <RotateCcw className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
-                                        <span className="text-left">
-                                          <span className="block font-medium text-orange-600">Refund (Authorize.Net)</span>
-                                          <span className="block text-xs text-gray-500 mt-0.5">Returns money to the original card via the payment gateway. Use for settled transactions.</span>
-                                        </span>
-                                      </button>
-                                    )}
-                                    {canVoid(payment) && (
-                                      <button
-                                        onClick={() => handleVoidClick(payment)}
-                                        className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-red-50 transition-colors"
-                                      >
-                                        <Ban className="w-4 h-4 mt-0.5 text-red-600 shrink-0" />
-                                        <span className="text-left">
-                                          <span className="block font-medium text-red-600">Void Transaction</span>
-                                          <span className="block text-xs text-gray-500 mt-0.5">Cancels the transaction before it settles. No money moves — the charge is simply removed.</span>
-                                        </span>
-                                      </button>
-                                    )}
-                                    {canManualRefund(payment) && (
-                                      <button
-                                        onClick={() => handleManualRefundClick(payment)}
-                                        className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
-                                      >
-                                        <RotateCcw className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
-                                        <span className="text-left">
-                                          <span className="block font-medium text-orange-600">Manual Refund ({payment.method === 'in-store' ? 'In-Store' : payment.method === 'cash' ? 'Cash' : 'Card'})</span>
-                                          <span className="block text-xs text-gray-500 mt-0.5">Records a cash/in-store refund. No gateway involved — marks the refund in the system only.</span>
-                                        </span>
-                                      </button>
-                                    )}
-                                    {payment.payable_id && (
-                                      <button
-                                        onClick={() => {
-                                          if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
-                                            navigate(`/bookings/${payment.payable_id}?from=payments`);
-                                          } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-                                            navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
-                                          } else if (payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE) {
-                                            navigate(`/events/purchases/${payment.payable_id}?from=payments`);
-                                          }
-                                          setOpenActionsMenu(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                      >
-                                        <FileText className="w-4 h-4" />
-                                        View Details
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => {
-                                        setConfirmDialog({ type: 'soft-delete', payment });
-                                        setOpenActionsMenu(null);
-                                      }}
-                                      className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-red-50 transition-colors border-t border-gray-100"
-                                    >
-                                      <Trash2 className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
-                                      <span className="text-left">
-                                        <span className="block font-medium text-red-600">Delete Payment</span>
-                                        <span className="block text-xs text-gray-500 mt-0.5">Soft delete — can be restored later. Linked totals will be recalculated.</span>
-                                      </span>
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.status !== 'completed' && payment.payable_id && (
+                            )}
+                            {canVoid(payment) && (
+                              <button
+                                onClick={() => handleVoidClick(payment)}
+                                className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-red-50 transition-colors"
+                              >
+                                <Ban className="w-4 h-4 mt-0.5 text-red-600 shrink-0" />
+                                <span className="text-left">
+                                  <span className="block font-medium text-red-600">Void Transaction</span>
+                                  <span className="block text-xs text-gray-500 mt-0.5">Cancels the transaction before it settles. No money moves — the charge is simply removed.</span>
+                                </span>
+                              </button>
+                            )}
+                            {canManualRefund(payment) && (
+                              <button
+                                onClick={() => handleManualRefundClick(payment)}
+                                className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
+                              >
+                                <RotateCcw className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
+                                <span className="text-left">
+                                  <span className="block font-medium text-orange-600">Manual Refund ({payment.method === 'in-store' ? 'In-Store' : payment.method === 'cash' ? 'Cash' : 'Card'})</span>
+                                  <span className="block text-xs text-gray-500 mt-0.5">Records a cash/in-store refund. No gateway involved — marks the refund in the system only.</span>
+                                </span>
+                              </button>
+                            )}
+                            {payment.payable_id && (
+                              <button
+                                onClick={() => {
+                                  navigateToPayable(payment);
+                                  setOpenActionsMenu(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                              >
+                                <FileText className="w-4 h-4" />
+                                View Details
+                              </button>
+                            )}
                             <button
                               onClick={() => {
-                                if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
-                                  navigate(`/bookings/${payment.payable_id}?from=payments`);
-                                } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-                                  navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
-                                } else if (payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE) {
-                                  navigate(`/events/purchases/${payment.payable_id}?from=payments`);
-                                }
+                                setConfirmDialog({ type: 'soft-delete', payment });
+                                setOpenActionsMenu(null);
                               }}
-                              className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                              title="View Details"
+                              className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-red-50 transition-colors border-t border-gray-100"
                             >
-                              <FileText className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
+                              <span className="text-left">
+                                <span className="block font-medium text-red-600">Delete Payment</span>
+                                <span className="block text-xs text-gray-500 mt-0.5">Soft delete — can be restored later. Linked totals will be recalculated.</span>
+                              </span>
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredPayments.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={paginate}
-              totalItems={filteredPayments.length}
-              showingFrom={indexOfFirstItem + 1}
-              showingTo={Math.min(indexOfLastItem, filteredPayments.length)}
-              itemLabel="payments"
-            />
-          </div>
-        )}
-      </div>
-      </>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.status !== 'completed' && payment.payable_id && (
+                    <button
+                      onClick={() => navigateToPayable(payment)}
+                      className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                      title="View Details"
+                    >
+                      <FileText className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            }}
+          />
+        </>
       )}
 
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmDialog(null)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className={`p-6 border-b border-gray-100 ${
-              confirmDialog.type === 'force-delete' ? 'bg-red-50' : 
+              confirmDialog.type === 'force-delete' ? 'bg-red-50' :
               confirmDialog.type === 'restore' ? 'bg-green-50' : 'bg-amber-50'
             }`}>
               <div className="flex items-center gap-3">
@@ -1907,9 +1683,9 @@ const Payments: React.FC = () => {
                       <label className="block text-xs font-medium text-gray-700 mb-1">Payment Type</label>
                       <select
                         value={exportFilters.payable_type || ''}
-                        onChange={(e) => setExportFilters(prev => ({ 
-                          ...prev, 
-                          payable_type: e.target.value as InvoiceExportFilters['payable_type'] || undefined 
+                        onChange={(e) => setExportFilters(prev => ({
+                          ...prev,
+                          payable_type: e.target.value as InvoiceExportFilters['payable_type'] || undefined
                         }))}
                         className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                       >
@@ -1923,9 +1699,9 @@ const Payments: React.FC = () => {
                       <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
                       <select
                         value={exportFilters.status || ''}
-                        onChange={(e) => setExportFilters(prev => ({ 
-                          ...prev, 
-                          status: e.target.value as InvoiceExportFilters['status'] || undefined 
+                        onChange={(e) => setExportFilters(prev => ({
+                          ...prev,
+                          status: e.target.value as InvoiceExportFilters['status'] || undefined
                         }))}
                         className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                       >
@@ -1941,9 +1717,9 @@ const Payments: React.FC = () => {
                     <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
                     <select
                       value={exportFilters.method || ''}
-                      onChange={(e) => setExportFilters(prev => ({ 
-                        ...prev, 
-                        method: e.target.value as InvoiceExportFilters['method'] || undefined 
+                      onChange={(e) => setExportFilters(prev => ({
+                        ...prev,
+                        method: e.target.value as InvoiceExportFilters['method'] || undefined
                       }))}
                       className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                     >
@@ -1984,8 +1760,8 @@ const Payments: React.FC = () => {
                   </label>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {exportFilters.view_mode === 'report' 
-                    ? 'Single page with table summary of all payments' 
+                  {exportFilters.view_mode === 'report'
+                    ? 'Single page with table summary of all payments'
                     : 'One invoice per page for each payment'}
                 </p>
               </div>
@@ -2051,9 +1827,9 @@ const Payments: React.FC = () => {
                 ) : (
                   <select
                     value={packageInvoiceFilters.package_id || ''}
-                    onChange={(e) => setPackageInvoiceFilters(prev => ({ 
-                      ...prev, 
-                      package_id: parseInt(e.target.value) || 0 
+                    onChange={(e) => setPackageInvoiceFilters(prev => ({
+                      ...prev,
+                      package_id: parseInt(e.target.value) || 0
                     }))}
                     className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   >
@@ -2091,9 +1867,9 @@ const Payments: React.FC = () => {
                   <label className="block text-xs font-medium text-gray-700 mb-1">Payment Status</label>
                   <select
                     value={packageInvoiceFilters.status || ''}
-                    onChange={(e) => setPackageInvoiceFilters(prev => ({ 
-                      ...prev, 
-                      status: e.target.value as PackageInvoiceFilters['status'] || undefined 
+                    onChange={(e) => setPackageInvoiceFilters(prev => ({
+                      ...prev,
+                      status: e.target.value as PackageInvoiceFilters['status'] || undefined
                     }))}
                     className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   >

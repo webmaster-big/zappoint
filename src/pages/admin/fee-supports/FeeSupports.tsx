@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Search,
-  Filter,
   Plus,
   Trash2,
   Pencil,
@@ -10,7 +8,7 @@ import {
   DollarSign,
   Percent,
   ArrowLeft,
-  RefreshCcw,
+  Download,
   CheckSquare,
   Square,
   Package as PackageIcon,
@@ -28,9 +26,16 @@ import { membershipCache } from '../../../services/MembershipCacheService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
-import type { FeeSupport, FeeSupportListFilters, FeeSupportFormData } from '../../../types/FeeSupport.types';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import type { FeeSupport, FeeSupportFormData } from '../../../types/FeeSupport.types';
 import type { Package as PackageType } from '../../../services/PackageService';
 import type { Attraction } from '../../../services/AttractionService';
 
@@ -39,7 +44,7 @@ const FeeSupports: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  
+
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const userLocationId = currentUser?.location_id || null;
 
@@ -48,13 +53,8 @@ const FeeSupports: React.FC = () => {
     entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' || entityTypeParam === 'membership' ? entityTypeParam : 'all';
 
   const [feeSupports, setFeeSupports] = useState<FeeSupport[]>([]);
-  const [filteredFeeSupports, setFilteredFeeSupports] = useState<FeeSupport[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
 
   const [showModal, setShowModal] = useState(false);
   const [editingFeeSupport, setEditingFeeSupport] = useState<FeeSupport | null>(null);
@@ -77,14 +77,6 @@ const FeeSupports: React.FC = () => {
     entity_ids: [],
     entity_type: initialEntityType !== 'all' ? initialEntityType : 'package',
     is_active: true,
-  });
-
-  const [filters, setFilters] = useState<FeeSupportListFilters>({
-    entity_type: initialEntityType as FeeSupportListFilters['entity_type'],
-    calculation_type: 'all',
-    application_type: 'all',
-    status: 'all',
-    search: ''
   });
 
   const loadFeeSupports = useCallback(async () => {
@@ -159,35 +151,7 @@ const FeeSupports: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  const applyFilters = useCallback(() => {
-    let result = [...feeSupports];
-
-    if (filters.search) {
-      const term = filters.search.toLowerCase();
-      result = result.filter(fs =>
-        fs.fee_name.toLowerCase().includes(term) ||
-        fs.location?.name?.toLowerCase().includes(term)
-      );
-    }
-    if (filters.entity_type !== 'all') {
-      result = result.filter(fs => fs.entity_type === filters.entity_type);
-    }
-    if (filters.calculation_type !== 'all') {
-      result = result.filter(fs => fs.fee_calculation_type === filters.calculation_type);
-    }
-    if (filters.application_type !== 'all') {
-      result = result.filter(fs => fs.fee_application_type === filters.application_type);
-    }
-    if (filters.status !== 'all') {
-      result = result.filter(fs => (filters.status === 'active' ? fs.is_active : !fs.is_active));
-    }
-
-    setFilteredFeeSupports(result);
-  }, [feeSupports, filters]);
-
   useEffect(() => { loadFeeSupports(); loadLocations(); }, [loadFeeSupports, loadLocations]);
-  useEffect(() => { applyFilters(); }, [applyFilters]);
-  useEffect(() => { setCurrentPage(1); }, [filters]);
 
   useEffect(() => {
     if (showModal) {
@@ -195,13 +159,24 @@ const FeeSupports: React.FC = () => {
     }
   }, [showModal, form.entity_type, loadEntities]);
 
-  const handleFilterChange = (key: keyof FeeSupportListFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const formatFeeAmount = (fs: FeeSupport) => {
+    if (fs.fee_calculation_type === 'percentage') return `${parseFloat(fs.fee_amount)}%`;
+    return `$${parseFloat(fs.fee_amount).toFixed(2)}`;
   };
 
-  const clearFilters = () => {
-    setFilters({ entity_type: 'all', calculation_type: 'all', application_type: 'all', status: 'all', search: '' });
+  const formatDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
+
+  const entityTypeLabel = (t: FeeSupport['entity_type']) =>
+    t === 'package' ? 'Package' : t === 'event' ? 'Event' : t === 'membership' ? 'Membership' : 'Attraction';
 
   const handleToggleStatus = async (id: number) => {
     try {
@@ -213,12 +188,237 @@ const FeeSupports: React.FC = () => {
     }
   };
 
+  const columns: AdminColumn<FeeSupport>[] = [
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: fs => fs.id,
+      exportValue: fs => fs.id,
+      defaultVisible: false,
+      render: fs => <span className="text-sm text-gray-500">#{fs.id}</span>,
+    },
+    {
+      key: 'fee_name',
+      label: 'Fee Name',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: fs => fs.fee_name,
+      exportValue: fs => fs.fee_name,
+      lockVisible: true,
+      render: fs => <span className="text-sm font-medium text-gray-900">{fs.fee_name}</span>,
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      group: 'Fee Details',
+      sortable: true,
+      sortValue: fs => parseFloat(fs.fee_amount),
+      exportValue: fs => formatFeeAmount(fs),
+      render: fs => <span className="text-sm font-semibold text-gray-900">{formatFeeAmount(fs)}</span>,
+    },
+    {
+      key: 'calculation',
+      label: 'Calculation',
+      group: 'Fee Details',
+      sortable: true,
+      sortValue: fs => fs.fee_calculation_type,
+      exportValue: fs => (fs.fee_calculation_type === 'fixed' ? 'Fixed' : 'Percentage'),
+      render: fs => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
+          {fs.fee_calculation_type === 'fixed' ? <DollarSign className="w-3 h-3" /> : <Percent className="w-3 h-3" />}
+          {fs.fee_calculation_type === 'fixed' ? 'Fixed' : 'Percentage'}
+        </span>
+      ),
+    },
+    {
+      key: 'application',
+      label: 'Application',
+      group: 'Fee Details',
+      sortable: true,
+      sortValue: fs => fs.fee_application_type,
+      exportValue: fs => (fs.fee_application_type === 'additive' ? 'Additive' : 'Inclusive'),
+      render: fs => (
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${fs.fee_application_type === 'additive' ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-600'}`}>
+          {fs.fee_application_type === 'additive' ? 'Additive' : 'Inclusive'}
+        </span>
+      ),
+    },
+    {
+      key: 'entity_type',
+      label: 'Entity Type',
+      group: 'Applies To',
+      sortable: true,
+      sortValue: fs => fs.entity_type,
+      exportValue: fs => entityTypeLabel(fs.entity_type),
+      render: fs => (
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${fs.entity_type === 'event' ? 'bg-amber-100 text-amber-800' : fs.entity_type === 'membership' ? 'bg-purple-100 text-purple-800' : `bg-${themeColor}-100 text-${fullColor}`}`}>
+          {fs.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> : fs.entity_type === 'event' ? <Layers className="w-3 h-3" /> : fs.entity_type === 'membership' ? <CreditCard className="w-3 h-3" /> : <Ticket className="w-3 h-3" />}
+          {entityTypeLabel(fs.entity_type)}
+        </span>
+      ),
+    },
+    {
+      key: 'entities',
+      label: 'Entities',
+      group: 'Applies To',
+      sortable: true,
+      sortValue: fs => fs.entity_ids?.length || 0,
+      exportValue: fs => fs.entity_ids?.length || 0,
+      render: fs => <span className="text-xs text-gray-500">{fs.entity_ids?.length || 0} item(s)</span>,
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Location',
+      sortable: true,
+      sortValue: fs => fs.location?.name || 'All Locations',
+      exportValue: fs => fs.location?.name || 'All Locations',
+      render: fs => <span className="text-sm text-gray-600">{fs.location?.name || 'All Locations'}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: fs => (fs.is_active ? 'Active' : 'Inactive'),
+      exportValue: fs => (fs.is_active ? 'Active' : 'Inactive'),
+      render: fs => (
+        <button
+          onClick={() => handleToggleStatus(fs.id)}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${fs.is_active ? `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200` : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+        >
+          <Power className="w-3 h-3" />
+          {fs.is_active ? 'Active' : 'Inactive'}
+        </button>
+      ),
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: fs => new Date(fs.created_at || 0).getTime(),
+      exportValue: fs => formatDateTime(fs.created_at),
+      defaultVisible: false,
+      render: fs => <span className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(fs.created_at)}</span>,
+    },
+    {
+      key: 'updated_at',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: fs => new Date(fs.updated_at || 0).getTime(),
+      exportValue: fs => formatDateTime(fs.updated_at),
+      defaultVisible: false,
+      render: fs => <span className="whitespace-nowrap text-sm text-gray-500">{formatDateTime(fs.updated_at)}</span>,
+    },
+  ];
+
+  const filterDefs: AdminFilterDef<FeeSupport>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'entity_type',
+      label: 'Entity Type',
+      allLabel: 'All Types',
+      options: [
+        { value: 'package', label: 'Package' },
+        { value: 'attraction', label: 'Attraction' },
+        { value: 'event', label: 'Event' },
+        { value: 'membership', label: 'Membership' },
+      ],
+      predicate: (fs, value) => fs.entity_type === value,
+    },
+    {
+      type: 'select',
+      key: 'calculation',
+      label: 'Calculation Type',
+      allLabel: 'All Calculations',
+      options: [
+        { value: 'fixed', label: 'Fixed' },
+        { value: 'percentage', label: 'Percentage' },
+      ],
+      predicate: (fs, value) => fs.fee_calculation_type === value,
+    },
+    {
+      type: 'select',
+      key: 'application',
+      label: 'Application Type',
+      allLabel: 'All Applications',
+      options: [
+        { value: 'additive', label: 'Additive' },
+        { value: 'inclusive', label: 'Inclusive' },
+      ],
+      predicate: (fs, value) => fs.fee_application_type === value,
+    },
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (fs, value) => (value === 'active' ? fs.is_active : !fs.is_active),
+    },
+    {
+      type: 'select',
+      key: 'location',
+      label: 'Location',
+      allLabel: 'All Locations',
+      options: [
+        { value: 'company-wide', label: 'Company-wide (All Locations)' },
+        ...locations.map(l => ({ value: String(l.id), label: l.name })),
+      ],
+      predicate: (fs, value) => (value === 'company-wide' ? fs.location_id === null : String(fs.location_id) === value),
+    },
+    {
+      type: 'daterange',
+      key: 'created',
+      label: 'Created Date',
+      getDate: fs => fs.created_at,
+    },
+    {
+      type: 'numberrange',
+      key: 'amount',
+      label: 'Fee Amount',
+      getValue: fs => parseFloat(fs.fee_amount),
+    },
+  ], [locations]);
+
+  const table = useAdminTable<FeeSupport>({
+    data: feeSupports,
+    columns,
+    getRowId: fs => String(fs.id),
+    storageKey: 'fee_supports',
+    filterDefs,
+    searchFields: fs => [
+      fs.id,
+      fs.fee_name,
+      fs.location?.name || 'All Locations',
+      fs.entity_type,
+      fs.fee_calculation_type,
+      fs.fee_application_type,
+      formatFeeAmount(fs),
+    ],
+    defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
+  useEffect(() => {
+    if (initialEntityType !== 'all') {
+      table.setFilterValue('entity_type', initialEntityType);
+    }
+  }, []);
+
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this fee support?')) return;
     try {
       await feeSupportService.deleteFeeSupport(id);
       setFeeSupports(prev => prev.filter(fs => fs.id !== id));
-      setSelectedItems(prev => { const n = new Set(prev); n.delete(id); return n; });
+      table.setSelectedIds(table.selectedIds.filter(x => x !== String(id)));
       setToast({ message: 'Fee support deleted', type: 'success' });
     } catch {
       setToast({ message: 'Failed to delete fee support', type: 'error' });
@@ -226,44 +426,38 @@ const FeeSupports: React.FC = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedItems.size === 0) return;
-    if (!window.confirm(`Delete ${selectedItems.size} fee support(s)?`)) return;
+    if (table.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${table.selectedIds.length} fee support(s)?`)) return;
+    const ids = table.selectedIds.map(Number);
     try {
-      await feeSupportService.bulkDelete(Array.from(selectedItems));
-      setFeeSupports(prev => prev.filter(fs => !selectedItems.has(fs.id)));
-      setSelectedItems(new Set());
-      setToast({ message: `${selectedItems.size} fee support(s) deleted`, type: 'success' });
+      await feeSupportService.bulkDelete(ids);
+      setFeeSupports(prev => prev.filter(fs => !ids.includes(fs.id)));
+      table.clearSelection();
+      setToast({ message: `${ids.length} fee support(s) deleted`, type: 'success' });
     } catch {
       setToast({ message: 'Failed to delete fee supports', type: 'error' });
     }
   };
 
-  const toggleSelectItem = (id: number) => {
-    setSelectedItems(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
+  const exportToCsv = () => {
+    exportTableCsv({
+      filename: `fee-supports-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Fee Amount (Raw)', value: fs => fs.fee_amount },
+        { label: 'Entity IDs', value: fs => (fs.entity_ids || []).join('; ') },
+        { label: 'Company', value: fs => fs.company?.name || fs.company_id },
+        { label: 'Location ID', value: fs => fs.location_id ?? '' },
+      ],
     });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedItems.size === currentItems.length) {
-      setSelectedItems(new Set());
-    } else {
-      setSelectedItems(new Set(currentItems.map(fs => fs.id)));
-    }
-  };
-
-  const formatFeeAmount = (fs: FeeSupport) => {
-    if (fs.fee_calculation_type === 'percentage') return `${parseFloat(fs.fee_amount)}%`;
-    return `$${parseFloat(fs.fee_amount).toFixed(2)}`;
   };
 
   const openCreateModal = () => {
     setEditingFeeSupport(null);
     setForm({
       company_id: currentUser?.company_id || 1,
-      location_id: isCompanyAdmin ? null : userLocationId, // Auto-set location for non-admins
+      location_id: isCompanyAdmin ? null : userLocationId,
       fee_name: '',
       fee_amount: 0,
       fee_calculation_type: 'fixed',
@@ -313,14 +507,14 @@ const FeeSupports: React.FC = () => {
   };
 
   const toggleSelectAllEntities = () => {
-    const entities = form.entity_type === 'package' ? packages
+    const entityList = form.entity_type === 'package' ? packages
       : form.entity_type === 'event' ? events
       : form.entity_type === 'membership' ? membershipPlans
       : attractions;
-    if (form.entity_ids.length === entities.length) {
+    if (form.entity_ids.length === entityList.length) {
       setForm(prev => ({ ...prev, entity_ids: [] }));
     } else {
-      setForm(prev => ({ ...prev, entity_ids: entities.map(e => e.id) }));
+      setForm(prev => ({ ...prev, entity_ids: entityList.map(e => e.id) }));
     }
   };
 
@@ -377,11 +571,6 @@ const FeeSupports: React.FC = () => {
   const totalEventFees = feeSupports.filter(fs => fs.entity_type === 'event').length;
   const totalMembershipFees = feeSupports.filter(fs => fs.entity_type === 'membership').length;
 
-  const indexOfLast = currentPage * itemsPerPage;
-  const indexOfFirst = indexOfLast - itemsPerPage;
-  const currentItems = filteredFeeSupports.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(filteredFeeSupports.length / itemsPerPage);
-
   const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
   const entities = form.entity_type === 'package' ? packages
@@ -417,6 +606,9 @@ const FeeSupports: React.FC = () => {
           </div>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
+          <StandardButton variant="secondary" size="md" icon={Download} onClick={exportToCsv}>
+            Export CSV
+          </StandardButton>
           <StandardButton variant="primary" size="md" icon={Plus} onClick={openCreateModal}>
             Create Fee
           </StandardButton>
@@ -445,197 +637,49 @@ const FeeSupports: React.FC = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        {selectedItems.size > 0 && (
-          <div className={`flex items-center justify-between p-3 mb-4 rounded-lg bg-${themeColor}-50 border border-${themeColor}-200`}>
-            <span className={`text-sm font-medium text-${themeColor}-800`}>{selectedItems.size} selected</span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedItems(new Set())} className={`text-sm text-${themeColor}-600 hover:text-${themeColor}-800 underline`}>Clear</button>
-              <StandardButton variant="danger" size="sm" icon={Trash2} onClick={handleBulkDelete}>Delete Selected</StandardButton>
-            </div>
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search fee supports..."
+        onRefresh={loadFeeSupports}
+      />
+
+      <BulkActionsBar table={table} itemLabel="fee support(s)">
+        <StandardButton variant="danger" size="sm" icon={Trash2} onClick={handleBulkDelete}>
+          Delete Selected
+        </StandardButton>
+      </BulkActionsBar>
+
+      <AdminDataTable
+        table={table}
+        loading={loading && feeSupports.length === 0}
+        selectable
+        itemLabel="fee supports"
+        emptyState={(
+          <div>
+            <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No fee supports found</p>
           </div>
         )}
-
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search fee supports..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton variant="secondary" size="sm" icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filters</StandardButton>
-            <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={loadFeeSupports}>{''}</StandardButton>
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Entity Type</label>
-                <select value={filters.entity_type} onChange={(e) => handleFilterChange('entity_type', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All Types</option>
-                  <option value="package">Package</option>
-                  <option value="attraction">Attraction</option>
-                  <option value="event">Event</option>
-                  <option value="membership">Membership</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Calculation Type</label>
-                <select value={filters.calculation_type} onChange={(e) => handleFilterChange('calculation_type', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All</option>
-                  <option value="fixed">Fixed</option>
-                  <option value="percentage">Percentage</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Application Type</label>
-                <select value={filters.application_type} onChange={(e) => handleFilterChange('application_type', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All</option>
-                  <option value="additive">Additive</option>
-                  <option value="inclusive">Inclusive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}>
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton variant="ghost" size="sm" onClick={clearFilters}>Clear Filters</StandardButton>
-            </div>
+        rowClassName={fs => (table.selectedIds.includes(String(fs.id)) ? `bg-${themeColor}-50` : '')}
+        renderActions={fs => (
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => openEditModal(fs)}
+              className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+              title="Edit"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleDelete(fs.id)}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-4 text-left">
-                  <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
-                    {selectedItems.size === currentItems.length && currentItems.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                  </button>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fee Name</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Calculation</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Application</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Entity Type</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Entities</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentItems.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center">
-                    <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">No fee supports found</p>
-                  </td>
-                </tr>
-              ) : (
-                currentItems.map((fs) => {
-                  const isSelected = selectedItems.has(fs.id);
-                  return (
-                    <tr key={fs.id} className={`hover:bg-gray-50 transition-colors ${isSelected ? `bg-${themeColor}-50` : ''}`}>
-                      <td className="px-4 py-3">
-                        <button onClick={() => toggleSelectItem(fs.id)} className="text-gray-400 hover:text-gray-600">
-                          {isSelected ? <CheckSquare className={`w-4 h-4 text-${fullColor}`} /> : <Square className="w-4 h-4" />}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-medium text-gray-900">{fs.fee_name}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-semibold text-gray-900">{formatFeeAmount(fs)}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
-                          {fs.fee_calculation_type === 'fixed' ? <DollarSign className="w-3 h-3" /> : <Percent className="w-3 h-3" />}
-                          {fs.fee_calculation_type === 'fixed' ? 'Fixed' : 'Percentage'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${fs.fee_application_type === 'additive' ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-600'}`}>
-                          {fs.fee_application_type === 'additive' ? 'Additive' : 'Inclusive'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${fs.entity_type === 'event' ? 'bg-amber-100 text-amber-800' : fs.entity_type === 'membership' ? 'bg-purple-100 text-purple-800' : `bg-${themeColor}-100 text-${fullColor}`}`}>
-                          {fs.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> : fs.entity_type === 'event' ? <Layers className="w-3 h-3" /> : fs.entity_type === 'membership' ? <CreditCard className="w-3 h-3" /> : <Ticket className="w-3 h-3" />}
-                          {fs.entity_type === 'package' ? 'Package' : fs.entity_type === 'event' ? 'Event' : fs.entity_type === 'membership' ? 'Membership' : 'Attraction'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-gray-500">{fs.entity_ids?.length || 0} item(s)</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600">{fs.location?.name || 'All Locations'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleToggleStatus(fs.id)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${fs.is_active ? `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200` : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                        >
-                          <Power className="w-3 h-3" />
-                          {fs.is_active ? 'Active' : 'Inactive'}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEditModal(fs)}
-                            className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                            title="Edit"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(fs.id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredFeeSupports.length > itemsPerPage && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalItems={filteredFeeSupports.length}
-              showingFrom={indexOfFirst + 1}
-              showingTo={Math.min(indexOfLast, filteredFeeSupports.length)}
-            />
-          </div>
-        )}
-      </div>
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeModal}>
@@ -691,7 +735,7 @@ const FeeSupports: React.FC = () => {
                     <DollarSign className={`w-4 h-4 text-${fullColor}`} /> Fee Settings
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">Define the fee amount and how it’s calculated.</p>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Calculation</label>
@@ -737,7 +781,7 @@ const FeeSupports: React.FC = () => {
                       <option value="inclusive">Inclusive (included in price)</option>
                     </select>
                   </div>
-                  
+
                   <div className={`mt-3 bg-${themeColor}-50 border border-${themeColor}-100 rounded-lg p-3 text-sm`}>
                     <span className="text-gray-600">Preview ($100): </span>
                     <span className={`text-${fullColor} font-semibold`}>+${previewFeeAmount.toFixed(2)}</span>
@@ -750,7 +794,7 @@ const FeeSupports: React.FC = () => {
                     <Layers className={`w-4 h-4 text-${fullColor}`} /> Apply To
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">Select which packages, attractions, events, or membership plans include this fee.</p>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Entity Type</label>
                     <select

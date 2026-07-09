@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Building2, Lock, Sparkles, DollarSign, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Building2, Lock, Sparkles, DollarSign, Download, Eye, EyeOff, KeyRound } from 'lucide-react';
 import membershipService from '../../../services/MembershipService';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import locationService from '../../../services/LocationService';
@@ -10,12 +10,19 @@ import type { SettingsAuthorizeNetAccount } from '../../../types/settings.types'
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
-import { SkeletonTableRow } from '../../../components/ui/Skeleton';
 import PlanBenefitsManager from '../../../components/membership/PlanBenefitsManager';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { formatMembershipPrice } from '../../../utils/membershipFormat';
 import { getStoredUser } from '../../../utils/storage';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
 const emptyForm: CreateMembershipPlanData = {
   name: '',
@@ -45,6 +52,25 @@ const emptyForm: CreateMembershipPlanData = {
   is_active: true,
 };
 
+const formatDateOnly = (value?: string | null): string => {
+  if (!value) return '—';
+  return new Date(value.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatDateTime = (value?: string | null): string => {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const planLocationNames = (p: MembershipPlan): string => {
+  if (p.location_access_mode === 'all') return 'All locations';
+  if (p.location_access_mode === 'multi') {
+    const names = (p.approved_locations || []).map((l) => l.name);
+    return names.length ? names.join(', ') : '—';
+  }
+  return p.location?.name || '—';
+};
+
 const MembershipPlans = () => {
   const { themeColor } = useThemeColor();
   const user = getStoredUser();
@@ -67,7 +93,6 @@ const MembershipPlans = () => {
   const [benefitsPlan, setBenefitsPlan] = useState<MembershipPlan | null>(null);
   const { toast, showSuccess, showError, clear } = useToast();
 
-  // Authorize.Net add-account modal
   const emptyAuthForm = { location_id: null as number | null, label: '', api_login_id: '', transaction_key: '', public_client_key: '', environment: 'sandbox' as 'sandbox' | 'production' };
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authForm, setAuthForm] = useState(emptyAuthForm);
@@ -108,7 +133,6 @@ const MembershipPlans = () => {
       if (detail.key === 'plans' || detail.key === 'all') load();
     });
     return off;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startCreate = () => {
@@ -116,8 +140,6 @@ const MembershipPlans = () => {
     const base = { ...emptyForm };
     if (isLocationManager) {
       base.location_access_mode = 'single';
-      // Use location_id directly from stored user — name-matching against the
-      // locations list is fragile and can silently produce null.
       base.location_id = user?.location_id ?? null;
     }
     setForm(base);
@@ -218,12 +240,10 @@ const MembershipPlans = () => {
       });
       if (res.success) {
         showSuccess('Authorize.Net account connected');
-        // Auto-select the new account as billing account for this plan
         const newAccountId = (res as any).data?.id ?? null;
         if (newAccountId) setForm((prev) => ({ ...prev, billing_account_id: newAccountId }));
         setAuthForm(emptyAuthForm);
         setShowAuthModal(false);
-        // Refresh auth accounts list
         getAllAuthorizeNetAccounts().then((r) => setAuthAccounts(r.data)).catch(() => {});
         locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
       } else {
@@ -234,6 +254,468 @@ const MembershipPlans = () => {
     } finally {
       setSavingAuth(false);
     }
+  };
+
+  const billingAccountLabel = (p: MembershipPlan): string => {
+    if (!p.billing_account_id) return 'Home location default';
+    const acc = authAccounts.find((a) => a.id === p.billing_account_id);
+    if (acc) return `${acc.label ?? acc.location?.name ?? `Account #${acc.id}`} (${acc.environment})`;
+    if (p.billing_account) return `${p.billing_account.label ?? `Account #${p.billing_account.id}`} (${p.billing_account.environment})`;
+    return `Account #${p.billing_account_id}`;
+  };
+
+  const columns: AdminColumn<MembershipPlan>[] = [
+    {
+      key: 'id',
+      label: 'Plan #',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: (p) => p.id,
+      exportValue: (p) => p.id,
+      defaultVisible: false,
+      render: (p) => <span className="text-sm text-gray-900">#{p.id}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: (p) => p.name.toLowerCase(),
+      exportValue: (p) => p.name,
+      render: (p) => <span className="font-medium text-gray-900">{p.name}</span>,
+    },
+    {
+      key: 'price',
+      label: 'Price',
+      group: 'Pricing',
+      sortable: true,
+      sortValue: (p) => Number(p.price),
+      exportValue: (p) => Number(p.price).toFixed(2),
+      render: (p) => <span className="whitespace-nowrap text-gray-700">{formatMembershipPrice(p.price)}</span>,
+    },
+    {
+      key: 'interval',
+      label: 'Interval',
+      group: 'Pricing',
+      sortable: true,
+      sortValue: (p) => p.billing_interval,
+      exportValue: (p) => p.billing_interval.replace(/_/g, ' '),
+      render: (p) => <span className="capitalize whitespace-nowrap text-gray-600">{p.billing_interval.replace('_', ' ')}</span>,
+    },
+    {
+      key: 'trial',
+      label: 'Trial',
+      group: 'Pricing',
+      sortable: true,
+      sortValue: (p) => p.trial_days ?? 0,
+      exportValue: (p) => p.trial_days ?? 0,
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{(p.trial_days ?? 0) > 0 ? `${p.trial_days} days` : '—'}</span>,
+    },
+    {
+      key: 'term',
+      label: 'Term (months)',
+      group: 'Pricing',
+      sortable: true,
+      sortValue: (p) => p.term_length_months ?? 0,
+      exportValue: (p) => p.term_length_months ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.term_length_months ?? '—'}</span>,
+    },
+    {
+      key: 'usage',
+      label: 'Usage',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (p) => p.usage_type,
+      exportValue: (p) => p.usage_type.replace(/_/g, ' '),
+      render: (p) => <span className="capitalize whitespace-nowrap text-gray-600">{p.usage_type.replace('_', ' ')}</span>,
+    },
+    {
+      key: 'visitsPerTerm',
+      label: 'Visits/Term',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (p) => p.included_visits_per_term ?? 0,
+      exportValue: (p) => p.included_visits_per_term ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.included_visits_per_term ?? '—'}</span>,
+    },
+    {
+      key: 'maxPerDay',
+      label: 'Max Visits/Day',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (p) => p.max_visits_per_day ?? 0,
+      exportValue: (p) => p.max_visits_per_day ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.max_visits_per_day ?? '—'}</span>,
+    },
+    {
+      key: 'punchTotal',
+      label: 'Punch Card Total',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (p) => p.punch_card_total ?? 0,
+      exportValue: (p) => p.punch_card_total ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.punch_card_total ?? '—'}</span>,
+    },
+    {
+      key: 'access',
+      label: 'Access',
+      group: 'Access',
+      sortable: true,
+      sortValue: (p) => p.location_access_mode,
+      exportValue: (p) => p.location_access_mode,
+      render: (p) => <span className="capitalize whitespace-nowrap text-gray-600">{p.location_access_mode}</span>,
+    },
+    {
+      key: 'locations',
+      label: 'Locations',
+      group: 'Access',
+      sortable: true,
+      sortValue: (p) => planLocationNames(p).toLowerCase(),
+      exportValue: (p) => planLocationNames(p),
+      defaultVisible: false,
+      render: (p) => (
+        <span className="text-gray-600" title={planLocationNames(p)}>
+          {p.location_access_mode === 'multi' ? `${(p.approved_locations || []).length} locations` : planLocationNames(p)}
+        </span>
+      ),
+    },
+    {
+      key: 'family',
+      label: 'Family/Group',
+      group: 'Access',
+      sortable: true,
+      sortValue: (p) => (p.is_family_or_group ? 'Yes' : 'No'),
+      exportValue: (p) => (p.is_family_or_group ? 'Yes' : 'No'),
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.is_family_or_group ? 'Yes' : 'No'}</span>,
+    },
+    {
+      key: 'maxFamily',
+      label: 'Max Family Size',
+      group: 'Access',
+      sortable: true,
+      sortValue: (p) => p.max_family_size ?? 0,
+      exportValue: (p) => p.max_family_size ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.max_family_size ?? '—'}</span>,
+    },
+    {
+      key: 'billingAccount',
+      label: 'Billing Account',
+      group: 'Billing',
+      sortable: true,
+      sortValue: (p) => billingAccountLabel(p).toLowerCase(),
+      exportValue: (p) => billingAccountLabel(p),
+      defaultVisible: false,
+      render: (p) => <span className="text-gray-600 whitespace-nowrap">{billingAccountLabel(p)}</span>,
+    },
+    {
+      key: 'cancellation',
+      label: 'Cancellation',
+      group: 'Billing',
+      sortable: true,
+      sortValue: (p) => p.cancellation_mode,
+      exportValue: (p) => p.cancellation_mode.replace(/_/g, ' '),
+      defaultVisible: false,
+      render: (p) => <span className="capitalize whitespace-nowrap text-gray-600">{p.cancellation_mode.replace(/_/g, ' ')}</span>,
+    },
+    {
+      key: 'grace',
+      label: 'Grace Period (days)',
+      group: 'Billing',
+      sortable: true,
+      sortValue: (p) => p.grace_period_days ?? 0,
+      exportValue: (p) => p.grace_period_days ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.grace_period_days ?? '—'}</span>,
+    },
+    {
+      key: 'retry',
+      label: 'Payment Retry (days)',
+      group: 'Billing',
+      sortable: true,
+      sortValue: (p) => p.failed_payment_retry_days ?? 0,
+      exportValue: (p) => p.failed_payment_retry_days ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-600">{p.failed_payment_retry_days ?? '—'}</span>,
+    },
+    {
+      key: 'seasonStart',
+      label: 'Season Start',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (p) => p.season_start_date?.slice(0, 10) ?? '',
+      exportValue: (p) => p.season_start_date?.slice(0, 10) ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-500">{formatDateOnly(p.season_start_date)}</span>,
+    },
+    {
+      key: 'seasonEnd',
+      label: 'Season End',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (p) => p.season_end_date?.slice(0, 10) ?? '',
+      exportValue: (p) => p.season_end_date?.slice(0, 10) ?? '',
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-500">{formatDateOnly(p.season_end_date)}</span>,
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (p) => new Date(p.created_at || 0).getTime(),
+      exportValue: (p) => (p.created_at ? new Date(p.created_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-500">{formatDateTime(p.created_at)}</span>,
+    },
+    {
+      key: 'updated',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (p) => new Date(p.updated_at || 0).getTime(),
+      exportValue: (p) => (p.updated_at ? new Date(p.updated_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: (p) => <span className="whitespace-nowrap text-gray-500">{formatDateTime(p.updated_at)}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: (p) => (p.is_active ? 'Active' : 'Inactive'),
+      exportValue: (p) => (p.is_active ? 'Active' : 'Inactive'),
+      render: (p) => (
+        <button
+          onClick={() => toggle(p)}
+          className="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900"
+        >
+          {p.is_active ? (
+            <ToggleRight className="w-5 h-5 text-green-600" />
+          ) : (
+            <ToggleLeft className="w-5 h-5 text-gray-400" />
+          )}
+          <span className={p.is_active ? 'text-green-700' : 'text-gray-500'}>
+            {p.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </button>
+      ),
+    },
+  ];
+
+  const locationOptions = useMemo(
+    () => locations.map((l) => ({ value: String(l.id), label: l.name })),
+    [locations]
+  );
+
+  const billingAccountOptions = useMemo(
+    () => [
+      { value: 'default', label: 'Home location default' },
+      ...authAccounts.map((acc) => ({
+        value: String(acc.id),
+        label: `${acc.label ?? acc.location?.name ?? `Account #${acc.id}`} (${acc.environment})`,
+      })),
+    ],
+    [authAccounts]
+  );
+
+  const filterDefs: AdminFilterDef<MembershipPlan>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      predicate: (p, value) => (value === 'active' ? p.is_active : !p.is_active),
+    },
+    {
+      type: 'select',
+      key: 'interval',
+      label: 'Billing Interval',
+      allLabel: 'All Intervals',
+      options: [
+        { value: 'monthly', label: 'Monthly' },
+        { value: 'quarterly', label: 'Quarterly' },
+        { value: 'annual', label: 'Annual' },
+        { value: 'one_time', label: 'One-time' },
+        { value: 'custom', label: 'Custom' },
+      ],
+      predicate: (p, value) => p.billing_interval === value,
+    },
+    {
+      type: 'select',
+      key: 'usage',
+      label: 'Usage Type',
+      allLabel: 'All Usage Types',
+      options: [
+        { value: 'unlimited', label: 'Unlimited' },
+        { value: 'limited_visits', label: 'Limited Visits' },
+        { value: 'punch_card', label: 'Punch Card' },
+      ],
+      predicate: (p, value) => p.usage_type === value,
+    },
+    {
+      type: 'select',
+      key: 'access',
+      label: 'Access Mode',
+      allLabel: 'All Access Modes',
+      options: [
+        { value: 'single', label: 'Single Home Location' },
+        { value: 'multi', label: 'Multi-Location' },
+        { value: 'all', label: 'All Locations' },
+      ],
+      predicate: (p, value) => p.location_access_mode === value,
+    },
+    {
+      type: 'select',
+      key: 'location',
+      label: 'Location',
+      allLabel: 'All Locations',
+      options: locationOptions,
+      predicate: (p, value) => {
+        const id = Number(value);
+        if (p.location_access_mode === 'all') return true;
+        if (p.location?.id === id) return true;
+        return (p.approved_locations || []).some((l) => l.id === id);
+      },
+    },
+    {
+      type: 'select',
+      key: 'billingAccount',
+      label: 'Billing Account',
+      allLabel: 'All Billing Accounts',
+      options: billingAccountOptions,
+      predicate: (p, value) =>
+        value === 'default' ? !p.billing_account_id : String(p.billing_account_id ?? '') === value,
+    },
+    {
+      type: 'select',
+      key: 'family',
+      label: 'Plan Type',
+      allLabel: 'All Plan Types',
+      options: [
+        { value: 'yes', label: 'Family / Group' },
+        { value: 'no', label: 'Individual' },
+      ],
+      predicate: (p, value) => (value === 'yes' ? p.is_family_or_group : !p.is_family_or_group),
+    },
+    {
+      type: 'select',
+      key: 'trial',
+      label: 'Trial',
+      allLabel: 'All Plans',
+      options: [
+        { value: 'yes', label: 'Has Trial' },
+        { value: 'no', label: 'No Trial' },
+      ],
+      predicate: (p, value) =>
+        value === 'yes' ? (p.trial_days ?? 0) > 0 : (p.trial_days ?? 0) === 0,
+    },
+    {
+      type: 'select',
+      key: 'schedule',
+      label: 'Schedule',
+      allLabel: 'All Schedules',
+      options: [
+        { value: 'seasonal', label: 'Seasonal' },
+        { value: 'rolling', label: 'Rolling' },
+      ],
+      predicate: (p, value) => {
+        const seasonal = !!(p.season_start_date || p.season_end_date);
+        return value === 'seasonal' ? seasonal : !seasonal;
+      },
+    },
+    {
+      type: 'numberrange',
+      key: 'price',
+      label: 'Price ($)',
+      getValue: (p) => Number(p.price),
+    },
+    {
+      type: 'daterange',
+      key: 'created',
+      label: 'Created Date',
+      getDate: (p) => p.created_at,
+    },
+  ], [locationOptions, billingAccountOptions]);
+
+  const table = useAdminTable<MembershipPlan>({
+    data: plans,
+    columns,
+    getRowId: (p) => String(p.id),
+    storageKey: 'membership_plans',
+    filterDefs,
+    searchFields: (p) => [
+      p.id,
+      p.name,
+      p.description,
+      p.tier,
+      Number(p.price),
+      p.billing_interval,
+      p.usage_type,
+      p.location_access_mode,
+      p.location?.name,
+      (p.approved_locations || []).map((l) => l.name).join(' '),
+      billingAccountLabel(p),
+      p.cancellation_mode,
+      p.is_active ? 'active' : 'inactive',
+    ],
+    defaultSort: (a, b) => a.name.localeCompare(b.name),
+    itemsPerPage: 10,
+  });
+
+  const exportCsv = (rows: MembershipPlan[]) => {
+    exportTableCsv({
+      filename: `membership-plans-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows,
+      extraColumns: [
+        { label: 'Description', value: (p) => p.description || '' },
+        { label: 'Tier', value: (p) => p.tier || '' },
+        { label: 'Slug', value: (p) => p.slug || '' },
+        { label: 'Home Location', value: (p) => p.location?.name || '' },
+        { label: 'Approved Locations', value: (p) => (p.approved_locations || []).map((l) => l.name).join('; ') },
+        { label: 'Unlimited Visits', value: (p) => (p.unlimited_visits ? 'Yes' : 'No') },
+        { label: 'Unlimited Uses', value: (p) => (p.unlimited_uses ? 'Yes' : 'No') },
+        { label: 'Requires Photo', value: (p) => (p.requires_photo ? 'Yes' : 'No') },
+        { label: 'Discount %', value: (p) => p.discount_percent ?? '' },
+        { label: 'Billing Account ID', value: (p) => p.billing_account_id ?? '' },
+        { label: 'Company ID', value: (p) => p.company_id },
+      ],
+    });
+  };
+
+  const bulkSetActive = async (active: boolean) => {
+    const targets = plans.filter(
+      (p) => table.selectedIds.includes(String(p.id)) && p.is_active !== active
+    );
+    if (targets.length === 0) {
+      table.clearSelection();
+      return;
+    }
+    try {
+      await Promise.all(targets.map((p) => membershipService.togglePlanStatus(p.id)));
+      showSuccess(`${targets.length} plan(s) ${active ? 'activated' : 'deactivated'}`);
+      table.clearSelection();
+      await membershipCache.invalidate('plans');
+      await membershipCache.invalidate('publicPlans');
+      load(true);
+    } catch (e: unknown) {
+      showError(e, 'Bulk update failed');
+    }
+  };
+
+  const exportSelected = () => {
+    exportCsv(plans.filter((p) => table.selectedIds.includes(String(p.id))));
   };
 
   return (
@@ -252,6 +734,9 @@ const MembershipPlans = () => {
           <p className="text-gray-600 mt-1">Pricing, billing cadence, and access rules</p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
+          <StandardButton variant="secondary" size="md" icon={Download} onClick={() => exportCsv(table.filteredRows)}>
+            Export CSV
+          </StandardButton>
           {canManagePlans && (
             <StandardButton variant="primary" size="md" icon={Plus} onClick={startCreate}>
               New Plan
@@ -260,94 +745,77 @@ const MembershipPlans = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {isSyncing && (
-          <div className="h-0.5 bg-blue-100">
-            <div className="h-full w-1/4 bg-blue-400 animate-pulse rounded-r-full" />
-          </div>
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search plans..."
+        onRefresh={() => load(true)}
+        actions={
+          <span className="inline-flex items-center px-1">
+            <InfoTooltip
+              widthClass="w-64"
+              content={<><b>Usage</b><br/><b>Unlimited</b> · no caps<br/><b>Limited visits</b> · fixed per term<br/><b>Punch card</b> · fixed total visits, no reset<br/><br/><b>Access</b><br/><b>Single</b> · only home location<br/><b>Multi</b> · approved locations only<br/><b>All</b> · every location<br/><br/><b>Status</b><br/>Inactive plans stay in admin but cannot be purchased by new customers.</>}
+            />
+          </span>
+        }
+      />
+
+      <BulkActionsBar table={table} itemLabel="plan(s)">
+        {canManagePlans && (
+          <>
+            <StandardButton variant="secondary" size="sm" icon={ToggleRight} onClick={() => bulkSetActive(true)}>
+              Activate
+            </StandardButton>
+            <StandardButton variant="secondary" size="sm" icon={ToggleLeft} onClick={() => bulkSetActive(false)}>
+              Deactivate
+            </StandardButton>
+          </>
         )}
-        {loading ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody>
-                {Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={7} />)}
-              </tbody>
-            </table>
+        <StandardButton variant="secondary" size="sm" icon={Download} onClick={exportSelected}>
+          Export Selected
+        </StandardButton>
+      </BulkActionsBar>
+
+      {isSyncing && (
+        <div className="h-0.5 bg-blue-100 mb-1 rounded overflow-hidden">
+          <div className="h-full w-1/4 bg-blue-400 animate-pulse rounded-r-full" />
+        </div>
+      )}
+
+      <AdminDataTable
+        table={table}
+        loading={loading}
+        selectable
+        itemLabel="plans"
+        emptyState={
+          <div className="inline-flex flex-col items-center gap-2">
+            <div className={`p-3 rounded-full bg-${themeColor}-50`}>
+              <CreditCard className={`w-6 h-6 text-${themeColor}-600`} />
+            </div>
+            {plans.length === 0 ? (
+              <span>No plans yet. Click <span className="font-medium">New Plan</span> to create one.</span>
+            ) : (
+              <span>No plans match your search or filters.</span>
+            )}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 font-medium"><span className="inline-flex items-center gap-1">Name <InfoTooltip content="Plan name shown to customers." size={11} /></span></th>
-                  <th className="px-4 py-3 font-medium"><span className="inline-flex items-center gap-1">Price <InfoTooltip content="Amount charged per billing cycle." size={11} /></span></th>
-                  <th className="px-4 py-3 font-medium"><span className="inline-flex items-center gap-1">Interval <InfoTooltip content="How often the member is auto-charged. 'One-time' means no recurring charge." size={11} /></span></th>
-                  <th className="px-4 py-3 font-medium"><span className="inline-flex items-center gap-1">Usage <InfoTooltip widthClass="w-60" content={<><b>Unlimited</b> · no caps<br/><b>Limited visits</b> · fixed per term<br/><b>Punch card</b> · fixed total visits, no reset</>} size={11} /></span></th>
-                  <th className="px-4 py-3 font-medium"><span className="inline-flex items-center gap-1">Access <InfoTooltip widthClass="w-60" content={<><b>Single</b> · only home location<br/><b>Multi</b> · approved locations only<br/><b>All</b> · every location</>} size={11} /></span></th>
-                  <th className="px-4 py-3 font-medium"><span className="inline-flex items-center gap-1">Status <InfoTooltip content="Inactive plans stay in admin but cannot be purchased by new customers." size={11} /></span></th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {plans.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                      <div className="inline-flex flex-col items-center gap-2">
-                        <div className={`p-3 rounded-full bg-${themeColor}-50`}>
-                          <CreditCard className={`w-6 h-6 text-${themeColor}-600`} />
-                        </div>
-                        No plans yet. Click <span className="font-medium">New Plan</span> to create one.
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  plans.map((p) => (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 font-medium text-gray-900">{p.name}</td>
-                      <td className="px-4 py-4 text-gray-700">{formatMembershipPrice(p.price)}</td>
-                      <td className="px-4 py-4 capitalize text-gray-600">{p.billing_interval.replace('_', ' ')}</td>
-                      <td className="px-4 py-4 capitalize text-gray-600">{p.usage_type.replace('_', ' ')}</td>
-                      <td className="px-4 py-4 capitalize text-gray-600">{p.location_access_mode}</td>
-                      <td className="px-4 py-4">
-                        <button
-                          onClick={() => toggle(p)}
-                          className="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900"
-                        >
-                          {p.is_active ? (
-                            <ToggleRight className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <ToggleLeft className="w-5 h-5 text-gray-400" />
-                          )}
-                          <span className={p.is_active ? 'text-green-700' : 'text-gray-500'}>
-                            {p.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </button>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        {canManagePlans ? (
-                          <div className="inline-flex items-center gap-2">
-                            <StandardButton variant="secondary" size="sm" icon={Sparkles} onClick={() => setBenefitsPlan(p)}>
-                              Benefits
-                            </StandardButton>
-                            <StandardButton variant="secondary" size="sm" icon={Edit2} onClick={() => startEdit(p)}>
-                              Edit
-                            </StandardButton>
-                            <StandardButton variant="danger" size="sm" icon={Trash2} onClick={() => remove(p)}>
-                              Delete
-                            </StandardButton>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">View only</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        }
+        renderActions={(p) =>
+          canManagePlans ? (
+            <div className="inline-flex items-center gap-2">
+              <StandardButton variant="secondary" size="sm" icon={Sparkles} onClick={() => setBenefitsPlan(p)}>
+                Benefits
+              </StandardButton>
+              <StandardButton variant="secondary" size="sm" icon={Edit2} onClick={() => startEdit(p)}>
+                Edit
+              </StandardButton>
+              <StandardButton variant="danger" size="sm" icon={Trash2} onClick={() => remove(p)}>
+                Delete
+              </StandardButton>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">View only</span>
+          )
+        }
+      />
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
@@ -724,7 +1192,6 @@ const MembershipPlans = () => {
         />
       )}
 
-      {/* Add Authorize.Net Account Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setShowAuthModal(false); setShowTxKey(false); setShowPubKey(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>

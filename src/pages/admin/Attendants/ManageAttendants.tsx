@@ -1,12 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Eye,
   Pencil,
   Trash2,
   Plus,
-  Search,
-  Filter,
-  RefreshCcw,
   Users,
   User,
   Mail,
@@ -18,9 +15,9 @@ import {
   CheckCircle,
   UserPlus,
   Building2,
+  Download,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
-import Pagination from '../../../components/ui/Pagination';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
@@ -31,10 +28,40 @@ import CreateStaffAccountModal from '../../../components/admin/users/CreateStaff
 import AttendantViewModal from '../../../components/admin/users/AttendantViewModal';
 import AttendantEditModal from '../../../components/admin/users/AttendantEditModal';
 import EditLocationModal from '../../../components/admin/users/EditLocationModal';
-import type {
-  ManageAttendantsAttendant,
-  ManageAttendantsFilterOptions,
-} from '../../../types/ManageAttendants.types';
+import type { ManageAttendantsAttendant } from '../../../types/ManageAttendants.types';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+
+type AttendantRow = ManageAttendantsAttendant & { locationId: string };
+
+const getExperience = (hireDate: string) => {
+  const hire = new Date(hireDate);
+  const today = new Date();
+  const months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
+  return Math.max(0, months);
+};
+
+const formatDateOnly = (dateString: string) =>
+  new Date(dateString.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
+const formatDateTime = (dateString: string) =>
+  new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 interface InvitationModalProps {
   isOpen: boolean;
@@ -42,9 +69,9 @@ interface InvitationModalProps {
   onSendInvitation: (email: string, userType: 'attendant' | 'manager') => void;
 }
 
-const InvitationModal: React.FC<InvitationModalProps> = ({ 
-  isOpen, 
-  onClose, 
+const InvitationModal: React.FC<InvitationModalProps> = ({
+  isOpen,
+  onClose,
   onSendInvitation
 }) => {
   const { themeColor } = useThemeColor();
@@ -257,22 +284,14 @@ const ManageAttendants = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isLocationManager = currentUser?.role === 'location_manager';
-  const [attendants, setAttendants] = useState<ManageAttendantsAttendant[]>([]);
-  const [filteredAttendants, setFilteredAttendants] = useState<ManageAttendantsAttendant[]>([]);
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const [attendants, setAttendants] = useState<AttendantRow[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAttendants, setSelectedAttendants] = useState<string[]>([]);
-  const [filters, setFilters] = useState<ManageAttendantsFilterOptions>({
-    status: 'all',
-    department: 'all',
-    search: ''
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
-  const [viewTarget, setViewTarget] = useState<ManageAttendantsAttendant | null>(null);
-  const [editTarget, setEditTarget] = useState<ManageAttendantsAttendant | null>(null);
+  const [viewTarget, setViewTarget] = useState<AttendantRow | null>(null);
+  const [editTarget, setEditTarget] = useState<AttendantRow | null>(null);
   const [locationInfo, setLocationInfo] = useState<Location | null>(null);
   const [editLocationTarget, setEditLocationTarget] = useState<Location | null>(null);
 
@@ -328,56 +347,6 @@ const ManageAttendants = () => {
     }
   ];
 
-  const applyFilters = useCallback(() => {
-    let result = [...attendants];
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(attendant =>
-        attendant.firstName.toLowerCase().includes(searchTerm) ||
-        attendant.lastName.toLowerCase().includes(searchTerm) ||
-        attendant.email.toLowerCase().includes(searchTerm) ||
-        attendant.employeeId.toLowerCase().includes(searchTerm) ||
-        attendant.department.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    if (filters.status !== 'all') {
-      result = result.filter(attendant => attendant.status === filters.status);
-    }
-
-    if (filters.department !== 'all') {
-      result = result.filter(attendant => attendant.department === filters.department);
-    }
-
-    setFilteredAttendants(result);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [attendants, filters]);
-
-  const loadLocationInfo = async () => {
-    if (!currentUser?.location_id) return;
-    try {
-      const res = await locationService.getLocation(currentUser.location_id);
-      if (res.success && res.data) {
-        setLocationInfo(res.data);
-      }
-    } catch {
-      // location card will simply not render
-    }
-  };
-
-  useEffect(() => {
-    loadAttendants();
-    if (isLocationManager) {
-      loadLocationInfo();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
   const loadAttendants = async () => {
     try {
       const userData = localStorage.getItem('zapzone_user');
@@ -390,10 +359,7 @@ const ManageAttendants = () => {
       }
 
       const params = new URLSearchParams();
-      if (filters.status !== 'all') params.append('status', filters.status);
-      if (filters.department !== 'all') params.append('department', filters.department);
-      if (filters.search) params.append('search', filters.search);
-      params.append('role', 'attendant'); // Only fetch attendants
+      params.append('role', 'attendant');
 
       const response = await fetch(`${API_BASE_URL}/users?${params.toString()}`, {
         method: 'GET',
@@ -409,7 +375,7 @@ const ManageAttendants = () => {
         throw new Error(data.message || 'Failed to load attendants');
       }
 
-      const transformedAttendants: ManageAttendantsAttendant[] = data.data.users.map((user: Record<string, unknown>) => ({
+      const transformedAttendants: AttendantRow[] = data.data.users.map((user: Record<string, unknown>) => ({
         id: String(user.id),
         firstName: String(user.first_name || ''),
         lastName: String(user.last_name || ''),
@@ -425,6 +391,7 @@ const ManageAttendants = () => {
         username: typeof user.email === 'string' ? user.email.split('@')[0] : '',
         createdAt: String(user.created_at || ''),
         accountCreated: true,
+        locationId: user.location_id != null ? String(user.location_id) : '',
       }));
 
       setAttendants(transformedAttendants);
@@ -436,38 +403,38 @@ const ManageAttendants = () => {
     }
   };
 
-  const handleFilterChange = (key: keyof ManageAttendantsFilterOptions, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      department: 'all',
-      search: ''
-    });
-  };
-
-  const handleSelectAttendant = (id: string) => {
-    setSelectedAttendants(prev =>
-      prev.includes(id)
-        ? prev.filter(attendantId => attendantId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedAttendants.length === currentAttendants.length) {
-      setSelectedAttendants([]);
-    } else {
-      setSelectedAttendants(currentAttendants.map(attendant => attendant.id));
+  const loadLocationInfo = async () => {
+    if (!currentUser?.location_id) return;
+    try {
+      const res = await locationService.getLocation(currentUser.location_id);
+      if (res.success && res.data) {
+        setLocationInfo(res.data);
+      }
+    } catch {
+      setLocationInfo(null);
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: ManageAttendantsAttendant['status']) => {
+  const loadLocations = async () => {
+    try {
+      const response = await locationService.getLocations();
+      setLocations(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setLocations([]);
+    }
+  };
+
+  useEffect(() => {
+    loadAttendants();
+    if (isLocationManager) {
+      loadLocationInfo();
+    }
+    if (isCompanyAdmin) {
+      loadLocations();
+    }
+  }, []);
+
+  const handleStatusChange = async (id: string, newStatus: AttendantRow['status']) => {
     try {
       const userData = localStorage.getItem('zapzone_user');
       const authToken = userData ? JSON.parse(userData).token : null;
@@ -491,10 +458,9 @@ const ManageAttendants = () => {
         throw new Error(data.message || 'Failed to update status');
       }
 
-      const updatedAttendants = attendants.map(attendant =>
+      setAttendants(prev => prev.map(attendant =>
         attendant.id === id ? { ...attendant, status: newStatus } : attendant
-      );
-      setAttendants(updatedAttendants);
+      ));
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update attendant status. Please try again.');
@@ -529,44 +495,332 @@ const ManageAttendants = () => {
         throw new Error(data.message || 'Failed to delete attendant');
       }
 
-      const updatedAttendants = attendants.filter(attendant => attendant.id !== id);
-      setAttendants(updatedAttendants);
+      setAttendants(prev => prev.filter(attendant => attendant.id !== id));
     } catch (error) {
       console.error('Error deleting attendant:', error);
       alert('Failed to delete attendant. Please try again.');
     }
   };
 
+  const locationNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    locations.forEach(l => {
+      map[String(l.id)] = l.name;
+    });
+    return map;
+  }, [locations]);
+
+  const getLocationName = (id: string) => (id ? locationNameById[id] || '' : '');
+
+  const columns: AdminColumn<AttendantRow>[] = [
+    {
+      key: 'userId',
+      label: 'User ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: a => Number(a.id),
+      exportValue: a => a.id,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">#{a.id}</span>,
+    },
+    {
+      key: 'employeeId',
+      label: 'Employee ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: a => a.employeeId,
+      exportValue: a => a.employeeId,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{a.employeeId}</span>,
+    },
+    {
+      key: 'attendant',
+      label: 'Attendant',
+      group: 'Attendant',
+      sortable: true,
+      sortValue: a => `${a.firstName} ${a.lastName}`.trim().toLowerCase(),
+      exportValue: a => `${a.firstName} ${a.lastName}`.trim(),
+      lockVisible: true,
+      render: a => (
+        <div>
+          <div className="font-medium text-gray-900">
+            {a.firstName} {a.lastName}
+          </div>
+          <div className="text-xs text-gray-600 mt-1">ID: {a.employeeId}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      label: 'Contact',
+      group: 'Contact',
+      sortable: true,
+      sortValue: a => a.email,
+      exportValue: a => a.email,
+      render: a => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <Mail className="h-3 w-3 text-gray-400" />
+            <span className="text-gray-900">{a.email}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Phone className="h-3 w-3 text-gray-400" />
+            <span className="text-gray-600">{a.phone}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'position',
+      label: 'Position',
+      group: 'Role',
+      sortable: true,
+      sortValue: a => a.position,
+      exportValue: a => a.position,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{a.position}</span>,
+    },
+    {
+      key: 'department',
+      label: 'Department',
+      group: 'Role',
+      sortable: true,
+      sortValue: a => a.department,
+      exportValue: a => a.department,
+      render: a => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${departmentColors[a.department] || 'bg-gray-100 text-gray-800'}`}>
+          {a.department}
+        </span>
+      ),
+    },
+    {
+      key: 'shift',
+      label: 'Shift',
+      group: 'Role',
+      sortable: true,
+      sortValue: a => a.shift,
+      exportValue: a => a.shift,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{a.shift || '—'}</span>,
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Role',
+      sortable: true,
+      sortValue: a => getLocationName(a.locationId),
+      exportValue: a => getLocationName(a.locationId) || a.locationId,
+      defaultVisible: false,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{getLocationName(a.locationId) || '—'}</span>,
+    },
+    {
+      key: 'experience',
+      label: 'Experience',
+      group: 'Dates',
+      sortable: true,
+      sortValue: a => getExperience(a.hireDate),
+      exportValue: a => `${getExperience(a.hireDate)} months`,
+      render: a => <span className="whitespace-nowrap text-sm text-gray-900">{getExperience(a.hireDate)} months</span>,
+    },
+    {
+      key: 'hireDate',
+      label: 'Hire Date',
+      group: 'Dates',
+      sortable: true,
+      sortValue: a => a.hireDate,
+      exportValue: a => a.hireDate,
+      defaultVisible: false,
+      render: a => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {a.hireDate ? formatDateOnly(a.hireDate) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: a => new Date(a.createdAt || 0).getTime(),
+      exportValue: a => (a.createdAt ? new Date(a.createdAt).toLocaleString() : ''),
+      defaultVisible: false,
+      render: a => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {a.createdAt ? formatDateTime(a.createdAt) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: a => a.status,
+      exportValue: a => a.status,
+      render: a => (
+        <select
+          value={a.status}
+          onChange={(e) => handleStatusChange(a.id, e.target.value as AttendantRow['status'])}
+          className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[a.status]} border-none focus:ring-2 focus:ring-${themeColor}-400`}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      ),
+    },
+  ];
+
+  const departmentOptions = useMemo(() => {
+    const unique = [...new Set(attendants.map(a => a.department).filter(Boolean))].sort();
+    return unique.map(d => ({ value: d, label: d }));
+  }, [attendants]);
+
+  const positionOptions = useMemo(() => {
+    const unique = [...new Set(attendants.map(a => a.position).filter(Boolean))].sort();
+    return unique.map(p => ({ value: p, label: p }));
+  }, [attendants]);
+
+  const shiftOptions = useMemo(() => {
+    const unique = [...new Set(attendants.map(a => a.shift).filter(Boolean))].sort();
+    return unique.map(s => ({ value: s, label: s }));
+  }, [attendants]);
+
+  const locationOptions = useMemo(
+    () => locations.map(l => ({ value: String(l.id), label: l.name })),
+    [locations]
+  );
+
+  const filterDefs: AdminFilterDef<AttendantRow>[] = useMemo(() => {
+    const defs: AdminFilterDef<AttendantRow>[] = [
+      {
+        type: 'select',
+        key: 'status',
+        label: 'Status',
+        allLabel: 'All Statuses',
+        options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' },
+        ],
+        predicate: (a, value) => a.status === value,
+      },
+      {
+        type: 'select',
+        key: 'department',
+        label: 'Department',
+        allLabel: 'All Departments',
+        options: departmentOptions,
+        predicate: (a, value) => a.department === value,
+      },
+      {
+        type: 'select',
+        key: 'position',
+        label: 'Position',
+        allLabel: 'All Positions',
+        options: positionOptions,
+        predicate: (a, value) => a.position === value,
+      },
+      {
+        type: 'select',
+        key: 'shift',
+        label: 'Shift',
+        allLabel: 'All Shifts',
+        options: shiftOptions,
+        predicate: (a, value) => a.shift === value,
+      },
+      {
+        type: 'select',
+        key: 'account',
+        label: 'Account',
+        allLabel: 'All Accounts',
+        options: [
+          { value: 'created', label: 'Account Created' },
+          { value: 'pending', label: 'Invitation Pending' },
+        ],
+        predicate: (a, value) =>
+          value === 'created' ? a.accountCreated !== false : a.accountCreated === false,
+      },
+      {
+        type: 'daterange',
+        key: 'hireDate',
+        label: 'Hire Date',
+        getDate: a => a.hireDate,
+      },
+      {
+        type: 'daterange',
+        key: 'createdDate',
+        label: 'Created Date',
+        getDate: a => a.createdAt,
+      },
+      {
+        type: 'numberrange',
+        key: 'experience',
+        label: 'Experience (months)',
+        getValue: a => getExperience(a.hireDate),
+      },
+    ];
+    if (isCompanyAdmin) {
+      defs.splice(4, 0, {
+        type: 'select',
+        key: 'location',
+        label: 'Location',
+        allLabel: 'All Locations',
+        options: locationOptions,
+        predicate: (a, value) => a.locationId === value,
+      });
+    }
+    return defs;
+  }, [departmentOptions, positionOptions, shiftOptions, locationOptions, isCompanyAdmin]);
+
+  const table = useAdminTable<AttendantRow>({
+    data: attendants,
+    columns,
+    getRowId: a => a.id,
+    storageKey: 'attendants',
+    filterDefs,
+    searchFields: a => [
+      a.firstName,
+      a.lastName,
+      `${a.firstName} ${a.lastName}`,
+      a.email,
+      a.phone,
+      a.employeeId,
+      a.department,
+      a.position,
+    ],
+    defaultSort: (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
   const handleBulkDelete = async () => {
-    if (selectedAttendants.length === 0) return;
-    
-    if (!window.confirm(`Are you sure you want to delete ${selectedAttendants.length} attendant(s)? This action cannot be undone.`)) {
+    if (table.selectedIds.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to delete ${table.selectedIds.length} attendant(s)? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      const ids = selectedAttendants.map(id => parseInt(id));
-      
+      const ids = table.selectedIds.map(id => parseInt(id));
+
       const response = await userService.bulkDelete(ids);
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to delete attendants');
       }
 
-      const updatedAttendants = attendants.filter(attendant => !selectedAttendants.includes(attendant.id));
-      setAttendants(updatedAttendants);
-      setSelectedAttendants([]);
-      
-      alert(`Successfully deleted ${selectedAttendants.length} attendant(s)`);
+      const deletedCount = table.selectedIds.length;
+      const deletedIds = [...table.selectedIds];
+      setAttendants(prev => prev.filter(attendant => !deletedIds.includes(attendant.id)));
+      table.clearSelection();
+
+      alert(`Successfully deleted ${deletedCount} attendant(s)`);
     } catch (error) {
       console.error('Error deleting attendants:', error);
       alert('Failed to delete some attendants. Please try again.');
     }
   };
 
-  const handleBulkStatusChange = async (newStatus: ManageAttendantsAttendant['status']) => {
-    if (selectedAttendants.length === 0) return;
-    
+  const handleBulkStatusChange = async (newStatus: AttendantRow['status']) => {
+    if (table.selectedIds.length === 0) return;
+
     try {
       const userData = localStorage.getItem('zapzone_user');
       const authToken = userData ? JSON.parse(userData).token : null;
@@ -576,7 +830,9 @@ const ManageAttendants = () => {
         return;
       }
 
-      await Promise.all(selectedAttendants.map(id => 
+      const selected = [...table.selectedIds];
+
+      await Promise.all(selected.map(id =>
         fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
           method: 'PATCH',
           headers: {
@@ -586,15 +842,29 @@ const ManageAttendants = () => {
         })
       ));
 
-      const updatedAttendants = attendants.map(attendant =>
-        selectedAttendants.includes(attendant.id) ? { ...attendant, status: newStatus } : attendant
-      );
-      setAttendants(updatedAttendants);
-      setSelectedAttendants([]);
+      setAttendants(prev => prev.map(attendant =>
+        selected.includes(attendant.id) ? { ...attendant, status: newStatus } : attendant
+      ));
+      table.clearSelection();
     } catch (error) {
       console.error('Error updating attendant status:', error);
       alert('Failed to update some attendant statuses. Please try again.');
     }
+  };
+
+  const exportToCSV = () => {
+    exportTableCsv({
+      filename: `attendants-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'First Name', value: a => a.firstName },
+        { label: 'Last Name', value: a => a.lastName },
+        { label: 'Phone', value: a => a.phone },
+        { label: 'Username', value: a => a.username },
+        { label: 'Account Created', value: a => (a.accountCreated === false ? 'No' : 'Yes') },
+      ],
+    });
   };
 
   const handleSendInvitation = () => {
@@ -604,26 +874,6 @@ const ManageAttendants = () => {
   const handleInviteAttendant = () => {
     setShowInvitationModal(true);
   };
-
-  const getUniqueDepartments = () => {
-    const departments = attendants.map(attendant => attendant.department);
-    return [...new Set(departments)];
-  };
-
-  const getExperience = (hireDate: string) => {
-    const hire = new Date(hireDate);
-    const today = new Date();
-    const months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
-    return Math.max(0, months);
-  };
-
-
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentAttendants = filteredAttendants.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredAttendants.length / itemsPerPage);
-
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   if (loading) {
     return (
@@ -641,6 +891,14 @@ const ManageAttendants = () => {
           <p className="text-gray-600 mt-2">View and manage all staff members in your facility</p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
+          <StandardButton
+            variant="secondary"
+            size="md"
+            icon={Download}
+            onClick={exportToCSV}
+          >
+            Export CSV
+          </StandardButton>
           <StandardButton
             variant="secondary"
             size="md"
@@ -724,235 +982,67 @@ const ManageAttendants = () => {
         })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search attendants..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              icon={RefreshCcw}
-              onClick={loadAttendants}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search attendants..."
+        onRefresh={loadAttendants}
+      />
 
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Department</label>
-                <select
-                  value={filters.department}
-                  onChange={(e) => handleFilterChange('department', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Departments</option>
-                  {getUniqueDepartments().map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
-        )}
-      </div>
+      <BulkActionsBar table={table} itemLabel="attendant(s)">
+        <select
+          onChange={(e) => {
+            if (e.target.value) {
+              handleBulkStatusChange(e.target.value as AttendantRow['status']);
+            }
+          }}
+          className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+        >
+          <option value="">Change Status</option>
+          <option value="active">Activate</option>
+          <option value="inactive">Deactivate</option>
+        </select>
+        <StandardButton
+          variant="danger"
+          size="md"
+          icon={Trash2}
+          onClick={handleBulkDelete}
+        >
+          Delete
+        </StandardButton>
+      </BulkActionsBar>
 
-      {selectedAttendants.length > 0 && (
-        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
-          <span className={`text-${fullColor} font-medium`}>
-            {selectedAttendants.length} attendant(s) selected
-          </span>
-          <div className="flex gap-2">
-            <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as ManageAttendantsAttendant['status'])}
-              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+      <AdminDataTable
+        table={table}
+        selectable
+        itemLabel="attendants"
+        emptyMessage="No attendants found"
+        renderActions={(attendant) => (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setViewTarget(attendant)}
+              className={`text-${themeColor}-600 hover:text-${themeColor}-800`}
+              title="View Profile"
             >
-              <option value="">Change Status</option>
-              <option value="active">Activate</option>
-              <option value="inactive">Deactivate</option>
-            </select>
+              <Eye className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setEditTarget(attendant)}
+              className="text-gray-600 hover:text-gray-800"
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
             <StandardButton
               variant="danger"
-              size="md"
+              size="sm"
               icon={Trash2}
-              onClick={handleBulkDelete}
-            >
-              Delete
-            </StandardButton>
+              onClick={() => handleDeleteAttendant(attendant.id)}
+              title="Delete"
+              className="!p-1 !bg-transparent hover:!bg-red-50"
+            />
           </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
-              <tr>
-                <th scope="col" className="px-6 py-4 font-medium w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedAttendants.length === currentAttendants.length && currentAttendants.length > 0}
-                    onChange={handleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
-                  />
-                </th>
-                <th scope="col" className="px-6 py-4 font-medium">Attendant</th>
-                <th scope="col" className="px-6 py-4 font-medium">Contact</th>
-                <th scope="col" className="px-6 py-4 font-medium">Position</th>
-                <th scope="col" className="px-6 py-4 font-medium">Department</th>
-                <th scope="col" className="px-6 py-4 font-medium">Experience</th>
-                <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                <th scope="col" className="px-6 py-4 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentAttendants.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-800">
-                    No attendants found
-                  </td>
-                </tr>
-              ) : (
-                currentAttendants.map((attendant) => (
-                  <tr key={attendant.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedAttendants.includes(attendant.id)}
-                        onChange={() => handleSelectAttendant(attendant.id)}
-                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {attendant.firstName} {attendant.lastName}
-                          </div>
-                          <div className="text-xs text-gray-600 mt-1">ID: {attendant.employeeId}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-3 w-3 text-gray-400" />
-                          <span className="text-gray-900">{attendant.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="h-3 w-3 text-gray-400" />
-                          <span className="text-gray-600">{attendant.phone}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {attendant.position}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${departmentColors[attendant.department] || 'bg-gray-100 text-gray-800'}`}>
-                        {attendant.department}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getExperience(attendant.hireDate)} months
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={attendant.status}
-                        onChange={(e) => handleStatusChange(attendant.id, e.target.value as ManageAttendantsAttendant['status'])}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attendant.status]} border-none focus:ring-2 focus:ring-${themeColor}-400`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setViewTarget(attendant)}
-                          className={`text-${themeColor}-600 hover:text-${themeColor}-800`}
-                          title="View Profile"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setEditTarget(attendant)}
-                          className="text-gray-600 hover:text-gray-800"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <StandardButton
-                          variant="danger"
-                          size="sm"
-                          icon={Trash2}
-                          onClick={() => handleDeleteAttendant(attendant.id)}
-                          title="Delete"
-                          className="!p-1 !bg-transparent hover:!bg-red-50"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="bg-white px-6 py-4 border-t border-gray-100">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={paginate}
-            totalItems={filteredAttendants.length}
-            showingFrom={indexOfFirstItem + 1}
-            showingTo={Math.min(indexOfLastItem, filteredAttendants.length)}
-          />
-        </div>
-      </div>
+        )}
+      />
 
       <InvitationModal
         isOpen={showInvitationModal}
@@ -978,7 +1068,7 @@ const ManageAttendants = () => {
         attendant={editTarget}
         onSaved={(updated) => {
           setAttendants((prev) =>
-            prev.map((a) => (a.id === updated.id ? updated : a))
+            prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a))
           );
           setEditTarget(null);
         }}
@@ -991,7 +1081,6 @@ const ManageAttendants = () => {
         onUpdated={(updated) => {
           setLocationInfo(updated);
           setEditLocationTarget(null);
-          // Sync the updated location name into the stored user so it reflects everywhere
           const storedUser = getStoredUser();
           if (storedUser && storedUser.location_id === updated.id) {
             setStoredUser({ ...storedUser, location_name: updated.name }, true);

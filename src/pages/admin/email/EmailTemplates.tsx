@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search,
   Plus,
-  Filter,
   RefreshCcw,
   FileText,
   Edit,
@@ -13,17 +11,35 @@ import {
   CheckCircle,
   Clock,
   Archive,
+  Download,
   LayoutTemplate
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
-import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../../utils/storage';
-import type { EmailTemplate, EmailTemplateFilters, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import type { EmailTemplate, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
+
+const categoryOptions = [
+  { value: 'onboarding', label: 'Onboarding' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'transactional', label: 'Transactional' },
+  { value: 'newsletter', label: 'Newsletter' },
+  { value: 'reminder', label: 'Reminder' },
+  { value: 'notification', label: 'Notification' },
+  { value: 'other', label: 'Other' }
+];
 
 const EmailTemplates: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -32,28 +48,13 @@ const EmailTemplates: React.FC = () => {
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [filters, setFilters] = useState<{
-    status: EmailTemplateStatus | 'all';
-    category: string;
-    search: string;
-  }>({
-    status: 'all',
-    category: 'all',
-    search: ''
-  });
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
 
   const templateStats = {
-    total: totalItems,
+    total: templates.length,
     active: templates.filter(t => t.status === 'active').length,
     draft: templates.filter(t => t.status === 'draft').length,
     archived: templates.filter(t => t.status === 'archived').length
@@ -64,17 +65,6 @@ const EmailTemplates: React.FC = () => {
     active: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Active' },
     archived: { color: 'bg-gray-100 text-gray-600', icon: Archive, label: 'Archived' }
   };
-
-  const categories = [
-    { value: 'all', label: 'All Categories' },
-    { value: 'onboarding', label: 'Onboarding' },
-    { value: 'marketing', label: 'Marketing' },
-    { value: 'transactional', label: 'Transactional' },
-    { value: 'newsletter', label: 'Newsletter' },
-    { value: 'reminder', label: 'Reminder' },
-    { value: 'notification', label: 'Notification' },
-    { value: 'other', label: 'Other' }
-  ];
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -95,39 +85,26 @@ const EmailTemplates: React.FC = () => {
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
-      
-      const apiFilters: EmailTemplateFilters = {
-        page: currentPage,
-        per_page: itemsPerPage
-      };
+      let allTemplates: EmailTemplate[] = [];
+      let page = 1;
+      let lastPage = 1;
 
-      if (filters.status !== 'all') {
-        apiFilters.status = filters.status;
-      }
-      if (filters.category !== 'all') {
-        apiFilters.category = filters.category;
-      }
-      if (filters.search.trim()) {
-        apiFilters.search = filters.search.trim();
-      }
-      if (selectedLocation) {
-        apiFilters.location_id = parseInt(selectedLocation);
-      }
+      do {
+        const response = await emailCampaignService.getTemplates({ page, per_page: 100 });
+        if (!response.success) break;
+        allTemplates = allTemplates.concat(response.data.data);
+        lastPage = response.data.last_page;
+        page++;
+      } while (page <= lastPage);
 
-      const response = await emailCampaignService.getTemplates(apiFilters);
-      
-      if (response.success) {
-        setTemplates(response.data.data);
-        setTotalPages(response.data.last_page);
-        setTotalItems(response.data.total);
-      }
+      setTemplates(allTemplates);
     } catch (error) {
       console.error('Error fetching templates:', error);
       setToast({ message: 'Failed to load email templates', type: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, filters, selectedLocation]);
+  }, []);
 
   useEffect(() => {
     fetchTemplates();
@@ -156,6 +133,211 @@ const EmailTemplates: React.FC = () => {
     });
   };
 
+  const creatorName = (t: EmailTemplate) =>
+    t.creator ? `${t.creator.first_name} ${t.creator.last_name}` : '';
+
+  const columns: AdminColumn<EmailTemplate>[] = [
+    {
+      key: 'id',
+      label: 'ID',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: t => t.id,
+      exportValue: t => t.id,
+      defaultVisible: false,
+      render: t => <span className="text-sm text-gray-900">#{t.id}</span>,
+    },
+    {
+      key: 'template',
+      label: 'Template',
+      group: 'Template',
+      sortable: true,
+      sortValue: t => t.name,
+      exportValue: t => t.name,
+      render: t => (
+        <div>
+          <p className="font-medium text-gray-900 text-sm">{t.name}</p>
+          <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{t.subject}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'subject',
+      label: 'Subject',
+      group: 'Template',
+      sortable: true,
+      sortValue: t => t.subject,
+      exportValue: t => t.subject,
+      defaultVisible: false,
+      render: t => <span className="text-sm text-gray-900 truncate max-w-md block">{t.subject}</span>,
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      group: 'Template',
+      sortable: true,
+      sortValue: t => t.category || '',
+      exportValue: t => t.category || '',
+      render: t => (
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 capitalize`}>
+          {t.category || 'Uncategorized'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: t => t.status,
+      exportValue: t => t.status,
+      render: t => {
+        const StatusIcon = statusConfig[t.status]?.icon || Clock;
+        return (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[t.status]?.color || 'bg-gray-100 text-gray-700'}`}>
+            <StatusIcon className="w-3.5 h-3.5" />
+            {statusConfig[t.status]?.label || t.status}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Ownership',
+      sortable: true,
+      sortValue: t => t.location?.name || '',
+      exportValue: t => t.location?.name || (t.location_id ? String(t.location_id) : ''),
+      defaultVisible: false,
+      render: t => <span className="text-sm text-gray-900">{t.location?.name || '—'}</span>,
+    },
+    {
+      key: 'creator',
+      label: 'Created By',
+      group: 'Ownership',
+      sortable: true,
+      sortValue: t => creatorName(t),
+      exportValue: t => creatorName(t),
+      defaultVisible: false,
+      render: t => <span className="text-sm text-gray-900">{creatorName(t) || '—'}</span>,
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: t => new Date(t.created_at || 0).getTime(),
+      exportValue: t => (t.created_at ? new Date(t.created_at).toLocaleString() : ''),
+      render: t => <span className="whitespace-nowrap text-sm text-gray-500">{formatDate(t.created_at)}</span>,
+    },
+    {
+      key: 'updated',
+      label: 'Updated',
+      group: 'Dates',
+      sortable: true,
+      sortValue: t => new Date(t.updated_at || 0).getTime(),
+      exportValue: t => (t.updated_at ? new Date(t.updated_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: t => <span className="whitespace-nowrap text-sm text-gray-500">{formatDate(t.updated_at)}</span>,
+    },
+  ];
+
+  const filterDefs: AdminFilterDef<EmailTemplate>[] = useMemo(() => {
+    const defs: AdminFilterDef<EmailTemplate>[] = [
+      {
+        type: 'select',
+        key: 'status',
+        label: 'Status',
+        allLabel: 'All Statuses',
+        options: [
+          { value: 'draft', label: 'Draft' },
+          { value: 'active', label: 'Active' },
+          { value: 'archived', label: 'Archived' },
+        ],
+        predicate: (t, value) => t.status === value,
+      },
+      {
+        type: 'select',
+        key: 'category',
+        label: 'Category',
+        allLabel: 'All Categories',
+        options: categoryOptions,
+        predicate: (t, value) => (t.category || '').toLowerCase() === value,
+      },
+      {
+        type: 'daterange',
+        key: 'created',
+        label: 'Created Date',
+        getDate: t => t.created_at,
+      },
+      {
+        type: 'daterange',
+        key: 'updated',
+        label: 'Updated Date',
+        getDate: t => t.updated_at,
+      },
+    ];
+    if (isCompanyAdmin && locations.length > 0) {
+      defs.splice(2, 0, {
+        type: 'select',
+        key: 'location',
+        label: 'Location',
+        allLabel: 'All Locations',
+        options: locations.map(loc => ({ value: String(loc.id), label: loc.name })),
+        predicate: (t, value) => String(t.location_id ?? '') === value,
+      });
+    }
+    return defs;
+  }, [isCompanyAdmin, locations]);
+
+  const table = useAdminTable<EmailTemplate>({
+    data: templates,
+    columns,
+    getRowId: t => String(t.id),
+    storageKey: 'email_templates',
+    filterDefs,
+    searchFields: t => [
+      t.id,
+      t.name,
+      t.subject,
+      t.category,
+      t.status,
+      creatorName(t),
+      t.location?.name,
+    ],
+    defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
+  const handleBulkStatusChange = async (newStatus: EmailTemplateStatus) => {
+    if (table.selectedIds.length === 0) return;
+    try {
+      await Promise.all(
+        table.selectedIds.map(id => emailCampaignService.updateTemplateStatus(Number(id), newStatus))
+      );
+      setToast({ message: `${table.selectedIds.length} template(s) updated successfully`, type: 'success' });
+      table.clearSelection();
+      fetchTemplates();
+    } catch (error) {
+      console.error('Error updating templates:', error);
+      setToast({ message: 'Failed to update some templates', type: 'error' });
+    }
+  };
+
+  const exportToCsv = () => {
+    exportTableCsv({
+      filename: `email-templates-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+      extraColumns: [
+        { label: 'Body (HTML)', value: t => t.body },
+        { label: 'Company', value: t => t.company?.company_name || '' },
+        { label: 'Location ID', value: t => t.location_id ?? '' },
+        { label: 'Creator Email', value: t => t.creator?.email || '' },
+      ],
+    });
+  };
+
   return (
     <div className="px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -171,6 +353,13 @@ const EmailTemplates: React.FC = () => {
             disabled={loading}
           >
             Refresh
+          </StandardButton>
+          <StandardButton
+            variant="secondary"
+            icon={Download}
+            onClick={exportToCsv}
+          >
+            Export CSV
           </StandardButton>
           <Link to="/admin/email/templates/create">
             <StandardButton variant="primary" icon={Plus}>
@@ -270,275 +459,77 @@ const EmailTemplates: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search templates by name or subject..."
-              value={filters.search}
-              onChange={(e) => {
-                setFilters(prev => ({ ...prev, search: e.target.value }));
-                setCurrentPage(1);
-              }}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton
-              onClick={() => setShowFilters(!showFilters)}
-              variant="secondary"
-              size="sm"
-              icon={Filter}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              onClick={fetchTemplates}
-              variant="secondary"
-              size="sm"
-              icon={RefreshCcw}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
-        
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className={`grid grid-cols-1 ${isCompanyAdmin && locations.length > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-3`}>
-              {isCompanyAdmin && locations.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                  <select
-                    value={selectedLocation}
-                    onChange={(e) => {
-                      setSelectedLocation(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                  >
-                    <option value="">All Locations</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search templates by name, subject, or category..."
+        onRefresh={() => fetchTemplates()}
+      />
 
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, status: e.target.value as EmailTemplateStatus | 'all' }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </div>
+      <BulkActionsBar table={table} itemLabel="template(s)">
+        <select
+          onChange={(e) => {
+            if (e.target.value) {
+              handleBulkStatusChange(e.target.value as EmailTemplateStatus);
+            }
+          }}
+          className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+        >
+          <option value="">Change Status</option>
+          <option value="draft">Mark as Draft</option>
+          <option value="active">Mark as Active</option>
+          <option value="archived">Archive</option>
+        </select>
+      </BulkActionsBar>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Category</label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, category: e.target.value }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  {categories.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <AdminDataTable
+        table={table}
+        loading={loading && templates.length === 0}
+        selectable
+        itemLabel="templates"
+        emptyState={
+          <div className="flex flex-col items-center justify-center py-4">
+            <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+              <FileText className={`h-12 w-12 text-${themeColor}-400`} />
             </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                onClick={() => {
-                  setFilters({ status: 'all', category: 'all', search: '' });
-                  setSelectedLocation('');
-                  setCurrentPage(1);
-                }}
-                variant="ghost"
-                size="sm"
-              >
-                Clear Filters
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
+            <p className="text-gray-500 mb-6">
+              {table.searchInput || table.activeFilterCount > 0
+                ? 'Try adjusting your search or filters'
+                : 'Get started by creating your first email template'}
+            </p>
+            <Link to="/admin/email/templates/create">
+              <StandardButton variant="primary" icon={Plus}>
+                Create Template
               </StandardButton>
-            </div>
+            </Link>
+          </div>
+        }
+        renderActions={(template) => (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPreviewTemplate(template)}
+              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Preview"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            <Link
+              to={`/admin/email/templates/edit/${template.id}`}
+              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+              title="Edit"
+            >
+              <Edit className="w-4 h-4" />
+            </Link>
+            <button
+              onClick={() => setDeleteConfirm(template.id)}
+              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
-            <p className="text-gray-500">Loading templates...</p>
-          </div>
-        ) : templates.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <div className="flex flex-col items-center justify-center">
-              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-                <FileText className={`h-12 w-12 text-${themeColor}-400`} />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
-              <p className="text-gray-500 mb-6">
-                {filters.search || filters.status !== 'all' || filters.category !== 'all'
-                  ? 'Try adjusting your search or filters'
-                  : 'Get started by creating your first email template'}
-              </p>
-              <Link to="/admin/email/templates/create">
-                <StandardButton variant="primary" icon={Plus}>
-                  Create Template
-                </StandardButton>
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Template</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
-                    <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {templates.map((template) => {
-                    const StatusIcon = statusConfig[template.status]?.icon || Clock;
-                    return (
-                      <tr key={template.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-4">
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{template.name}</p>
-                            <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{template.subject}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 capitalize`}>
-                            {template.category || 'Uncategorized'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[template.status]?.color || 'bg-gray-100 text-gray-700'}`}>
-                            <StatusIcon className="w-3.5 h-3.5" />
-                            {statusConfig[template.status]?.label || template.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-500">
-                          {formatDate(template.created_at)}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => setPreviewTemplate(template)}
-                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Preview"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <Link
-                              to={`/admin/email/templates/edit/${template.id}`}
-                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Edit"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                            <button
-                              onClick={() => setDeleteConfirm(template.id)}
-                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="md:hidden divide-y divide-gray-100">
-              {templates.map((template) => {
-                const StatusIcon = statusConfig[template.status]?.icon || Clock;
-                return (
-                  <div key={template.id} className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{template.name}</h3>
-                        <p className="text-sm text-gray-500 truncate">{template.subject}</p>
-                      </div>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[template.status]?.color || 'bg-gray-100 text-gray-700'}`}>
-                        <StatusIcon className="w-3 h-3" />
-                        {statusConfig[template.status]?.label || template.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="px-2 py-0.5 bg-gray-100 rounded capitalize">{template.category || 'Uncategorized'}</span>
-                        <span>{formatDate(template.created_at)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setPreviewTemplate(template)}
-                          className="p-2 text-gray-500 hover:text-gray-700"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <Link
-                          to={`/admin/email/templates/edit/${template.id}`}
-                          className="p-2 text-gray-500 hover:text-gray-700"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                        <button
-                          onClick={() => setDeleteConfirm(template.id)}
-                          className="p-2 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  itemLabel="templates"
-                />
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      />
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -589,7 +580,7 @@ const EmailTemplates: React.FC = () => {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Body</label>
-                <div 
+                <div
                   className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
                   dangerouslySetInnerHTML={{ __html: previewTemplate.body }}
                 />

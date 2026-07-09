@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search,
-  Filter,
   ChevronRight,
   Users,
   CheckCircle2,
   AlertTriangle,
   Snowflake,
   CreditCard,
-  RefreshCcw,
   Plus,
   X,
   CalendarCheck,
   BarChart3,
+  Download,
 } from 'lucide-react';
 import axios from 'axios';
 import membershipService from '../../../services/MembershipService';
@@ -29,14 +27,21 @@ import ActionMenu from '../../../components/ui/ActionMenu';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
-import { SkeletonTableRow, SkeletonStatCard } from '../../../components/ui/Skeleton';
-import { formatMembershipDate } from '../../../utils/membershipFormat';
+import { SkeletonStatCard } from '../../../components/ui/Skeleton';
+import { formatMembershipDate, membershipStatusLabel } from '../../../utils/membershipFormat';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { API_BASE_URL } from '../../../utils/storage';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
-const STATUSES: { value: MembershipStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
+const STATUS_OPTIONS: { value: MembershipStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'pending', label: 'Pending' },
   { value: 'past_due', label: 'Past Due' },
@@ -46,6 +51,23 @@ const STATUSES: { value: MembershipStatus | 'all'; label: string }[] = [
   { value: 'expired', label: 'Expired' },
 ];
 
+const customerFullName = (m: Membership): string =>
+  `${m.customer?.first_name ?? ''} ${m.customer?.last_name ?? ''}`.trim();
+
+const memberDisplayName = (m: Membership): string =>
+  m.holder_name?.trim() || customerFullName(m);
+
+const paymentTypeLabel = (m: Membership): string => {
+  if (m.is_comped) return 'Comped';
+  if (m.payment_method_label) return m.payment_method_label;
+  return m.recurring_billing_authorized ? 'Card (recurring)' : 'Cash / external';
+};
+
+const dateSortValue = (value?: string | null): number =>
+  value ? new Date(value).getTime() : 0;
+
+const toDateTimeString = (value?: string | null): string =>
+  value ? new Date(value).toLocaleString() : '';
 
 interface CustomerSearchResult {
   id: number;
@@ -80,13 +102,10 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
   const [lastName, setLastName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [phone, setPhone] = useState('');
-  // Pass holder (authorized user) — distinct from the account/guardian above.
-  // Optional: defaults to the account holder's name on the back end if left blank.
   const [holderName, setHolderName] = useState('');
 
   const [planId, setPlanId] = useState<number | ''>('');
   const [locationId, setLocationId] = useState<number | ''>('');
-  // Payment handling for in-person sales (task 1).
   const [paymentMethod, setPaymentMethod] = useState<'charge' | 'external' | 'comp'>('charge');
   const isComped = paymentMethod === 'comp';
   const [cardNumber, setCardNumber] = useState('');
@@ -106,8 +125,6 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
     locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
   }, []);
 
-  // When charging a card in person, load the Authorize.Net Accept.js config for the
-  // chosen location so the card can be tokenized client-side (PCI-safe).
   useEffect(() => {
     if (paymentMethod !== 'charge' || planPrice <= 0) {
       setGatewayReady(false);
@@ -226,7 +243,6 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
 
     setSaving(true);
     try {
-      // Charge the card in person: tokenize via Accept.js so raw PAN never hits our server.
       if (paymentMethod === 'charge' && planPrice > 0) {
         if (!gatewayReady) {
           setFormError(gatewayError || 'Payment gateway is not ready. Try again in a moment.');
@@ -520,8 +536,6 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
 const Memberships = () => {
   const navigate = useNavigate();
   const { themeColor } = useThemeColor();
-  // Initialise instantly from the in-memory cache so the page renders content
-  // on the very first frame — no blank screen between navigations.
   const [items, setItems] = useState<Membership[]>(
     () => membershipCache.getListSync()?.data ?? []
   );
@@ -529,25 +543,15 @@ const Memberships = () => {
     () => (membershipCache.getListSync() === null)
   );
   const [isSyncing, setIsSyncing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<MembershipStatus | 'all'>('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const { toast, showError, clear } = useToast();
 
   const load = async (forceRefresh = false) => {
     if (!forceRefresh && items.length === 0) setLoading(true);
     try {
-      if (status === 'all' && !search) {
-        const res = await membershipCache.getList({}, forceRefresh);
-        setItems(res.data);
-      } else {
-        const res = await membershipService.listMemberships({
-          status: status === 'all' ? undefined : status,
-          search: search || undefined,
-        });
-        setItems(res.data);
-      }
+      const res = await membershipCache.getList({}, forceRefresh);
+      setItems(res.data);
     } catch (e: unknown) {
       showError(e, 'Failed to load memberships');
     } finally {
@@ -557,30 +561,17 @@ const Memberships = () => {
 
   useEffect(() => {
     load();
+    locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
     const off = membershipCache.onUpdate((detail) => {
       if (detail.source === 'syncing') { setIsSyncing(true); return; }
       if (detail.source === 'synced') { setIsSyncing(false); return; }
-      if (status === 'all' && !search && (detail.key === 'list' || detail.key === 'all')) {
-        membershipCache.getListSync() && setItems(membershipCache.getListSync()!.data);
+      if (detail.key === 'list' || detail.key === 'all') {
+        const cached = membershipCache.getListSync();
+        if (cached) setItems(cached.data);
       }
     });
     return off;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  const filtered = useMemo(() => {
-    if (!search) return items;
-    const q = search.toLowerCase();
-    return items.filter((m) => {
-      const name = `${m.customer?.first_name || ''} ${m.customer?.last_name || ''}`.toLowerCase();
-      return (
-        name.includes(q) ||
-        m.holder_name?.toLowerCase().includes(q) ||
-        m.customer?.email?.toLowerCase().includes(q) ||
-        m.qr_token.toLowerCase().includes(q)
-      );
-    });
-  }, [items, search]);
+  }, []);
 
   const metrics = useMemo(() => {
     const total = items.length;
@@ -594,6 +585,307 @@ const Memberships = () => {
       { title: 'Frozen', value: frozen, icon: Snowflake, accent: 'blue', tooltip: 'Member paused their membership. Billing is paused and check-ins are blocked until the freeze ends.' },
     ];
   }, [items]);
+
+  const locationName = (m: Membership): string =>
+    m.home_location?.name
+      || locations.find((l) => l.id === m.home_location_id)?.name
+      || (m.home_location_id ? `#${m.home_location_id}` : '');
+
+  const columns: AdminColumn<Membership>[] = [
+    {
+      key: 'id',
+      label: 'Member #',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: (m) => m.id,
+      exportValue: (m) => m.id,
+      defaultVisible: false,
+      render: (m) => <span className="text-sm text-gray-900">#{m.id}</span>,
+    },
+    {
+      key: 'member',
+      label: 'Member',
+      group: 'Customer',
+      sortable: true,
+      sortValue: (m) => memberDisplayName(m).toLowerCase(),
+      exportValue: (m) => memberDisplayName(m),
+      render: (m) => (
+        <div>
+          <div className="font-medium text-gray-900">{memberDisplayName(m)}</div>
+          <div className="text-xs text-gray-500">
+            {m.holder_name?.trim() && (
+              <span>{m.customer?.first_name} {m.customer?.last_name} · </span>
+            )}
+            {m.customer?.email || 'no email'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'plan',
+      label: 'Plan',
+      group: 'Plan',
+      sortable: true,
+      sortValue: (m) => (m.plan?.name || `#${m.membership_plan_id}`).toLowerCase(),
+      exportValue: (m) => m.plan?.name || `#${m.membership_plan_id}`,
+      render: (m) => <span className="text-gray-700">{m.plan?.name || `#${m.membership_plan_id}`}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: (m) => m.status,
+      exportValue: (m) => membershipStatusLabel(m.status),
+      render: (m) => <MembershipStatusBadge status={m.status} />,
+    },
+    {
+      key: 'started',
+      label: 'Started',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (m) => dateSortValue(m.started_at),
+      exportValue: (m) => toDateTimeString(m.started_at),
+      render: (m) => <span className="text-gray-600">{formatMembershipDate(m.started_at)}</span>,
+    },
+    {
+      key: 'renews',
+      label: 'Renews',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (m) => dateSortValue(m.current_term_end),
+      exportValue: (m) => toDateTimeString(m.current_term_end),
+      render: (m) => <span className="text-gray-600">{formatMembershipDate(m.current_term_end)}</span>,
+    },
+    {
+      key: 'homeLocation',
+      label: 'Home Location',
+      group: 'Location',
+      sortable: true,
+      sortValue: (m) => locationName(m).toLowerCase(),
+      exportValue: (m) => locationName(m),
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">{locationName(m) || '—'}</span>,
+    },
+    {
+      key: 'paymentType',
+      label: 'Payment Type',
+      group: 'Payment',
+      sortable: true,
+      sortValue: (m) => paymentTypeLabel(m),
+      exportValue: (m) => paymentTypeLabel(m),
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">{paymentTypeLabel(m)}</span>,
+    },
+    {
+      key: 'billingAmount',
+      label: 'Billing Amount',
+      group: 'Payment',
+      sortable: true,
+      sortValue: (m) => Number(m.billing_amount ?? m.plan?.price ?? 0),
+      exportValue: (m) => Number(m.billing_amount ?? m.plan?.price ?? 0).toFixed(2),
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">${Number(m.billing_amount ?? m.plan?.price ?? 0).toFixed(2)}</span>,
+    },
+    {
+      key: 'visitsUsed',
+      label: 'Visits Used (Term)',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (m) => m.visits_used_this_term ?? 0,
+      exportValue: (m) => m.visits_used_this_term ?? 0,
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">{m.visits_used_this_term ?? 0}</span>,
+    },
+    {
+      key: 'visitsRemaining',
+      label: 'Visits Remaining',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (m) => m.visits_remaining ?? -1,
+      exportValue: (m) => m.visits_remaining ?? '',
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">{m.visits_remaining ?? '—'}</span>,
+    },
+    {
+      key: 'lastVisit',
+      label: 'Last Visit',
+      group: 'Usage',
+      sortable: true,
+      sortValue: (m) => dateSortValue(m.last_visit_at),
+      exportValue: (m) => toDateTimeString(m.last_visit_at),
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">{formatMembershipDate(m.last_visit_at)}</span>,
+    },
+    {
+      key: 'qrToken',
+      label: 'QR Token',
+      group: 'Identifiers',
+      sortValue: (m) => m.qr_token,
+      exportValue: (m) => m.qr_token,
+      defaultVisible: false,
+      render: (m) => <span className="font-mono text-xs text-gray-600">{m.qr_token}</span>,
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      group: 'Dates',
+      sortable: true,
+      sortValue: (m) => dateSortValue(m.created_at),
+      exportValue: (m) => toDateTimeString(m.created_at),
+      defaultVisible: false,
+      render: (m) => <span className="text-gray-600">{formatMembershipDate(m.created_at)}</span>,
+    },
+  ];
+
+  const planOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    items.forEach((m) => {
+      if (!map.has(m.membership_plan_id)) {
+        map.set(m.membership_plan_id, m.plan?.name || `#${m.membership_plan_id}`);
+      }
+    });
+    return [...map.entries()]
+      .map(([id, name]) => ({ value: String(id), label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [items]);
+
+  const locationOptions = useMemo(
+    () => locations.map((l) => ({ value: String(l.id), label: l.name })),
+    [locations]
+  );
+
+  const filterDefs: AdminFilterDef<Membership>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: STATUS_OPTIONS,
+      predicate: (m, value) => m.status === value,
+    },
+    {
+      type: 'select',
+      key: 'plan',
+      label: 'Plan',
+      allLabel: 'All Plans',
+      options: planOptions,
+      predicate: (m, value) => String(m.membership_plan_id) === value,
+    },
+    {
+      type: 'select',
+      key: 'homeLocation',
+      label: 'Home Location',
+      allLabel: 'All Locations',
+      options: locationOptions,
+      predicate: (m, value) => String(m.home_location_id ?? '') === value,
+    },
+    {
+      type: 'select',
+      key: 'paymentType',
+      label: 'Payment Type',
+      allLabel: 'All Payment Types',
+      options: [
+        { value: 'comped', label: 'Comped (free)' },
+        { value: 'recurring', label: 'Card (recurring)' },
+        { value: 'external', label: 'Cash / external' },
+      ],
+      predicate: (m, value) => {
+        if (value === 'comped') return m.is_comped;
+        if (value === 'recurring') return !m.is_comped && m.recurring_billing_authorized;
+        return !m.is_comped && !m.recurring_billing_authorized;
+      },
+    },
+    {
+      type: 'select',
+      key: 'renewalWindow',
+      label: 'Renewal Window',
+      allLabel: 'Any Renewal Date',
+      options: [
+        { value: 'within_7', label: 'Renews within 7 days' },
+        { value: 'within_30', label: 'Renews within 30 days' },
+        { value: 'in_grace', label: 'In grace period' },
+      ],
+      predicate: (m, value) => {
+        const now = Date.now();
+        if (value === 'in_grace') {
+          return !!m.grace_period_ends_at && new Date(m.grace_period_ends_at).getTime() >= now;
+        }
+        const end = m.current_term_end ? new Date(m.current_term_end).getTime() : null;
+        if (end === null) return false;
+        const days = value === 'within_7' ? 7 : 30;
+        return end >= now && end <= now + days * 86400000;
+      },
+    },
+    {
+      type: 'daterange',
+      key: 'startedRange',
+      label: 'Started Date',
+      getDate: (m) => m.started_at,
+    },
+    {
+      type: 'daterange',
+      key: 'renewsRange',
+      label: 'Renewal Date',
+      getDate: (m) => m.current_term_end,
+    },
+  ], [planOptions, locationOptions]);
+
+  const table = useAdminTable<Membership>({
+    data: items,
+    columns,
+    getRowId: (m) => String(m.id),
+    storageKey: 'memberships',
+    filterDefs,
+    searchFields: (m) => [
+      m.id,
+      customerFullName(m),
+      m.holder_name,
+      m.customer?.email,
+      m.customer?.phone,
+      m.qr_token,
+      m.plan?.name,
+      m.status,
+    ],
+    defaultSort: (a, b) => dateSortValue(b.created_at) - dateSortValue(a.created_at),
+  });
+
+  const exportCsv = (rows: Membership[]) => {
+    exportTableCsv({
+      filename: `memberships-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows,
+      extraColumns: [
+        { label: 'Customer ID', value: (m) => m.customer_id },
+        { label: 'Customer Name', value: (m) => customerFullName(m) },
+        { label: 'Email', value: (m) => m.customer?.email || '' },
+        { label: 'Phone', value: (m) => m.customer?.phone || '' },
+        { label: 'Holder Name', value: (m) => m.holder_name || '' },
+        { label: 'Plan ID', value: (m) => m.membership_plan_id },
+        { label: 'Plan Price', value: (m) => (m.plan ? Number(m.plan.price).toFixed(2) : '') },
+        { label: 'Billing Interval', value: (m) => m.plan?.billing_interval || '' },
+        { label: 'Status (raw)', value: (m) => m.status },
+        { label: 'Sold At Location', value: (m) => m.sold_at_location?.name || (m.sold_at_location_id ? `#${m.sold_at_location_id}` : '') },
+        { label: 'Term Start', value: (m) => toDateTimeString(m.current_term_start) },
+        { label: 'Grace Period Ends', value: (m) => toDateTimeString(m.grace_period_ends_at) },
+        { label: 'Frozen Until', value: (m) => toDateTimeString(m.frozen_until) },
+        { label: 'Canceled At', value: (m) => toDateTimeString(m.canceled_at) },
+        { label: 'Cancellation Effective', value: (m) => toDateTimeString(m.cancellation_effective_at) },
+        { label: 'Expires At', value: (m) => toDateTimeString(m.expires_at) },
+        { label: 'Recurring Billing Authorized', value: (m) => (m.recurring_billing_authorized ? 'Yes' : 'No') },
+        { label: 'Terms Accepted', value: (m) => (m.terms_accepted ? 'Yes' : 'No') },
+        { label: 'Comped', value: (m) => (m.is_comped ? 'Yes' : 'No') },
+        { label: 'Group ID', value: (m) => m.membership_group_id ?? '' },
+        { label: 'Updated', value: (m) => toDateTimeString(m.updated_at) },
+      ],
+    });
+  };
+
+  const exportSelected = () => {
+    const selected = items.filter((m) => table.selectedIds.includes(String(m.id)));
+    if (selected.length === 0) return;
+    exportCsv(selected);
+  };
 
   return (
     <div className="px-6 py-8">
@@ -623,6 +915,9 @@ const Memberships = () => {
               { label: 'Reports', icon: BarChart3, onClick: () => navigate('/memberships/reports') },
             ]}
           />
+          <StandardButton variant="secondary" size="md" icon={Download} onClick={() => exportCsv(table.filteredRows)}>
+            Export CSV
+          </StandardButton>
           <StandardButton variant="primary" size="md" icon={Plus} onClick={() => setShowAddModal(true)}>
             Add Member
           </StandardButton>
@@ -654,124 +949,60 @@ const Memberships = () => {
             })}
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search by name, email, or QR token..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search by name, email, phone, or QR token..."
+        onRefresh={() => load(true)}
+        actions={
+          <div className="flex items-center px-1">
+            <InfoTooltip
+              widthClass="w-72"
+              content={<>
+                <b>Plan</b> · the membership tier — determines price, included visits and benefits<br />
+                <b>Started</b> · date the membership was first activated<br />
+                <b>Renews</b> · end of the current paid term; the next recurring charge fires on this date<br /><br />
+                <b>active</b> · paid & valid<br />
+                <b>pending</b> · awaiting first payment<br />
+                <b>past_due</b> · payment failed, in grace<br />
+                <b>frozen</b> · paused by member<br />
+                <b>suspended</b> · blocked by staff/system<br />
+                <b>canceled / expired</b> · inactive
+              </>}
             />
           </div>
-          <div className="flex gap-1">
-            <StandardButton variant="secondary" size="sm" icon={Filter} onClick={() => setShowFilters(!showFilters)}>
-              Filters
-            </StandardButton>
-            <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={() => load(true)} title="Refresh">
-              {''}
-            </StandardButton>
-          </div>
-        </div>
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as MembershipStatus | 'all')}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        }
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {isSyncing && (
-          <div className="h-0.5 bg-blue-100">
-            <div className="h-full w-1/4 bg-blue-400 animate-pulse rounded-r-full" />
-          </div>
-        )}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 font-medium">Member</th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    Plan
-                    <InfoTooltip content="The membership tier the customer subscribed to. Determines price, included visits and benefits." size={12} />
-                  </span>
-                </th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    Status
-                    <InfoTooltip widthClass="w-64" content={<><b>active</b> · paid & valid<br/><b>pending</b> · awaiting first payment<br/><b>past_due</b> · payment failed, in grace<br/><b>frozen</b> · paused by member<br/><b>suspended</b> · blocked by staff/system<br/><b>canceled / expired</b> · inactive</>} size={12} />
-                  </span>
-                </th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    Started
-                    <InfoTooltip content="Date the membership was first activated." size={12} />
-                  </span>
-                </th>
-                <th className="px-4 py-3 font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    Renews
-                    <InfoTooltip content="End of the current paid term. The next recurring charge fires on this date." size={12} />
-                  </span>
-                </th>
-                <th className="px-4 py-3 font-medium text-right"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => <SkeletonTableRow key={i} cols={6} />)
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">No memberships found.</td>
-                </tr>
-              ) : (
-                filtered.map((m) => (
-                  <tr
-                    key={m.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate(`/memberships/${m.id}`)}
-                  >
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-gray-900">
-                        {m.holder_name?.trim() || `${m.customer?.first_name ?? ''} ${m.customer?.last_name ?? ''}`.trim()}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {m.holder_name?.trim() && (
-                          <span>{m.customer?.first_name} {m.customer?.last_name} · </span>
-                        )}
-                        {m.customer?.email || 'no email'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-gray-700">{m.plan?.name || `#${m.membership_plan_id}`}</td>
-                    <td className="px-4 py-4"><MembershipStatusBadge status={m.status} /></td>
-                    <td className="px-4 py-4 text-gray-600">{formatMembershipDate(m.started_at)}</td>
-                    <td className="px-4 py-4 text-gray-600">{formatMembershipDate(m.current_term_end)}</td>
-                    <td className="px-4 py-4 text-right"><ChevronRight size={16} className="inline text-gray-400" /></td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      <BulkActionsBar table={table} itemLabel="membership(s)">
+        <StandardButton variant="secondary" size="md" icon={Download} onClick={exportSelected}>
+          Export Selected
+        </StandardButton>
+      </BulkActionsBar>
+
+      {isSyncing && (
+        <div className="h-0.5 bg-blue-100 mb-1 rounded-full overflow-hidden">
+          <div className="h-full w-1/4 bg-blue-400 animate-pulse rounded-r-full" />
         </div>
-      </div>
+      )}
+
+      <AdminDataTable
+        table={table}
+        loading={loading}
+        selectable
+        itemLabel="memberships"
+        emptyMessage="No memberships found."
+        onRowClick={(m) => navigate(`/memberships/${m.id}`)}
+        actionsHeader=""
+        renderActions={(m) => (
+          <button
+            onClick={() => navigate(`/memberships/${m.id}`)}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="View details"
+          >
+            <ChevronRight size={16} />
+          </button>
+        )}
+      />
     </div>
   );
 };

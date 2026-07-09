@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search,
   Plus,
   RefreshCcw,
-  Filter,
   Send,
   Eye,
   CheckCircle,
@@ -15,19 +13,44 @@ import {
   Mail,
   Users,
   BarChart3,
-  Trash2
+  Trash2,
+  Download
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
+import type { Location } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../../utils/storage';
-import type { EmailCampaign, EmailCampaignFilters, EmailCampaignStatus, EmailCampaignStatistics } from '../../../types/EmailCampaign.types';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  BulkActionsBar,
+  exportTableCsv,
+  useAdminTable,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import type {
+  EmailCampaign,
+  EmailCampaignFilters,
+  EmailCampaignStatus,
+  EmailCampaignStatistics,
+  RecipientType,
+} from '../../../types/EmailCampaign.types';
 
-const EmailCampaigns: React.FC = () => {
+const RECIPIENT_TYPE_LABELS: Record<RecipientType, string> = {
+  customers: 'Customers',
+  attendants: 'Attendants',
+  company_admin: 'Company Admins',
+  location_managers: 'Location Managers',
+  custom: 'Custom Emails',
+};
+
+const EmailCampaigns = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
@@ -36,24 +59,12 @@ const EmailCampaigns: React.FC = () => {
   const [statistics, setStatistics] = useState<EmailCampaignStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [filters, setFilters] = useState<{
-    status: EmailCampaignStatus | 'all';
-    search: string;
-  }>({
-    status: 'all',
-    search: ''
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
 
-  const statusConfig: Record<EmailCampaignStatus, { color: string; icon: React.ElementType; label: string }> = {
+  const statusConfig: Record<EmailCampaignStatus, { color: string; icon: typeof Clock; label: string }> = {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     sending: { color: 'bg-blue-100 text-blue-800', icon: Send, label: 'Sending' },
     completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Completed' },
@@ -63,53 +74,48 @@ const EmailCampaigns: React.FC = () => {
 
   useEffect(() => {
     const fetchLocations = async () => {
-      if (isCompanyAdmin) {
-        try {
-          const response = await locationService.getLocations();
-          if (response.success && response.data) {
-            setLocations(response.data);
-          }
-        } catch (error) {
-          console.error('Error fetching locations:', error);
-        }
+      if (!isCompanyAdmin) return;
+      try {
+        const response = await locationService.getLocations();
+        const locationsArray = Array.isArray(response.data) ? response.data : [];
+        setLocations(locationsArray);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        setLocations([]);
       }
     };
     fetchLocations();
   }, [isCompanyAdmin]);
 
-  const fetchCampaigns = useCallback(async () => {
+  const loadCampaigns = useCallback(async () => {
     try {
       setLoading(true);
-      
-      const apiFilters: EmailCampaignFilters = {
-        page: currentPage,
-        per_page: itemsPerPage
-      };
 
-      if (filters.status !== 'all') {
-        apiFilters.status = filters.status;
-      }
-      if (filters.search.trim()) {
-        apiFilters.search = filters.search.trim();
-      }
+      const baseParams: EmailCampaignFilters = { per_page: 100 };
       if (selectedLocation) {
-        apiFilters.location_id = parseInt(selectedLocation);
+        baseParams.location_id = parseInt(selectedLocation);
       }
 
-      const response = await emailCampaignService.getCampaigns(apiFilters);
-      
-      if (response.success) {
-        setCampaigns(response.data.data);
-        setTotalPages(response.data.last_page);
-        setTotalItems(response.data.total);
-      }
+      let allCampaigns: EmailCampaign[] = [];
+      let page = 1;
+      let lastPage = 1;
+
+      do {
+        const response = await emailCampaignService.getCampaigns({ ...baseParams, page });
+        if (!response.success) break;
+        allCampaigns = allCampaigns.concat(response.data.data);
+        lastPage = response.data.last_page;
+        page++;
+      } while (page <= lastPage);
+
+      setCampaigns(allCampaigns);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       setToast({ message: 'Failed to load email campaigns', type: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, filters, selectedLocation]);
+  }, [selectedLocation]);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -127,16 +133,16 @@ const EmailCampaigns: React.FC = () => {
   }, [selectedLocation]);
 
   useEffect(() => {
-    fetchCampaigns();
+    loadCampaigns();
     fetchStatistics();
-  }, [fetchCampaigns, fetchStatistics]);
+  }, [loadCampaigns, fetchStatistics]);
 
   const handleDelete = async (id: number) => {
     try {
       const response = await emailCampaignService.deleteCampaign(id);
       if (response.success) {
         setToast({ message: 'Campaign deleted successfully', type: 'success' });
-        fetchCampaigns();
+        loadCampaigns();
         fetchStatistics();
       }
     } catch (error) {
@@ -152,7 +158,7 @@ const EmailCampaigns: React.FC = () => {
       const response = await emailCampaignService.cancelCampaign(id);
       if (response.success) {
         setToast({ message: 'Campaign cancelled successfully', type: 'success' });
-        fetchCampaigns();
+        loadCampaigns();
         fetchStatistics();
       }
     } catch (error) {
@@ -173,6 +179,440 @@ const EmailCampaigns: React.FC = () => {
     });
   };
 
+  const successRate = (campaign: EmailCampaign) =>
+    campaign.total_recipients > 0
+      ? Math.round((campaign.sent_count / campaign.total_recipients) * 100)
+      : 0;
+
+  const creatorName = (campaign: EmailCampaign) =>
+    campaign.creator
+      ? `${campaign.creator.first_name} ${campaign.creator.last_name}`
+      : campaign.created_by
+        ? `User #${campaign.created_by}`
+        : '';
+
+  const recipientTypesLabel = (campaign: EmailCampaign) =>
+    (campaign.recipient_types || []).map(t => RECIPIENT_TYPE_LABELS[t] || t).join(', ');
+
+  const columns: AdminColumn<EmailCampaign>[] = [
+    {
+      key: 'id',
+      label: 'Campaign #',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: c => c.id,
+      exportValue: c => c.id,
+      defaultVisible: false,
+      render: c => <span className="text-sm text-gray-900">#{c.id}</span>,
+    },
+    {
+      key: 'campaign',
+      label: 'Campaign',
+      group: 'Campaign',
+      sortable: true,
+      sortValue: c => c.name,
+      exportValue: c => c.name,
+      render: c => (
+        <div>
+          <p className="font-medium text-gray-900 text-sm">{c.name}</p>
+          <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{c.subject}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'subject',
+      label: 'Subject',
+      group: 'Campaign',
+      sortable: true,
+      sortValue: c => c.subject,
+      exportValue: c => c.subject,
+      defaultVisible: false,
+      render: c => <span className="text-sm text-gray-900 truncate max-w-md block">{c.subject}</span>,
+    },
+    {
+      key: 'template',
+      label: 'Template',
+      group: 'Campaign',
+      sortable: true,
+      sortValue: c => c.template?.name || '',
+      exportValue: c => c.template?.name || (c.email_template_id ? `Template #${c.email_template_id}` : ''),
+      defaultVisible: false,
+      render: c => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          {c.template?.name || (c.email_template_id ? `Template #${c.email_template_id}` : '—')}
+        </span>
+      ),
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      group: 'Campaign',
+      sortable: true,
+      sortValue: c => c.location?.name || '',
+      exportValue: c => c.location?.name || (c.location_id ? String(c.location_id) : ''),
+      defaultVisible: false,
+      render: c => <span className="whitespace-nowrap text-sm text-gray-900">{c.location?.name || '—'}</span>,
+    },
+    {
+      key: 'createdBy',
+      label: 'Created By',
+      group: 'Campaign',
+      sortable: true,
+      sortValue: c => creatorName(c),
+      exportValue: c => creatorName(c),
+      defaultVisible: false,
+      render: c => <span className="whitespace-nowrap text-sm text-gray-900">{creatorName(c) || '—'}</span>,
+    },
+    {
+      key: 'recipients',
+      label: 'Recipients',
+      group: 'Recipients',
+      sortable: true,
+      sortValue: c => c.total_recipients,
+      exportValue: c => c.total_recipients,
+      render: c => (
+        <div className="flex items-center gap-1.5">
+          <Users className={`w-4 h-4 text-${themeColor}-500`} />
+          <span className="font-medium text-gray-900 text-sm">{c.total_recipients}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'recipientTypes',
+      label: 'Recipient Types',
+      group: 'Recipients',
+      sortable: true,
+      sortValue: c => recipientTypesLabel(c),
+      exportValue: c => recipientTypesLabel(c),
+      defaultVisible: false,
+      render: c => <span className="text-xs text-gray-600">{recipientTypesLabel(c) || '—'}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      group: 'Status',
+      sortable: true,
+      sortValue: c => c.status,
+      exportValue: c => statusConfig[c.status]?.label || c.status,
+      render: c => {
+        const StatusIcon = statusConfig[c.status]?.icon || Clock;
+        return (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[c.status]?.color || 'bg-gray-100 text-gray-700'}`}>
+            <StatusIcon className="w-3.5 h-3.5" />
+            {statusConfig[c.status]?.label || c.status}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'progress',
+      label: 'Progress',
+      group: 'Status',
+      sortable: true,
+      sortValue: c => successRate(c),
+      exportValue: c => `${c.sent_count}/${c.total_recipients}${c.failed_count > 0 ? ` (${c.failed_count} failed)` : ''}`,
+      render: c => (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
+            <div
+              className={`h-full rounded-full ${c.failed_count > 0 ? 'bg-yellow-500' : `bg-${themeColor}-500`}`}
+              style={{ width: `${successRate(c)}%` }}
+            />
+          </div>
+          <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
+            {c.sent_count}/{c.total_recipients}
+          </span>
+          {c.failed_count > 0 && (
+            <span className="text-xs text-red-500 font-medium whitespace-nowrap">
+              ({c.failed_count} failed)
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'scheduledAt',
+      label: 'Scheduled At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => (c.scheduled_at ? new Date(c.scheduled_at).getTime() : 0),
+      exportValue: c => (c.scheduled_at ? new Date(c.scheduled_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: c => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {c.scheduled_at ? formatDate(c.scheduled_at) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'sentAt',
+      label: 'Sent At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => (c.sent_at ? new Date(c.sent_at).getTime() : 0),
+      exportValue: c => (c.sent_at ? new Date(c.sent_at).toLocaleString() : ''),
+      render: c => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {c.sent_at ? formatDate(c.sent_at) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'completedAt',
+      label: 'Completed At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => (c.completed_at ? new Date(c.completed_at).getTime() : 0),
+      exportValue: c => (c.completed_at ? new Date(c.completed_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: c => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {c.completed_at ? formatDate(c.completed_at) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      label: 'Created At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => (c.created_at ? new Date(c.created_at).getTime() : 0),
+      exportValue: c => (c.created_at ? new Date(c.created_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: c => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {c.created_at ? formatDate(c.created_at) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'updatedAt',
+      label: 'Updated At',
+      group: 'Dates',
+      sortable: true,
+      sortValue: c => (c.updated_at ? new Date(c.updated_at).getTime() : 0),
+      exportValue: c => (c.updated_at ? new Date(c.updated_at).toLocaleString() : ''),
+      defaultVisible: false,
+      render: c => (
+        <span className="whitespace-nowrap text-sm text-gray-500">
+          {c.updated_at ? formatDate(c.updated_at) : '-'}
+        </span>
+      ),
+    },
+  ];
+
+  const templateOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    campaigns.forEach(c => {
+      if (c.email_template_id) {
+        map.set(String(c.email_template_id), c.template?.name || `Template #${c.email_template_id}`);
+      }
+    });
+    return [...map.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [campaigns]);
+
+  const creatorOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    campaigns.forEach(c => {
+      if (c.created_by) {
+        map.set(
+          String(c.created_by),
+          c.creator ? `${c.creator.first_name} ${c.creator.last_name}` : `User #${c.created_by}`
+        );
+      }
+    });
+    return [...map.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [campaigns]);
+
+  const filterDefs: AdminFilterDef<EmailCampaign>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'status',
+      label: 'Status',
+      allLabel: 'All Statuses',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'sending', label: 'Sending' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'failed', label: 'Failed' },
+        { value: 'cancelled', label: 'Cancelled' },
+      ],
+      predicate: (c, value) => c.status === value,
+    },
+    {
+      type: 'select',
+      key: 'recipientType',
+      label: 'Recipient Type',
+      allLabel: 'All Recipient Types',
+      options: Object.entries(RECIPIENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+      predicate: (c, value) => (c.recipient_types || []).includes(value as RecipientType),
+    },
+    {
+      type: 'select',
+      key: 'template',
+      label: 'Template',
+      allLabel: 'All Templates',
+      options: [{ value: 'none', label: 'No Template' }, ...templateOptions],
+      predicate: (c, value) =>
+        value === 'none' ? !c.email_template_id : String(c.email_template_id || '') === value,
+    },
+    {
+      type: 'select',
+      key: 'createdBy',
+      label: 'Created By',
+      allLabel: 'All Creators',
+      options: creatorOptions,
+      predicate: (c, value) => String(c.created_by || '') === value,
+    },
+    {
+      type: 'select',
+      key: 'sendState',
+      label: 'Send State',
+      allLabel: 'All Send States',
+      options: [
+        { value: 'scheduled', label: 'Scheduled (not sent)' },
+        { value: 'sent', label: 'Sent' },
+        { value: 'unsent', label: 'Not Sent' },
+      ],
+      predicate: (c, value) => {
+        if (value === 'scheduled') return !!c.scheduled_at && !c.sent_at;
+        if (value === 'sent') return !!c.sent_at;
+        return !c.sent_at;
+      },
+    },
+    {
+      type: 'select',
+      key: 'failures',
+      label: 'Failures',
+      allLabel: 'All Campaigns',
+      options: [
+        { value: 'yes', label: 'Has Failures' },
+        { value: 'no', label: 'No Failures' },
+      ],
+      predicate: (c, value) => (value === 'yes' ? c.failed_count > 0 : c.failed_count === 0),
+    },
+    {
+      type: 'daterange',
+      key: 'createdDate',
+      label: 'Created Date',
+      getDate: c => c.created_at,
+    },
+    {
+      type: 'daterange',
+      key: 'scheduledDate',
+      label: 'Scheduled Date',
+      getDate: c => c.scheduled_at,
+    },
+    {
+      type: 'daterange',
+      key: 'sentDate',
+      label: 'Sent Date',
+      getDate: c => c.sent_at,
+    },
+    {
+      type: 'daterange',
+      key: 'completedDate',
+      label: 'Completed Date',
+      getDate: c => c.completed_at,
+    },
+  ], [templateOptions, creatorOptions]);
+
+  const table = useAdminTable<EmailCampaign>({
+    data: campaigns,
+    columns,
+    getRowId: c => String(c.id),
+    storageKey: 'email_campaigns',
+    filterDefs,
+    searchFields: c => [
+      c.id,
+      c.name,
+      c.subject,
+      creatorName(c),
+      c.creator?.email,
+      c.template?.name,
+      c.location?.name,
+      c.status,
+    ],
+    defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
+  const exportCampaignsCsv = (rows: EmailCampaign[]) => {
+    exportTableCsv({
+      filename: `email-campaigns-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows,
+      extraColumns: [
+        { label: 'Sent Count', value: c => c.sent_count },
+        { label: 'Failed Count', value: c => c.failed_count },
+        { label: 'Success Rate (%)', value: c => successRate(c) },
+        { label: 'Custom Emails', value: c => (c.custom_emails || []).join('; ') },
+        { label: 'Creator Email', value: c => c.creator?.email || '' },
+        { label: 'Company', value: c => c.company?.company_name || '' },
+      ],
+    });
+  };
+
+  const handleExportSelected = () => {
+    const selected = new Set(table.selectedIds);
+    exportCampaignsCsv(campaigns.filter(c => selected.has(String(c.id))));
+  };
+
+  const hasActiveCriteria = !!table.searchInput || table.activeFilterCount > 0;
+
+  const emptyState = (
+    <div className="flex flex-col items-center justify-center py-4">
+      <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+        <Send className={`h-12 w-12 text-${themeColor}-400`} />
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
+      <p className="text-gray-500 mb-6">
+        {hasActiveCriteria
+          ? 'Try adjusting your search or filters'
+          : 'Get started by creating your first email campaign'}
+      </p>
+      <Link to="/admin/email/campaigns/create">
+        <StandardButton variant="primary" icon={Plus}>
+          Create Campaign
+        </StandardButton>
+      </Link>
+    </div>
+  );
+
+  const renderRowActions = (campaign: EmailCampaign) => (
+    <div className="flex items-center gap-1">
+      <Link
+        to={`/admin/email/campaigns/${campaign.id}`}
+        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+        title="View Details"
+      >
+        <Eye className="w-4 h-4" />
+      </Link>
+      {(campaign.status === 'pending' || campaign.status === 'sending') && (
+        <button
+          onClick={() => setCancelConfirm(campaign.id)}
+          className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
+          title="Cancel Campaign"
+        >
+          <Ban className="w-4 h-4" />
+        </button>
+      )}
+      {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
+        <button
+          onClick={() => setDeleteConfirm(campaign.id)}
+          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+          title="Delete"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -180,7 +620,18 @@ const EmailCampaigns: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Email Campaigns</h1>
           <p className="text-gray-600 mt-2">Send bulk emails to customers and staff</p>
         </div>
-        <div className="flex items-center gap-3 mt-4 sm:mt-0">
+        <div className="flex items-center gap-3 mt-4 sm:mt-0 flex-wrap">
+          {isCompanyAdmin && locations.length > 0 && (
+            <LocationSelector
+              locations={locations}
+              selectedLocation={selectedLocation}
+              onLocationChange={setSelectedLocation}
+              themeColor={themeColor}
+              fullColor={fullColor}
+              variant="compact"
+              showAllOption={true}
+            />
+          )}
           <Link to="/admin/email/templates">
             <StandardButton variant="secondary" icon={Mail}>
               Templates
@@ -189,10 +640,17 @@ const EmailCampaigns: React.FC = () => {
           <StandardButton
             variant="secondary"
             icon={RefreshCcw}
-            onClick={() => { fetchCampaigns(); fetchStatistics(); }}
+            onClick={() => { loadCampaigns(); fetchStatistics(); }}
             disabled={loading}
           >
             Refresh
+          </StandardButton>
+          <StandardButton
+            variant="secondary"
+            icon={Download}
+            onClick={() => exportCampaignsCsv(table.filteredRows)}
+          >
+            Export CSV
           </StandardButton>
           <Link to="/admin/email/campaigns/create">
             <StandardButton variant="primary" icon={Plus}>
@@ -258,227 +716,46 @@ const EmailCampaigns: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-600" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search campaigns by name or subject..."
-              value={filters.search}
-              onChange={(e) => {
-                setFilters(prev => ({ ...prev, search: e.target.value }));
-                setCurrentPage(1);
-              }}
-              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-            />
-          </div>
-          <div className="flex gap-1">
-            <StandardButton
-              onClick={() => setShowFilters(!showFilters)}
-              variant="secondary"
-              size="sm"
-              icon={Filter}
-            >
-              Filters
-            </StandardButton>
-            <StandardButton
-              onClick={() => { fetchCampaigns(); fetchStatistics(); }}
-              variant="secondary"
-              size="sm"
-              icon={RefreshCcw}
-            >
-              {''}
-            </StandardButton>
-          </div>
-        </div>
-        
-        {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className={`grid grid-cols-1 ${isCompanyAdmin && locations.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-3`}>
-              {isCompanyAdmin && locations.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                  <select
-                    value={selectedLocation}
-                    onChange={(e) => {
-                      setSelectedLocation(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                  >
-                    <option value="">All Locations</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search campaigns by name or subject..."
+        onRefresh={() => { loadCampaigns(); fetchStatistics(); }}
+      />
 
-              <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, status: e.target.value as EmailCampaignStatus | 'all' }));
-                    setCurrentPage(1);
-                  }}
-                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="sending">Sending</option>
-                  <option value="completed">Completed</option>
-                  <option value="failed">Failed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <StandardButton
-                onClick={() => {
-                  setFilters({ status: 'all', search: '' });
-                  setSelectedLocation('');
-                  setCurrentPage(1);
-                }}
-                variant="ghost"
-                size="sm"
-              >
-                Clear Filters
-              </StandardButton>
-            </div>
-          </div>
-        )}
+      <BulkActionsBar table={table} itemLabel="campaign(s)">
+        <StandardButton
+          variant="secondary"
+          size="md"
+          icon={Download}
+          onClick={handleExportSelected}
+        >
+          Export Selected
+        </StandardButton>
+      </BulkActionsBar>
+
+      <div className="hidden md:block">
+        <AdminDataTable
+          table={table}
+          loading={loading && campaigns.length === 0}
+          selectable
+          itemLabel="campaigns"
+          emptyState={emptyState}
+          renderActions={renderRowActions}
+        />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
+      <div className="md:hidden bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading && campaigns.length === 0 ? (
           <div className="p-8 text-center">
             <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
             <p className="text-gray-500">Loading campaigns...</p>
           </div>
-        ) : campaigns.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <div className="flex flex-col items-center justify-center">
-              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-                <Send className={`h-12 w-12 text-${themeColor}-400`} />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
-              <p className="text-gray-500 mb-6">
-                {filters.search || filters.status !== 'all'
-                  ? 'Try adjusting your search or filters'
-                  : 'Get started by creating your first email campaign'}
-              </p>
-              <Link to="/admin/email/campaigns/create">
-                <StandardButton variant="primary" icon={Plus}>
-                  Create Campaign
-                </StandardButton>
-              </Link>
-            </div>
-          </div>
+        ) : table.rows.length === 0 ? (
+          <div className="px-6 py-12 text-center">{emptyState}</div>
         ) : (
           <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Campaign</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Recipients</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Progress</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sent At</th>
-                    <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {campaigns.map((campaign) => {
-                    const StatusIcon = statusConfig[campaign.status]?.icon || Clock;
-                    const successRate = campaign.total_recipients > 0 
-                      ? Math.round((campaign.sent_count / campaign.total_recipients) * 100) 
-                      : 0;
-                    return (
-                      <tr key={campaign.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-4">
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{campaign.name}</p>
-                            <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{campaign.subject}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-1.5">
-                            <Users className={`w-4 h-4 text-${themeColor}-500`} />
-                            <span className="font-medium text-gray-900 text-sm">{campaign.total_recipients}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[campaign.status]?.color || 'bg-gray-100 text-gray-700'}`}>
-                            <StatusIcon className="w-3.5 h-3.5" />
-                            {statusConfig[campaign.status]?.label || campaign.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
-                              <div 
-                                className={`h-full rounded-full ${campaign.failed_count > 0 ? 'bg-yellow-500' : `bg-${themeColor}-500`}`}
-                                style={{ width: `${successRate}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-600 font-medium">
-                              {campaign.sent_count}/{campaign.total_recipients}
-                            </span>
-                            {campaign.failed_count > 0 && (
-                              <span className="text-xs text-red-500 font-medium">
-                                ({campaign.failed_count} failed)
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-500">
-                          {campaign.sent_at ? formatDate(campaign.sent_at) : '-'}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link
-                              to={`/admin/email/campaigns/${campaign.id}`}
-                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="View Details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Link>
-                            {(campaign.status === 'pending' || campaign.status === 'sending') && (
-                              <button
-                                onClick={() => setCancelConfirm(campaign.id)}
-                                className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
-                                title="Cancel Campaign"
-                              >
-                                <Ban className="w-4 h-4" />
-                              </button>
-                            )}
-                            {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
-                              <button
-                                onClick={() => setDeleteConfirm(campaign.id)}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="md:hidden divide-y divide-gray-100">
-              {campaigns.map((campaign) => {
+            <div className="divide-y divide-gray-100">
+              {table.rows.map((campaign) => {
                 const StatusIcon = statusConfig[campaign.status]?.icon || Clock;
                 return (
                   <div key={campaign.id} className="p-4">
@@ -527,15 +804,14 @@ const EmailCampaigns: React.FC = () => {
                 );
               })}
             </div>
-
-            {totalPages > 1 && (
-              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            {table.totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-gray-100">
                 <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
+                  currentPage={table.page}
+                  totalPages={table.totalPages}
+                  onPageChange={table.setPage}
+                  totalItems={table.totalItems}
+                  itemsPerPage={table.itemsPerPage}
                   itemLabel="campaigns"
                 />
               </div>
