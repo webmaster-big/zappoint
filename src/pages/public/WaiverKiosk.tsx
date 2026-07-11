@@ -37,7 +37,7 @@ const WaiverKiosk = () => {
       setLoading(true);
       const ctx = preview
         ? await waiverService.getKioskPreview(templateId)
-        : await waiverService.getKioskForm(templateId);
+        : await waiverService.getKioskForm(templateId, locationId);
       setContext(ctx);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -45,7 +45,7 @@ const WaiverKiosk = () => {
     } finally {
       setLoading(false);
     }
-  }, [templateId, preview]);
+  }, [templateId, preview, locationId]);
 
   useEffect(() => {
     load();

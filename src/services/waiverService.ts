@@ -58,8 +58,10 @@ const waiverService = {
     (await publicApi.post(`/waivers/access/${token}/submit`, data)).data,
 
   // ---- public: kiosk ----
-  getKioskForm: async (templateId: number): Promise<WaiverFormContext> =>
-    (await publicApi.get<ApiResponse<WaiverFormContext>>(`/waivers/kiosk/${templateId}`)).data.data,
+  getKioskForm: async (templateId: number, locationId?: number | null): Promise<WaiverFormContext> =>
+    (await publicApi.get<ApiResponse<WaiverFormContext>>(`/waivers/kiosk/${templateId}`, {
+      params: locationId != null ? { location_id: locationId } : undefined,
+    })).data.data,
 
   getKioskPreview: async (templateId: number): Promise<WaiverFormContext> =>
     (await api.get<ApiResponse<WaiverFormContext>>(`/waiver-templates/${templateId}/kiosk-preview`)).data.data,
