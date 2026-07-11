@@ -3,6 +3,10 @@ import { X, Tablet, Search, Loader2, ChevronRight } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import waiverService from '../../services/waiverService';
 import bookingService from '../../services/bookingService';
+import locationService from '../../services/LocationService';
+import type { Location as LocationOption } from '../../services/LocationService';
+import { useLocationScope } from '../../contexts/LocationContext';
+import { getStoredUser } from '../../utils/storage';
 import attractionPurchaseService from '../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../services/EventPurchaseService';
 import { packageCacheService } from '../../services/PackageCacheService';
@@ -54,9 +58,20 @@ export default function KioskSessionModal({
   onClose,
 }: Props) {
   const { themeColor, fullColor } = useThemeColor();
+  const { locations: scopedLocations, effectiveLocationId } = useLocationScope();
+
+  const [storedUser] = useState(() => getStoredUser());
+  const isCompanyAdmin = storedUser?.role === 'company_admin';
+  const userLocationId: number | null = storedUser?.location_id ?? null;
+  const userLocationName: string = storedUser?.location_name ?? '';
 
   const [mode, setMode] = useState<'generic' | 'bound'>('generic');
   const [sourceType, setSourceType] = useState<SourceType>('booking');
+
+  const [locations, setLocations] = useState<LocationOption[]>(scopedLocations);
+  const [selectedLocationId, setSelectedLocationId] = useState<number | ''>(
+    isCompanyAdmin ? (effectiveLocationId ?? '') : '',
+  );
 
   const [packages, setPackages] = useState<Package[]>([]);
   const [attractions, setAttractions] = useState<Attraction[]>([]);
@@ -84,6 +99,22 @@ export default function KioskSessionModal({
       setEvents(assignedEventIds != null ? evts.filter((e) => assignedEventIds.includes(e.id)) : evts);
     })();
   }, [assignedPackageIds, assignedAttractionIds, assignedEventIds]);
+
+  useEffect(() => {
+    if (scopedLocations.length > 0) {
+      setLocations(scopedLocations);
+      return;
+    }
+    if (!isCompanyAdmin) return;
+    (async () => {
+      try {
+        const res = await locationService.getLocations({ per_page: 100 });
+        setLocations(res?.data ?? []);
+      } catch {
+        setLocations([]);
+      }
+    })();
+  }, [isCompanyAdmin, scopedLocations]);
 
   useEffect(() => {
     setSelectedResult(null);
@@ -156,8 +187,15 @@ export default function KioskSessionModal({
         ? 'Guest name, email, or attraction name…'
         : 'Guest name, email, or event name…';
 
+  const resolvedLocationId: number | null = isCompanyAdmin
+    ? (selectedLocationId === '' ? null : selectedLocationId)
+    : userLocationId;
+
   const canLaunch = () => {
-    if (mode === 'generic') return true;
+    if (mode === 'generic') {
+      if (isCompanyAdmin && selectedLocationId === '') return false;
+      return true;
+    }
     if (isPurchaseType(sourceType)) return selectedResult !== null;
     return selectedActivityId !== '';
   };
@@ -165,7 +203,11 @@ export default function KioskSessionModal({
   const launch = async () => {
     setError(null);
     if (mode === 'generic') {
-      window.open(`/waiver/kiosk/${templateId}${isPreview ? '?preview=1' : ''}`, '_blank', 'noopener');
+      const params = new URLSearchParams();
+      if (isPreview) params.set('preview', '1');
+      if (resolvedLocationId != null) params.set('location_id', String(resolvedLocationId));
+      const qs = params.toString();
+      window.open(`/waiver/kiosk/${templateId}${qs ? `?${qs}` : ''}`, '_blank', 'noopener');
       onClose();
       return;
     }
@@ -240,6 +282,33 @@ export default function KioskSessionModal({
               <div className="text-xs text-gray-500 mt-0.5">Link to a booking, purchase, or activity</div>
             </button>
           </div>
+
+          {mode === 'generic' && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Location</p>
+              {isCompanyAdmin ? (
+                <>
+                  <select
+                    value={selectedLocationId}
+                    onChange={(e) => setSelectedLocationId(e.target.value === '' ? '' : Number(e.target.value))}
+                    className={fieldCls}
+                  >
+                    <option value="">— select a location —</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>{loc?.name}</option>
+                    ))}
+                  </select>
+                  {selectedLocationId === '' && (
+                    <p className="text-xs text-amber-600 mt-1.5">Select a location — waivers from this kiosk will be associated with it.</p>
+                  )}
+                </>
+              ) : (
+                <div className="px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                  {userLocationName ? userLocationName : userLocationId != null ? `Location #${userLocationId}` : 'No location assigned'}
+                </div>
+              )}
+            </div>
+          )}
 
           {mode === 'bound' && (
             <div className="space-y-4">

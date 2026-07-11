@@ -1,6 +1,7 @@
 import { Route, Routes, Navigate, useLocation } from "react-router-dom"
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { LocationProvider } from "./contexts/LocationContext";
 import PageTitleSetter from "./components/PageTitleSetter";
 import { getStoredUser } from "./utils/storage";
 import MainLayout from "./layouts/AdminMainLayout";
@@ -17,6 +18,7 @@ import BookPackage from "./pages/admin/bookings/BookPackage"
 import GiftCard from "./pages/admin/packages/GiftCard"
 import Promo from "./pages/admin/packages/Promo"
 import Bookings from "./pages/admin/bookings/Bookings"
+import LocationChangeRequests from "./pages/admin/bookings/LocationChangeRequests";
 import EditBooking from "./pages/admin/bookings/EditBooking"
 import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
@@ -170,7 +172,7 @@ function App() {
           <Route path="/customer/membership/update-payment" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_update_payment" /><UpdatePaymentMethod /></></CustomerProtectedRoute>} />
         </Route>
         
-        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}> 
+        <Route element={<ProtectedRoute><LocationProvider><MainLayout /></LocationProvider></ProtectedRoute>}>
           <Route path="/attendant/dashboard" element={<ProtectedRoute allowedRoles={['attendant']}><AttendantDashboard /></ProtectedRoute>} />
           <Route path="/manager/dashboard" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationManagerDashboard /></ProtectedRoute>} />
           <Route path="/company/dashboard" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyDashboard /></ProtectedRoute>} />
@@ -217,6 +219,7 @@ function App() {
           <Route path="/waivers/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><WaiverSettings /></ProtectedRoute>} />
 
           <Route path="/bookings" element={<Bookings />} />
+          <Route path="/location-change-requests" element={<LocationChangeRequests />} />
           <Route path="/bookings/edit/:id" element={<EditBooking />} />
           <Route path="/bookings/:id" element={<ViewBooking />} />
           <Route path="/bookings/calendar" element={<CalendarView />} />

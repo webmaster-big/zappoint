@@ -64,8 +64,8 @@ const waiverService = {
   getKioskPreview: async (templateId: number): Promise<WaiverFormContext> =>
     (await api.get<ApiResponse<WaiverFormContext>>(`/waiver-templates/${templateId}/kiosk-preview`)).data.data,
 
-  kioskSubmit: async (templateId: number, data: WaiverSubmission) =>
-    (await publicApi.post(`/waivers/kiosk/${templateId}/submit`, data)).data,
+  kioskSubmit: async (templateId: number, data: WaiverSubmission, locationId?: number | null) =>
+    (await publicApi.post(`/waivers/kiosk/${templateId}/submit`, locationId != null ? { ...data, location_id: locationId } : data)).data,
 
   // ---- public: chaperone (bulk) ----
   getBulk: async (manageToken: string): Promise<BulkChaperoneView> =>

@@ -31,8 +31,7 @@ import type { ManageAttractionsAttraction } from '../../../types/manageAttractio
 import { attractionService } from '../../../services/AttractionService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Attraction, AttractionFilters, CreateAttractionData } from '../../../services/AttractionService';
-import { locationService } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
 import { createSlugWithId } from '../../../utils/slug';
 import { getStoredUser } from '../../../utils/storage';
@@ -117,8 +116,8 @@ const ManageAttractions = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+  const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
+  const selectedLocation = effectiveLocationId;
   const [attractions, setAttractions] = useState<AttractionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -136,22 +135,6 @@ const ManageAttractions = () => {
     inactive: 'bg-gray-100 text-gray-800',
     maintenance: 'bg-yellow-100 text-yellow-800',
   };
-
-  useEffect(() => {
-    if (isCompanyAdmin) {
-      const fetchLocations = async () => {
-        try {
-          const response = await locationService.getLocations();
-          if (response.success && response.data) {
-            setLocations(Array.isArray(response.data) ? response.data : []);
-          }
-        } catch (error) {
-          console.error('Error fetching locations:', error);
-        }
-      };
-      fetchLocations();
-    }
-  }, [isCompanyAdmin]);
 
   useEffect(() => {
     loadAttractions();
@@ -935,17 +918,6 @@ const ManageAttractions = () => {
           <p className="text-gray-600 mt-1">View and manage all attractions</p>
         </div>
         <div className="mt-4 sm:mt-0 flex flex-wrap items-center gap-2">
-          {isCompanyAdmin && (
-            <LocationSelector
-              variant="compact"
-              locations={locations}
-              selectedLocation={selectedLocation?.toString() || ''}
-              onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              showAllOption={true}
-            />
-          )}
           <ActionMenu
             items={[
               { label: 'Fee Supports', icon: DollarSign, onClick: () => navigate('/fee-supports?entity_type=attraction') },
@@ -1182,7 +1154,7 @@ const ManageAttractions = () => {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
-              {isCompanyAdmin && locations.length > 1 && (
+              {isCompanyAdmin && scopeLocations.length > 1 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Import to Location
@@ -1193,7 +1165,7 @@ const ManageAttractions = () => {
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   >
                     <option value="">Select a location...</option>
-                    {locations.map(loc => (
+                    {scopeLocations.map(loc => (
                       <option key={loc.id} value={loc.id}>{loc.name}</option>
                     ))}
                   </select>
@@ -1268,7 +1240,7 @@ const ManageAttractions = () => {
               </StandardButton>
               <StandardButton
                 onClick={handleImport}
-                disabled={!importData.trim() || (isCompanyAdmin && locations.length > 1 && !importLocationId)}
+                disabled={!importData.trim() || (isCompanyAdmin && scopeLocations.length > 1 && !importLocationId)}
                 variant="primary"
                 icon={Upload}
               >

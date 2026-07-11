@@ -26,6 +26,7 @@ import type { Room, RoomFilters } from '../../../services/RoomService';
 import type { Location } from '../../../services/LocationService';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 
 const Rooms: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
@@ -53,8 +54,9 @@ const Rooms: React.FC = () => {
     
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
+    const { effectiveLocationId } = useLocationScope();
     const [locations, setLocations] = useState<Location[]>([]);
-    const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+    const selectedLocationId = effectiveLocationId;
     const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
     const [formData, setFormData] = useState({
@@ -124,9 +126,6 @@ const Rooms: React.FC = () => {
                     if (response.success && response.data) {
                         const locationsArray = Array.isArray(response.data) ? response.data : [];
                         setLocations(locationsArray);
-                        if (locationsArray.length > 0 && selectedLocationId === null) {
-                            setSelectedLocationId(locationsArray[0].id);
-                        }
                     }
                 } catch (error) {
                     console.error('Error fetching locations:', error);
@@ -671,29 +670,6 @@ const Rooms: React.FC = () => {
                                             <option value="desc">Descending</option>
                                         </select>
                                     </div>
-                                    {isCompanyAdmin && locations.length > 0 && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                                            <LocationSelector
-                                                locations={locations.map(loc => ({
-                                                    id: loc.id.toString(),
-                                                    name: loc.name,
-                                                    address: loc.address || '',
-                                                    city: loc.city || '',
-                                                    state: loc.state || ''
-                                                }))}
-                                                selectedLocation={selectedLocationId?.toString() || ''}
-                                                onLocationChange={(locationId) => {
-                                                    setSelectedLocationId(locationId ? Number(locationId) : null);
-                                                    setCurrentPage(1);
-                                                }}
-                                                themeColor={themeColor}
-                                                fullColor={fullColor}
-                                                variant="compact"
-                                                showAllOption={true}
-                                            />
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="mt-3 flex justify-end">
                                     <StandardButton

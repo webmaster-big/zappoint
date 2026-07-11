@@ -3,13 +3,13 @@ import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, 
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
-import { dayOffService, locationService, packageService, roomService } from '../../../services';
+import { dayOffService, packageService, roomService } from '../../../services';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import type { DayOff, DayOffFilters, BlockingScope } from '../../../services/DayOffService';
-import type { Location } from '../../../services/LocationService';
 import type { Package } from '../../../services/PackageService';
 import type { Room } from '../../../services/RoomService';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
 
 const DayOffs: React.FC = () => {
@@ -37,8 +37,8 @@ const DayOffs: React.FC = () => {
     
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
-    const [locations, setLocations] = useState<Location[]>([]);
-    const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+    const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
+    const selectedLocationId = effectiveLocationId;
     const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
     const [formData, setFormData] = useState({
@@ -98,26 +98,6 @@ const DayOffs: React.FC = () => {
     const [editValue, setEditValue] = useState('');
     const [savingCell, setSavingCell] = useState<{ dayOffId: number; field: string } | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        const fetchLocations = async () => {
-            if (isCompanyAdmin) {
-                try {
-                    const response = await locationService.getLocations();
-                    if (response.success && response.data) {
-                        const locationsArray = Array.isArray(response.data) ? response.data : [];
-                        setLocations(locationsArray);
-                        if (locationsArray.length > 0 && selectedLocationId === null) {
-                            setSelectedLocationId(locationsArray[0].id);
-                        }
-                    }
-                } catch {
-                }
-            }
-        };
-        fetchLocations();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const fetchDayOffs = React.useCallback(async () => {
         try {
@@ -796,8 +776,8 @@ const DayOffs: React.FC = () => {
                             setBulkSelectedDates(new Set());
                             setBulkReason('');
                             setBulkIsRecurring(false);
-                            if (isCompanyAdmin && locations.length > 0) {
-                                setModalLocationId(locations[0].id);
+                            if (isCompanyAdmin && scopeLocations.length > 0) {
+                                setModalLocationId(scopeLocations[0].id);
                             }
                             setShowBulkModal(true);
                         }}
@@ -810,8 +790,8 @@ const DayOffs: React.FC = () => {
                     <StandardButton
                         onClick={() => {
                             resetForm();
-                            if (isCompanyAdmin && locations.length > 0) {
-                                setModalLocationId(locations[0].id);
+                            if (isCompanyAdmin && scopeLocations.length > 0) {
+                                setModalLocationId(scopeLocations[0].id);
                             }
                             setShowCreateModal(true);
                         }}
@@ -943,31 +923,6 @@ const DayOffs: React.FC = () => {
                                         </select>
                                     </div>
                                 </div>
-                                {isCompanyAdmin && locations.length > 0 && (
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                                            <LocationSelector
-                                                locations={locations.map(loc => ({
-                                                    id: loc.id.toString(),
-                                                    name: loc.name,
-                                                    address: loc.address || '',
-                                                    city: loc.city || '',
-                                                    state: loc.state || ''
-                                                }))}
-                                                selectedLocation={selectedLocationId?.toString() || ''}
-                                                onLocationChange={(locationId) => {
-                                                    setSelectedLocationId(locationId ? Number(locationId) : null);
-                                                    setCurrentPage(1);
-                                                }}
-                                                themeColor={themeColor}
-                                                fullColor={fullColor}
-                                                variant="compact"
-                                                showAllOption={true}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="mt-3 flex justify-end">
                                     <StandardButton
                                         variant="ghost"
@@ -1315,8 +1270,8 @@ const DayOffs: React.FC = () => {
                         <StandardButton
                             onClick={() => {
                                 resetForm();
-                                if (isCompanyAdmin && locations.length > 0) {
-                                    setModalLocationId(locations[0].id);
+                                if (isCompanyAdmin && scopeLocations.length > 0) {
+                                    setModalLocationId(scopeLocations[0].id);
                                 }
                                 setShowCreateModal(true);
                             }}
@@ -1352,7 +1307,7 @@ const DayOffs: React.FC = () => {
                                             Location <span className="text-red-500">*</span>
                                         </label>
                                         <LocationSelector
-                                            locations={locations.map(loc => ({
+                                            locations={scopeLocations.map(loc => ({
                                                 id: loc.id.toString(),
                                                 name: loc.name,
                                                 address: '',
@@ -1969,7 +1924,7 @@ const DayOffs: React.FC = () => {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             disabled={bulkCreating}
                                         >
-                                            {locations.map(loc => (
+                                            {scopeLocations.map(loc => (
                                                 <option key={loc.id} value={loc.id}>{loc.name}</option>
                                             ))}
                                         </select>

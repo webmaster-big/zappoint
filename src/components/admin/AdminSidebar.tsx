@@ -9,6 +9,9 @@ import {
   Ticket,
   BarChart3,
   ChevronDown,
+  MapPin,
+  Building2,
+  Check,
   Search,
   Bell,
   MessageSquare,
@@ -47,6 +50,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLocationScope, LOCATION_SCOPE_ENABLED } from '../../contexts/LocationContext';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
 import { API_BASE_URL, getImageUrl } from '../../utils/storage';
@@ -121,6 +125,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
       { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
       { label: 'Room Schedule', href: '/bookings/room-schedule', icon: Dot },
       { label: 'Bookings', href: '/bookings', icon: Dot },
+      { label: 'Location Requests', href: '/location-change-requests', icon: Dot },
       { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
       { label: 'Check-in with QR Scanner', href: '/bookings/check-in', icon: Dot }
     ]},
@@ -163,6 +168,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
           { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
           { label: 'Manage Bookings', href: '/bookings', icon: List },
+          { label: 'Location Requests', href: '/location-change-requests', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
@@ -215,6 +221,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
           { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
           { label: 'Manage Bookings', href: '/bookings', icon: List },
+          { label: 'Location Requests', href: '/location-change-requests', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
@@ -290,6 +297,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
           { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
           { label: 'Manage Bookings', href: '/bookings', icon: List },
+          { label: 'Location Requests', href: '/location-change-requests', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
@@ -360,7 +368,24 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const { theme, toggleTheme } = useTheme();
   const { themeColor, fullColor } = useThemeColor();
   const location = useLocation();
-  
+  const { selectedLocationId, setSelectedLocationId, locations: scopeLocations, isCompanyAdmin: canScopeLocation } = useLocationScope();
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+  const locationMenuRef = useRef<HTMLDivElement>(null);
+  const selectedLocationName = selectedLocationId === null
+    ? 'All Locations'
+    : (scopeLocations.find((l) => l.id === selectedLocationId)?.name || `Location #${selectedLocationId}`);
+
+  useEffect(() => {
+    if (!locationMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (locationMenuRef.current && !locationMenuRef.current.contains(e.target as Node)) {
+        setLocationMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [locationMenuOpen]);
+
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem('zapzone_sidebar_dropdowns');
@@ -1186,6 +1211,51 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
               />
             </button>
           </div>
+
+          {LOCATION_SCOPE_ENABLED && canScopeLocation && !isMinimized && (
+            <div className="px-3 pt-3 relative" ref={locationMenuRef}>
+              <button
+                type="button"
+                onClick={() => setLocationMenuOpen((o) => !o)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-colors text-left ${locationMenuOpen ? 'bg-gray-50 border-gray-100' : ''}`}
+              >
+                <span className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${themeColor}-50 text-${fullColor} flex-shrink-0`}>
+                  <MapPin className="w-4 h-4" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Location</span>
+                  <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1">{selectedLocationName}</span>
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {locationMenuOpen && (
+                <div className="absolute left-3 right-3 z-50 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 max-h-72 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedLocationId(null); setLocationMenuOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${selectedLocationId === null ? `text-${themeColor}-700 font-semibold` : 'text-gray-700'}`}
+                  >
+                    <Building2 className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                    <span className="flex-1">All Locations</span>
+                    {selectedLocationId === null && <Check className={`w-4 h-4 text-${fullColor}`} />}
+                  </button>
+                  {scopeLocations.map((loc) => (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => { setSelectedLocationId(loc.id); setLocationMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${selectedLocationId === loc.id ? `text-${themeColor}-700 font-semibold` : 'text-gray-700'}`}
+                    >
+                      <MapPin className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                      <span className="flex-1 truncate">{loc.name}</span>
+                      {selectedLocationId === loc.id && <Check className={`w-4 h-4 text-${fullColor}`} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="p-4" ref={searchRef}>
             {isMinimized ? (

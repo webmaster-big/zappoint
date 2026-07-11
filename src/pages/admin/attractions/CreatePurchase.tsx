@@ -21,8 +21,7 @@ import { attractionPurchaseService } from '../../../services/AttractionPurchaseS
 import { attractionPurchaseCacheService } from '../../../services/AttractionPurchaseCacheService';
 import { metricsCacheService } from '../../../services/MetricsCacheService';
 import { customerService, type Customer } from '../../../services/CustomerService';
-import { locationService } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
@@ -41,7 +40,7 @@ import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 
 const CreatePurchase = () => {
-  const { themeColor, fullColor } = useThemeColor();
+  const { themeColor } = useThemeColor();
 
   const [attractions, setAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [filteredAttractions, setFilteredAttractions] = useState<CreatePurchaseAttraction[]>([]);
@@ -90,25 +89,8 @@ const CreatePurchase = () => {
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<CreatePurchaseAddOn | null>(null);
   
-  const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (isCompanyAdmin) {
-      const fetchLocations = async () => {
-        try {
-          const response = await locationService.getLocations();
-          if (response.success && response.data) {
-            setLocations(Array.isArray(response.data) ? response.data : []);
-          }
-        } catch {
-        }
-      };
-      fetchLocations();
-    }
-  }, [isCompanyAdmin]);
+  const { effectiveLocationId } = useLocationScope();
+  const selectedLocation = effectiveLocationId;
 
   useEffect(() => {
     const loadAttractions = async () => {
@@ -794,24 +776,6 @@ const CreatePurchase = () => {
               <h1 className="text-2xl font-bold text-gray-800">Create New Purchase</h1>
               <p className="text-gray-600">Process on-site ticket purchases for customers</p>
             </div>
-            
-            {isCompanyAdmin && (
-              <LocationSelector
-                locations={locations.map(loc => ({
-                  id: loc.id.toString(),
-                  name: loc.name,
-                  address: loc.address || '',
-                  city: loc.city || '',
-                  state: loc.state || ''
-                }))}
-                selectedLocation={selectedLocation?.toString() || ''}
-                onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
-                themeColor={themeColor}
-                fullColor={fullColor}
-                variant="compact"
-                showAllOption={true}
-              />
-            )}
           </div>
         </div>
 

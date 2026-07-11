@@ -20,9 +20,7 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { eventPurchaseService } from '../../../services/EventPurchaseService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
-import { locationService } from '../../../services';
-import type { Location } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import type { EventPurchase } from '../../../types/event.types';
@@ -69,11 +67,10 @@ const statusPriority: Record<string, number> = {
 const EventPurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
+  const selectedLocation = effectiveLocationId === null ? '' : String(effectiveLocationId);
 
   const [purchases, setPurchases] = useState<DisplayPurchase[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -177,25 +174,9 @@ const EventPurchases = () => {
     }
   };
 
-  const fetchLocations = async () => {
-    if (!isCompanyAdmin) return;
-    try {
-      const response = await locationService.getLocations();
-      const locationsArray = Array.isArray(response.data) ? response.data : [];
-      setLocations(locationsArray);
-    } catch (error) {
-      console.error('Error fetching locations:', error);
-      setLocations([]);
-    }
-  };
-
   useEffect(() => {
     loadPurchases();
   }, [selectedLocation]);
-
-  useEffect(() => {
-    fetchLocations();
-  }, []);
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
@@ -558,7 +539,7 @@ const EventPurchases = () => {
         { label: 'Email', value: p => p.email },
         { label: 'Phone', value: p => p.phone },
         { label: 'Balance Due', value: p => (p.totalAmount - p.amountPaid).toFixed(2) },
-        { label: 'Location', value: p => locations.find(l => String(l.id) === String(p.locationId))?.name || p.locationId || '' },
+        { label: 'Location', value: p => scopeLocations.find(l => String(l.id) === String(p.locationId))?.name || p.locationId || '' },
       ],
     });
   };
@@ -704,17 +685,6 @@ const EventPurchases = () => {
           <p className="text-gray-600 mt-2">View and manage all event ticket purchases</p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
-          {isCompanyAdmin && (
-            <LocationSelector
-              locations={locations}
-              selectedLocation={selectedLocation}
-              onLocationChange={setSelectedLocation}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              variant="compact"
-              showAllOption={true}
-            />
-          )}
           <StandardButton
             variant={showTrashed ? 'primary' : 'secondary'}
             size="md"

@@ -13,6 +13,7 @@ import type { AddOnsAddon, PackageSpecificPrice } from '../../../types/addOns.ty
 import type { Location } from '../../../services/LocationService';
 import type { Package } from '../../../services/PackageService';
 import { getStoredUser, ASSET_URL } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 
 const ManageAddons = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -49,8 +50,9 @@ const ManageAddons = () => {
   
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId } = useLocationScope();
   const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const selectedLocationId = effectiveLocationId;
   const [modalLocationId, setModalLocationId] = useState<number | null>(null);
   
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
@@ -68,9 +70,6 @@ const ManageAddons = () => {
           if (response.success && response.data) {
             const locationsArray = Array.isArray(response.data) ? response.data : [];
             setLocations(locationsArray);
-            if (locationsArray.length > 0 && selectedLocationId === null) {
-              setSelectedLocationId(locationsArray[0].id);
-            }
           }
         } catch (error) {
           console.error('Error fetching locations:', error);
@@ -746,38 +745,12 @@ const ManageAddons = () => {
 
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                {isCompanyAdmin && locations.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
-                    <LocationSelector
-                      locations={locations.map(loc => ({
-                        id: loc.id.toString(),
-                        name: loc.name,
-                        address: loc.address || '',
-                        city: loc.city || '',
-                        state: loc.state || ''
-                      }))}
-                      selectedLocation={selectedLocationId?.toString() || ''}
-                      onLocationChange={(locationId) => {
-                        setSelectedLocationId(locationId ? Number(locationId) : null);
-                        setCurrentPage(1);
-                      }}
-                      themeColor={themeColor}
-                      fullColor={fullColor}
-                      variant="compact"
-                      showAllOption={true}
-                    />
-                  </div>
-                )}
-              </div>
               <div className="mt-3 flex justify-end">
                 <StandardButton
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setSearchTerm('');
-                    setSelectedLocationId(null);
                   }}
                 >
                   Clear Filters

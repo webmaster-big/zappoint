@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from 'qrcode';
+import { MapPin } from 'lucide-react';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
@@ -1348,6 +1349,12 @@ const BookPackage: React.FC = () => {
                   <span className="text-gray-600">Package:</span>
                   <span className="font-medium text-gray-900 text-right ml-2">{pkg?.name}</span>
                 </div>
+                {pkg?.location?.name && (
+                  <div className="flex justify-between text-sm sm:text-base">
+                    <span className="text-gray-600">Location:</span>
+                    <span className="font-medium text-gray-900 text-right ml-2">{pkg.location.name}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Guest Name:</span>
                   <span className="font-medium text-gray-900">{form.firstName} {form.lastName}</span>
@@ -1718,6 +1725,13 @@ const BookPackage: React.FC = () => {
             )}
           </div>
           
+          {pkg.location?.name && (
+            <div className="flex items-center gap-1.5 mb-4 md:hidden bg-white rounded-2xl px-3 py-2 shadow-md">
+              <MapPin className="h-4 w-4 text-blue-600 flex-shrink-0" />
+              <span className="text-xs font-medium text-gray-700 truncate">{pkg.location.name}</span>
+            </div>
+          )}
+
           <div className="flex items-center mb-4 md:mb-6 bg-white rounded-2xl p-3 md:p-4 shadow-md">
             <div className="flex items-center">
               <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all ${currentStep >= 1 ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
@@ -2615,6 +2629,12 @@ const BookPackage: React.FC = () => {
                   <span className="text-gray-500 text-sm">Package</span>
                   <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
                 </div>
+                {pkg.location?.name && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Location</span>
+                    <span className="font-medium text-gray-800 text-sm text-right ml-2">{pkg.location.name}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500 text-sm">Participants</span>
                   <span className="font-medium text-gray-800 text-sm">{participants}</span>
@@ -2891,6 +2911,12 @@ const BookPackage: React.FC = () => {
                   <span className="text-gray-500 text-sm">Package</span>
                   <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
                 </div>
+                {pkg.location?.name && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Location</span>
+                    <span className="font-medium text-gray-800 text-sm text-right ml-2">{pkg.location.name}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500 text-sm">Participants</span>
                   <span className="font-medium text-gray-800 text-sm">{participants}</span>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Package, User, Home, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
+import { Calendar, Package, User, Home, MapPin, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
 import QRCode from 'qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -13,8 +13,10 @@ import { roomCacheService } from '../../../services/RoomCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import locationService, { type Location } from '../../../services/LocationService';
+import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import DatePicker from '../../../components/ui/DatePicker';
-import { formatTimeTo12Hour } from '../../../utils/storage';
+import { formatTimeTo12Hour, getStoredUser } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 
@@ -35,6 +37,7 @@ interface DayOffWithTime {
 const EditBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
+  const isCompanyAdmin = getStoredUser()?.role === 'company_admin';
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const referenceNumber = searchParams.get('ref');
@@ -67,6 +70,14 @@ const EditBooking: React.FC = () => {
   const [originalAmountPaid, setOriginalAmountPaid] = useState<number>(0);
   const [availablePackages, setAvailablePackages] = useState<PackageType[]>([]);
   const [availableRooms, setAvailableRooms] = useState<Array<{id: number; name: string}>>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationBookings, setLocationBookings] = useState<Booking[]>([]);
+  const [loadingLocationBookings, setLoadingLocationBookings] = useState(false);
+  const [requestToLocation, setRequestToLocation] = useState<number | ''>('');
+  const [requestReason, setRequestReason] = useState('');
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     customerName: '',
     email: '',
@@ -75,6 +86,7 @@ const EditBooking: React.FC = () => {
     time: '',
     participants: 0,
     status: 'pending' as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
+    locationId: null as number | null,
     packageId: null as number | null,
     roomId: null as number | null,
     notes: '',
@@ -92,6 +104,53 @@ const EditBooking: React.FC = () => {
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
+
+  const loadPackagesAndRoomsForLocation = useCallback(async (locationId: number) => {
+    const [packagesResult, roomsResult] = await Promise.all([
+      (async () => {
+        const cachedPackages = await packageCacheService.getCachedPackages();
+        if (cachedPackages && cachedPackages.length > 0) {
+          packageCacheService.syncInBackground();
+          return cachedPackages.filter((pkg: PackageType) => pkg.location_id === locationId);
+        }
+        const response = await packageService.getPackages({ location_id: locationId });
+        return response.success && response.data ? (response.data.packages || []) : [];
+      })(),
+
+      (async () => {
+        const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
+        if (cachedRooms && cachedRooms.length > 0) {
+          roomCacheService.syncInBackground();
+          return cachedRooms.map(room => ({ id: room.id, name: room.name }));
+        }
+        const response = await roomService.getRooms({ location_id: locationId });
+        if (response.success && response.data) {
+          const rooms = response.data.rooms || response.data;
+          const roomsArray = Array.isArray(rooms) ? rooms : [];
+          roomCacheService.cacheRooms(roomsArray);
+          return roomsArray.map((room: any) => ({ id: room.id, name: room.name }));
+        }
+        return [];
+      })()
+    ]);
+
+    setAvailablePackages(packagesResult);
+    setAvailableRooms(roomsResult);
+  }, []);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await locationService.getLocations({ per_page: 100 });
+        if (response.success && response.data) {
+          setLocations(response.data);
+        }
+      } catch {
+      }
+    };
+
+    loadLocations();
+  }, []);
 
   useEffect(() => {
     const loadBookingAndPackage = async () => {
@@ -154,6 +213,7 @@ const EditBooking: React.FC = () => {
           time: bookingData.booking_time,
           participants: bookingData.participants,
           status: bookingData.status,
+          locationId: bookingData.location_id ?? null,
           packageId: bookingData.package_id || null,
           roomId: bookingData.room_id || null,
           notes: bookingData.notes || '',
@@ -177,50 +237,25 @@ const EditBooking: React.FC = () => {
         const locationId = bookingData.location_id;
         const packageId = bookingData.package_id;
 
-        const [packagesResult, roomsResult, packageDetailResult] = await Promise.all([
+        await Promise.all([
+          loadPackagesAndRoomsForLocation(locationId),
+
           (async () => {
-            const cachedPackages = await packageCacheService.getCachedPackages();
-            if (cachedPackages && cachedPackages.length > 0) {
-              packageCacheService.syncInBackground();
-              return cachedPackages.filter((pkg: PackageType) => pkg.location_id === locationId);
-            }
-            const response = await packageService.getPackages({ location_id: locationId });
-            return response.success && response.data ? (response.data.packages || []) : [];
-          })(),
-          
-          (async () => {
-            const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
-            if (cachedRooms && cachedRooms.length > 0) {
-              roomCacheService.syncInBackground();
-              return cachedRooms.map(room => ({ id: room.id, name: room.name }));
-            }
-            const response = await roomService.getRooms({ location_id: locationId });
-            if (response.success && response.data) {
-              const rooms = response.data.rooms || response.data;
-              const roomsArray = Array.isArray(rooms) ? rooms : [];
-              roomCacheService.cacheRooms(roomsArray);
-              return roomsArray.map((room: any) => ({ id: room.id, name: room.name }));
-            }
-            return [];
-          })(),
-          
-          (async () => {
-            if (!packageId) return null;
+            if (!packageId) return;
             const cachedPackages = await packageCacheService.getCachedPackages();
             if (cachedPackages) {
               const found = cachedPackages.find((pkg: PackageType) => pkg.id === packageId);
-              if (found) return found;
+              if (found) {
+                setPackageDetails(found);
+                return;
+              }
             }
             const response = await packageService.getPackage(packageId);
-            return response.success && response.data ? response.data : null;
+            if (response.success && response.data) {
+              setPackageDetails(response.data);
+            }
           })()
         ]);
-
-        setAvailablePackages(packagesResult);
-        setAvailableRooms(roomsResult);
-        if (packageDetailResult) {
-          setPackageDetails(packageDetailResult);
-        }
 
       } catch (error) {
         console.error('Error loading booking:', error);
@@ -231,6 +266,74 @@ const EditBooking: React.FC = () => {
 
     loadBookingAndPackage();
   }, [id, referenceNumber]);
+
+  const handleLocationChange = async (locationId: number) => {
+    setFormData(prev => ({ ...prev, locationId, packageId: null, roomId: null, date: '', time: '' }));
+    setPackageDetails(null);
+    setAvailablePackages([]);
+    setAvailableRooms([]);
+    setAvailableDates([]);
+    setAvailableTimeSlots([]);
+
+    if (!locationId) return;
+
+    try {
+      await loadPackagesAndRoomsForLocation(locationId);
+    } catch (error) {
+      console.error('Error loading location data:', error);
+    }
+  };
+
+  const handleSubmitLocationRequest = async () => {
+    if (!originalBooking || requestToLocation === '') return;
+    setSubmittingRequest(true);
+    setRequestError(null);
+    try {
+      const res = await locationChangeRequestService.create(originalBooking.id, {
+        to_location_id: Number(requestToLocation),
+        reason: requestReason.trim() || undefined,
+      });
+      if (res.success) {
+        setRequestSubmitted(true);
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { message?: string } } };
+      setRequestError(e?.response?.data?.message || 'Failed to submit request. Please try again.');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  useEffect(() => {
+    const locId = formData.locationId;
+    const dateStr = formData.date;
+
+    if (!isCompanyAdmin || !locId || !dateStr) {
+      setLocationBookings([]);
+      setLoadingLocationBookings(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingLocationBookings(true);
+
+    (async () => {
+      try {
+        const response = await bookingService.getBookingsByLocationAndDate(locId, dateStr);
+        if (!cancelled) {
+          setLocationBookings(response.success && response.data ? response.data : []);
+        }
+      } catch {
+        if (!cancelled) setLocationBookings([]);
+      } finally {
+        if (!cancelled) setLoadingLocationBookings(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.locationId, formData.date, isCompanyAdmin]);
 
   const handlePackageChange = async (packageId: number) => {
     setFormData(prev => ({ ...prev, packageId, date: '', time: '' }));
@@ -564,8 +667,9 @@ const EditBooking: React.FC = () => {
         booking_time: formData.time,
         participants: formData.participants,
         status: formData.status,
+        location_id: formData.locationId || undefined,
         package_id: formData.packageId || undefined,
-        room_id: formData.roomId || undefined,
+        room_id: formData.roomId ?? null,
         notes: formData.notes || undefined,
         send_notification: formData.sendNotification,
         applied_fees: appliedFees.length > 0 ? appliedFees : null,
@@ -686,6 +790,116 @@ const EditBooking: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
+            {isCompanyAdmin && (
+              <div>
+                <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                  <MapPin className={`w-5 h-5 text-${themeColor}-600`} /> Location
+                </h3>
+                <div className="space-y-3">
+                  <select
+                    name="locationId"
+                    value={formData.locationId || ''}
+                    onChange={(e) => handleLocationChange(Number(e.target.value))}
+                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                  >
+                    <option value="">Select a location</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>{loc?.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500">
+                    Changing the location resets the selected package, space, date, and time.
+                  </p>
+
+                  {formData.locationId && formData.date && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-start gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                        <p className="text-sm font-semibold text-neutral-800">
+                          Existing bookings at {locations.find(l => l.id === formData.locationId)?.name || 'this location'} on{' '}
+                          {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      {loadingLocationBookings ? (
+                        <p className="text-sm text-gray-500">Checking existing bookings...</p>
+                      ) : (() => {
+                        const others = locationBookings.filter(b => b.id !== originalBooking?.id);
+                        if (others.length === 0) {
+                          return <p className="text-sm text-green-700">No other bookings at this location on this date.</p>;
+                        }
+                        return (
+                          <ul className="space-y-1.5">
+                            {others.map((b) => {
+                              const roomName = (b.room as { name?: string } | null | undefined)?.name
+                                || (b.room_id ? `Space #${b.room_id}` : 'No space');
+                              return (
+                                <li key={b.id} className="text-sm text-gray-700 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                  <span className="font-medium text-neutral-800">{formatTimeTo12Hour(b.booking_time)}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span>{roomName}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span className="text-gray-500 break-all">{b.guest_name || b.reference_number}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!isCompanyAdmin && originalBooking && (
+              <div>
+                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                  <MapPin className={`w-5 h-5 text-${themeColor}-600`} /> Request Location Change
+                </h3>
+                {requestSubmitted ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700">
+                    Your location change request has been submitted. The booking stays at its current location until a manager at the destination or an admin approves it.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-500">
+                      Request moving this booking to another location. It stays here until the destination location or an admin approves it.
+                    </p>
+                    <select
+                      value={requestToLocation}
+                      onChange={(e) => { setRequestToLocation(e.target.value ? Number(e.target.value) : ''); setRequestError(null); }}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                    >
+                      <option value="">Select destination location</option>
+                      {locations.filter((loc) => loc.id !== formData.locationId).map((loc) => (
+                        <option key={loc.id} value={loc.id}>{loc.name}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      value={requestReason}
+                      onChange={(e) => setRequestReason(e.target.value)}
+                      placeholder="Reason for the change (optional)"
+                      rows={2}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-sm transition-all`}
+                    />
+                    {requestError && <p className="text-sm text-red-600">{requestError}</p>}
+                    <div>
+                      <StandardButton
+                        type="button"
+                        variant="primary"
+                        size="md"
+                        onClick={handleSubmitLocationRequest}
+                        disabled={submittingRequest || requestToLocation === ''}
+                        loading={submittingRequest}
+                      >
+                        {submittingRequest ? 'Submitting...' : 'Submit Request'}
+                      </StandardButton>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Package className={`w-5 h-5 text-${themeColor}-600`} /> Package / Party

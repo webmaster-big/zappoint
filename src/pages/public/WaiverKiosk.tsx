@@ -10,6 +10,8 @@ const WaiverKiosk = () => {
   const [searchParams] = useSearchParams();
   const preview = searchParams.get('preview') === '1';
   const templateId = Number(id);
+  const locationParam = searchParams.get('location_id');
+  const locationId = locationParam ? Number(locationParam) : null;
 
   const [context, setContext] = useState<WaiverFormContext | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +89,7 @@ const WaiverKiosk = () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await waiverService.kioskSubmit(templateId, data);
+      await waiverService.kioskSubmit(templateId, data, locationId);
       setJustCompleted(true);
       completeTimer.current = setTimeout(resetForm, 4000);
     } catch (err: unknown) {

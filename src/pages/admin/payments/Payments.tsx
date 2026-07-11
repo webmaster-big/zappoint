@@ -47,9 +47,8 @@ import {
   type InvoiceExportFilters,
   type PackageInvoiceFilters
 } from '../../../services/PaymentService';
-import { locationService } from '../../../services/LocationService';
 import { packageService } from '../../../services/PackageService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
@@ -180,8 +179,8 @@ const Payments = () => {
 
   const [payments, setPayments] = useState<PaymentsPagePayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const { effectiveLocationId } = useLocationScope();
+  const selectedLocation = effectiveLocationId === null ? '' : String(effectiveLocationId);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [viewMode, setViewMode] = useState<'active' | 'trashed'>('active');
@@ -310,23 +309,6 @@ const Payments = () => {
     }
   }, [selectedLocation, isLocationManager, currentUser?.location_id]);
 
-  const loadLocations = useCallback(async () => {
-    if (isCompanyAdmin) {
-      try {
-        const response = await locationService.getLocations();
-        if (response.success && response.data) {
-          const locationsArray = Array.isArray(response.data) ? response.data : [];
-          setLocations(locationsArray.map((loc: { id: number; name: string }) => ({
-            id: loc.id,
-            name: loc.name
-          })));
-        }
-      } catch (error) {
-        console.error('Error loading locations:', error);
-      }
-    }
-  }, [isCompanyAdmin]);
-
   const loadTrashedPayments = useCallback(async () => {
     try {
       setLoadingTrashed(true);
@@ -347,10 +329,6 @@ const Payments = () => {
       setLoadingTrashed(false);
     }
   }, [selectedLocation, isLocationManager, currentUser?.location_id]);
-
-  useEffect(() => {
-    loadLocations();
-  }, [loadLocations]);
 
   useEffect(() => {
     loadPayments();
@@ -1098,17 +1076,6 @@ const Payments = () => {
           <p className="text-gray-600 mt-2">View and manage all payment transactions</p>
         </div>
         <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
-          {isCompanyAdmin && (
-            <LocationSelector
-              variant="compact"
-              locations={locations}
-              selectedLocation={selectedLocation}
-              onLocationChange={setSelectedLocation}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              showAllOption={true}
-            />
-          )}
           <StandardButton
             variant="secondary"
             size="md"

@@ -1836,6 +1836,12 @@ const PurchaseAttraction = () => {
               <div className="p-4 md:p-6">
                 <div className="mb-4">
                   <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">{attraction.name}</h2>
+                  {attraction.location && (
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-2">
+                      <MapPin className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium">{attraction.location}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mb-3">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       <Tag className="h-3 w-3 mr-1" />
@@ -1846,16 +1852,6 @@ const PurchaseAttraction = () => {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div className="flex items-start gap-2">
-                    <div className="p-2 bg-blue-50 rounded-xl">
-                      <MapPin className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Location</p>
-                      <p className="text-sm font-medium text-gray-900">{attraction.location}</p>
-                    </div>
-                  </div>
-                  
                   <div className="flex items-start gap-2">
                     <div className="p-2 bg-blue-50 rounded-xl">
                       <Clock className="h-4 w-4 text-blue-600" />
@@ -2103,6 +2099,12 @@ const PurchaseAttraction = () => {
 
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">{attraction.name}</h2>
+                {attraction.location && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-2">
+                    <MapPin className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium">{attraction.location}</span>
+                  </div>
+                )}
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   <Tag className="h-3 w-3 mr-1" />
                   {attraction.category}
@@ -2110,15 +2112,6 @@ const PurchaseAttraction = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="flex items-start gap-2">
-                  <div className="p-2 bg-blue-50 rounded-xl">
-                    <MapPin className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Location</p>
-                    <p className="text-sm font-medium text-gray-900">{attraction.location}</p>
-                  </div>
-                </div>
                 <div className="flex items-start gap-2">
                   <div className="p-2 bg-blue-50 rounded-xl">
                     <Clock className="h-4 w-4 text-blue-600" />

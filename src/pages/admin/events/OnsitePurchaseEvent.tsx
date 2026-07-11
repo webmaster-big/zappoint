@@ -22,8 +22,6 @@ import { eventPurchaseService } from '../../../services/EventPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import LocationSelector from '../../../components/admin/LocationSelector';
-import { locationService } from '../../../services/LocationService';
 import type { Event, EventAddOn } from '../../../types/event.types';
 import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -38,12 +36,8 @@ import { buildAppliedDiscounts } from '../../../utils/discounts';
 
 const OnsitePurchaseEvent = () => {
   const navigate = useNavigate();
-  const { themeColor, fullColor } = useThemeColor();
+  const { themeColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
-
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [eventSearch, setEventSearch] = useState('');
@@ -108,16 +102,6 @@ const OnsitePurchaseEvent = () => {
       setPaymentError('');
     }
   };
-
-  useEffect(() => {
-    if (isCompanyAdmin) {
-      locationService.getLocations().then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          setLocations(res.data.map(l => ({ id: l.id, name: l.name })));
-        }
-      }).catch(() => {});
-    }
-  }, [isCompanyAdmin]);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -590,19 +574,6 @@ const OnsitePurchaseEvent = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Onsite Event Purchase</h1>
           <p className="text-gray-600 mt-1">Create a walk-in event purchase</p>
-        </div>
-        <div className="mt-4 sm:mt-0 flex items-center gap-2">
-          {isCompanyAdmin && locations.length > 0 && (
-            <LocationSelector
-              variant="compact"
-              locations={locations}
-              selectedLocation={selectedLocation?.toString() || ''}
-              onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              showAllOption={true}
-            />
-          )}
         </div>
       </div>
 

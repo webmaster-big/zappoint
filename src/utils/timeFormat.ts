@@ -143,6 +143,27 @@ export function getMichiganNow(): { year: number; month: number; day: number; ho
   return { year, month, day, hour, minute, dayOfWeek, date };
 }
 
+export function formatDateLong(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  const date = parseLocalDate(dateStr);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+export function formatDateTimeET(iso?: string | null): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-US', {
+    timeZone: MICHIGAN_TZ,
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }) + ' ET';
+}
+
 export interface UpcomingSession {
   label: string;
   startTime: string;

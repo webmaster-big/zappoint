@@ -21,8 +21,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
 import { customerService } from '../../../services/CustomerService';
-import { locationService } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 
 import {
@@ -46,11 +45,11 @@ import type { CustomerAnalyticsAnalyticsData } from '../../../types/CustomerAnal
 
 const CustomerAnalytics: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'custom'>('30d');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const selectedLocation = effectiveLocationId;
   const [loading, setLoading] = useState(true);
   const [keyMetrics, setKeyMetrics] = useState<any[]>([]);
   const [analyticsData, setAnalyticsData] = useState<CustomerAnalyticsAnalyticsData | null>(null);
@@ -69,25 +68,8 @@ const CustomerAnalytics: React.FC = () => {
   const isCompanyAdmin = user?.role === 'company_admin';
 
   useEffect(() => {
-    if (isCompanyAdmin) {
-      fetchLocations();
-    }
-  }, [isCompanyAdmin]);
-
-  useEffect(() => {
     fetchAnalytics();
   }, [dateRange, startDate, endDate, selectedLocation]);
-
-  const fetchLocations = async () => {
-    try {
-      const response = await locationService.getLocations();
-      if (response.success && response.data) {
-        setLocations(Array.isArray(response.data) ? response.data : []);
-      }
-    } catch (error) {
-      console.error('Error fetching locations:', error);
-    }
-  };
 
   const fetchAnalytics = async () => {
     if (dateRange === 'custom' && (!startDate || !endDate)) {
@@ -242,18 +224,7 @@ const CustomerAnalytics: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
-            {isCompanyAdmin && locations.length > 0 && (
-              <LocationSelector
-                variant="compact"
-                locations={locations}
-                selectedLocation={selectedLocation?.toString() || ''}
-                onLocationChange={(id) => setSelectedLocation(id ? parseInt(id) : null)}
-                themeColor={themeColor}
-                fullColor={fullColor}
-                showAllOption={true}
-              />
-            )}
-            <select 
+            <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'custom')}
               className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
@@ -834,16 +805,16 @@ const CustomerAnalytics: React.FC = () => {
               )}
             </div>
 
-            {isCompanyAdmin && locations.length > 0 && (
+            {isCompanyAdmin && scopeLocations.length > 0 && (
               <div className="mb-5">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                <select 
+                <select
                   value={exportLocation ?? ''}
                   onChange={(e) => setExportLocation(e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Locations</option>
-                  {locations.map((location) => (
+                  {scopeLocations.map((location) => (
                     <option key={location.id} value={location.id}>
                       {location.name}
                     </option>

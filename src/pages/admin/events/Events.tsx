@@ -13,10 +13,9 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import Toast from '../../../components/ui/Toast';
-import LocationSelector from '../../../components/admin/LocationSelector';
 import { eventService } from '../../../services/EventService';
 import { eventCacheService } from '../../../services/EventCacheService';
-import { locationService } from '../../../services/LocationService';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
 import type { Event } from '../../../types/event.types';
 import {
@@ -67,33 +66,18 @@ const Events = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId } = useLocationScope();
+  const selectedLocation = effectiveLocationId;
 
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  useEffect(() => {
-    loadLocations();
-  }, []);
 
   useEffect(() => {
     fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
-
-  const loadLocations = async () => {
-    try {
-      const res = await locationService.getLocations();
-      if (res.success && Array.isArray(res.data)) {
-        setLocations(res.data.map(l => ({ id: l.id, name: l.name })));
-      }
-    } catch {
-    }
-  };
 
   const fetchEvents = async (forceRefresh = false) => {
     setLoading(true);
@@ -557,17 +541,6 @@ const Events = () => {
           <p className="text-gray-600 mt-1">View and manage all events</p>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">
-          {isCompanyAdmin && locations.length > 0 && (
-            <LocationSelector
-              variant="compact"
-              locations={locations}
-              selectedLocation={selectedLocation?.toString() || ''}
-              onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              showAllOption={true}
-            />
-          )}
           <StandardButton
             onClick={exportToCSV}
             variant="secondary"

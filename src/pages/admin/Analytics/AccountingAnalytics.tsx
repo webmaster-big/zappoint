@@ -18,13 +18,11 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
-import LocationSelector from '../../../components/admin/LocationSelector';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { accountingAnalyticsService } from '../../../services/AccountingAnalyticsService';
-import { locationService } from '../../../services/LocationService';
-import { getStoredUser } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import type {
   AccountingReportResponse,
   CategoryData,
@@ -59,9 +57,7 @@ const formatDateRange = (start: string, end: string): string => {
 
 const AccountingAnalytics: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const user = getStoredUser();
-  const isCompanyAdmin = user?.role === 'company_admin';
-  const isLocationManager = user?.role === 'location_manager';
+  const { effectiveLocationId } = useLocationScope();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,65 +74,14 @@ const AccountingAnalytics: React.FC = () => {
   const [compareEndDate, setCompareEndDate] = useState<string>('');
   
   const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_on');
-  
-  const [locations, setLocations] = useState<Array<{ id: string | number; name: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
-  
+
+  const selectedLocation = effectiveLocationId === null ? '' : String(effectiveLocationId);
+
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['Parties', 'Attractions', 'Events', 'Add-ons'])
   );
   
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const cached = localStorage.getItem('zapzone_locations');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              if (isLocationManager && user?.location_id) {
-                const userLoc = parsed.find((l: { id: number }) => l.id === user.location_id);
-                if (userLoc) {
-                  setLocations([userLoc]);
-                  setSelectedLocation(userLoc.id.toString());
-                }
-              } else {
-                setLocations(parsed);
-                if (!selectedLocation && parsed.length > 0) {
-                  setSelectedLocation(parsed[0].id.toString());
-                }
-              }
-            }
-          } catch { /* ignore */ }
-        }
-
-        const response = await locationService.getLocations();
-        const locs = response.data || response;
-        
-        if (isLocationManager && user?.location_id) {
-          const userLocation = locs.find((l: { id: number; name: string }) => l.id === user.location_id);
-          if (userLocation) {
-            setLocations([{ id: userLocation.id, name: userLocation.name }]);
-            setSelectedLocation(userLocation.id.toString());
-          }
-        } else {
-          const mapped = locs.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }));
-          setLocations(mapped);
-          localStorage.setItem('zapzone_locations', JSON.stringify(mapped));
-          if (!selectedLocation && mapped.length > 0) {
-            setSelectedLocation(mapped[0].id.toString());
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch locations:', error);
-        setToast({ message: 'Failed to load locations', type: 'error' });
-      }
-    };
-    fetchLocations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLocationManager, user?.location_id]);
 
   const fetchReport = async (showRefreshing = false) => {
     if (!selectedLocation || !startDate) return;
@@ -197,6 +142,8 @@ const AccountingAnalytics: React.FC = () => {
   useEffect(() => {
     if (selectedLocation) {
       fetchReport();
+    } else {
+      setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
@@ -252,19 +199,6 @@ const AccountingAnalytics: React.FC = () => {
           <p className="text-gray-600 mt-1">
             {viewMode === 'booked_for' ? 'Events scheduled for selected dates' : 'Purchases made on selected dates'}
           </p>
-        </div>
-        <div className="mt-4 sm:mt-0 flex items-center gap-2">
-          {isCompanyAdmin && locations.length > 1 && (
-            <LocationSelector
-              locations={locations}
-              selectedLocation={selectedLocation}
-              onLocationChange={setSelectedLocation}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              showAllOption={false}
-              variant="compact"
-            />
-          )}
         </div>
       </div>
 
@@ -442,7 +376,11 @@ const AccountingAnalytics: React.FC = () => {
 
       {!reportData && !loading && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <p className="text-gray-500">No data available for the selected date range.</p>
+          <p className="text-gray-500">
+            {!selectedLocation
+              ? 'Select a specific location from the sidebar to view its accounting report.'
+              : 'No data available for the selected date range.'}
+          </p>
         </div>
       )}
     </div>

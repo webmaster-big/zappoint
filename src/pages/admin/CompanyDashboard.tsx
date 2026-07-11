@@ -41,11 +41,9 @@ import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
 import Pagination from '../../components/ui/Pagination';
 import CounterAnimation from '../../components/ui/CounterAnimation';
-import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
-import { locationService, type Location } from '../../services/LocationService';
 import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
@@ -53,15 +51,17 @@ import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { getStoredUser } from '../../utils/storage';
+import { useLocationScope } from '../../contexts/LocationContext';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentDay, setCurrentDay] = useState(new Date());
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedLocation, setSelectedLocation] = useState<number | 'all'>('all');
+  const selectedLocation: number | 'all' = effectiveLocationId === null ? 'all' : effectiveLocationId;
   const [calendarFilter, setCalendarFilter] = useState({
     type: 'all',
     value: ''
@@ -125,7 +125,6 @@ const CompanyDashboard: React.FC = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  const [locations, setLocations] = useState<Location[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings (optionally filtered by location)
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
@@ -375,24 +374,6 @@ const CompanyDashboard: React.FC = () => {
     const endMins = totalMinutes % 60;
     return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
   };
-
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        console.log('Fetching locations...');
-        const response = await locationService.getLocations();
-        console.log('Locations response:', response);
-        const locationsList = Array.isArray(response.data) ? response.data : [];
-        console.log('Locations list:', locationsList);
-        setLocations(locationsList);
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-        console.error('Error details:', (error as { response?: unknown; message?: string }).response || (error as { response?: unknown; message?: string }).message);
-      }
-    };
-    
-    fetchLocations();
-  }, []);
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -919,10 +900,10 @@ const CompanyDashboard: React.FC = () => {
     const stats: {[key: number]: {name: string, bookings: number, purchases: number, revenue: number, participants: number, utilization: number}} = {};
     
     console.log('=== LOCATION STATS CALCULATION (CLIENT-SIDE FALLBACK) ===');
-    console.log('Total locations:', locations.length);
-    console.log('Locations:', locations);
-    
-    locations.forEach(location => {
+    console.log('Total locations:', scopeLocations.length);
+    console.log('Locations:', scopeLocations);
+
+    scopeLocations.forEach(location => {
       stats[location.id] = { name: location.name, bookings: 0, purchases: 0, revenue: 0, participants: 0, utilization: 0 };
     });
     
@@ -1173,22 +1154,6 @@ const CompanyDashboard: React.FC = () => {
               />
             </div>
           )}
-          <LocationSelector
-            locations={locations.map(loc => ({
-              id: loc.id.toString(),
-              name: loc.name,
-              address: loc.address || '',
-              city: loc.city || '',
-              state: loc.state || ''
-            }))}
-            selectedLocation={selectedLocation === 'all' ? '' : selectedLocation.toString()}
-            onLocationChange={(locationId) => {
-              setSelectedLocation(locationId === '' ? 'all' : parseInt(locationId));
-              setCurrentPage(1);
-            }}
-            variant="compact"
-            showAllOption={true}
-          />
         </div>
       </div>
 
@@ -1564,7 +1529,7 @@ const CompanyDashboard: React.FC = () => {
                   id="filter-location"
                   name="calendar-filter"
                   checked={calendarFilter.type === 'location'}
-                  onChange={() => setCalendarFilter({ type: 'location', value: locations[0]?.id.toString() || '' })}
+                  onChange={() => setCalendarFilter({ type: 'location', value: scopeLocations[0]?.id.toString() || '' })}
                   className="mr-2"
                 />
                 <label htmlFor="filter-location" className="text-sm text-gray-800 mr-2">
@@ -1577,7 +1542,7 @@ const CompanyDashboard: React.FC = () => {
                     onChange={(e) => setCalendarFilter({ type: 'location', value: e.target.value })}
                     className="px-2 py-1 border border-gray-300 rounded text-sm"
                   >
-                    {locations.map(location => (
+                    {scopeLocations.map(location => (
                       <option key={location.id} value={location.id.toString()}>{location.name}</option>
                     ))}
                   </select>
@@ -1600,8 +1565,8 @@ const CompanyDashboard: React.FC = () => {
             {calendarFilter.type !== 'all' && (
               <div className="mt-3 text-sm text-gray-800">
                 Showing: {calendarFilter.type === 'activity' ? 'Activity' : calendarFilter.type === 'package' ? 'Package' : 'Location'} - {
-                  calendarFilter.type === 'location' 
-                    ? locations.find(loc => loc.id.toString() === calendarFilter.value)?.name || calendarFilter.value
+                  calendarFilter.type === 'location'
+                    ? scopeLocations.find(loc => loc.id.toString() === calendarFilter.value)?.name || calendarFilter.value
                     : calendarFilter.value
                 }
               </div>
@@ -2035,25 +2000,7 @@ const CompanyDashboard: React.FC = () => {
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
-            <div className="min-w-[200px]">
-              <LocationSelector
-                locations={locations.map(loc => ({
-                  id: loc.id.toString(),
-                  name: loc.name,
-                  address: loc.address || '',
-                  city: loc.city || '',
-                  state: loc.state || ''
-                }))}
-                selectedLocation={selectedLocation === 'all' ? '' : selectedLocation.toString()}
-                onLocationChange={(locationId) => {
-                  setSelectedLocation(locationId === '' ? 'all' : parseInt(locationId));
-                  setCurrentPage(1);
-                }}
-                variant="compact"
-                showAllOption={true}
-              />
-            </div>
-            <StandardButton 
+            <StandardButton
               variant="secondary" 
               size="sm"
             >

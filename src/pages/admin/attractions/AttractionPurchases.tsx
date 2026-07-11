@@ -23,9 +23,7 @@ import { attractionPurchaseCacheService } from '../../../services/AttractionPurc
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
-import { locationService } from '../../../services';
-import type { Location } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import {
@@ -40,11 +38,10 @@ import type { AdminColumn, AdminFilterDef } from '../../../components/admin/tabl
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
+  const selectedLocation = effectiveLocationId === null ? '' : String(effectiveLocationId);
 
   const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -182,26 +179,9 @@ const ManagePurchases = () => {
     }
   };
 
-  const fetchLocations = async () => {
-    if (!isCompanyAdmin) return;
-
-    try {
-      const response = await locationService.getLocations();
-      const locationsArray = Array.isArray(response.data) ? response.data : [];
-      setLocations(locationsArray);
-    } catch (error) {
-      console.error('Error fetching locations:', error);
-      setLocations([]);
-    }
-  };
-
   useEffect(() => {
     loadPurchases();
   }, [selectedLocation]);
-
-  useEffect(() => {
-    fetchLocations();
-  }, []);
 
   useEffect(() => {
     const unsubscribe = attractionPurchaseCacheService.onCacheUpdate(async () => {
@@ -536,7 +516,7 @@ const ManagePurchases = () => {
       extraColumns: [
         { label: 'Email', value: p => p.email },
         { label: 'Phone', value: p => p.phone },
-        { label: 'Location', value: p => locations.find(l => String(l.id) === String(p.locationId))?.name || p.locationId || '' },
+        { label: 'Location', value: p => scopeLocations.find(l => String(l.id) === String(p.locationId))?.name || p.locationId || '' },
       ],
     });
   };
@@ -753,17 +733,6 @@ const ManagePurchases = () => {
           <p className="text-gray-600 mt-2">View and manage all customer purchases</p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
-          {isCompanyAdmin && (
-            <LocationSelector
-              locations={locations}
-              selectedLocation={selectedLocation}
-              onLocationChange={setSelectedLocation}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              variant="compact"
-              showAllOption={true}
-            />
-          )}
           <StandardButton
             variant={showTrashed ? 'primary' : 'secondary'}
             size="md"

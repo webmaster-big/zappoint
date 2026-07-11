@@ -130,7 +130,7 @@ export interface UpdateBookingData {
   guest_phone?: string;
   package_id?: number;
   location_id?: number;
-  room_id?: number;
+  room_id?: number | null;
   booking_date?: string;
   booking_time?: string;
   participants?: number;
@@ -401,6 +401,14 @@ const bookingService = {
     const response = await api.get('/bookings/location-date', {
       params: { location_id, date }
     });
+    return response.data;
+  },
+
+  async updateBookingLocation(
+    id: number,
+    data: { location_id: number; room_id?: number | null; force?: boolean }
+  ): Promise<BookingResponse & { conflict?: boolean; conflicts?: Array<{ type: string; message: string }>; had_conflict?: boolean }> {
+    const response = await api.patch(`/bookings/${id}/location`, data);
     return response.data;
   },
 

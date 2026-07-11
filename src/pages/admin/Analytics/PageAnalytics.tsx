@@ -17,8 +17,7 @@ import {
   ChevronRight,
   RefreshCw,
 } from 'lucide-react';
-import LocationSelector from '../../../components/admin/LocationSelector';
-import { locationService } from '../../../services/LocationService';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import {
   AreaChart,
   Area,
@@ -40,7 +39,6 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import Pagination from '../../../components/ui/Pagination';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { getStoredUser } from '../../../utils/storage';
 import PageAnalyticsService, {
   type AnalyticsEntityType,
   type AttributionRow,
@@ -134,14 +132,12 @@ const presetToRange = (p: RangePreset): { from: string; to: string } => {
 
 const PageAnalytics: React.FC = () => {
   const { themeColor } = useThemeColor();
-  const user = getStoredUser();
-  const userLocationId: number | undefined = user?.location_id ?? undefined;
+  const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
 
   const [preset, setPreset] = useState<RangePreset>('30d');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [locations, setLocations] = useState<Array<{ id: string | number; name: string }>>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState<string>(userLocationId?.toString() ?? '');
+  const selectedLocationId = effectiveLocationId === null ? '' : String(effectiveLocationId);
   const locationOverride: number | undefined = selectedLocationId ? Number(selectedLocationId) : undefined;
 
   const [entityTypeForLeaderboard, setEntityTypeForLeaderboard] = useState<AnalyticsEntityType>('package');
@@ -235,26 +231,6 @@ const PageAnalytics: React.FC = () => {
   }, [fetchAll]);
 
   useEffect(() => {
-    if (userLocationId) return; // location_managers have a fixed location
-    const load = async () => {
-      try {
-        const cached = localStorage.getItem('zapzone_locations');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) setLocations(parsed);
-          } catch { /* ignore bad cache */ }
-        }
-        const response = await locationService.getLocations({ is_active: true, per_page: 200 });
-        const locs = (response.data || []).map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }));
-        setLocations(locs);
-        localStorage.setItem('zapzone_locations', JSON.stringify(locs));
-      } catch { /* silently ignore — selector simply won't appear */ }
-    };
-    load();
-  }, [userLocationId]);
-
-  useEffect(() => {
     let cancelled = false;
     const tick = async () => {
       try {
@@ -335,16 +311,6 @@ const PageAnalytics: React.FC = () => {
                 themeColor={themeColor}
               />
             </div>
-          )}
-          {!userLocationId && locations.length > 0 && (
-            <LocationSelector
-              locations={locations}
-              selectedLocation={selectedLocationId}
-              onLocationChange={setSelectedLocationId}
-              themeColor={themeColor}
-              showAllOption
-              variant="compact"
-            />
           )}
           <StandardButton onClick={fetchAll} variant="secondary" size="sm" icon={RefreshCw}>
             Refresh
@@ -714,7 +680,7 @@ const PageAnalytics: React.FC = () => {
           entityId={drillEntity.id}
           entityName={drillEntity.name}
           filter={filter}
-          locations={locations}
+          locations={scopeLocations}
         />
       )}
     </div>

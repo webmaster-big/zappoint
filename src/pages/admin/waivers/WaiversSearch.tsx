@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode, ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
+import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import waiverService from '../../../services/waiverService';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
@@ -59,12 +61,6 @@ const marketingLabels: Record<string, string> = {
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const formatDateTime = (iso?: string | null) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
 const adultName = (w: Waiver) => [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ');
@@ -224,7 +220,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => w.selected_date || '',
       exportValue: (w) => w.selected_date || '',
-      render: (w) => <span className="text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{w.selected_date}</span>,
+      render: (w) => <span className="text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDateLong(w.selected_date)}</span>,
     },
     {
       key: 'template',
@@ -285,7 +281,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => (w.submitted_at ? new Date(w.submitted_at).getTime() : 0),
       exportValue: (w) => (w.submitted_at ? new Date(w.submitted_at).toLocaleString() : ''),
-      render: (w) => <span className="text-sm text-gray-500">{formatDateTime(w.submitted_at)}</span>,
+      render: (w) => <span className="text-sm text-gray-500">{formatDateTimeET(w.submitted_at)}</span>,
     },
   ];
 
@@ -539,46 +535,101 @@ const WaiversSearch = () => {
 };
 
 /* ---------- Detail modal ---------- */
+const consentPill = (ok: boolean, yes = 'Yes', no = 'No') => (
+  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{ok ? yes : no}</span>
+);
+
+const DetailField = ({ label, value }: { label: string; value: ReactNode }) => (
+  <div>
+    <div className="text-xs text-gray-400 uppercase tracking-wide">{label}</div>
+    <div className="text-sm text-gray-900 font-medium mt-0.5 break-words">{value ?? '—'}</div>
+  </div>
+);
+
+const DetailSection = ({ icon: Icon, title, children }: { icon: ComponentType<{ className?: string }>; title: string; children: ReactNode }) => (
+  <div>
+    <h3 className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pb-1.5 border-b border-gray-100">
+      <Icon className="w-3.5 h-3.5" /> {title}
+    </h3>
+    {children}
+  </div>
+);
+
 const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiver; rendered_body: string }; onClose: () => void; themeColor: string }) => {
   const w = data.waiver;
+  const fullName = [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || 'Waiver';
+  const linked = linkedLabel(w);
+  const statusStyle: Record<string, string> = {
+    completed: 'bg-green-100 text-green-700',
+    pending: 'bg-amber-100 text-amber-700',
+    expired: 'bg-red-100 text-red-700',
+    voided: 'bg-gray-200 text-gray-600',
+  };
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{[w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || 'Waiver'}</h2>
-            <p className="text-xs text-gray-500">{w.template?.title} · {w.selected_date}</p>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-bold text-gray-900 truncate">{fullName}</h2>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle[w.status] || 'bg-gray-100 text-gray-600'}`}>{w.status.charAt(0).toUpperCase() + w.status.slice(1)}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">{w.template?.title || 'Liability Waiver'} · Waiver #{w.id}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg shrink-0"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-6 overflow-y-auto space-y-5">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {[
-              ['Email', w.adult_email], ['Phone', w.adult_phone],
-              ['Typed name', w.typed_legal_name], ['Source', sourceLabels[w.source] || w.source],
-              ['Marketing', w.marketing_consent_status === 'opted_in' ? 'Opted in' : 'Not opted in'],
-              ['Photo/Video', w.photo_video_consent ? 'Consented' : '—'],
-            ].map(([k, v]) => (
-              <div key={k as string}><span className="text-gray-400">{k}</span><div className="text-gray-900 font-medium">{v || '—'}</div></div>
-            ))}
-          </div>
+        <div className="p-6 overflow-y-auto space-y-6">
+          <DetailSection icon={Users} title="Participant / Guardian">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <DetailField label="Full name" value={fullName} />
+              <DetailField label="Date of birth" value={formatDateLong(w.adult_dob)} />
+              <DetailField label="Email" value={w.adult_email} />
+              <DetailField label="Phone" value={w.adult_phone} />
+            </div>
+          </DetailSection>
+
+          <DetailSection icon={Link2} title="Visit details">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <DetailField label="Location" value={w.location?.name} />
+              <DetailField label="Visit date" value={formatDateLong(w.selected_date)} />
+              <DetailField label="Linked to" value={linked || 'Walk-in'} />
+              <DetailField label="Source" value={sourceLabels[w.source] || w.source} />
+              <DetailField label="Submitted" value={formatDateTimeET(w.submitted_at)} />
+            </div>
+          </DetailSection>
+
           {w.minors && w.minors.length > 0 && (
-            <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Minors</h3>
+            <DetailSection icon={Users} title={`Minor Participants (${w.minors.length})`}>
               <div className="border border-gray-100 rounded-lg divide-y divide-gray-50">
                 {w.minors.map((m, i) => (
-                  <div key={i} className="px-3 py-2 flex justify-between text-sm">
-                    <span className="text-gray-900">{m.first_name} {m.last_name}</span>
-                    <span className="text-gray-400">{[m.date_of_birth, m.relationship].filter(Boolean).join(' · ')}</span>
+                  <div key={i} className="px-3 py-2 flex items-center justify-between text-sm gap-2">
+                    <span className="text-gray-900 font-medium">{[m.first_name, m.last_name].filter(Boolean).join(' ')}</span>
+                    <span className="text-gray-500 text-right">{[m.date_of_birth ? formatDateLong(m.date_of_birth) : null, m.relationship].filter(Boolean).join(' · ') || '—'}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </DetailSection>
           )}
-          <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Agreement</h3>
-            <div className={`bg-${themeColor}-50/40 border border-gray-100 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto`} dangerouslySetInnerHTML={{ __html: data.rendered_body }} />
-          </div>
+
+          <DetailSection icon={FileText} title="Waiver Agreement">
+            <div className={`bg-${themeColor}-50/40 border border-gray-100 rounded-lg p-4 text-sm text-gray-700 leading-relaxed max-h-72 overflow-y-auto`} dangerouslySetInnerHTML={{ __html: data.rendered_body }} />
+          </DetailSection>
+
+          <DetailSection icon={ShieldCheck} title="Acknowledgment & Signature">
+            <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 space-y-2.5">
+              <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Agreement accepted</span>{consentPill(!!w.agreement_accepted)}</div>
+              <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Electronic consent</span>{consentPill(!!w.electronic_consent_accepted)}</div>
+              {w.photo_video_consent !== null && w.photo_video_consent !== undefined && (
+                <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Photo / video release</span>{consentPill(!!w.photo_video_consent, 'Agreed', 'Declined')}</div>
+              )}
+              <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Marketing consent</span><span className="text-gray-900 font-medium">{w.marketing_consent_status === 'opted_in' ? 'Opted in' : 'Not opted in'}</span></div>
+              <div className="pt-2.5 mt-1 border-t border-gray-200">
+                <div className="text-xs text-gray-400 uppercase tracking-wide">Signed electronically by</div>
+                <div className="text-base font-semibold text-gray-900 mt-0.5" style={{ fontFamily: 'Georgia, serif' }}>{w.typed_legal_name || '—'}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{formatDateTimeET(w.submitted_at)}</div>
+              </div>
+            </div>
+          </DetailSection>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <StandardButton variant="secondary" onClick={onClose}>Close</StandardButton>

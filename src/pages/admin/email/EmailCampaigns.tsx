@@ -17,15 +17,12 @@ import {
   Download
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
-import { locationService } from '../../../services/LocationService';
-import type { Location } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
-import { getStoredUser } from '../../../utils/storage';
 import {
   AdminDataTable,
   AdminTableToolbar,
@@ -52,14 +49,12 @@ const RECIPIENT_TYPE_LABELS: Record<RecipientType, string> = {
 
 const EmailCampaigns = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId } = useLocationScope();
+  const selectedLocation = effectiveLocationId === null ? '' : String(effectiveLocationId);
 
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [statistics, setStatistics] = useState<EmailCampaignStatistics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [locations, setLocations] = useState<Location[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
@@ -71,21 +66,6 @@ const EmailCampaigns = () => {
     failed: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Failed' },
     cancelled: { color: 'bg-gray-100 text-gray-600', icon: Ban, label: 'Cancelled' }
   };
-
-  useEffect(() => {
-    const fetchLocations = async () => {
-      if (!isCompanyAdmin) return;
-      try {
-        const response = await locationService.getLocations();
-        const locationsArray = Array.isArray(response.data) ? response.data : [];
-        setLocations(locationsArray);
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-        setLocations([]);
-      }
-    };
-    fetchLocations();
-  }, [isCompanyAdmin]);
 
   const loadCampaigns = useCallback(async () => {
     try {
@@ -621,17 +601,6 @@ const EmailCampaigns = () => {
           <p className="text-gray-600 mt-2">Send bulk emails to customers and staff</p>
         </div>
         <div className="flex items-center gap-3 mt-4 sm:mt-0 flex-wrap">
-          {isCompanyAdmin && locations.length > 0 && (
-            <LocationSelector
-              locations={locations}
-              selectedLocation={selectedLocation}
-              onLocationChange={setSelectedLocation}
-              themeColor={themeColor}
-              fullColor={fullColor}
-              variant="compact"
-              showAllOption={true}
-            />
-          )}
           <Link to="/admin/email/templates">
             <StandardButton variant="secondary" icon={Mail}>
               Templates
