@@ -128,8 +128,6 @@ const CompanyDashboard: React.FC = () => {
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings (optionally filtered by location)
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
-  const [allWeeklyBookings, setAllWeeklyBookings] = useState<any[]>([]);
-  const [allTicketPurchases, setAllTicketPurchases] = useState<any[]>([]);
   const [recentEventPurchases, setRecentEventPurchases] = useState<any[]>([]);
   const [apiLocationStats, setApiLocationStats] = useState<any>(null);
   const [metrics, setMetrics] = useState({
@@ -146,9 +144,11 @@ const CompanyDashboard: React.FC = () => {
     bookingRevenue: 0,
     purchaseRevenue: 0,
     totalPurchases: 0,
+    totalAttractionTickets: 0,
     eventPurchaseRevenue: 0,
     totalEventPurchases: 0,
     totalEventTickets: 0,
+    confirmedTotal: 0,
     totalMemberships: 0,
     activeMemberships: 0,
     newMemberships: 0,
@@ -530,9 +530,6 @@ const CompanyDashboard: React.FC = () => {
           if (cachedData.locationStats) {
             setApiLocationStats(cachedData.locationStats);
           }
-          if (cachedData.recentPurchases) {
-            setAllTicketPurchases(cachedData.recentPurchases);
-          }
           if (cachedData.recentEventPurchases) {
             setRecentEventPurchases(cachedData.recentEventPurchases);
           }
@@ -583,14 +580,11 @@ const CompanyDashboard: React.FC = () => {
         }
         
         if (metricsResponse.recentPurchases && metricsResponse.recentPurchases.length > 0) {
-          setAllTicketPurchases(metricsResponse.recentPurchases);
           await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
           console.log('🎫 [CompanyDashboard] Ticket purchases updated:', metricsResponse.recentPurchases.length);
         }
 
-        if (metricsResponse.recentEventPurchases && metricsResponse.recentEventPurchases.length > 0) {
-          setRecentEventPurchases(metricsResponse.recentEventPurchases);
-        }
+        setRecentEventPurchases(metricsResponse.recentEventPurchases ?? []);
         
         await metricsCacheService.cacheMetrics('company', {
           metrics: metricsResponse.metrics,
@@ -601,51 +595,7 @@ const CompanyDashboard: React.FC = () => {
         } as any, selectedLocation, metricsTimeframe);
         
         console.log('✅ [CompanyDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
-        
-        const today = new Date();
-        const weekStart = new Date(today);
-        const day = weekStart.getDay();
-        const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
-        weekStart.setDate(diff);
-        
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        
-        console.log('📅 Current week range:', weekStart.toISOString().split('T')[0], 'to', weekEnd.toISOString().split('T')[0]);
-        
-        const bookingParams = {
-          date_from: weekStart.toISOString().split('T')[0],
-          date_to: weekEnd.toISOString().split('T')[0],
-        };
-        
-        let allBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
-        
-        if (allBookings && allBookings.length > 0) {
-          console.log('📋 Using cached bookings:', allBookings.length);
-          if (selectedLocation !== 'all') {
-            allBookings = allBookings.filter(b => b.location_id === selectedLocation);
-          }
-          setAllWeeklyBookings(allBookings);
-        } else {
-          console.log('📋 No cache, fetching from API...');
-          const allBookingsParams: any = {
-            date_from: weekStart.toISOString().split('T')[0],
-            date_to: weekEnd.toISOString().split('T')[0],
-            per_page: 500,
-          };
-          
-          if (selectedLocation !== 'all') {
-            allBookingsParams.location_id = selectedLocation;
-          }
-          
-          const allBookingsResponse = await bookingService.getBookings(allBookingsParams);
-          allBookings = allBookingsResponse.data.bookings || [];
-          setAllWeeklyBookings(allBookings);
-          await bookingCacheService.cacheBookings(allBookings);
-        }
-        
-        console.log('✅ Loaded', allBookings.length, 'bookings');
-        
+
       } catch (error: any) {
         console.error('❌ Error fetching metrics data:', error);
         console.error('Error details:', error.message || error);
@@ -697,8 +647,8 @@ const CompanyDashboard: React.FC = () => {
     {
       key: 'attractionsSold',
       title: 'Attractions Sold',
-      value: metrics.totalPurchases,
-      description: `Tickets sold`,
+      value: metrics.totalAttractionTickets ?? metrics.totalPurchases,
+      description: `${metrics.totalPurchases} orders`,
       icon: Ticket,
       accent: 'bg-green-100 text-green-700',
       timeframe: timeframeDescription,
@@ -737,7 +687,7 @@ const CompanyDashboard: React.FC = () => {
     {
       key: 'confirmedBookings',
       title: 'Confirmed Bookings',
-      value: metrics.confirmedBookings,
+      value: metrics.confirmedTotal ?? metrics.confirmedBookings,
       description: `Packages + events + attractions`,
       icon: CheckCircle,
       accent: 'bg-emerald-100 text-emerald-700',
@@ -891,83 +841,7 @@ const CompanyDashboard: React.FC = () => {
     setCalendarFilter({ type: 'all', value: '' });
   };
 
-  const getLocationStats = () => {
-    if (apiLocationStats) {
-      console.log('Using API location stats:', apiLocationStats);
-      return apiLocationStats;
-    }
-    
-    const stats: {[key: number]: {name: string, bookings: number, purchases: number, revenue: number, participants: number, utilization: number}} = {};
-    
-    console.log('=== LOCATION STATS CALCULATION (CLIENT-SIDE FALLBACK) ===');
-    console.log('Total locations:', scopeLocations.length);
-    console.log('Locations:', scopeLocations);
-
-    scopeLocations.forEach(location => {
-      stats[location.id] = { name: location.name, bookings: 0, purchases: 0, revenue: 0, participants: 0, utilization: 0 };
-    });
-    
-    console.log('Initialized stats:', stats);
-    console.log('All weekly bookings count:', allWeeklyBookings.length);
-    console.log('All ticket purchases count:', allTicketPurchases.length);
-    
-    const currentWeekAllBookings = allWeeklyBookings.filter(booking => {
-      const bookingDate = parseLocalDate(booking.booking_date);
-      return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
-    });
-    
-    console.log('Current week bookings:', currentWeekAllBookings.length);
-    
-    currentWeekAllBookings.forEach(booking => {
-      console.log('Processing booking:', booking.id, 'Location ID:', booking.location_id);
-      if (booking.location_id && stats[booking.location_id]) {
-        stats[booking.location_id].bookings += 1;
-        stats[booking.location_id].revenue += parseFloat(String(booking.total_amount || 0));
-        stats[booking.location_id].participants += parseInt(String(booking.participants || 0)) || 0;
-        console.log(`Updated stats for location ${booking.location_id}:`, stats[booking.location_id]);
-      } else {
-        console.log('Booking skipped - invalid location_id or location not in stats');
-      }
-    });
-    
-    console.log('Total purchases to process:', allTicketPurchases.length);
-    
-    const currentWeekAllPurchases = allTicketPurchases.filter(purchase => {
-      if (!purchase.purchase_date && !purchase.created_at) return false;
-      const purchaseDate = new Date(purchase.purchase_date || purchase.created_at);
-      return weekDates.some(date => date.toDateString() === purchaseDate.toDateString());
-    });
-    
-    console.log('Purchases for current week:', currentWeekAllPurchases.length);
-    
-    currentWeekAllPurchases.forEach(purchase => {
-      console.log('Processing purchase:', purchase.id);
-      const locationId = purchase.attraction?.location_id || purchase.location_id;
-      console.log('Purchase location_id:', locationId, 'Attraction:', purchase.attraction);
-      
-      if (locationId && stats[locationId]) {
-        stats[locationId].purchases += 1;
-        stats[locationId].revenue += parseFloat(String(purchase.total_amount || 0));
-        stats[locationId].participants += parseInt(String(purchase.quantity || 0)) || 0;
-        console.log(`Added purchase to location ${locationId}:`, stats[locationId]);
-      } else {
-        console.log('Purchase skipped - no valid location_id or location not in stats');
-      }
-    });
-    
-    Object.keys(stats).forEach(locationId => {
-      const maxCapacity = 200; // Assuming each location has a max capacity of 200
-      stats[parseInt(locationId)].utilization = Math.min(100, Math.round((stats[parseInt(locationId)].participants / maxCapacity) * 100));
-    });
-    
-    console.log('Final stats:', stats);
-    console.log('=== END LOCATION STATS ===');
-    
-    return stats;
-  };
-
-  const locationStats = getLocationStats();
-
+  const locationStats = apiLocationStats ?? {};
 
   const getTopLocations = () => {
     return Object.entries(locationStats)
@@ -975,9 +849,6 @@ const CompanyDashboard: React.FC = () => {
       .slice(0, 3);
   };
   const topLocations = getTopLocations();
-
-  console.log('Location Stats:', locationStats);
-  console.log('Top Locations:', topLocations);
 
   const [showAllLocations, setShowAllLocations] = useState(false);
 
@@ -1241,10 +1112,16 @@ const CompanyDashboard: React.FC = () => {
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <TrendingUp className={`w-4 h-4 text-${fullColor}`} /> Top Performing Locations
             </h3>
-            {topLocations.length > 0 ? (
+            {metricsLoading && topLocations.length === 0 ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : topLocations.length > 0 ? (
               <div className="space-y-4">
                 {topLocations.map(([locationId, stats], index) => {
-                  const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number; eventPurchases?: number };
+                  const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number };
                   return (
                   <div key={locationId} className={`flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-${themeColor}-50 border-${fullColor}`}>
                     <div className="flex items-center gap-4">
@@ -1253,7 +1130,10 @@ const CompanyDashboard: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-bold text-gray-900 text-lg">{typedStats.name}</div>
-                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.purchases} tickets • {typedStats.eventPurchases ?? 0} events • {typedStats.participants} guests</div>
+                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.attractionTickets ?? typedStats.purchases} tickets • {typedStats.eventPurchases ?? 0} events • {typedStats.participants} guests</div>
+                        <div className="text-[11px] text-gray-400 mt-0.5">
+                          Bookings ${Number(typedStats.bookingRevenue ?? 0).toFixed(2)} • Tickets ${Number(typedStats.purchaseRevenue ?? 0).toFixed(2)} • Events ${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(2)}
+                        </div>
                       </div>
                     </div>
                     <div className="text-right min-w-[120px]">
@@ -1279,11 +1159,17 @@ const CompanyDashboard: React.FC = () => {
 
           <div className="flex-1">
             <h3 className="font-semibold text-gray-800 mb-4">All Locations Overview</h3>
-            {displayedLocations.length > 0 ? (
+            {metricsLoading && displayedLocations.length === 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-32 bg-gray-100 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : displayedLocations.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedLocations.map(([locationId, stats]) => {
-                    const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number };
+                    const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number };
                     return (
                     <div key={locationId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
@@ -1297,7 +1183,7 @@ const CompanyDashboard: React.FC = () => {
                         </div>
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Tickets</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.purchases}</div>
+                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.attractionTickets ?? typedStats.purchases}</div>
                         </div>
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Events</div>
@@ -1317,6 +1203,20 @@ const CompanyDashboard: React.FC = () => {
                               <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-gray-200 grid grid-cols-3 gap-2">
+                        <div>
+                          <div className="text-[10px] text-gray-400">Bookings Rev.</div>
+                          <div className="text-xs font-semibold text-gray-700">${Number(typedStats.bookingRevenue ?? 0).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-gray-400">Tickets Rev.</div>
+                          <div className="text-xs font-semibold text-gray-700">${Number(typedStats.purchaseRevenue ?? 0).toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-gray-400">Events Rev.</div>
+                          <div className="text-xs font-semibold text-gray-700">${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(2)}</div>
                         </div>
                       </div>
                     </div>

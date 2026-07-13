@@ -13,9 +13,11 @@ export interface DashboardMetrics {
   bookingRevenue: number;
   purchaseRevenue: number;
   totalPurchases: number;
+  totalAttractionTickets?: number;
   eventPurchaseRevenue: number;
   totalEventPurchases: number;
   totalEventTickets: number;
+  confirmedTotal?: number;
   newCustomers: number;
   returningCustomers: number;
   totalMemberships: number;
@@ -66,6 +68,7 @@ export interface LocationStats {
     name: string;
     bookings: number;
     purchases: number;
+    attractionTickets?: number;
     revenue: number;
     participants: number;
     utilization: number;

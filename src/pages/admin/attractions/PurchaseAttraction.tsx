@@ -1011,7 +1011,7 @@ const PurchaseAttraction = () => {
                     ))}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span className="hidden sm:inline">Quantity</span>
+                    <span className="hidden sm:inline truncate max-w-[45%]">Quantity {attraction.name}</span>
                     <span className="sm:hidden">Qty</span>
                     <span className="hidden sm:inline">Your Info</span>
                     <span className="sm:hidden">Info</span>
@@ -1025,7 +1025,7 @@ const PurchaseAttraction = () => {
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
-                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity</h2>
+                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity of {attraction.name}</h2>
                     <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
                   </div>
                   

@@ -774,7 +774,7 @@ const PurchaseEvent = () => {
                     ))}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span className="hidden sm:inline">Tickets</span><span className="sm:hidden">Qty</span>
+                    <span className="hidden sm:inline truncate max-w-[45%]">Tickets {event.name}</span><span className="sm:hidden">Qty</span>
                     <span className="hidden sm:inline">Your Info</span><span className="sm:hidden">Info</span>
                     <span>Payment</span>
                     <span className="hidden sm:inline">Confirmation</span><span className="sm:hidden">Done</span>
@@ -785,7 +785,7 @@ const PurchaseEvent = () => {
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
-                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Tickets</h2>
+                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Tickets of {event.name}</h2>
                     <p className="text-xs md:text-sm text-gray-600">Choose your date, time, and quantity</p>
                   </div>
 
