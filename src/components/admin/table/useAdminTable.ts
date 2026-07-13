@@ -337,6 +337,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const handleDragStart = (e: React.DragEvent, key: string) => {
     setDraggedColumn(key);
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', key);
   };
 
   const handleDragEnd = () => {
