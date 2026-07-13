@@ -44,7 +44,7 @@ import CounterAnimation from '../../components/ui/CounterAnimation';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
-import { metricsService, type TimeframeType } from '../../services/MetricsService';
+import { metricsService, type TimeframeType, type DashboardMetrics } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
@@ -130,7 +130,7 @@ const CompanyDashboard: React.FC = () => {
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
   const [recentEventPurchases, setRecentEventPurchases] = useState<any[]>([]);
   const [apiLocationStats, setApiLocationStats] = useState<any>(null);
-  const [metrics, setMetrics] = useState({
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalBookings: 0,
     totalRevenue: 0,
     totalCustomers: 0,
@@ -140,6 +140,7 @@ const CompanyDashboard: React.FC = () => {
     pendingBookings: 0,
     completedBookings: 0,
     cancelledBookings: 0,
+    checkedInBookings: 0,
     totalParticipants: 0,
     bookingRevenue: 0,
     purchaseRevenue: 0,
