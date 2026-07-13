@@ -29,6 +29,7 @@ export interface BreakdownItem {
   label: string;
   count: number;
   percentage: number;
+  items?: BreakdownItem[];
 }
 
 export interface DashboardBreakdowns {

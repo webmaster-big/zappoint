@@ -1077,12 +1077,26 @@ const CompanyDashboard: React.FC = () => {
                     </div>
                     {hasBreakdown ? (
                       <div className="space-y-1.5">
-                        {(card.breakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
-                          <div key={item.label} className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600 truncate mr-2">{item.label}</span>
-                            <span className="text-gray-800 font-medium shrink-0">
-                              {item.count} <span className="text-gray-400">({item.percentage}%)</span>
-                            </span>
+                        {(card.breakdown as Array<{label:string;count:number;percentage:number;items?:Array<{label:string;count:number;percentage:number}>}>).map((item) => (
+                          <div key={item.label}>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600 truncate mr-2">{item.label}</span>
+                              <span className="text-gray-800 font-medium shrink-0">
+                                {item.count} <span className="text-gray-400">({item.percentage}%)</span>
+                              </span>
+                            </div>
+                            {Array.isArray(item.items) && item.items.length > 0 && (
+                              <div className="mt-1 ml-2 pl-2 border-l border-gray-100 space-y-1">
+                                {item.items.map((sub) => (
+                                  <div key={sub.label} className="flex items-center justify-between text-[11px]">
+                                    <span className="text-gray-500 truncate mr-2">{sub.label}</span>
+                                    <span className="text-gray-600 shrink-0">
+                                      {sub.count} <span className="text-gray-400">({sub.percentage}%)</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                         <div className="pt-1.5 mt-1.5 border-t border-gray-100 flex items-center justify-between text-xs font-semibold">
