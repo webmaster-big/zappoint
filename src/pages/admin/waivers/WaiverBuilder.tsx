@@ -62,6 +62,7 @@ const defaultForm: WaiverTemplatePayload = {
   dob_required: false,
   relationship_required: false,
   photo_video_release_enabled: false,
+  photo_video_release_text: '',
   medical_ack_enabled: false,
   property_damage_enabled: false,
   group_leader_clause_enabled: false,
@@ -148,6 +149,7 @@ const WaiverBuilder = () => {
               dob_required: t.dob_required,
               relationship_required: t.relationship_required,
               photo_video_release_enabled: t.photo_video_release_enabled,
+              photo_video_release_text: t.photo_video_release_text ?? '',
               medical_ack_enabled: t.medical_ack_enabled,
               property_damage_enabled: t.property_damage_enabled,
               group_leader_clause_enabled: t.group_leader_clause_enabled,
@@ -407,6 +409,21 @@ const WaiverBuilder = () => {
               </label>
             ))}
           </div>
+          {form.photo_video_release_enabled && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <label className={labelCls}>Photo / video release text</label>
+              <textarea
+                value={form.photo_video_release_text ?? ''}
+                onChange={(e) => set('photo_video_release_text', e.target.value)}
+                rows={3}
+                className={fieldCls}
+                placeholder="I grant {{company_name}} permission to photograph and record me and any minors listed on this waiver during our visit, and to use those images and recordings for promotional purposes."
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Merge tags like {'{{company_name}}'}, {'{{location_name}}'}, and {'{{full_name}}'} autofill with the guest's real data on the form. Leave blank to use the default text with your company name filled in.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Marketing */}

@@ -298,8 +298,8 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
               <div className="px-3.5 py-2 border-b border-gray-100 bg-gray-50/60">
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Photo & Video Release</span>
               </div>
-              <div className="px-3.5 py-2.5 max-h-20 overflow-y-auto text-xs text-gray-600 leading-relaxed">
-                I consent to the use of photos and video taken during this visit for promotional purposes.
+              <div className="px-3.5 py-2.5 max-h-20 overflow-y-auto text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                {tpl.photo_video_release_text || 'I consent to the use of photos and video taken during this visit for promotional purposes.'}
               </div>
               <label className="flex items-center gap-2.5 px-3.5 py-2.5 border-t border-gray-100 cursor-pointer bg-gray-50/40">
                 <input

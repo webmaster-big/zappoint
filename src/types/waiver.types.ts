@@ -60,6 +60,7 @@ export interface WaiverTemplate {
   dob_required: boolean;
   relationship_required: boolean;
   photo_video_release_enabled: boolean;
+  photo_video_release_text?: string | null;
   medical_ack_enabled: boolean;
   property_damage_enabled: boolean;
   group_leader_clause_enabled: boolean;
@@ -115,6 +116,7 @@ export interface WaiverFormTemplate {
   dob_required: boolean;
   relationship_required: boolean;
   photo_video_release_enabled: boolean;
+  photo_video_release_text?: string | null;
   electronic_consent_enabled: boolean;
   marketing_consent_enabled: boolean;
   marketing_consent_text?: string | null;
