@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, ComponentType } from 'react';
+import DOMPurify from 'dompurify';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Download,
   Printer,
   Trash2,
-  Eye,
   Plus,
+  UserCheck,
+  Undo2,
   ClipboardList,
   FileText,
   Settings as SettingsIcon,
@@ -186,6 +188,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => linkedLabel(w).toLowerCase(),
       exportValue: (w) => linkedLabel(w),
+      defaultVisible: false,
       render: (w) => (
         w.booking ? (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
@@ -220,6 +223,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => w.selected_date || '',
       exportValue: (w) => w.selected_date || '',
+      defaultVisible: false,
       render: (w) => <span className="text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDateLong(w.selected_date)}</span>,
     },
     {
@@ -229,6 +233,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => w.template?.title || '',
       exportValue: (w) => w.template?.title || '',
+      defaultVisible: false,
       render: (w) => <span className="text-sm text-gray-600">{w.template?.title || '—'}</span>,
     },
     {
@@ -238,6 +243,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => w.location?.name || '',
       exportValue: (w) => w.location?.name || '',
+      defaultVisible: false,
       render: (w) => <span className="text-sm text-gray-600">{w.location?.name || '—'}</span>,
     },
     {
@@ -257,6 +263,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => sourceLabels[w.source] || w.source || '',
       exportValue: (w) => sourceLabels[w.source] || w.source || '',
+      defaultVisible: false,
       render: (w) => <span className="text-xs text-gray-500">{sourceLabels[w.source] || w.source}</span>,
     },
     {
@@ -266,6 +273,7 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => w.marketing_consent_status || '',
       exportValue: (w) => marketingLabels[w.marketing_consent_status] || w.marketing_consent_status || '',
+      defaultVisible: false,
       render: (w) => (
         w.marketing_consent_status === 'opted_in' ? (
           <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Opted in</span>
@@ -281,11 +289,40 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => (w.submitted_at ? new Date(w.submitted_at).getTime() : 0),
       exportValue: (w) => (w.submitted_at ? new Date(w.submitted_at).toLocaleString() : ''),
+      defaultVisible: false,
       render: (w) => <span className="text-sm text-gray-500">{formatDateTimeET(w.submitted_at)}</span>,
+    },
+    {
+      key: 'check_in',
+      label: 'Check-In',
+      group: 'Status',
+      sortable: true,
+      sortValue: (w) => (w.checked_in_at ? 1 : 0),
+      exportValue: (w) => (w.checked_in_at ? 'Checked in' : 'Not checked in'),
+      render: (w) => (
+        w.checked_in_at ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+            <UserCheck className="w-3 h-3" />Checked In
+          </span>
+        ) : (
+          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-500 border border-gray-200">Not Checked In</span>
+        )
+      ),
     },
   ];
 
   const filterDefs: AdminFilterDef<Waiver>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'check_in',
+      label: 'Check-In',
+      allLabel: 'Any check-in status',
+      options: [
+        { value: 'checked_in', label: 'Checked in' },
+        { value: 'not_checked_in', label: 'Not checked in' },
+      ],
+      predicate: (w, value) => (value === 'checked_in' ? !!w.checked_in_at : !w.checked_in_at),
+    },
     {
       type: 'select',
       key: 'source',
@@ -334,7 +371,7 @@ const WaiversSearch = () => {
     data: waivers,
     columns,
     getRowId: (w) => String(w.id),
-    storageKey: 'waivers_search',
+    storageKey: 'waivers_search_v2',
     filterDefs,
     searchFields: (w) => [
       w.id,
@@ -399,6 +436,28 @@ const WaiversSearch = () => {
         { label: 'Minor Details', value: (w) => (w.minors || []).map((m) => `${[m.first_name, m.last_name].filter(Boolean).join(' ')}${m.date_of_birth ? ` (DOB ${m.date_of_birth})` : ''}${m.relationship ? ` [${m.relationship}]` : ''}`).join('; ') },
       ],
     });
+  };
+
+  const handleCheckIn = async (w: Waiver) => {
+    try {
+      await waiverService.checkIn(w.id);
+      setToast({ message: `${adultName(w) || 'Waiver'} checked in`, type: 'success' });
+      load();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setToast({ message: e.response?.data?.message || 'Failed to check in waiver', type: 'error' });
+    }
+  };
+
+  const handleUndoCheckIn = async (w: Waiver) => {
+    try {
+      await waiverService.undoCheckIn(w.id);
+      setToast({ message: 'Check-in undone', type: 'info' });
+      load();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setToast({ message: e.response?.data?.message || 'Failed to undo check-in', type: 'error' });
+    }
   };
 
   const confirmDelete = async (reason: string) => {
@@ -501,6 +560,7 @@ const WaiversSearch = () => {
           table={table}
           loading={loading}
           itemLabel="waivers"
+          onRowClick={openDetail}
           emptyState={
             <div className="flex flex-col items-center">
               <ShieldCheck className="w-10 h-10 text-gray-300 mb-3" />
@@ -509,7 +569,11 @@ const WaiversSearch = () => {
           }
           renderActions={(w) => (
             <div data-tour="waivers-row-actions" className="flex items-center justify-end gap-1">
-              <button onClick={() => openDetail(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="View"><Eye className="w-4 h-4" /></button>
+              {w.status === 'completed' && !w.checked_in_at && (
+                <button onClick={() => handleCheckIn(w)} className="px-2 py-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors" title="Check in">
+                  <UserCheck className="w-3.5 h-3.5" />Check In
+                </button>
+              )}
               <button onClick={() => handlePrint(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Print"><Printer className="w-4 h-4" /></button>
               {isAdmin && (
                 <button onClick={() => setDeleteTarget(w)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
@@ -525,7 +589,14 @@ const WaiversSearch = () => {
         </div>
       )}
 
-      {detail && <WaiverDetailModal data={detail} onClose={() => setDetail(null)} themeColor={themeColor} />}
+      {detail && (
+        <WaiverDetailModal
+          data={detail}
+          onClose={() => setDetail(null)}
+          onCheckIn={async (w) => { await handleCheckIn(w); openDetail(w); }}
+          onUndoCheckIn={async (w) => { await handleUndoCheckIn(w); openDetail(w); }}
+        />
+      )}
       {showAssign && <AssignWaiverModal onClose={() => setShowAssign(false)} onSaved={() => { setShowAssign(false); load(); setToast({ message: 'Waiver assigned & link sent', type: 'success' }); }} themeColor={themeColor} />}
       {deleteTarget && <DeleteWaiverModal waiver={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />}
 
@@ -555,8 +626,22 @@ const DetailSection = ({ icon: Icon, title, children }: { icon: ComponentType<{ 
   </div>
 );
 
-const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiver; rendered_body: string }; onClose: () => void; themeColor: string }) => {
+const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn }: {
+  data: { waiver: Waiver; rendered_body: string };
+  onClose: () => void;
+  onCheckIn: (w: Waiver) => Promise<void>;
+  onUndoCheckIn: (w: Waiver) => Promise<void>;
+}) => {
   const w = data.waiver;
+  const [checkInBusy, setCheckInBusy] = useState(false);
+  const runCheckInAction = async (action: (w: Waiver) => Promise<void>) => {
+    setCheckInBusy(true);
+    try {
+      await action(w);
+    } finally {
+      setCheckInBusy(false);
+    }
+  };
   const fullName = [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || 'Waiver';
   const linked = linkedLabel(w);
   const statusStyle: Record<string, string> = {
@@ -573,6 +658,11 @@ const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiv
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-gray-900 truncate">{fullName}</h2>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle[w.status] || 'bg-gray-100 text-gray-600'}`}>{w.status.charAt(0).toUpperCase() + w.status.slice(1)}</span>
+              {w.checked_in_at ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><UserCheck className="w-3 h-3" />Checked In</span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Not Checked In</span>
+              )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">{w.template?.title || 'Liability Waiver'} · Waiver #{w.id}</p>
           </div>
@@ -595,6 +685,7 @@ const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiv
               <DetailField label="Linked to" value={linked || 'Walk-in'} />
               <DetailField label="Source" value={sourceLabels[w.source] || w.source} />
               <DetailField label="Submitted" value={formatDateTimeET(w.submitted_at)} />
+              <DetailField label="Checked in" value={w.checked_in_at ? formatDateTimeET(w.checked_in_at) : 'Not checked in'} />
             </div>
           </DetailSection>
 
@@ -612,7 +703,18 @@ const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiv
           )}
 
           <DetailSection icon={FileText} title="Waiver Agreement">
-            <div className={`bg-${themeColor}-50/40 border border-gray-100 rounded-lg p-4 text-sm text-gray-700 leading-relaxed max-h-72 overflow-y-auto`} dangerouslySetInnerHTML={{ __html: data.rendered_body }} />
+            <div className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-900">{w.template?.title || 'Waiver Agreement'}</span>
+                {w.version?.version != null && (
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">v{w.version.version}</span>
+                )}
+              </div>
+              <div
+                className="px-4 py-3 h-64 overflow-y-auto text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.rendered_body) }}
+              />
+            </div>
           </DetailSection>
 
           <DetailSection icon={ShieldCheck} title="Acknowledgment & Signature">
@@ -632,8 +734,14 @@ const WaiverDetailModal = ({ data, onClose, themeColor }: { data: { waiver: Waiv
           </DetailSection>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          {w.checked_in_at && (
+            <StandardButton variant="secondary" icon={Undo2} disabled={checkInBusy} onClick={() => runCheckInAction(onUndoCheckIn)}>Undo Check-In</StandardButton>
+          )}
           <StandardButton variant="secondary" onClick={onClose}>Close</StandardButton>
-          <StandardButton variant="primary" icon={Printer} onClick={async () => { try { const blob = await waiverService.print(w.id); const url = URL.createObjectURL(blob); window.open(url, '_blank'); } catch { /* noop */ } }}>Print</StandardButton>
+          <StandardButton variant="secondary" icon={Printer} onClick={async () => { try { const blob = await waiverService.print(w.id); const url = URL.createObjectURL(blob); window.open(url, '_blank'); } catch { /* noop */ } }}>Print</StandardButton>
+          {w.status === 'completed' && !w.checked_in_at && (
+            <StandardButton variant="primary" icon={UserCheck} disabled={checkInBusy} onClick={() => runCheckInAction(onCheckIn)}>Check In</StandardButton>
+          )}
         </div>
       </div>
     </div>

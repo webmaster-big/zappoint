@@ -30,6 +30,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
+import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 
 interface ScanResult {
   bookingId: number;
@@ -930,6 +931,10 @@ const CheckIn: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="mb-3 sm:mb-6">
+                  <WaiverConnectionPanel type="booking" id={verifiedBooking.id} title="Waivers" />
+                </div>
 
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Booking Information</h3>

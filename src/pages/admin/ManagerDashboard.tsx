@@ -30,6 +30,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
+import InfoTooltip from '../../components/ui/InfoTooltip';
 import StandardButton from '../../components/ui/StandardButton';
 import Pagination from '../../components/ui/Pagination';
 import { getStoredUser } from '../../utils/storage';
@@ -596,6 +597,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: `${metrics.totalParticipants} participants • ${timeframeDescription}`,
       icon: Package,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      explanation: 'Package bookings placed in the period (counted by the date the booking was made), excluding cancelled ones. The subtitle shows total participants across those bookings.',
     },
     {
       title: 'New Bookings',
@@ -603,6 +605,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: `Created • ${timeframeDescription}`,
       icon: Sparkles,
       accent: 'bg-blue-100 text-blue-600',
+      explanation: 'Bookings created within the selected timeframe, based on the loaded booking list.',
     },
     {
       title: 'Total Revenue',
@@ -610,6 +613,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: `Bkgs: $${Math.round(metrics.bookingRevenue)} • Tix: $${Math.round(metrics.purchaseRevenue)}${metrics.eventPurchaseRevenue > 0 ? ` • Events: $${Math.round(metrics.eventPurchaseRevenue)}` : ''} • ${timeframeDescription}`,
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      explanation: 'Money actually collected (amount paid) on package bookings, attraction orders, and event orders placed in the period. Cancelled/refunded orders are excluded. Outstanding balances are not included.',
     },
     {
       title: 'Unique Customers',
@@ -617,6 +621,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: timeframeDescription,
       icon: Users,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      explanation: 'Customers with at least one booking, attraction order, or event order in the period. Each customer is counted once; guests without a customer account are not included.',
     },
     {
       title: 'Confirmed',
@@ -624,6 +629,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: `Completed: ${metrics.completedBookings} • ${timeframeDescription}`,
       icon: CheckCircle,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      explanation: 'Package bookings that were confirmed, including those that have since checked in or completed. The subtitle shows how many of them are fully completed.',
     },
     {
       title: 'Avg Booking',
@@ -631,6 +637,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: `${metrics.totalPurchases} tickets sold${metrics.totalEventTickets > 0 ? ` • ${metrics.totalEventTickets} event tickets` : ''} • ${timeframeDescription}`,
       icon: TrendingUp,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      explanation: 'Average collected per package booking: booking revenue divided by the number of non-cancelled bookings in the period.',
     },
   ];
 
@@ -813,6 +820,7 @@ const LocationManagerDashboard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={20} /></div>
                 <span className="text-base font-semibold text-gray-800">{metric.title}</span>
+                <InfoTooltip content={metric.explanation} size={13} widthClass="w-72" className="ml-auto" iconClassName="text-gray-300 hover:text-gray-500" />
               </div>
               {loading ? (
                 <div className="animate-pulse space-y-2 mt-2">

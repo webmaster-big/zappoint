@@ -15,6 +15,7 @@ import type {
   ActivityType,
   WaiverMinor,
   ConnectedWaiver,
+  EntityWaiverSummary,
 } from '../types/waiver.types';
 
 const getAuthToken = (): string | null => {
@@ -124,8 +125,20 @@ const waiverService = {
   entityWaivers: async (
     type: 'booking' | 'attraction_purchase' | 'event_purchase' | 'customer',
     id: number,
-  ): Promise<ApiResponse<{ waivers: ConnectedWaiver[]; summary: { total: number; completed: number; pending: number } }>> =>
+  ): Promise<ApiResponse<{ waivers: ConnectedWaiver[]; summary: EntityWaiverSummary }>> =>
     (await api.get('/waivers/for', { params: { type, id } })).data,
+
+  checkIn: async (id: number): Promise<ApiResponse<Waiver>> =>
+    (await api.post(`/waivers/${id}/check-in`, {})).data,
+
+  undoCheckIn: async (id: number): Promise<ApiResponse<Waiver>> =>
+    (await api.post(`/waivers/${id}/undo-check-in`, {})).data,
+
+  checkInAll: async (
+    type: 'booking' | 'attraction_purchase' | 'event_purchase' | 'customer',
+    id: number,
+  ): Promise<ApiResponse<{ checked_in: number }>> =>
+    (await api.post('/waivers/check-in-all', { type, id })).data,
 
   createKioskSession: async (
     sourceType: 'booking' | 'attraction_purchase' | 'event_purchase' | 'package' | 'attraction' | 'event',

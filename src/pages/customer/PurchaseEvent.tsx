@@ -753,6 +753,15 @@ const PurchaseEvent = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
 
           <div className="lg:col-span-2">
+            <div className="lg:hidden mb-4 px-1">
+              <h1 className="text-2xl font-bold text-gray-900 leading-tight">{event.name}</h1>
+              {event.location && (
+                <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <span className="font-medium">{event.location.name}</span>
+                </div>
+              )}
+            </div>
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
 
               <div className="bg-gradient-to-r from-gray-50 to-white">

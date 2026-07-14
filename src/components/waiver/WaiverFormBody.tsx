@@ -62,7 +62,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     const errs: Record<string, string> = {};
     if (!adultFirstName.trim()) errs.adultFirstName = 'Required';
     if (!adultLastName.trim()) errs.adultLastName = 'Required';
-    if (adultEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adultEmail)) errs.adultEmail = 'Invalid email';
+    if (!adultEmail.trim()) errs.adultEmail = 'Required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adultEmail)) errs.adultEmail = 'Invalid email';
+    if (!adultPhone.trim()) errs.adultPhone = 'Required';
+    if (!adultDob) errs.adultDob = 'Required';
     if (!typedLegalName.trim()) errs.typedLegalName = 'Please type your full legal name';
     if (!agreementAccepted) errs.agreement = 'You must agree to the waiver to continue';
     if (tpl?.electronic_consent_enabled && !electronicConsent)
@@ -85,9 +88,9 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     const payload: WaiverSubmission = {
       adult_first_name: adultFirstName.trim(),
       adult_last_name: adultLastName.trim(),
-      adult_email: adultEmail.trim() || undefined,
-      adult_phone: adultPhone.trim() || undefined,
-      adult_dob: adultDob || undefined,
+      adult_email: adultEmail.trim(),
+      adult_phone: adultPhone.trim(),
+      adult_dob: adultDob,
       typed_legal_name: typedLegalName.trim(),
       agreement_accepted: agreementAccepted,
       electronic_consent_accepted: tpl?.electronic_consent_enabled ? electronicConsent : undefined,
@@ -161,9 +164,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             {formErrors.adultLastName && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultLastName}</p>}
           </div>
           <div data-tour="wf-adult-contact">
-            <label className={labelClass}>
-              Email <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
+            <label className={labelClass}>Email *</label>
             <input
               type="email"
               value={adultEmail}
@@ -174,28 +175,26 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             {formErrors.adultEmail && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultEmail}</p>}
           </div>
           <div>
-            <label className={labelClass}>
-              Phone <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
+            <label className={labelClass}>Phone *</label>
             <input
               type="tel"
               value={adultPhone}
               autoComplete={autoCompleteOff}
               onChange={(e) => setAdultPhone(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} ${formErrors.adultPhone ? 'border-red-300' : ''}`}
             />
+            {formErrors.adultPhone && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultPhone}</p>}
           </div>
           <div data-tour="wf-adult-dob">
-            <label className={labelClass}>
-              Date of Birth <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
+            <label className={labelClass}>Date of Birth *</label>
             <input
               type="date"
               value={adultDob}
               autoComplete={autoCompleteOff}
               onChange={(e) => setAdultDob(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} ${formErrors.adultDob ? 'border-red-300' : ''}`}
             />
+            {formErrors.adultDob && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultDob}</p>}
           </div>
         </div>
       </div>
@@ -295,34 +294,44 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
         </div>
         <div className="p-5 space-y-4">
           {tpl?.photo_video_release_enabled && (
-            <label data-tour="wf-photo-consent" className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={photoVideoConsent}
-                onChange={(e) => setPhotoVideoConsent(e.target.checked)}
-                className="mt-0.5 h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
-              />
-              <span className="text-xs text-gray-600 leading-relaxed">
+            <div data-tour="wf-photo-consent" className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="px-3.5 py-2 border-b border-gray-100 bg-gray-50/60">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Photo & Video Release</span>
+              </div>
+              <div className="px-3.5 py-2.5 max-h-20 overflow-y-auto text-xs text-gray-600 leading-relaxed">
                 I consent to the use of photos and video taken during this visit for promotional purposes.
-              </span>
-            </label>
+              </div>
+              <label className="flex items-center gap-2.5 px-3.5 py-2.5 border-t border-gray-100 cursor-pointer bg-gray-50/40">
+                <input
+                  type="checkbox"
+                  checked={photoVideoConsent}
+                  onChange={(e) => setPhotoVideoConsent(e.target.checked)}
+                  className="h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-xs font-medium text-gray-700">I agree to the photo & video release.</span>
+              </label>
+            </div>
           )}
 
           {tpl?.marketing_consent_enabled && (
-            <div data-tour="wf-marketing-consent" className="bg-gray-50 border border-gray-100 rounded-lg p-3.5">
-              <label className="flex items-start gap-2.5 cursor-pointer">
+            <div data-tour="wf-marketing-consent" className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="px-3.5 py-2 border-b border-gray-100 bg-gray-50/60">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Stay in Touch</span>
+              </div>
+              <div className="px-3.5 py-2.5 max-h-20 overflow-y-auto text-xs text-gray-600 leading-relaxed">
+                {tpl.marketing_consent_text || 'Keep me updated on future events, coupons, and special offers.'}
+                {tpl.marketing_helper_text && (
+                  <span className="block text-[11px] text-gray-400 mt-1">{tpl.marketing_helper_text}</span>
+                )}
+              </div>
+              <label className="flex items-center gap-2.5 px-3.5 py-2.5 border-t border-gray-100 cursor-pointer bg-gray-50/40">
                 <input
                   type="checkbox"
                   checked={marketingConsent}
                   onChange={(e) => setMarketingConsent(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
                 />
-                <span className="text-xs text-gray-600 leading-relaxed">
-                  {tpl.marketing_consent_text || 'Keep me updated on future events, coupons, and special offers.'}
-                  {tpl.marketing_helper_text && (
-                    <span className="block text-[11px] text-gray-400 mt-1">{tpl.marketing_helper_text}</span>
-                  )}
-                </span>
+                <span className="text-xs font-medium text-gray-700">Yes, keep me updated.</span>
               </label>
             </div>
           )}

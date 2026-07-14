@@ -33,7 +33,6 @@ import {
   CheckCircle,
   Ticket,
   Columns,
-  Info,
   UserPlus,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -41,6 +40,7 @@ import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
 import Pagination from '../../components/ui/Pagination';
 import CounterAnimation from '../../components/ui/CounterAnimation';
+import InfoTooltip from '../../components/ui/InfoTooltip';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
@@ -634,6 +634,7 @@ const CompanyDashboard: React.FC = () => {
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.packageBreakdown ?? [],
+      explanation: 'Package bookings placed in the selected period (counted by the date the booking was made, not the party date). Cancelled bookings are excluded. "Confirmed" counts bookings that were confirmed, including those already checked in or completed.',
     },
     {
       key: 'partyParticipants',
@@ -644,6 +645,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-blue-100 text-blue-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.participantBreakdown ?? [],
+      explanation: 'Total participant headcount across all non-cancelled package bookings placed in the period. Attraction and event tickets are not included here.',
     },
     {
       key: 'attractionsSold',
@@ -654,6 +656,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-green-100 text-green-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.attractionBreakdown ?? [],
+      explanation: 'Attraction tickets sold in the period (sum of ticket quantities across orders, counted by purchase date). Cancelled and refunded orders are excluded. The subtitle shows how many orders those tickets came from.',
     },
     {
       key: 'eventsSold',
@@ -664,6 +667,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-purple-100 text-purple-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.eventBreakdown ?? [],
+      explanation: 'Event orders placed in the period (counted by purchase date). Cancelled and refunded orders are excluded. The subtitle shows the total tickets across those orders.',
     },
     {
       key: 'memberships',
@@ -674,6 +678,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-amber-100 text-amber-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.membershipBreakdown ?? [],
+      explanation: 'New memberships created in the selected period. This is not the total number of active members — it counts sign-ups within the timeframe.',
     },
     {
       key: 'uniqueCustomers',
@@ -684,16 +689,18 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-rose-100 text-rose-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.customerBreakdown ?? [],
+      explanation: 'Customers with at least one package booking, attraction order, or event order in the period. Each customer is counted once. "New" counts those whose customer account was also created in the period; guests who booked without an account are not included.',
     },
     {
       key: 'confirmedBookings',
-      title: 'Confirmed Bookings',
+      title: 'Confirmed Orders',
       value: metrics.confirmedTotal ?? metrics.confirmedBookings,
       description: `Packages + events + attractions`,
       icon: CheckCircle,
       accent: 'bg-emerald-100 text-emerald-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.confirmedBreakdown ?? [],
+      explanation: 'All confirmed sales in the period combined: package bookings + event orders + attraction orders. Orders that progressed to checked-in or completed still count as confirmed. Click the card for the split by type.',
     },
   ];
 
@@ -1048,9 +1055,9 @@ const CompanyDashboard: React.FC = () => {
                     <div className={`p-1.5 rounded-lg ${card.accent}`}>
                       <Icon size={16} />
                     </div>
-                    {hasBreakdown && (
-                      <Info size={13} className="text-gray-300" />
-                    )}
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <InfoTooltip content={card.explanation} size={13} widthClass="w-72" iconClassName="text-gray-300 hover:text-gray-500" />
+                    </span>
                   </div>
                   <div className="mt-1">
                     {loading ? (
@@ -1075,6 +1082,7 @@ const CompanyDashboard: React.FC = () => {
                         <X size={12} />
                       </button>
                     </div>
+                    <p className="text-[11px] text-gray-500 leading-relaxed mb-2 pb-2 border-b border-gray-100">{card.explanation}</p>
                     {hasBreakdown ? (
                       <div className="space-y-1.5">
                         {(card.breakdown as Array<{label:string;count:number;percentage:number;items?:Array<{label:string;count:number;percentage:number}>}>).map((item) => (

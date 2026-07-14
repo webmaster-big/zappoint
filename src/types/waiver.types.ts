@@ -94,7 +94,10 @@ export interface Waiver {
   marketing_consent_status: MarketingConsentStatus;
   source: WaiverSource;
   submitted_at?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by?: number | null;
   template?: { id: number; title: string };
+  version?: { id: number; version: number };
   location?: { id: number; name: string };
   minors?: WaiverMinor[];
   booking?: { id: number; reference_number?: string };
@@ -207,8 +210,16 @@ export interface ConnectedWaiver {
   source: WaiverSource;
   marketing_consent_status: MarketingConsentStatus;
   submitted_at?: string | null;
+  checked_in_at?: string | null;
   minors: string[];
   signing_url?: string | null;
+}
+
+export interface EntityWaiverSummary {
+  total: number;
+  completed: number;
+  pending: number;
+  checked_in?: number;
 }
 
 export interface WaiverSearchFilters {

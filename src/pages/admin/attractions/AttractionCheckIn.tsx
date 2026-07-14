@@ -23,6 +23,7 @@ import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDis
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { convertTo12Hour } from '../../../utils/timeFormat';
+import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 
 interface ScanResult {
   purchaseId: number;
@@ -587,6 +588,10 @@ const AttractionCheckIn = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="mb-6">
+                  <WaiverConnectionPanel type="attraction_purchase" id={verifiedPurchase.id} title="Waivers" />
+                </div>
 
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Ticket Information</h3>
