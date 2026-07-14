@@ -693,14 +693,14 @@ const CompanyDashboard: React.FC = () => {
     },
     {
       key: 'confirmedBookings',
-      title: 'Confirmed Orders',
+      title: 'Confirmed Sales',
       value: metrics.confirmedTotal ?? metrics.confirmedBookings,
-      description: `Packages + events + attractions`,
+      description: `Bookings + tickets confirmed`,
       icon: CheckCircle,
       accent: 'bg-emerald-100 text-emerald-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.confirmedBreakdown ?? [],
-      explanation: 'All confirmed sales in the period combined: package bookings + event orders + attraction orders. Orders that progressed to checked-in or completed still count as confirmed. Click the card for the split by type.',
+      explanation: 'All confirmed sales in the period combined by quantity: package bookings + event tickets + attraction tickets, matching the counts on the sold cards. Sales that progressed to checked-in or completed still count as confirmed. Click the card for the split by type.',
     },
   ];
 
