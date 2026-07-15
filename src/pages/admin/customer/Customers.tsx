@@ -78,6 +78,7 @@ const CustomerListing: React.FC = () => {
     last_name: '',
     email: '',
     phone: '',
+    date_of_birth: '',
     company_name: '',
     job_title: '',
     address: '',
@@ -408,6 +409,7 @@ const CustomerListing: React.FC = () => {
         first_name: newContact.first_name.trim() || undefined,
         last_name: newContact.last_name.trim() || undefined,
         phone: newContact.phone.trim() || undefined,
+        date_of_birth: newContact.date_of_birth || undefined,
         company_name: newContact.company_name.trim() || undefined,
         job_title: newContact.job_title.trim() || undefined,
         address: newContact.address.trim() || undefined,
@@ -427,6 +429,7 @@ const CustomerListing: React.FC = () => {
           last_name: '',
           email: '',
           phone: '',
+          date_of_birth: '',
           company_name: '',
           job_title: '',
           address: '',
@@ -458,6 +461,7 @@ const CustomerListing: React.FC = () => {
       last_name: selectedContactForView.last_name || '',
       email: selectedContactForView.email,
       phone: selectedContactForView.phone || '',
+      date_of_birth: selectedContactForView.date_of_birth ? selectedContactForView.date_of_birth.substring(0, 10) : '',
       company_name: selectedContactForView.company_name || '',
       job_title: selectedContactForView.job_title || '',
       address: selectedContactForView.address || '',
@@ -482,6 +486,7 @@ const CustomerListing: React.FC = () => {
       if (viewEditData.last_name !== undefined) updateData.last_name = viewEditData.last_name || undefined;
       if (viewEditData.email !== undefined) updateData.email = viewEditData.email;
       if (viewEditData.phone !== undefined) updateData.phone = viewEditData.phone || undefined;
+      if (viewEditData.date_of_birth !== undefined) updateData.date_of_birth = viewEditData.date_of_birth || undefined;
       if (viewEditData.company_name !== undefined) updateData.company_name = viewEditData.company_name || undefined;
       if (viewEditData.job_title !== undefined) updateData.job_title = viewEditData.job_title || undefined;
       if (viewEditData.address !== undefined) updateData.address = viewEditData.address || undefined;
@@ -1521,6 +1526,7 @@ const CustomerListing: React.FC = () => {
                       last_name: '',
                       email: '',
                       phone: '',
+                      date_of_birth: '',
                       company_name: '',
                       job_title: '',
                       address: '',
@@ -1584,6 +1590,15 @@ const CustomerListing: React.FC = () => {
                         onChange={(e) => setNewContact(prev => ({ ...prev, phone: e.target.value }))}
                         className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                         placeholder="+1 (555) 000-0000"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Date of Birth</label>
+                      <input
+                        type="date"
+                        value={newContact.date_of_birth}
+                        onChange={(e) => setNewContact(prev => ({ ...prev, date_of_birth: e.target.value }))}
+                        className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                       />
                     </div>
                   </div>
@@ -1760,6 +1775,7 @@ const CustomerListing: React.FC = () => {
                     last_name: '',
                     email: '',
                     phone: '',
+                    date_of_birth: '',
                     company_name: '',
                     job_title: '',
                     address: '',
@@ -1961,6 +1977,19 @@ const CustomerListing: React.FC = () => {
                         />
                       ) : (
                         <p className="text-sm text-gray-900">{selectedContactForView.phone || '—'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Date of Birth</label>
+                      {viewEditMode ? (
+                        <input
+                          type="date"
+                          value={viewEditData.date_of_birth || ''}
+                          onChange={(e) => setViewEditData(prev => ({ ...prev, date_of_birth: e.target.value }))}
+                          className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                        />
+                      ) : (
+                        <p className="text-sm text-gray-900">{selectedContactForView.date_of_birth ? selectedContactForView.date_of_birth.substring(0, 10) : '—'}</p>
                       )}
                     </div>
                     <div>

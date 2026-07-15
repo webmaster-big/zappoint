@@ -30,6 +30,7 @@ export interface Contact {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
+  date_of_birth: string | null;
   company_name: string | null;
   job_title: string | null;
   address: string | null;
@@ -84,6 +85,7 @@ export interface ContactCreateData {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  date_of_birth?: string;
   company_name?: string;
   job_title?: string;
   address?: string;
@@ -104,6 +106,7 @@ export interface ContactUpdateData {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  date_of_birth?: string;
   company_name?: string;
   job_title?: string;
   address?: string;
