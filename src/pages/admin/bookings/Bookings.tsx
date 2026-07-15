@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
@@ -71,6 +71,12 @@ const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
   return new Date(year, month - 1, day);
+};
+
+const columnKeyAtPointFromDom = (x: number, y: number): string | null => {
+  const el = document.elementFromPoint(x, y);
+  const th = el ? (el as Element).closest('[data-col-key]') : null;
+  return th ? th.getAttribute('data-col-key') : null;
 };
 
 const Bookings: React.FC = () => {
@@ -249,7 +255,10 @@ const Bookings: React.FC = () => {
   const [columnOrder, setColumnOrder] = useState<BookingsColumnKey[]>(getDefaultColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<BookingsColumnKey | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<BookingsColumnKey | null>(null);
-  const draggedColumnRef = useRef<BookingsColumnKey | null>(null);
+  const pointerDragRef = useRef<{ key: BookingsColumnKey; startX: number; startY: number; active: boolean } | null>(null);
+  const suppressColumnClickRef = useRef(false);
+  const columnOrderRef = useRef<BookingsColumnKey[]>(columnOrder);
+  columnOrderRef.current = columnOrder;
 
   const [sortColumn, setSortColumn] = useState<BookingsColumnKey | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -264,54 +273,56 @@ const Bookings: React.FC = () => {
   const [trashedTotal, setTrashedTotal] = useState(0);
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
   
-  const handleDragStart = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
-    draggedColumnRef.current = columnKey;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', columnKey);
-    setTimeout(() => {
-      if (draggedColumnRef.current === columnKey) setDraggedColumn(columnKey);
-    }, 0);
-  };
-
-  const handleDragEnd = () => {
-    draggedColumnRef.current = null;
-    setDraggedColumn(null);
-    setDragOverColumn(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (columnKey !== draggedColumnRef.current) {
-      setDragOverColumn(columnKey);
+  const onColumnPointerMove = useCallback((e: PointerEvent) => {
+    const st = pointerDragRef.current;
+    if (!st) return;
+    if (!st.active) {
+      if (Math.hypot(e.clientX - st.startX, e.clientY - st.startY) < 4) return;
+      st.active = true;
+      setDraggedColumn(st.key);
     }
-  };
+    const over = columnKeyAtPointFromDom(e.clientX, e.clientY) as BookingsColumnKey | null;
+    setDragOverColumn(over && over !== st.key ? over : null);
+  }, []);
 
-  const handleDragLeave = () => {
-    setDragOverColumn(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetColumnKey: BookingsColumnKey) => {
-    e.preventDefault();
-    setDragOverColumn(null);
-
-    const sourceKey = (draggedColumnRef.current ||
-      e.dataTransfer.getData('text/plain')) as BookingsColumnKey | '';
-    draggedColumnRef.current = null;
+  const onColumnPointerUp = useCallback((e: PointerEvent) => {
+    window.removeEventListener('pointermove', onColumnPointerMove);
+    window.removeEventListener('pointerup', onColumnPointerUp);
+    window.removeEventListener('pointercancel', onColumnPointerUp);
+    const st = pointerDragRef.current;
+    pointerDragRef.current = null;
     setDraggedColumn(null);
-
-    if (!sourceKey || sourceKey === targetColumnKey) return;
-
-    const newOrder = [...columnOrder];
-    const draggedIndex = newOrder.indexOf(sourceKey);
-    const targetIndex = newOrder.indexOf(targetColumnKey);
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, sourceKey);
-
+    setDragOverColumn(null);
+    if (!st || !st.active) return;
+    suppressColumnClickRef.current = true;
+    const targetKey = columnKeyAtPointFromDom(e.clientX, e.clientY) as BookingsColumnKey | null;
+    if (!targetKey || targetKey === st.key) return;
+    const newOrder = [...columnOrderRef.current];
+    const from = newOrder.indexOf(st.key);
+    const to = newOrder.indexOf(targetKey);
+    if (from === -1 || to === -1) return;
+    newOrder.splice(from, 1);
+    newOrder.splice(to, 0, st.key);
     setColumnOrder(newOrder);
     localStorage.setItem('bookings_column_order', JSON.stringify(newOrder));
+  }, [onColumnPointerMove]);
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', onColumnPointerMove);
+      window.removeEventListener('pointerup', onColumnPointerUp);
+      window.removeEventListener('pointercancel', onColumnPointerUp);
+    },
+    [onColumnPointerMove, onColumnPointerUp]
+  );
+
+  const handleColumnPointerDown = (e: React.PointerEvent, columnKey: BookingsColumnKey) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    suppressColumnClickRef.current = false;
+    pointerDragRef.current = { key: columnKey, startX: e.clientX, startY: e.clientY, active: false };
+    window.addEventListener('pointermove', onColumnPointerMove);
+    window.addEventListener('pointerup', onColumnPointerUp);
+    window.addEventListener('pointercancel', onColumnPointerUp);
   };
 
   const resetColumnOrder = () => {
@@ -859,6 +870,10 @@ const Bookings: React.FC = () => {
   };
 
   const handleColumnSort = (columnKey: BookingsColumnKey) => {
+    if (suppressColumnClickRef.current) {
+      suppressColumnClickRef.current = false;
+      return;
+    }
     if (sortColumn === columnKey) {
       if (sortDirection === 'asc') {
         setSortDirection('desc');
@@ -3257,14 +3272,10 @@ const Bookings: React.FC = () => {
                       <th
                         key={columnKey}
                         scope="col"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, columnKey)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => handleDragOver(e, columnKey)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, columnKey)}
+                        data-col-key={columnKey}
+                        onPointerDown={(e) => handleColumnPointerDown(e, columnKey)}
                         onClick={() => isSortable && handleColumnSort(columnKey)}
-                        className={`px-4 py-3 font-medium select-none transition-all duration-150 ${
+                        className={`px-4 py-3 font-medium select-none touch-none transition-all duration-150 ${
                           isSortable ? 'cursor-pointer hover:bg-gray-100' : 'cursor-grab active:cursor-grabbing'
                         } ${
                           draggedColumn === columnKey ? 'opacity-50' : ''

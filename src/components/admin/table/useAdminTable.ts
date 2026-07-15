@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AdminFilterDef,
   AdminTableConfig,
@@ -59,6 +59,12 @@ const compareValues = (a: string | number, b: string | number): number => {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 };
 
+const columnKeyAtPoint = (x: number, y: number): string | null => {
+  const el = document.elementFromPoint(x, y);
+  const th = el ? (el as Element).closest('[data-col-key]') : null;
+  return th ? th.getAttribute('data-col-key') : null;
+};
+
 export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstance<T> {
   const {
     data,
@@ -103,7 +109,11 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const [showFilters, setShowFilters] = useState(false);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
-  const draggedColumnRef = useRef<string | null>(null);
+  const pointerDragRef = useRef<{ key: string; startX: number; startY: number; active: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+  const columnOrderRef = useRef<string[]>([]);
+  const columnKeysRef = useRef<string[]>([]);
+  const persistOrderRef = useRef<(next: string[]) => void>(() => {});
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -331,52 +341,70 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
     localStorage.setItem(orderStorageKey, JSON.stringify(next));
   };
 
+  columnOrderRef.current = columnOrder;
+  columnKeysRef.current = columnKeys;
+  persistOrderRef.current = persistOrder;
+
   const resetColumnOrder = () => {
     persistOrder([...columnKeys]);
   };
 
-  const handleDragStart = (e: React.DragEvent, key: string) => {
-    draggedColumnRef.current = key;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', key);
-    setTimeout(() => {
-      if (draggedColumnRef.current === key) setDraggedColumn(key);
-    }, 0);
-  };
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    const st = pointerDragRef.current;
+    if (!st) return;
+    if (!st.active) {
+      if (Math.hypot(e.clientX - st.startX, e.clientY - st.startY) < 4) return;
+      st.active = true;
+      setDraggedColumn(st.key);
+    }
+    const over = columnKeyAtPoint(e.clientX, e.clientY);
+    setDragOverColumn(over && over !== st.key ? over : null);
+  }, []);
 
-  const handleDragEnd = () => {
-    draggedColumnRef.current = null;
+  const onPointerUp = useCallback((e: PointerEvent) => {
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    const st = pointerDragRef.current;
+    pointerDragRef.current = null;
     setDraggedColumn(null);
     setDragOverColumn(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, key: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (key !== draggedColumnRef.current) setDragOverColumn(key);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverColumn(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetKey: string) => {
-    e.preventDefault();
-    setDragOverColumn(null);
-    const sourceKey = draggedColumnRef.current || e.dataTransfer.getData('text/plain');
-    draggedColumnRef.current = null;
-    setDraggedColumn(null);
-    if (!sourceKey || sourceKey === targetKey) return;
-    const next = mergeOrder(columnOrder, columnKeys);
-    const from = next.indexOf(sourceKey);
+    if (!st || !st.active) return;
+    suppressClickRef.current = true;
+    const targetKey = columnKeyAtPoint(e.clientX, e.clientY);
+    if (!targetKey || targetKey === st.key) return;
+    const next = mergeOrder(columnOrderRef.current, columnKeysRef.current);
+    const from = next.indexOf(st.key);
     const to = next.indexOf(targetKey);
     if (from === -1 || to === -1) return;
     next.splice(from, 1);
-    next.splice(to, 0, sourceKey);
-    persistOrder(next);
+    next.splice(to, 0, st.key);
+    persistOrderRef.current(next);
+  }, [onPointerMove]);
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    },
+    [onPointerMove, onPointerUp]
+  );
+
+  const handlePointerDown = (e: React.PointerEvent, key: string) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    suppressClickRef.current = false;
+    pointerDragRef.current = { key, startX: e.clientX, startY: e.clientY, active: false };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
 
   const handleColumnSort = (key: string) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     const column = columns.find(c => c.key === key);
     if (!column?.sortable || !column.sortValue) return;
     if (sortColumn === key) {
@@ -450,11 +478,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
     drag: {
       draggedColumn,
       dragOverColumn,
-      handleDragStart,
-      handleDragEnd,
-      handleDragOver,
-      handleDragLeave,
-      handleDrop,
+      handlePointerDown,
     },
     sortColumn,
     sortDirection,

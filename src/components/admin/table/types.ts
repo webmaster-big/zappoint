@@ -89,11 +89,7 @@ export interface AdminTableConfig<T> {
 export interface ColumnDragState {
   draggedColumn: string | null;
   dragOverColumn: string | null;
-  handleDragStart: (e: React.DragEvent, key: string) => void;
-  handleDragEnd: (e: React.DragEvent) => void;
-  handleDragOver: (e: React.DragEvent, key: string) => void;
-  handleDragLeave: () => void;
-  handleDrop: (e: React.DragEvent, key: string) => void;
+  handlePointerDown: (e: React.PointerEvent, key: string) => void;
 }
 
 export interface AdminTableInstance<T> {

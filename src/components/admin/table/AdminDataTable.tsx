@@ -77,14 +77,10 @@ export function AdminDataTable<T>({
                   <th
                     key={column.key}
                     scope="col"
-                    draggable
-                    onDragStart={e => table.drag.handleDragStart(e, column.key)}
-                    onDragEnd={table.drag.handleDragEnd}
-                    onDragOver={e => table.drag.handleDragOver(e, column.key)}
-                    onDragLeave={table.drag.handleDragLeave}
-                    onDrop={e => table.drag.handleDrop(e, column.key)}
+                    data-col-key={column.key}
+                    onPointerDown={e => table.drag.handlePointerDown(e, column.key)}
                     onClick={() => isSortable && table.handleColumnSort(column.key)}
-                    className={`px-4 py-3 font-medium select-none transition-all duration-150 ${
+                    className={`px-4 py-3 font-medium select-none touch-none transition-all duration-150 ${
                       isSortable ? 'cursor-pointer hover:bg-gray-100' : 'cursor-grab active:cursor-grabbing'
                     } ${table.drag.draggedColumn === column.key ? 'opacity-50' : ''} ${
                       table.drag.dragOverColumn === column.key
