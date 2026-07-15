@@ -292,7 +292,6 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         <div className="flex items-center gap-2">
           <Clock className={`h-4 w-4 text-${themeColor}-600`} />
           <h3 className="text-sm font-semibold text-gray-900">Schedule Your Visit</h3>
-          <span className="text-[10px] text-gray-400 ml-auto">(Optional)</span>
         </div>
         {availableDaysDisplay && (
           <p className="text-[11px] text-gray-500 mt-0.5">

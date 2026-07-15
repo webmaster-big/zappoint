@@ -32,6 +32,8 @@ import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
 import attractionPurchaseService, { type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
+import { AttractionScheduleCard, EventScheduleCard } from '../../../components/admin/calendar/ScheduledActivity';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import type { Booking } from '../../../services/bookingService';
 import type { EventPurchase } from '../../../types/event.types';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
@@ -60,6 +62,7 @@ interface UserData {
 
 const CalendarView: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [attractionPurchases, setAttractionPurchases] = useState<AttractionPurchase[]>([]);
@@ -312,6 +315,10 @@ const CalendarView: React.FC = () => {
   useEffect(() => {
     let result = [...bookings];
 
+    if (effectiveLocationId) {
+      result = result.filter(booking => booking.location_id === effectiveLocationId);
+    }
+
     if (filterLocation !== 'all') {
       const locationId = parseInt(filterLocation);
       result = result.filter(booking => booking.location_id === locationId);
@@ -336,7 +343,7 @@ const CalendarView: React.FC = () => {
 
     setFilteredBookings(result);
     console.log('Filtered bookings:', result.length, 'of', bookings.length);
-  }, [bookings, filters.search, filters.packages, filterLocation]);
+  }, [bookings, filters.search, filters.packages, filterLocation, effectiveLocationId]);
 
   const handleFilterChange = (key: keyof CalendarViewFilterOptions, value: string | string[]) => {
     setFilters(prev => ({
@@ -514,18 +521,28 @@ const CalendarView: React.FC = () => {
   };
 
   const filteredAttractionPurchases = useMemo(() => {
-    if (filterLocation === 'all') return attractionPurchases;
-    const locationId = parseInt(filterLocation);
-    return attractionPurchases.filter(
-      p => (p.location_id ?? p.attraction?.location_id) === locationId
-    );
-  }, [attractionPurchases, filterLocation]);
+    let result = attractionPurchases;
+    if (effectiveLocationId) {
+      result = result.filter(p => (p.location_id ?? p.attraction?.location_id) === effectiveLocationId);
+    }
+    if (filterLocation !== 'all') {
+      const locationId = parseInt(filterLocation);
+      result = result.filter(p => (p.location_id ?? p.attraction?.location_id) === locationId);
+    }
+    return result;
+  }, [attractionPurchases, filterLocation, effectiveLocationId]);
 
   const filteredEventPurchases = useMemo(() => {
-    if (filterLocation === 'all') return eventPurchases;
-    const locationId = parseInt(filterLocation);
-    return eventPurchases.filter(p => p.location_id === locationId);
-  }, [eventPurchases, filterLocation]);
+    let result = eventPurchases;
+    if (effectiveLocationId) {
+      result = result.filter(p => p.location_id === effectiveLocationId);
+    }
+    if (filterLocation !== 'all') {
+      const locationId = parseInt(filterLocation);
+      result = result.filter(p => p.location_id === locationId);
+    }
+    return result;
+  }, [eventPurchases, filterLocation, effectiveLocationId]);
 
   const getAttractionsForDate = (date: Date): AttractionPurchase[] => {
     const dateString = formatDateKey(date);
@@ -677,89 +694,6 @@ const CalendarView: React.FC = () => {
     }
   };
 
-  const renderAttractionCard = (p: AttractionPurchase) => {
-    const guest = p.guest_name || (p.customer ? `${p.customer.first_name} ${p.customer.last_name}` : 'Guest');
-    const scheduled = (p.scheduled_date || p.purchase_date || '').split('T')[0];
-    return (
-      <div key={`attraction-${p.id}`} className="border border-purple-200 rounded-lg p-5 bg-purple-50/40">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Ticket className="h-4 w-4 text-purple-600 flex-shrink-0" />
-              <h4 className="font-medium text-gray-900 text-base">{p.attraction?.name || 'Attraction'}</h4>
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">{guest}</p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusPillClass(p.status)}`}>{p.status}</span>
-            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Attraction</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div className="flex items-center text-gray-600">
-            <Clock className="h-4 w-4 text-gray-400 mr-2" />
-            <span>{p.scheduled_time ? formatTime12Hour(p.scheduled_time) : 'Any time'}</span>
-          </div>
-          <div className="flex items-center text-gray-600">
-            <Ticket className="h-4 w-4 text-gray-400 mr-2" />
-            <span>{p.quantity} ticket{p.quantity !== 1 ? 's' : ''}</span>
-          </div>
-          {p.attraction?.location?.name ? (
-            <div className="flex items-center text-gray-600">
-              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-              <span className="truncate">{p.attraction.location.name}</span>
-            </div>
-          ) : null}
-        </div>
-        <div className="mt-3 pt-3 border-t border-purple-100 flex justify-between items-center">
-          <span className="text-xs text-gray-500">Scheduled {scheduled}</span>
-          <span className="text-sm font-medium text-gray-900">${Number(p.total_amount).toFixed(2)}</span>
-        </div>
-      </div>
-    );
-  };
-
-  const renderEventCard = (p: EventPurchase) => {
-    const guest = p.guest_name || (p.customer ? `${p.customer.first_name} ${p.customer.last_name}` : 'Guest');
-    return (
-      <div key={`event-${p.id}`} className="border border-amber-200 rounded-lg p-5 bg-amber-50/40">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-amber-600 flex-shrink-0" />
-              <h4 className="font-medium text-gray-900 text-base">{p.event?.name || 'Event'}</h4>
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">{guest}</p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusPillClass(p.status)}`}>{p.status}</span>
-            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Event</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div className="flex items-center text-gray-600">
-            <Clock className="h-4 w-4 text-gray-400 mr-2" />
-            <span>{p.purchase_time ? formatTime12Hour(p.purchase_time) : '—'}</span>
-          </div>
-          <div className="flex items-center text-gray-600">
-            <Users className="h-4 w-4 text-gray-400 mr-2" />
-            <span>{p.quantity} ticket{p.quantity !== 1 ? 's' : ''}</span>
-          </div>
-          {p.location?.name ? (
-            <div className="flex items-center text-gray-600">
-              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-              <span className="truncate">{p.location.name}</span>
-            </div>
-          ) : null}
-        </div>
-        <div className="mt-3 pt-3 border-t border-amber-100 flex justify-between items-center">
-          <span className="text-xs text-gray-500 font-mono">#{p.reference_number}</span>
-          <span className="text-sm font-medium text-gray-900">${Number(p.total_amount).toFixed(2)}</span>
-        </div>
-      </div>
-    );
-  };
-
   const renderDayView = () => {
     const dayBookings = getBookingsForDate(currentDate);
     const dayAttractions = getAttractionsForDate(currentDate);
@@ -823,7 +757,7 @@ const CalendarView: React.FC = () => {
                   Attraction Purchases ({dayAttractions.length})
                 </div>
                 <div className="space-y-4">
-                  {dayAttractions.map(renderAttractionCard)}
+                  {dayAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
                 </div>
               </div>
             )}
@@ -835,7 +769,7 @@ const CalendarView: React.FC = () => {
                   Event Registrations ({dayEvents.length})
                 </div>
                 <div className="space-y-4">
-                  {dayEvents.map(renderEventCard)}
+                  {dayEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
                 </div>
               </div>
             )}
@@ -1633,7 +1567,7 @@ const CalendarView: React.FC = () => {
                               Attraction Purchases ({dayAttractions.length})
                             </div>
                             <div className="space-y-4">
-                              {dayAttractions.map(renderAttractionCard)}
+                              {dayAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
                             </div>
                           </div>
                         )}
@@ -1645,7 +1579,7 @@ const CalendarView: React.FC = () => {
                               Event Registrations ({dayEvents.length})
                             </div>
                             <div className="space-y-4">
-                              {dayEvents.map(renderEventCard)}
+                              {dayEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
                             </div>
                           </div>
                         )}

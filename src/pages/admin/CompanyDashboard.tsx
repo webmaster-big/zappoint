@@ -267,22 +267,30 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
-  const monthRange = useMemo(() => {
+  const activeRange = useMemo(() => {
+    if (calendarView === 'day') {
+      const d = formatDateKey(currentDay);
+      return { from: d, to: d };
+    }
+    if (calendarView === 'week') {
+      const wd = getWeekDates(currentWeek);
+      return { from: formatDateKey(wd[0]), to: formatDateKey(wd[6]) };
+    }
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     return {
       from: formatDateKey(new Date(year, month, 1)),
       to: formatDateKey(new Date(year, month + 1, 0)),
     };
-  }, [currentMonth]);
+  }, [calendarView, currentDay, currentWeek, currentMonth]);
 
-  const { attractions: monthlyAttractions, events: monthlyEvents } = useScheduledExtras(
-    monthRange,
+  const { attractions: scheduledAttractions, events: scheduledEvents } = useScheduledExtras(
+    activeRange,
     selectedLocation === 'all' ? null : (selectedLocation as number)
   );
 
-  const getAttractionsForDay = (date: Date) => attractionsForDate(monthlyAttractions, date);
-  const getEventsForDay = (date: Date) => eventsForDate(monthlyEvents, date);
+  const getAttractionsForDay = (date: Date) => attractionsForDate(scheduledAttractions, date);
+  const getEventsForDay = (date: Date) => eventsForDate(scheduledEvents, date);
 
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
@@ -1634,6 +1642,36 @@ const CompanyDashboard: React.FC = () => {
         </div>
         )}
 
+        {calendarView === 'week' && (() => {
+          const weekAttractions = weekDates.flatMap(d => getAttractionsForDay(d));
+          const weekEvents = weekDates.flatMap(d => getEventsForDay(d));
+          if (weekAttractions.length === 0 && weekEvents.length === 0) return null;
+          return (
+            <div className="mt-4 space-y-4">
+              {weekAttractions.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                    <Ticket className="h-4 w-4 text-purple-600" /> Attraction Purchases ({weekAttractions.length})
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {weekAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
+                  </div>
+                </div>
+              )}
+              {weekEvents.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                    <Sparkles className="h-4 w-4 text-amber-600" /> Event Registrations ({weekEvents.length})
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {weekEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {calendarView === 'day' && (
           <div className="rounded-lg border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
@@ -1824,6 +1862,36 @@ const CompanyDashboard: React.FC = () => {
             )}
           </div>
         )}
+
+        {calendarView === 'day' && (() => {
+          const dayAttractions = getAttractionsForDay(currentDay);
+          const dayEvents = getEventsForDay(currentDay);
+          if (dayAttractions.length === 0 && dayEvents.length === 0) return null;
+          return (
+            <div className="mt-4 space-y-4">
+              {dayAttractions.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                    <Ticket className="h-4 w-4 text-purple-600" /> Attraction Purchases ({dayAttractions.length})
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {dayAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
+                  </div>
+                </div>
+              )}
+              {dayEvents.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                    <Sparkles className="h-4 w-4 text-amber-600" /> Event Registrations ({dayEvents.length})
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {dayEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {calendarView === 'month' && (
           <div className="rounded-lg border border-gray-200">
