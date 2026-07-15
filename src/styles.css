@@ -4,6 +4,10 @@ html.dark label {
 }
 @import "tailwindcss";
 
+[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
 /* Safelist for dynamic theme colors - ensures all color variants are included */
 @layer utilities {
   /* Background colors for all theme colors and shades */

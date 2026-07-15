@@ -249,6 +249,7 @@ const Bookings: React.FC = () => {
   const [columnOrder, setColumnOrder] = useState<BookingsColumnKey[]>(getDefaultColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<BookingsColumnKey | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<BookingsColumnKey | null>(null);
+  const draggedColumnRef = useRef<BookingsColumnKey | null>(null);
 
   const [sortColumn, setSortColumn] = useState<BookingsColumnKey | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -264,16 +265,16 @@ const Bookings: React.FC = () => {
   const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
   
   const handleDragStart = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
-    setDraggedColumn(columnKey);
+    draggedColumnRef.current = columnKey;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', columnKey);
     setTimeout(() => {
-      (e.target as HTMLElement).style.opacity = '0.5';
+      if (draggedColumnRef.current === columnKey) setDraggedColumn(columnKey);
     }, 0);
   };
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    (e.target as HTMLElement).style.opacity = '1';
+  const handleDragEnd = () => {
+    draggedColumnRef.current = null;
     setDraggedColumn(null);
     setDragOverColumn(null);
   };
@@ -281,7 +282,7 @@ const Bookings: React.FC = () => {
   const handleDragOver = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (draggedColumn && columnKey !== draggedColumn) {
+    if (columnKey !== draggedColumnRef.current) {
       setDragOverColumn(columnKey);
     }
   };
@@ -292,25 +293,25 @@ const Bookings: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent, targetColumnKey: BookingsColumnKey) => {
     e.preventDefault();
-    
-    if (!draggedColumn || draggedColumn === targetColumnKey) {
-      setDraggedColumn(null);
-      setDragOverColumn(null);
-      return;
-    }
+    setDragOverColumn(null);
+
+    const sourceKey = (draggedColumnRef.current ||
+      e.dataTransfer.getData('text/plain')) as BookingsColumnKey | '';
+    draggedColumnRef.current = null;
+    setDraggedColumn(null);
+
+    if (!sourceKey || sourceKey === targetColumnKey) return;
 
     const newOrder = [...columnOrder];
-    const draggedIndex = newOrder.indexOf(draggedColumn);
+    const draggedIndex = newOrder.indexOf(sourceKey);
     const targetIndex = newOrder.indexOf(targetColumnKey);
+    if (draggedIndex === -1 || targetIndex === -1) return;
 
     newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedColumn);
+    newOrder.splice(targetIndex, 0, sourceKey);
 
     setColumnOrder(newOrder);
     localStorage.setItem('bookings_column_order', JSON.stringify(newOrder));
-    
-    setDraggedColumn(null);
-    setDragOverColumn(null);
   };
 
   const resetColumnOrder = () => {

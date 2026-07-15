@@ -103,6 +103,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const [showFilters, setShowFilters] = useState(false);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const draggedColumnRef = useRef<string | null>(null);
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -335,12 +336,16 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   };
 
   const handleDragStart = (e: React.DragEvent, key: string) => {
-    setDraggedColumn(key);
+    draggedColumnRef.current = key;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', key);
+    setTimeout(() => {
+      if (draggedColumnRef.current === key) setDraggedColumn(key);
+    }, 0);
   };
 
   const handleDragEnd = () => {
+    draggedColumnRef.current = null;
     setDraggedColumn(null);
     setDragOverColumn(null);
   };
@@ -348,7 +353,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const handleDragOver = (e: React.DragEvent, key: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (key !== draggedColumn) setDragOverColumn(key);
+    if (key !== draggedColumnRef.current) setDragOverColumn(key);
   };
 
   const handleDragLeave = () => {
@@ -358,21 +363,17 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const handleDrop = (e: React.DragEvent, targetKey: string) => {
     e.preventDefault();
     setDragOverColumn(null);
-    if (!draggedColumn || draggedColumn === targetKey) {
-      setDraggedColumn(null);
-      return;
-    }
-    const next = mergeOrder(columnOrder, columnKeys);
-    const from = next.indexOf(draggedColumn);
-    const to = next.indexOf(targetKey);
-    if (from === -1 || to === -1) {
-      setDraggedColumn(null);
-      return;
-    }
-    next.splice(from, 1);
-    next.splice(to, 0, draggedColumn);
-    persistOrder(next);
+    const sourceKey = draggedColumnRef.current || e.dataTransfer.getData('text/plain');
+    draggedColumnRef.current = null;
     setDraggedColumn(null);
+    if (!sourceKey || sourceKey === targetKey) return;
+    const next = mergeOrder(columnOrder, columnKeys);
+    const from = next.indexOf(sourceKey);
+    const to = next.indexOf(targetKey);
+    if (from === -1 || to === -1) return;
+    next.splice(from, 1);
+    next.splice(to, 0, sourceKey);
+    persistOrder(next);
   };
 
   const handleColumnSort = (key: string) => {
