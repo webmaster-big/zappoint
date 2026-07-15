@@ -331,24 +331,31 @@ const EntertainmentLandingPage = () => {
     if (activeBookingType === 'event') {
       if (!selectedEvent) return;
       const locData = selectedEvent.locations.find(loc => loc.location_name === location);
-      const locationSlug = (locData?.location_slug || generateLocationSlug(location)).toLowerCase();
-      const eventSlug = generateSlug(selectedEvent.name, selectedEvent.id);
+      if (!locData) return;
+      const locationSlug = (locData.location_slug || generateLocationSlug(location)).toLowerCase();
+      const eventSlug = generateSlug(selectedEvent.name, locData.event_id);
       window.open(`${window.location.origin}/purchase/event/${locationSlug}/${eventSlug}`, '_blank');
       return;
     }
 
-    const bookingItem = activeBookingType === 'attraction' ? selectedAttraction : selectedPackage;
-    if (!bookingItem) return;
-
-    const locationSlug = generateLocationSlug(location);
-    const itemSlug = generateSlug(bookingItem.name, bookingItem.id);
-    
     if (activeBookingType === 'attraction') {
-      const url = `${window.location.origin}/purchase/attraction/${locationSlug}/${itemSlug}`;
-      window.open(url, '_blank');
-    } else if (activeBookingType === 'package') {
-      const url = `${window.location.origin}/book/package/${locationSlug}/${itemSlug}`;
-      window.open(url, '_blank');
+      if (!selectedAttraction) return;
+      const link = selectedAttraction.purchaseLinks?.find(l => l.location === location);
+      if (!link) return;
+      const locationSlug = generateLocationSlug(location);
+      const itemSlug = generateSlug(selectedAttraction.name, link.attraction_id);
+      window.open(`${window.location.origin}/purchase/attraction/${locationSlug}/${itemSlug}`, '_blank');
+      return;
+    }
+
+    if (activeBookingType === 'package') {
+      if (!selectedPackage) return;
+      const link = selectedPackage.bookingLinks?.find(l => l.location === location);
+      if (!link) return;
+      const locationSlug = generateLocationSlug(location);
+      const itemSlug = generateSlug(selectedPackage.name, link.package_id);
+      window.open(`${window.location.origin}/book/package/${locationSlug}/${itemSlug}`, '_blank');
+      return;
     }
   };
 
