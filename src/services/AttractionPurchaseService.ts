@@ -154,6 +154,8 @@ export interface PurchaseFilters {
   payment_method?: string;
   start_date?: string;
   end_date?: string;
+  scheduled_from?: string;
+  scheduled_to?: string;
   search?: string;
   sort_by?: 'purchase_date' | 'total_amount' | 'quantity' | 'status' | 'created_at' | 'deleted_at';
   sort_order?: 'asc' | 'desc';

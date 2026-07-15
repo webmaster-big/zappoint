@@ -991,7 +991,7 @@ const PurchaseAttraction = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           <div className="lg:col-span-2">
-            <div className="lg:hidden mb-4 px-1">
+            <div className="lg:hidden mb-4 px-1 pt-12">
               <h1 className="text-2xl font-bold text-gray-900 leading-tight">{attraction.name}</h1>
               {attraction.location && (
                 <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-600">
@@ -1034,7 +1034,7 @@ const PurchaseAttraction = () => {
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
-                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity of {attraction.name}</h2>
+                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity of <span className="text-xl md:text-2xl font-extrabold text-blue-800">{attraction.name}</span></h2>
                     <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
                   </div>
                   

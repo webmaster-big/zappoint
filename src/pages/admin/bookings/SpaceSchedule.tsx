@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, Edit, LogIn, CheckCircle, FileText, Save, DollarSign } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -32,6 +33,7 @@ interface BookingCell {
 
 const SpaceSchedule = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [spaces, setSpaces] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -120,6 +122,11 @@ const SpaceSchedule = () => {
 
   const currentDayName = useMemo(() => getDayName(selectedDate), [selectedDate]);
 
+  const displaySpaces = useMemo(
+    () => (effectiveLocationId ? spaces.filter(s => s.location_id === effectiveLocationId) : spaces),
+    [spaces, effectiveLocationId]
+  );
+
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
     const nameB = b.name;
@@ -197,6 +204,7 @@ const SpaceSchedule = () => {
         console.log('[SpaceSchedule] Cache exists, filtering for date:', dateStr);
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
           booking_date: dateStr,
+          location_id: effectiveLocationId ?? undefined,
         });
         console.log('[SpaceSchedule] Filtered bookings from cache:', cachedBookings?.length || 0);
         fetchedBookings = (cachedBookings || []) as Booking[];
@@ -205,9 +213,10 @@ const SpaceSchedule = () => {
       } else {
         const bookingsResponse = await bookingService.getBookings({
           booking_date: dateStr,
-          user_id: getStoredUser()?.id
+          user_id: getStoredUser()?.id,
+          location_id: effectiveLocationId ?? undefined,
         });
-        
+
         fetchedBookings = bookingsResponse.data.bookings || [];
         setBookings(fetchedBookings);
         await bookingCacheService.cacheBookings(fetchedBookings);
@@ -224,7 +233,7 @@ const SpaceSchedule = () => {
     } finally {
       setBookingsLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, effectiveLocationId]);
 
   useEffect(() => {
     const init = async () => {
@@ -238,7 +247,7 @@ const SpaceSchedule = () => {
     if (!initialLoading) {
       loadBookings();
     }
-  }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDate, effectiveLocationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const unsubRoom = roomCacheService.onCacheUpdate(async (event: CustomEvent) => {
@@ -347,7 +356,7 @@ const SpaceSchedule = () => {
     const isBreakCache = new Map<string, boolean>();
     
     for (const slot of timeSlots) {
-      for (const space of spaces) {
+      for (const space of displaySpaces) {
         const key = `${space.id}-${slot.hour}-${slot.minute}`;
         
         const spaceBookings = bookingsByRoom.get(space.id) || [];
@@ -426,7 +435,7 @@ const SpaceSchedule = () => {
     }
     
     return { cache, breakCache, isBreakCache };
-  }, [timeSlots, spaces, bookingsByRoom, currentDayName, timeInterval]);
+  }, [timeSlots, displaySpaces, bookingsByRoom, currentDayName, timeInterval]);
 
   const getCellData = useCallback((spaceId: number, slot: TimeSlot): BookingCell | null => {
     return cellDataCache.cache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || null;
@@ -442,14 +451,14 @@ const SpaceSchedule = () => {
 
   const visibleTimeSlots = useMemo(() => {
     return timeSlots.filter(slot => {
-      return spaces.some(space => {
+      return displaySpaces.some(space => {
         const key = `${space.id}-${slot.hour}-${slot.minute}`;
         const hasBooking = cellDataCache.cache.get(key) !== null;
         const hasBreak = cellDataCache.isBreakCache.get(key) || false;
         return hasBooking || hasBreak;
       });
     });
-  }, [timeSlots, spaces, cellDataCache]);
+  }, [timeSlots, displaySpaces, cellDataCache]);
 
   if (initialLoading) {
     return (
@@ -736,12 +745,12 @@ const SpaceSchedule = () => {
                       Time
                     </div>
                   </th>
-                  {spaces.length === 0 ? (
+                  {displaySpaces.length === 0 ? (
                     <th className="px-4 py-3 text-center text-gray-500" colSpan={100}>
                       No spaces available
                     </th>
                   ) : (
-                    spaces.map(space => (
+                    displaySpaces.map(space => (
                       <th 
                         key={space.id} 
                         className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]"
@@ -764,7 +773,7 @@ const SpaceSchedule = () => {
                   <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
                     {slot.time}
                   </td>
-                  {spaces.map(space => {
+                  {displaySpaces.map(space => {
                     const cellData = getCellData(space.id, slot);
                     const breakTimeData = getBreakStart(space.id, slot);
                     const isInBreak = getIsBreak(space.id, slot);

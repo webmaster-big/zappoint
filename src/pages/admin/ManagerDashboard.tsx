@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar,
   Users,
@@ -38,6 +38,16 @@ import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import { locationService } from '../../services/LocationService';
+import {
+  useScheduledExtras,
+  formatDateKey,
+  attractionsForDate,
+  eventsForDate,
+  getDaySummary,
+  DateActivityBreakdown,
+  AttractionScheduleCard,
+  EventScheduleCard,
+} from '../../components/admin/calendar/ScheduledActivity';
 import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
@@ -458,6 +468,20 @@ const LocationManagerDashboard: React.FC = () => {
       return bookingDate.toDateString() === date.toDateString();
     });
   };
+
+  const monthRange = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    return {
+      from: formatDateKey(new Date(year, month, 1)),
+      to: formatDateKey(new Date(year, month + 1, 0)),
+    };
+  }, [currentMonth]);
+
+  const { attractions: monthlyAttractions, events: monthlyEvents } = useScheduledExtras(monthRange, null);
+
+  const getAttractionsForDay = (date: Date) => attractionsForDate(monthlyAttractions, date);
+  const getEventsForDay = (date: Date) => eventsForDate(monthlyEvents, date);
 
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
@@ -1269,50 +1293,25 @@ const LocationManagerDashboard: React.FC = () => {
                 }
                 
                 const dayBookings = getBookingsForDay(day);
+                const dayAttractions = getAttractionsForDay(day);
+                const dayEvents = getEventsForDay(day);
                 const isToday = day.toDateString() === new Date().toDateString();
-                const hasBookings = dayBookings.length > 0;
-                
-                const confirmedCount = dayBookings.filter(b => b.status === 'confirmed' || b.status === 'Confirmed').length;
-                const pendingCount = dayBookings.filter(b => b.status === 'pending' || b.status === 'Pending').length;
-                const cancelledCount = dayBookings.filter(b => b.status === 'cancelled' || b.status === 'Cancelled').length;
-                
+                const summary = getDaySummary(dayBookings.length, dayAttractions, dayEvents);
+                const hasActivity = summary.total > 0;
+
                 return (
                   <div
                     key={day.toISOString()}
-                    onClick={() => hasBookings && setSelectedDayBookings({ date: day, bookings: dayBookings })}
+                    onClick={() => hasActivity && setSelectedDayBookings({ date: day, bookings: dayBookings })}
                     className={`min-h-[100px] p-2 border-b border-r border-gray-200 transition-all ${
-                      hasBookings ? 'cursor-pointer hover:bg-gray-50' : ''
+                      hasActivity ? 'cursor-pointer hover:bg-gray-50' : ''
                     } ${isToday ? `bg-${themeColor}-50` : 'bg-white'}`}
                   >
                     <div className={`text-sm font-medium mb-2 ${isToday ? `text-${fullColor}` : 'text-gray-900'}`}>
                       {day.getDate()}
                     </div>
-                    
-                    {hasBookings && (
-                      <div className="space-y-1">
-                        {confirmedCount > 0 && (
-                          <div className="flex items-center gap-1 text-xs">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                            <span className="text-gray-600">{confirmedCount} confirmed</span>
-                          </div>
-                        )}
-                        {pendingCount > 0 && (
-                          <div className="flex items-center gap-1 text-xs">
-                            <div className="w-2 h-2 rounded-full bg-amber-500" />
-                            <span className="text-gray-600">{pendingCount} pending</span>
-                          </div>
-                        )}
-                        {cancelledCount > 0 && (
-                          <div className="flex items-center gap-1 text-xs">
-                            <div className="w-2 h-2 rounded-full bg-rose-500" />
-                            <span className="text-gray-600">{cancelledCount} cancelled</span>
-                          </div>
-                        )}
-                        <div className={`text-xs font-medium text-${fullColor} mt-1`}>
-                          {dayBookings.length} total
-                        </div>
-                      </div>
-                    )}
+
+                    {hasActivity && <DateActivityBreakdown summary={summary} />}
                   </div>
                 );
               })}
@@ -1754,7 +1753,18 @@ const LocationManagerDashboard: React.FC = () => {
                     {selectedDayBookings.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    {selectedDayBookings.bookings.length} booking{selectedDayBookings.bookings.length !== 1 ? 's' : ''}
+                    {(() => {
+                      const s = getDaySummary(
+                        selectedDayBookings.bookings.length,
+                        getAttractionsForDay(selectedDayBookings.date),
+                        getEventsForDay(selectedDayBookings.date)
+                      );
+                      const parts: string[] = [];
+                      if (s.bookings > 0) parts.push(`${s.bookings} booking${s.bookings !== 1 ? 's' : ''}`);
+                      if (s.attractionTickets > 0) parts.push(`${s.attractionTickets} attraction ticket${s.attractionTickets !== 1 ? 's' : ''}`);
+                      if (s.eventRegistrations > 0) parts.push(`${s.eventRegistrations} event registration${s.eventRegistrations !== 1 ? 's' : ''}`);
+                      return parts.join(' • ') || 'No scheduled activity';
+                    })()}
                   </p>
                 </div>
                 <StandardButton
@@ -1765,6 +1775,7 @@ const LocationManagerDashboard: React.FC = () => {
                 />
               </div>
 
+              {selectedDayBookings.bookings.length > 0 && (
               <div className="space-y-3">
                 {selectedDayBookings.bookings
                   .sort((a, b) => a.booking_time.localeCompare(b.booking_time))
@@ -1826,6 +1837,38 @@ const LocationManagerDashboard: React.FC = () => {
                     );
                   })}
               </div>
+              )}
+
+              {(() => {
+                const dayAttractions = getAttractionsForDay(selectedDayBookings.date);
+                const dayEvents = getEventsForDay(selectedDayBookings.date);
+                return (
+                  <>
+                    {dayAttractions.length > 0 && (
+                      <div className="mt-6">
+                        <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                          <Ticket className="h-4 w-4 text-purple-600" />
+                          Attraction Purchases ({dayAttractions.length})
+                        </div>
+                        <div className="space-y-3">
+                          {dayAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
+                        </div>
+                      </div>
+                    )}
+                    {dayEvents.length > 0 && (
+                      <div className="mt-6">
+                        <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                          <Sparkles className="h-4 w-4 text-amber-600" />
+                          Event Registrations ({dayEvents.length})
+                        </div>
+                        <div className="space-y-3">
+                          {dayEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <StandardButton

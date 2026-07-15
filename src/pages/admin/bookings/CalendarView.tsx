@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ChevronLeft, 
@@ -21,14 +21,19 @@ import {
   CheckCircle,
   FileText,
   Save,
-  DollarSign
+  DollarSign,
+  Ticket,
+  Sparkles
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
+import attractionPurchaseService, { type AttractionPurchase } from '../../../services/AttractionPurchaseService';
+import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { Booking } from '../../../services/bookingService';
+import type { EventPurchase } from '../../../types/event.types';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -57,6 +62,8 @@ const CalendarView: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
+  const [attractionPurchases, setAttractionPurchases] = useState<AttractionPurchase[]>([]);
+  const [eventPurchases, setEventPurchases] = useState<EventPurchase[]>([]);
   const [initialLoading, setInitialLoading] = useState(true); // Only for first load
   const [dataLoading, setDataLoading] = useState(false); // For navigation changes
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -218,6 +225,89 @@ const CalendarView: React.FC = () => {
     });
     return () => unsubscribe();
   }, [loadBookings]);
+
+  const getVisibleRange = useCallback((): { from: string; to: string } | null => {
+    const formatKey = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    if (filters.view === 'range') {
+      if (!filters.dateRange.start || !filters.dateRange.end) return null;
+      return { from: filters.dateRange.start, to: filters.dateRange.end };
+    }
+
+    const startDate = new Date(currentDate);
+    let endDate = new Date(currentDate);
+
+    if (filters.view === 'week') {
+      const day = startDate.getDay();
+      const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
+      startDate.setDate(diff);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+    } else if (filters.view === 'month') {
+      startDate.setDate(1);
+      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    }
+
+    return { from: formatKey(startDate), to: formatKey(endDate) };
+  }, [currentDate, filters.view, filters.dateRange]);
+
+  const loadExtras = useCallback(async () => {
+    const range = getVisibleRange();
+    if (!range) {
+      setAttractionPurchases([]);
+      setEventPurchases([]);
+      return;
+    }
+
+    const userId = getStoredUser()?.id;
+
+    try {
+      const collected: AttractionPurchase[] = [];
+      let page = 1;
+      let lastPage = 1;
+      do {
+        const response = await attractionPurchaseService.getPurchases({
+          scheduled_from: range.from,
+          scheduled_to: range.to,
+          per_page: 100,
+          page,
+          user_id: userId,
+        });
+        collected.push(...(response?.data?.purchases || []));
+        lastPage = response?.data?.pagination?.last_page ?? 1;
+        page += 1;
+      } while (page <= lastPage);
+      setAttractionPurchases(collected);
+    } catch (error) {
+      console.error('Error loading attraction purchases:', error);
+      setAttractionPurchases([]);
+    }
+
+    try {
+      const response = await eventPurchaseService.getPurchases({
+        start_date: range.from,
+        end_date: range.to,
+        user_id: userId,
+      });
+      const raw = response as unknown;
+      const list = Array.isArray(raw)
+        ? (raw as EventPurchase[])
+        : ((raw as { data?: EventPurchase[] })?.data ?? []);
+      setEventPurchases(list);
+    } catch (error) {
+      console.error('Error loading event purchases:', error);
+      setEventPurchases([]);
+    }
+  }, [getVisibleRange]);
+
+  useEffect(() => {
+    loadExtras();
+  }, [loadExtras]);
 
   useEffect(() => {
     let result = [...bookings];
@@ -416,6 +506,53 @@ const CalendarView: React.FC = () => {
     return bookingsForDate;
   };
 
+  const formatDateKey = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const filteredAttractionPurchases = useMemo(() => {
+    if (filterLocation === 'all') return attractionPurchases;
+    const locationId = parseInt(filterLocation);
+    return attractionPurchases.filter(
+      p => (p.location_id ?? p.attraction?.location_id) === locationId
+    );
+  }, [attractionPurchases, filterLocation]);
+
+  const filteredEventPurchases = useMemo(() => {
+    if (filterLocation === 'all') return eventPurchases;
+    const locationId = parseInt(filterLocation);
+    return eventPurchases.filter(p => p.location_id === locationId);
+  }, [eventPurchases, filterLocation]);
+
+  const getAttractionsForDate = (date: Date): AttractionPurchase[] => {
+    const dateString = formatDateKey(date);
+    return filteredAttractionPurchases.filter(p => {
+      const scheduled = (p.scheduled_date || p.purchase_date || '').split('T')[0];
+      return scheduled === dateString;
+    });
+  };
+
+  const getEventsForDate = (date: Date): EventPurchase[] => {
+    const dateString = formatDateKey(date);
+    return filteredEventPurchases.filter(p => (p.purchase_date || '').split('T')[0] === dateString);
+  };
+
+  const getDateSummary = (date: Date) => {
+    const dayBookings = getBookingsForDate(date);
+    const dayAttractions = getAttractionsForDate(date);
+    const dayEvents = getEventsForDate(date);
+    const attractionTickets = dayAttractions.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
+    return {
+      bookings: dayBookings.length,
+      attractionTickets,
+      eventRegistrations: dayEvents.length,
+      total: dayBookings.length + dayAttractions.length + dayEvents.length,
+    };
+  };
+
   const getUniquePackages = () => {
     const packages = bookings
       .map(booking => booking.package?.name)
@@ -483,54 +620,225 @@ const CalendarView: React.FC = () => {
     return Array.from(packagesMap.values());
   };
 
+  const renderDateBreakdown = (date: Date, compact = false) => {
+    const summary = getDateSummary(date);
+    if (summary.total === 0) return null;
+
+    const rows: Array<{ key: string; icon: React.ReactNode; label: string; className: string }> = [];
+    if (summary.bookings > 0) {
+      rows.push({
+        key: 'bookings',
+        icon: <PackageIcon className="h-3 w-3 flex-shrink-0" />,
+        label: `${summary.bookings} Booking${summary.bookings !== 1 ? 's' : ''}`,
+        className: 'bg-blue-100 text-blue-800',
+      });
+    }
+    if (summary.attractionTickets > 0) {
+      rows.push({
+        key: 'attractions',
+        icon: <Ticket className="h-3 w-3 flex-shrink-0" />,
+        label: `${summary.attractionTickets} Attraction Ticket${summary.attractionTickets !== 1 ? 's' : ''}`,
+        className: 'bg-purple-100 text-purple-800',
+      });
+    }
+    if (summary.eventRegistrations > 0) {
+      rows.push({
+        key: 'events',
+        icon: <Sparkles className="h-3 w-3 flex-shrink-0" />,
+        label: `${summary.eventRegistrations} Event Registration${summary.eventRegistrations !== 1 ? 's' : ''}`,
+        className: 'bg-amber-100 text-amber-800',
+      });
+    }
+
+    return (
+      <div className={`space-y-1 ${compact ? '' : 'mt-1'}`}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            className={`flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium leading-tight ${row.className}`}
+          >
+            {row.icon}
+            <span className="truncate">{row.label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const statusPillClass = (status?: string): string => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'checked-in': return `bg-${themeColor}-100 text-${fullColor}`;
+      case 'completed': return 'bg-gray-100 text-gray-800';
+      case 'refunded': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const renderAttractionCard = (p: AttractionPurchase) => {
+    const guest = p.guest_name || (p.customer ? `${p.customer.first_name} ${p.customer.last_name}` : 'Guest');
+    const scheduled = (p.scheduled_date || p.purchase_date || '').split('T')[0];
+    return (
+      <div key={`attraction-${p.id}`} className="border border-purple-200 rounded-lg p-5 bg-purple-50/40">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Ticket className="h-4 w-4 text-purple-600 flex-shrink-0" />
+              <h4 className="font-medium text-gray-900 text-base">{p.attraction?.name || 'Attraction'}</h4>
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">{guest}</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusPillClass(p.status)}`}>{p.status}</span>
+            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Attraction</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div className="flex items-center text-gray-600">
+            <Clock className="h-4 w-4 text-gray-400 mr-2" />
+            <span>{p.scheduled_time ? formatTime12Hour(p.scheduled_time) : 'Any time'}</span>
+          </div>
+          <div className="flex items-center text-gray-600">
+            <Ticket className="h-4 w-4 text-gray-400 mr-2" />
+            <span>{p.quantity} ticket{p.quantity !== 1 ? 's' : ''}</span>
+          </div>
+          {p.attraction?.location?.name ? (
+            <div className="flex items-center text-gray-600">
+              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+              <span className="truncate">{p.attraction.location.name}</span>
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-3 pt-3 border-t border-purple-100 flex justify-between items-center">
+          <span className="text-xs text-gray-500">Scheduled {scheduled}</span>
+          <span className="text-sm font-medium text-gray-900">${Number(p.total_amount).toFixed(2)}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEventCard = (p: EventPurchase) => {
+    const guest = p.guest_name || (p.customer ? `${p.customer.first_name} ${p.customer.last_name}` : 'Guest');
+    return (
+      <div key={`event-${p.id}`} className="border border-amber-200 rounded-lg p-5 bg-amber-50/40">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-600 flex-shrink-0" />
+              <h4 className="font-medium text-gray-900 text-base">{p.event?.name || 'Event'}</h4>
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">{guest}</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusPillClass(p.status)}`}>{p.status}</span>
+            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Event</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div className="flex items-center text-gray-600">
+            <Clock className="h-4 w-4 text-gray-400 mr-2" />
+            <span>{p.purchase_time ? formatTime12Hour(p.purchase_time) : '—'}</span>
+          </div>
+          <div className="flex items-center text-gray-600">
+            <Users className="h-4 w-4 text-gray-400 mr-2" />
+            <span>{p.quantity} ticket{p.quantity !== 1 ? 's' : ''}</span>
+          </div>
+          {p.location?.name ? (
+            <div className="flex items-center text-gray-600">
+              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+              <span className="truncate">{p.location.name}</span>
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-3 pt-3 border-t border-amber-100 flex justify-between items-center">
+          <span className="text-xs text-gray-500 font-mono">#{p.reference_number}</span>
+          <span className="text-sm font-medium text-gray-900">${Number(p.total_amount).toFixed(2)}</span>
+        </div>
+      </div>
+    );
+  };
+
   const renderDayView = () => {
     const dayBookings = getBookingsForDate(currentDate);
+    const dayAttractions = getAttractionsForDate(currentDate);
+    const dayEvents = getEventsForDate(currentDate);
+    const hasAny = dayBookings.length > 0 || dayAttractions.length > 0 || dayEvents.length > 0;
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">
-          Bookings for {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          Scheduled for {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </h3>
-        {dayBookings.length === 0 ? (
+        {!hasAny ? (
           <div className="text-center text-gray-500 py-8">
-            No bookings for this day
+            No scheduled activity for this day
           </div>
         ) : (
-          <div className="space-y-4">
-            {dayBookings.map(booking => (
-              <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBooking(booking)}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
-                    <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
-                    <p className="text-sm text-gray-500">{formatTime12Hour(booking.booking_time)}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                      booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                      booking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {booking.status}
-                    </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
-                      {booking.package?.name || 'Package'}
-                    </span>
-                  </div>
+          <div className="space-y-6">
+            {dayBookings.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                  <PackageIcon className="h-4 w-4 text-blue-600" />
+                  Package Bookings ({dayBookings.length})
                 </div>
-                <div className="mt-2 text-sm space-y-1">
-                  <p>Participants: {booking.participants}</p>
-                  {booking.location ? (
-                    <p className="flex items-center text-gray-600">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {String((booking.location as { name?: string }).name || 'N/A')}
-                    </p>
-                  ) : null}
-                  <p>Ref: #{booking.reference_number}</p>
+                <div className="space-y-4">
+                  {dayBookings.map(booking => (
+                    <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBooking(booking)}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
+                          <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
+                          <p className="text-sm text-gray-500">{formatTime12Hour(booking.booking_time)}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusPillClass(booking.status)}`}>
+                            {booking.status}
+                          </span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
+                            {booking.package?.name || 'Package'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-sm space-y-1">
+                        <p>Participants: {booking.participants}</p>
+                        {booking.location ? (
+                          <p className="flex items-center text-gray-600">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {String((booking.location as { name?: string }).name || 'N/A')}
+                          </p>
+                        ) : null}
+                        <p>Ref: #{booking.reference_number}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {dayAttractions.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                  <Ticket className="h-4 w-4 text-purple-600" />
+                  Attraction Purchases ({dayAttractions.length})
+                </div>
+                <div className="space-y-4">
+                  {dayAttractions.map(renderAttractionCard)}
+                </div>
+              </div>
+            )}
+
+            {dayEvents.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  Event Registrations ({dayEvents.length})
+                </div>
+                <div className="space-y-4">
+                  {dayEvents.map(renderEventCard)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -551,29 +859,23 @@ const CalendarView: React.FC = () => {
         </div>
         <div className="grid grid-cols-7 gap-2">
           {weekDays.map(day => {
-            const dayBookings = getBookingsForDate(day);
+            const summary = getDateSummary(day);
             return (
-              <div 
-                key={day.toISOString()} 
-                className={`border border-gray-200 rounded-lg p-3 min-h-40 ${
+              <div
+                key={day.toISOString()}
+                className={`border border-gray-200 rounded-lg p-2 min-h-40 cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
                   day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
+                onClick={() => setSelectedDate(formatDateKey(day))}
               >
-                <div className="text-sm font-medium mb-2">
+                <div className="text-sm font-medium mb-1">
                   {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </div>
-                {dayBookings.map(booking => (
-                  <div 
-                    key={booking.id} 
-                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getPackageColor(booking)}`}
-                    title={`${booking.guest_name || 'Guest'} - ${formatTime12Hour(booking.booking_time)}`}
-                    onClick={() => setSelectedBooking(booking)}
-                  >
-                    <div className="font-medium truncate">{formatTime12Hour(booking.booking_time)} - {booking.guest_name || 'Guest'}</div>
-                    <div className="truncate">{getBookingTitle(booking)}</div>
-                  </div>
-                ))}
-               
+                {summary.total === 0 ? (
+                  <div className="text-xs text-gray-400 mt-2">No activity</div>
+                ) : (
+                  renderDateBreakdown(day)
+                )}
               </div>
             );
           })}
@@ -614,41 +916,22 @@ const CalendarView: React.FC = () => {
             if (!day) {
               return <div key={`empty-${index}`} className="border border-gray-100 rounded-lg p-2 h-32" />;
             }
-            
-            const dayBookings = getBookingsForDate(day);
-            
+
+            const summary = getDateSummary(day);
+
             return (
-              <div 
-                key={day.toISOString()} 
-                className={`border border-gray-200 rounded-lg p-3 h-32 overflow-y-auto ${
+              <div
+                key={day.toISOString()}
+                className={`border border-gray-200 rounded-lg p-2 h-32 overflow-y-auto cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
                   day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
-                onClick={() => {
-                  const year = day.getFullYear();
-                  const month = String(day.getMonth() + 1).padStart(2, '0');
-                  const dayNum = String(day.getDate()).padStart(2, '0');
-                  setSelectedDate(`${year}-${month}-${dayNum}`);
-                }}
+                onClick={() => setSelectedDate(formatDateKey(day))}
               >
-                <div className="text-sm font-medium mb-2 sticky top-0">
+                <div className="text-sm font-medium mb-1 sticky top-0">
                   {day.getDate()}
                 </div>
-                
-                {dayBookings.map(booking => (
-                  <div 
-                    key={booking.id} 
-                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getPackageColor(booking)}`}
-                    title={`${booking.guest_name || 'Guest'} - ${formatTime12Hour(booking.booking_time)}`}
-                    onClick={e => {
-                      e.stopPropagation();
-                      setSelectedBooking(booking);
-                    }}
-                  >
-                    <div className="font-medium truncate">{formatTime12Hour(booking.booking_time)} - {booking.guest_name || 'Guest'}</div>
-                    <div className="truncate">{getBookingTitle(booking)}</div>
-                  </div>
-                ))}
-                
+
+                {summary.total === 0 ? null : renderDateBreakdown(day)}
               </div>
             );
           })}
@@ -1198,9 +1481,9 @@ const CalendarView: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedDate(null)}>
             <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-semibold text-gray-900">
-                    Bookings for {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    Scheduled for {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </h3>
                   <StandardButton
                     variant="ghost"
@@ -1211,107 +1494,165 @@ const CalendarView: React.FC = () => {
                     {''}
                   </StandardButton>
                 </div>
-                {getBookingsForDate(parseLocalDate(selectedDate)).length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p>No bookings for this day</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {getBookingsForDate(parseLocalDate(selectedDate)).map(booking => (
-                      <div 
-                        key={booking.id} 
-                        className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => {
-                          setSelectedDate(null);
-                          setSelectedBooking(booking);
-                        }}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-medium text-gray-900 text-base">{booking.guest_name || 'Guest'}</h4>
-                            <p className="text-sm text-gray-500">{booking.guest_email || 'No email'}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                              booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                              booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                              booking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {booking.status}
-                            </span>
-                            <span className="text-xs text-gray-500 font-mono">
-                              #{booking.reference_number}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                          <div className="flex items-center text-gray-600">
-                            <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                            <span>{formatTime12Hour(booking.booking_time)}</span>
-                          </div>
-                          <div className="flex items-center text-gray-600">
-                            <Users className="h-4 w-4 text-gray-400 mr-2" />
-                            <span>{booking.participants} participants</span>
-                          </div>
-                          <div className="flex items-center text-gray-600">
-                            <PackageIcon className="h-4 w-4 text-gray-400 mr-2" />
-                            <span className="truncate">{booking.package?.name || 'N/A'}</span>
-                          </div>
-                          {booking.location ? (
-                            <div className="flex items-center text-gray-600">
-                              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-                              <span className="truncate">{String((booking.location as { name?: string }).name || 'N/A')}</span>
-                            </div>
-                          ) : null}
-                        </div>
+                {(() => {
+                  const modalDate = parseLocalDate(selectedDate);
+                  const dayBookings = getBookingsForDate(modalDate);
+                  const dayAttractions = getAttractionsForDate(modalDate);
+                  const dayEvents = getEventsForDate(modalDate);
+                  const attractionTickets = dayAttractions.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
+                  const hasAny = dayBookings.length > 0 || dayAttractions.length > 0 || dayEvents.length > 0;
 
-                        {(booking.attractions?.length || (booking.add_ons || (booking as any).add_ons)?.length) && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              {booking.attractions && booking.attractions.length > 0 && (
-                                <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded">
-                                  {booking.attractions.length} attraction{booking.attractions.length !== 1 ? 's' : ''}
-                                </span>
-                              )}
-                              {(booking.add_ons || (booking as any).add_ons) && (booking.add_ons || (booking as any).add_ons).length > 0 && (
-                                <span className={`bg-${themeColor}-50 text-${themeColor}-700 px-2 py-1 rounded`}>
-                                  {(booking.add_ons || (booking as any).add_ons).length} add-on{(booking.add_ons || (booking as any).add_ons).length !== 1 ? 's' : ''}
-                                </span>
-                              )}
+                  if (!hasAny) {
+                    return (
+                      <div className="text-center text-gray-500 py-8">
+                        <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                        <p>No scheduled activity for this day</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 text-blue-800 px-3 py-1 text-sm font-medium">
+                          <PackageIcon className="h-4 w-4" />
+                          {dayBookings.length} Booking{dayBookings.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 text-purple-800 px-3 py-1 text-sm font-medium">
+                          <Ticket className="h-4 w-4" />
+                          {attractionTickets} Attraction Ticket{attractionTickets !== 1 ? 's' : ''}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-sm font-medium">
+                          <Sparkles className="h-4 w-4" />
+                          {dayEvents.length} Event Registration{dayEvents.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <div className="space-y-6">
+                        {dayBookings.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                              <PackageIcon className="h-4 w-4 text-blue-600" />
+                              Package Bookings ({dayBookings.length})
+                            </div>
+                            <div className="space-y-4">
+                              {dayBookings.map(booking => (
+                                <div
+                                  key={booking.id}
+                                  className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
+                                  onClick={() => {
+                                    setSelectedDate(null);
+                                    setSelectedBooking(booking);
+                                  }}
+                                >
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                      <h4 className="font-medium text-gray-900 text-base">{booking.guest_name || 'Guest'}</h4>
+                                      <p className="text-sm text-gray-500">{booking.guest_email || 'No email'}</p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusPillClass(booking.status)}`}>
+                                        {booking.status}
+                                      </span>
+                                      <span className="text-xs text-gray-500 font-mono">
+                                        #{booking.reference_number}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                                    <div className="flex items-center text-gray-600">
+                                      <Clock className="h-4 w-4 text-gray-400 mr-2" />
+                                      <span>{formatTime12Hour(booking.booking_time)}</span>
+                                    </div>
+                                    <div className="flex items-center text-gray-600">
+                                      <Users className="h-4 w-4 text-gray-400 mr-2" />
+                                      <span>{booking.participants} participants</span>
+                                    </div>
+                                    <div className="flex items-center text-gray-600">
+                                      <PackageIcon className="h-4 w-4 text-gray-400 mr-2" />
+                                      <span className="truncate">{booking.package?.name || 'N/A'}</span>
+                                    </div>
+                                    {booking.location ? (
+                                      <div className="flex items-center text-gray-600">
+                                        <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                                        <span className="truncate">{String((booking.location as { name?: string }).name || 'N/A')}</span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+
+                                  {(booking.attractions?.length || (booking.add_ons || (booking as any).add_ons)?.length) && (
+                                    <div className="mt-3 pt-3 border-t border-gray-100">
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        {booking.attractions && booking.attractions.length > 0 && (
+                                          <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded">
+                                            {booking.attractions.length} attraction{booking.attractions.length !== 1 ? 's' : ''}
+                                          </span>
+                                        )}
+                                        {(booking.add_ons || (booking as any).add_ons) && (booking.add_ons || (booking as any).add_ons).length > 0 && (
+                                          <span className={`bg-${themeColor}-50 text-${themeColor}-700 px-2 py-1 rounded`}>
+                                            {(booking.add_ons || (booking as any).add_ons).length} add-on{(booking.add_ons || (booking as any).add_ons).length !== 1 ? 's' : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                                    <div className="text-sm text-gray-600">
+                                      <CreditCard className="h-4 w-4 inline text-gray-400 mr-1" />
+                                      <span className="capitalize">{booking.payment_method || 'N/A'}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={`text-sm font-medium ${
+                                        booking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
+                                      }`}>
+                                        ${Number(booking.total_amount).toFixed(2)}
+                                      </div>
+                                      {booking.payment_status === 'partial' && (
+                                        <div className="text-xs text-gray-500">
+                                          (Paid: ${Number(booking.amount_paid).toFixed(2)})
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 text-xs text-gray-400 text-center">
+                                    Click to view full details
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
 
-                        <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-                          <div className="text-sm text-gray-600">
-                            <CreditCard className="h-4 w-4 inline text-gray-400 mr-1" />
-                            <span className="capitalize">{booking.payment_method || 'N/A'}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-sm font-medium ${
-                              booking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
-                            }`}>
-                              ${Number(booking.total_amount).toFixed(2)}
+                        {dayAttractions.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                              <Ticket className="h-4 w-4 text-purple-600" />
+                              Attraction Purchases ({dayAttractions.length})
                             </div>
-                            {booking.payment_status === 'partial' && (
-                              <div className="text-xs text-gray-500">
-                                (Paid: ${Number(booking.amount_paid).toFixed(2)})
-                              </div>
-                            )}
+                            <div className="space-y-4">
+                              {dayAttractions.map(renderAttractionCard)}
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        <div className="mt-3 text-xs text-gray-400 text-center">
-                          Click to view full details
-                        </div>
+                        {dayEvents.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
+                              <Sparkles className="h-4 w-4 text-amber-600" />
+                              Event Registrations ({dayEvents.length})
+                            </div>
+                            <div className="space-y-4">
+                              {dayEvents.map(renderEventCard)}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </>
+                  );
+                })()}
                 
                 <div className="mt-6 pt-4 border-t border-gray-200">
                   <StandardButton

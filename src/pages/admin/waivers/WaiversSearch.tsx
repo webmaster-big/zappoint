@@ -289,7 +289,6 @@ const WaiversSearch = () => {
       sortable: true,
       sortValue: (w) => (w.submitted_at ? new Date(w.submitted_at).getTime() : 0),
       exportValue: (w) => (w.submitted_at ? new Date(w.submitted_at).toLocaleString() : ''),
-      defaultVisible: false,
       render: (w) => <span className="text-sm text-gray-500">{formatDateTimeET(w.submitted_at)}</span>,
     },
     {
@@ -371,7 +370,7 @@ const WaiversSearch = () => {
     data: waivers,
     columns,
     getRowId: (w) => String(w.id),
-    storageKey: 'waivers_search_v2',
+    storageKey: 'waivers_search_v3',
     filterDefs,
     searchFields: (w) => [
       w.id,

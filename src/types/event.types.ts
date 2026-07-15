@@ -169,6 +169,9 @@ export interface EventPurchaseFilters {
   status?: string;
   customer_id?: number;
   purchase_date?: string;
+  start_date?: string;
+  end_date?: string;
+  user_id?: number;
   search?: string;
   per_page?: number;
   page?: number;
