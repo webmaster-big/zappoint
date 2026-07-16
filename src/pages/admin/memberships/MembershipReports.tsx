@@ -134,7 +134,7 @@ const MembershipReports = () => {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
             Membership Reports
             <InfoTooltip
               widthClass="w-72"

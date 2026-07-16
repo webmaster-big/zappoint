@@ -340,7 +340,7 @@ const MembershipDetails = () => {
             return (
               <>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pass Holder</p>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
                   {headline}
                   <InfoTooltip
                     widthClass="w-80"

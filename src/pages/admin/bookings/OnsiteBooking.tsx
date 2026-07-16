@@ -2057,7 +2057,7 @@ const OnsiteBooking: React.FC = () => {
               <Users className="w-4 h-4 mr-2" />
               Number of Participants
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <StandardButton
                 type="button"
                 variant="secondary"
@@ -3342,8 +3342,8 @@ const OnsiteBooking: React.FC = () => {
       )}
 
       <div className="py-8">
-      <div className="flex items-center justify-between mb-8 px-1">
-        <h1 className="text-3xl font-bold text-gray-900 ml-4">On-site Booking</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8 px-1">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 sm:ml-4">On-site Booking</h1>
         
         {isCompanyAdmin && (
           <LocationSelector
@@ -3384,7 +3384,7 @@ const OnsiteBooking: React.FC = () => {
         </div>
       </div>
       
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6">
+      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()} {/* Now Date & Time */}
         {step === 3 && renderStep3()} {/* Now Attractions & Add-ons */}

@@ -127,7 +127,7 @@ const MainLayout: React.FC = () => {
     <>
       {showLoader && <LoadingSpinner fullScreen message="Signing out..." />}
 
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-dvh bg-gray-50">
   <Sidebar 
     user={userData!} 
     isOpen={isSidebarOpen} 

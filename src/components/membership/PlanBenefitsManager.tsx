@@ -499,7 +499,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
                 {editingId ? 'Edit benefit' : 'New benefit'}
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Benefit type</label>
                   <select

@@ -537,7 +537,7 @@ const Events = () => {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Events</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Events</h1>
           <p className="text-gray-600 mt-1">View and manage all events</p>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">

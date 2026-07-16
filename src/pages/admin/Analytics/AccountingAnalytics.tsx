@@ -195,7 +195,7 @@ const AccountingAnalytics: React.FC = () => {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Accounting & Analytics</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Accounting & Analytics</h1>
           <p className="text-gray-600 mt-1">
             {viewMode === 'booked_for' ? 'Events scheduled for selected dates' : 'Purchases made on selected dates'}
           </p>

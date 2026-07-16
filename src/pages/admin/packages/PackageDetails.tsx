@@ -148,14 +148,14 @@ const PackageDetails = () => {
               onClick={() => navigate('/packages')}
             />
           </div>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{packageData.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{packageData.name}</h1>
               <p className="text-gray-600 mt-2">{packageData.category || "No category"}</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <span className={`px-4 py-2 rounded-full text-sm font-medium ${
-                packageData.is_active 
+                packageData.is_active
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-gray-100 text-gray-800'
               }`}>

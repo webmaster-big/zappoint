@@ -1863,7 +1863,7 @@ const CreatePackage: React.FC = () => {
                                     })}
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <input
                                         type="number"
                                         min="0"

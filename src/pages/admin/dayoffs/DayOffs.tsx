@@ -756,7 +756,7 @@ const DayOffs: React.FC = () => {
         <div className="px-6 py-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Day Offs</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Day Offs</h1>
                     <p className="text-gray-600 mt-2">Manage blocked dates and holidays for your locations</p>
                 </div>
                 <div className="flex items-center gap-2">

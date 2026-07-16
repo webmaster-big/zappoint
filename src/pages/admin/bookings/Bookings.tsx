@@ -2851,7 +2851,7 @@ const Bookings: React.FC = () => {
       <div className="px-6 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Bookings</h1>
             <p className="text-gray-800 mt-2">Manage all bookings</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0">
@@ -2937,7 +2937,7 @@ const Bookings: React.FC = () => {
                   Columns
                 </StandardButton>
                 {showColumnSelector && (
-                  <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3 max-h-[80vh] overflow-y-auto">
+                  <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3 max-h-[80vh] overflow-y-auto">
                     <div className="text-xs font-semibold text-gray-700 mb-2">Toggle Columns</div>
                     
                     <div className="mb-2">
@@ -3675,9 +3675,9 @@ const Bookings: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                     <h3 className="text-sm font-semibold text-gray-900">Date Range</h3>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <StandardButton
                         variant="secondary"
                         size="sm"
@@ -3851,7 +3851,7 @@ const Bookings: React.FC = () => {
 
         {showPaymentModal && selectedBookingForPayment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedBookingForPayment(null); }}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
                 <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
                 <p className="text-sm text-gray-600 mt-1">
@@ -3967,7 +3967,7 @@ const Bookings: React.FC = () => {
 
         {showInternalNotesModal && selectedBookingForNotes && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseInternalNotesModal}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="p-6 border-b border-gray-100 bg-amber-50">
                 <div className="flex items-center justify-between">
                   <div>
@@ -4631,7 +4631,7 @@ const Bookings: React.FC = () => {
                 </div>
 
                 {reportFilters.periodType === 'weekly' && (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Week</label>
                       <select

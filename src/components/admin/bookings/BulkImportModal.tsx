@@ -312,7 +312,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               <h3 className="text-lg font-semibold text-gray-900">Import Complete</h3>
             </div>
 
-            <div className="grid grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
               <div className="bg-gray-50 rounded-lg p-3 text-center border border-gray-100">
                 <p className="text-xl font-bold text-gray-900">{result.total_rows}</p>
                 <p className="text-xs text-gray-500 mt-0.5">Total</p>

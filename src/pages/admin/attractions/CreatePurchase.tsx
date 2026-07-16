@@ -768,7 +768,7 @@ const CreatePurchase = () => {
 
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-4 sm:p-6">
       <div className="mx-auto">
         <div className="mb-6">
           <div className="flex items-center justify-between">
@@ -1121,7 +1121,7 @@ const CreatePurchase = () => {
                   <h2 className="text-lg font-semibold text-gray-800">Payment</h2>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
                   <StandardButton
                     variant={paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
                     size="md"

@@ -42,7 +42,7 @@ export function AdminTableToolbar<T>({
   });
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-lg w-full">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -87,7 +87,7 @@ export function AdminTableToolbar<T>({
               Columns
             </StandardButton>
             {table.showColumnSelector && (
-              <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3 max-h-[80vh] overflow-y-auto">
+              <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3 max-h-[80vh] overflow-y-auto">
                 <div className="text-xs font-semibold text-gray-700 mb-2">Toggle Columns</div>
                 {[...groups.entries()].map(([group, columns]) => (
                   <div key={group} className="mb-2">

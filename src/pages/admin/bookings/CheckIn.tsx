@@ -577,7 +577,7 @@ const CheckIn: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -595,7 +595,7 @@ const CheckIn: React.FC = () => {
         </div>
 
         {scanResult && (
-          <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex items-center justify-between ${
+          <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${
             scanResult.success 
               ? 'border-green-200 bg-green-50' 
               : 'border-red-200 bg-red-50'
@@ -1795,7 +1795,7 @@ const CheckIn: React.FC = () => {
 
         {showPaymentModal && selectedBookingForPayment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedBookingForPayment(null); }}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
                 <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
                 <p className="text-sm text-gray-600 mt-1">

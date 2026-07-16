@@ -601,7 +601,7 @@ const EmailNotifications = () => {
     <div className="px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Email Notifications</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Email Notifications</h1>
           <p className="text-gray-600 mt-2">Automated email notifications for bookings, purchases, and payments</p>
         </div>
         <div className="flex items-center gap-3 mt-4 sm:mt-0">

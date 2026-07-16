@@ -729,7 +729,7 @@ const ManagePurchases = () => {
     <div className="min-h-screen px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manage Purchases</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Manage Purchases</h1>
           <p className="text-gray-600 mt-2">View and manage all customer purchases</p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
@@ -978,7 +978,7 @@ const ManagePurchases = () => {
 
       {showPaymentModal && selectedPurchaseForPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedPurchaseForPayment(null); }}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
               <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
               <p className="text-sm text-gray-600 mt-1">

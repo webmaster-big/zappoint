@@ -70,7 +70,7 @@ const Pagination: React.FC<PaginationProps> = ({
             {from}–{to} of {totalItems}
           </span>
         )}
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <button
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
@@ -116,7 +116,7 @@ const Pagination: React.FC<PaginationProps> = ({
           of <span className="font-medium">{totalItems}</span> {itemLabel}
         </div>
       )}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <StandardButton
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}

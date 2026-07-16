@@ -686,7 +686,7 @@ const Packages: React.FC = () => {
               />
             </div>
             
-            <div className="flex gap-1 items-center">
+            <div className="flex flex-wrap gap-1 items-center">
               {isCompanyAdmin && uniqueLocations.length > 0 && (
                 <select
                   value={filterLocation}
@@ -1147,7 +1147,7 @@ const Packages: React.FC = () => {
 
       {showBulkMinNoticeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
@@ -1257,7 +1257,7 @@ const Packages: React.FC = () => {
 
       {showDuplicateLocationModal && packageToDuplicate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>

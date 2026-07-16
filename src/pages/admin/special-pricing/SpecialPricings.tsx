@@ -736,7 +736,7 @@ const SpecialPricings: React.FC = () => {
             </button>
           )}
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Special Pricing</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Special Pricing</h1>
             <p className="text-gray-600 mt-1">Manage automatic discounts for packages and attractions</p>
           </div>
         </div>

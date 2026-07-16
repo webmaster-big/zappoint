@@ -183,7 +183,7 @@ const WaiverTemplates = () => {
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
           <div data-tour="templates-heading">
-            <h1 className="text-3xl font-bold text-gray-900">Waiver Templates</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Waiver Templates</h1>
             <p className="text-gray-600 mt-1">Build legal waivers and assign them to packages, attractions, and events.</p>
           </div>
         </div>

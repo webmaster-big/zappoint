@@ -166,7 +166,7 @@ const LocationChangeRequests = () => {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 mt-3 text-sm">
+              <div className="flex items-center gap-2 mt-3 text-sm flex-wrap">
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-50 text-gray-700">
                   <MapPin className="w-3.5 h-3.5 text-gray-400" /> {r.from_location?.name || `Location #${r.from_location_id}`}
                 </span>

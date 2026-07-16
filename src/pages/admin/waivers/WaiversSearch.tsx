@@ -485,7 +485,7 @@ const WaiversSearch = () => {
       <WaiverPageTour steps={WAIVER_RECORDS_STEPS} storageKey="tour_waiver_records" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
         <div data-tour="waivers-heading">
-          <h1 className="text-3xl font-bold text-gray-900">Waivers</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Waivers</h1>
           <p className="text-gray-600 mt-1">Look up signed waivers, assign new ones, and manage records.</p>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">

@@ -1006,7 +1006,7 @@ const ManualBooking: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1023,7 +1023,7 @@ const ManualBooking: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center bg-gray-100 rounded-md p-0.5">
                 <button
                   type="button"
@@ -1912,7 +1912,7 @@ const ManualBooking: React.FC = () => {
                     {pkg?.has_guest_of_honor && (
                       <div className="border-t border-gray-100 pt-4">
                         <h4 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Guest of Honor</h4>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Name</label>
                             <input

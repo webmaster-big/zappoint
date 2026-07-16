@@ -283,7 +283,7 @@ const PageAnalytics: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
+          <h1 className="text-2xl md:text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
             <Activity className={`w-6 h-6 text-${themeColor}-600`} /> Page Analytics
           </h1>
           <p className="text-sm md:text-base text-gray-600">

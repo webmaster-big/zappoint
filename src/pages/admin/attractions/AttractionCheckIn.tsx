@@ -380,7 +380,7 @@ const AttractionCheckIn = () => {
         </div>
 
         {scanResult && (
-          <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex items-center justify-between ${
+          <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${
             scanResult.success 
               ? 'border-green-200 bg-green-50' 
               : 'border-red-200 bg-red-50'

@@ -1174,7 +1174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       )}
       <aside
         id="sidebar"
-        className={`fixed top-0 left-0 z-50 h-screen bg-white via-white to-white shadow-md transition-all duration-300 ease-in-out transform animate-slide-in-from-left
+        className={`fixed top-0 left-0 z-50 h-dvh bg-white via-white to-white shadow-md transition-all duration-300 ease-in-out transform animate-slide-in-from-left
           ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-0 ${isMinimized ? 'w-20' : 'w-64'}`}
         style={{ overflow: 'visible' }}
       >

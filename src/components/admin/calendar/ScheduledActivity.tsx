@@ -28,14 +28,27 @@ const formatTime12Hour = (time24?: string | null): string => {
   return `${hours12}:${minutes ?? '00'} ${period}`;
 };
 
+const timeToMinutes = (time?: string | null): number => {
+  if (!time) return Number.MAX_SAFE_INTEGER;
+  const [h, m] = time.split(':');
+  const hours = parseInt(h, 10);
+  if (Number.isNaN(hours)) return Number.MAX_SAFE_INTEGER;
+  const mins = parseInt(m ?? '0', 10);
+  return hours * 60 + (Number.isNaN(mins) ? 0 : mins);
+};
+
 export const attractionsForDate = (list: AttractionPurchase[], date: Date): AttractionPurchase[] => {
   const key = formatDateKey(date);
-  return list.filter(p => (p.scheduled_date || p.purchase_date || '').split('T')[0] === key);
+  return list
+    .filter(p => (p.scheduled_date || p.purchase_date || '').split('T')[0] === key)
+    .sort((a, b) => timeToMinutes(a.scheduled_time) - timeToMinutes(b.scheduled_time));
 };
 
 export const eventsForDate = (list: EventPurchase[], date: Date): EventPurchase[] => {
   const key = formatDateKey(date);
-  return list.filter(p => (p.purchase_date || '').split('T')[0] === key);
+  return list
+    .filter(p => (p.purchase_date || '').split('T')[0] === key)
+    .sort((a, b) => timeToMinutes(a.purchase_time) - timeToMinutes(b.purchase_time));
 };
 
 export interface DaySummary {
@@ -211,7 +224,7 @@ const PurchaseDetailModal: React.FC<{
 }> = ({ title, typeLabel, typeClass, icon, viewHref, editHref, onClose, children }) => (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
     <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-center gap-3">
             {icon}

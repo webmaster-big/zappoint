@@ -463,10 +463,12 @@ const LocationManagerDashboard: React.FC = () => {
   }, [selectedStatus]);
 
   const getBookingsForDay = (date: Date) => {
-    return monthlyBookings.filter(booking => {
-      const bookingDate = parseLocalDate(booking.booking_date);
-      return bookingDate.toDateString() === date.toDateString();
-    });
+    return monthlyBookings
+      .filter(booking => {
+        const bookingDate = parseLocalDate(booking.booking_date);
+        return bookingDate.toDateString() === date.toDateString();
+      })
+      .sort((a, b) => (a.booking_time || '').localeCompare(b.booking_time || ''));
   };
 
   const activeRange = useMemo(() => {
@@ -792,7 +794,7 @@ const LocationManagerDashboard: React.FC = () => {
     <div className="min-h-screen p-4 md:p-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+          <h1 className="text-2xl md:text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
             Dashboard
           </h1>
           <p className="text-sm text-gray-600">
@@ -935,14 +937,14 @@ const LocationManagerDashboard: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="flex items-center space-x-2 mt-4 md:mt-0">
+          <div className="flex flex-wrap items-center gap-2 mt-4 md:mt-0">
             <StandardButton 
               onClick={calendarView === 'day' ? goToPreviousDay : calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
               variant="secondary"
               size="sm"
               icon={ChevronLeft}
             />
-            <span className="text-sm font-medium text-gray-800 min-w-[200px] text-center">
+            <span className="text-sm font-medium text-gray-800 min-w-0 sm:min-w-[200px] text-center">
               {calendarView === 'day'
                 ? currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
                 : calendarView === 'week' 

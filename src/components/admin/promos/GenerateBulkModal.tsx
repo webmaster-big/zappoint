@@ -99,7 +99,7 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
 
           <div className="border-t border-gray-200 pt-4 mb-4">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Discount Settings</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-800 mb-1">Type *</label>
                 <select
@@ -134,7 +134,7 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
 
           <div className="border-t border-gray-200 pt-4 mb-4">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Validity Period</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-800 mb-1">Start Date *</label>
                 <input
@@ -162,7 +162,7 @@ const GenerateBulkModal: React.FC<GenerateBulkModalProps> = ({ open, onClose, on
 
           <div className="border-t border-gray-200 pt-4 mb-6">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Code Generation Settings</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-800 mb-1">Quantity * <span className="text-gray-400 font-normal">(max 1000)</span></label>
                 <input

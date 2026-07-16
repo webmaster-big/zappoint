@@ -907,7 +907,7 @@ const EditPackage: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-col sm:flex-row gap-2">
                                             <div className="flex gap-1 items-center flex-1">
                                                 <select
                                                     name="category"
@@ -1936,7 +1936,7 @@ const EditPackage: React.FC = () => {
                                 })}
                             </div>
                             
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <input
                                     type="number"
                                     min="0"

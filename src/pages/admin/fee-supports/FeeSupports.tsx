@@ -601,7 +601,7 @@ const FeeSupports: React.FC = () => {
             </button>
           )}
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Fee Supports</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Fee Supports</h1>
             <p className="text-gray-600 mt-1">Manage additional fees for packages, attractions, events, and memberships</p>
           </div>
         </div>

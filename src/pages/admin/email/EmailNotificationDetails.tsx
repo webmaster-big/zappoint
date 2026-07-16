@@ -306,7 +306,7 @@ const EmailNotificationDetails: React.FC = () => {
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-900">{notification.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{notification.name}</h1>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                 notification.is_active
                   ? `bg-${themeColor}-100 text-${themeColor}-700`

@@ -303,7 +303,7 @@ const Promo: React.FC = () => {
         <>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Promo Codes</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Promo Codes</h1>
               <p className="text-gray-600 mt-2">Create and manage promotional codes</p>
             </div>
             {activeTab === "single" && (
@@ -320,7 +320,7 @@ const Promo: React.FC = () => {
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="border-b border-gray-200">
-              <nav className="flex -mb-px">
+              <nav className="flex -mb-px overflow-x-auto">
                 <button
                   onClick={() => setActiveTab("single")}
                   className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -707,7 +707,7 @@ const Promo: React.FC = () => {
 
       {editPromoId !== null && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto">
             <StandardButton 
               className="absolute top-4 right-4" 
               variant="ghost"

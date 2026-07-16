@@ -28,7 +28,7 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[9999] animate-fadeIn">
       <div 
-        className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-slideUp"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`relative px-5 py-6 text-center bg-${themeColor}-50`}>

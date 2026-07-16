@@ -150,7 +150,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
           <ShieldCheck className={`w-4 h-4 text-${fullColor}`} />
           <h3 className="text-sm font-bold text-gray-900">{title}</h3>
         </div>
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex items-center gap-2 text-[11px] flex-wrap">
           <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><ShieldCheck className="w-3 h-3" />{summary.completed} signed</span>
           {summary.pending > 0 && <span className="inline-flex items-center gap-1 text-amber-600 font-medium"><Clock className="w-3 h-3" />{summary.pending} pending</span>}
           {checkInActions && (summary.checked_in ?? 0) > 0 && (

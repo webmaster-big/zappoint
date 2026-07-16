@@ -261,10 +261,12 @@ const CompanyDashboard: React.FC = () => {
   }, [allBookings, currentMonth, calendarView]);
 
   const getBookingsForDay = (date: Date) => {
-    return monthlyBookings.filter(booking => {
-      const bookingDate = parseLocalDate(booking.booking_date);
-      return bookingDate.toDateString() === date.toDateString();
-    });
+    return monthlyBookings
+      .filter(booking => {
+        const bookingDate = parseLocalDate(booking.booking_date);
+        return bookingDate.toDateString() === date.toDateString();
+      })
+      .sort((a, b) => (a.booking_time || '').localeCompare(b.booking_time || ''));
   };
 
   const activeRange = useMemo(() => {
@@ -982,7 +984,7 @@ const CompanyDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
+          <h1 className="text-2xl md:text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
             Company Dashboard
           </h1>
           <p className="text-sm md:text-base text-gray-500">Multi-location booking overview and management</p>
@@ -1345,14 +1347,14 @@ const CompanyDashboard: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="flex items-center space-x-2 mt-4 md:mt-0">
+          <div className="flex flex-wrap items-center gap-2 mt-4 md:mt-0">
             <StandardButton 
               variant="secondary"
               size="sm"
               icon={ChevronLeft}
               onClick={calendarView === 'day' ? goToPreviousDay : calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
             />
-            <span className="text-sm font-medium text-gray-800 min-w-[200px] text-center">
+            <span className="text-sm font-medium text-gray-800 min-w-0 sm:min-w-[200px] text-center">
               {calendarView === 'day'
                 ? currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
                 : calendarView === 'week' 

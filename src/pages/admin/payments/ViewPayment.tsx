@@ -249,7 +249,7 @@ const ViewPayment: React.FC = () => {
               {''}
             </StandardButton>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Payment Details</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Payment Details</h1>
               <p className="text-gray-600 mt-1">Transaction ID: {payment.transaction_id || 'N/A'}</p>
             </div>
           </div>

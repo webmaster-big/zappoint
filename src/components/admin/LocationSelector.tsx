@@ -72,7 +72,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 z-50 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto">
+          <div className="absolute left-0 sm:left-auto sm:right-0 z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto">
             {showAllOption && (
               <button
                 type="button"

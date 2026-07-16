@@ -572,7 +572,7 @@ const OnsitePurchaseEvent = () => {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Onsite Event Purchase</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Onsite Event Purchase</h1>
           <p className="text-gray-600 mt-1">Create a walk-in event purchase</p>
         </div>
       </div>

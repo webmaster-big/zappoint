@@ -763,7 +763,7 @@ const EditAttraction = () => {
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block font-medium mb-2 text-sm text-neutral-700 flex items-center gap-1">
                           <Clock className="w-4 h-4" /> Start Time

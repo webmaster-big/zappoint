@@ -914,7 +914,7 @@ const ManageAttractions = () => {
     <div className="px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manage Attractions</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Manage Attractions</h1>
           <p className="text-gray-600 mt-1">View and manage all attractions</p>
         </div>
         <div className="mt-4 sm:mt-0 flex flex-wrap items-center gap-2">

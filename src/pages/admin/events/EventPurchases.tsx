@@ -681,7 +681,7 @@ const EventPurchases = () => {
     <div className="min-h-screen px-6 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Event Purchases</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Event Purchases</h1>
           <p className="text-gray-600 mt-2">View and manage all event ticket purchases</p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">

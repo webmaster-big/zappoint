@@ -52,6 +52,15 @@ const formatTime12Hour = (time24: string): string => {
   return `${hours12}:${minutes} ${period}`;
 };
 
+const timeToMinutes = (time?: string | null): number => {
+  if (!time) return Number.MAX_SAFE_INTEGER;
+  const [h, m] = time.split(':');
+  const hours = parseInt(h, 10);
+  if (Number.isNaN(hours)) return Number.MAX_SAFE_INTEGER;
+  const mins = parseInt(m ?? '0', 10);
+  return hours * 60 + (Number.isNaN(mins) ? 0 : mins);
+};
+
 interface UserData {
   name: string;
   company: string;
@@ -509,8 +518,7 @@ const CalendarView: React.FC = () => {
       const bookingDatePart = booking.booking_date.split('T')[0];
       return bookingDatePart === dateString;
     });
-    console.log(`Bookings for ${dateString}:`, bookingsForDate.length, bookingsForDate.map(b => ({ ref: b.reference_number, date: b.booking_date })));
-    return bookingsForDate;
+    return bookingsForDate.sort((a, b) => timeToMinutes(a.booking_time) - timeToMinutes(b.booking_time));
   };
 
   const formatDateKey = (date: Date): string => {
@@ -546,15 +554,19 @@ const CalendarView: React.FC = () => {
 
   const getAttractionsForDate = (date: Date): AttractionPurchase[] => {
     const dateString = formatDateKey(date);
-    return filteredAttractionPurchases.filter(p => {
-      const scheduled = (p.scheduled_date || p.purchase_date || '').split('T')[0];
-      return scheduled === dateString;
-    });
+    return filteredAttractionPurchases
+      .filter(p => {
+        const scheduled = (p.scheduled_date || p.purchase_date || '').split('T')[0];
+        return scheduled === dateString;
+      })
+      .sort((a, b) => timeToMinutes(a.scheduled_time) - timeToMinutes(b.scheduled_time));
   };
 
   const getEventsForDate = (date: Date): EventPurchase[] => {
     const dateString = formatDateKey(date);
-    return filteredEventPurchases.filter(p => (p.purchase_date || '').split('T')[0] === dateString);
+    return filteredEventPurchases
+      .filter(p => (p.purchase_date || '').split('T')[0] === dateString)
+      .sort((a, b) => timeToMinutes(a.purchase_time) - timeToMinutes(b.purchase_time));
   };
 
   const getDateSummary = (date: Date) => {
@@ -641,12 +653,13 @@ const CalendarView: React.FC = () => {
     const summary = getDateSummary(date);
     if (summary.total === 0) return null;
 
-    const rows: Array<{ key: string; icon: React.ReactNode; label: string; className: string }> = [];
+    const rows: Array<{ key: string; icon: React.ReactNode; label: string; count: number; className: string }> = [];
     if (summary.bookings > 0) {
       rows.push({
         key: 'bookings',
         icon: <PackageIcon className="h-3 w-3 flex-shrink-0" />,
         label: `${summary.bookings} Booking${summary.bookings !== 1 ? 's' : ''}`,
+        count: summary.bookings,
         className: 'bg-blue-100 text-blue-800',
       });
     }
@@ -655,6 +668,7 @@ const CalendarView: React.FC = () => {
         key: 'attractions',
         icon: <Ticket className="h-3 w-3 flex-shrink-0" />,
         label: `${summary.attractionTickets} Attraction Ticket${summary.attractionTickets !== 1 ? 's' : ''}`,
+        count: summary.attractionTickets,
         className: 'bg-purple-100 text-purple-800',
       });
     }
@@ -663,21 +677,35 @@ const CalendarView: React.FC = () => {
         key: 'events',
         icon: <Sparkles className="h-3 w-3 flex-shrink-0" />,
         label: `${summary.eventRegistrations} Event Registration${summary.eventRegistrations !== 1 ? 's' : ''}`,
+        count: summary.eventRegistrations,
         className: 'bg-amber-100 text-amber-800',
       });
     }
 
     return (
-      <div className={`space-y-1 ${compact ? '' : 'mt-1'}`}>
-        {rows.map(row => (
-          <div
-            key={row.key}
-            className={`flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium leading-tight ${row.className}`}
-          >
-            {row.icon}
-            <span className="truncate">{row.label}</span>
-          </div>
-        ))}
+      <div className={compact ? '' : 'mt-1'}>
+        <div className="flex flex-wrap items-center gap-1 sm:hidden">
+          {rows.map(row => (
+            <span
+              key={row.key}
+              className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${row.className}`}
+            >
+              {row.icon}
+              {row.count}
+            </span>
+          ))}
+        </div>
+        <div className="hidden sm:block space-y-1">
+          {rows.map(row => (
+            <div
+              key={row.key}
+              className={`flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium leading-tight ${row.className}`}
+            >
+              {row.icon}
+              <span className="truncate">{row.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -700,7 +728,7 @@ const CalendarView: React.FC = () => {
     const dayEvents = getEventsForDate(currentDate);
     const hasAny = dayBookings.length > 0 || dayAttractions.length > 0 || dayEvents.length > 0;
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 h-full overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">
           Scheduled for {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </h3>
@@ -782,8 +810,8 @@ const CalendarView: React.FC = () => {
   const renderWeekView = () => {
     const weekDays = getWeekDays();
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
-        <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 h-full overflow-y-auto">
+        <div className="hidden md:grid grid-cols-7 gap-2 mb-4">
           {weekDays.map(day => (
             <div key={day.toISOString()} className="text-center font-medium text-gray-800 py-2">
               {day.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -791,22 +819,23 @@ const CalendarView: React.FC = () => {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
           {weekDays.map(day => {
             const summary = getDateSummary(day);
             return (
               <div
                 key={day.toISOString()}
-                className={`border border-gray-200 rounded-lg p-2 min-h-40 cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
+                className={`border border-gray-200 rounded-lg p-3 md:p-2 min-h-0 md:min-h-40 cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
                   day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
                 onClick={() => setSelectedDate(formatDateKey(day))}
               >
                 <div className="text-sm font-medium mb-1">
-                  {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  <span className="md:hidden">{day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+                  <span className="hidden md:inline">{day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 </div>
                 {summary.total === 0 ? (
-                  <div className="text-xs text-gray-400 mt-2">No activity</div>
+                  <div className="text-xs text-gray-400 mt-1 md:mt-2">No activity</div>
                 ) : (
                   renderDateBreakdown(day)
                 )}
@@ -836,19 +865,20 @@ const CalendarView: React.FC = () => {
     }
     
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
-        <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="bg-white rounded-lg shadow-sm p-2 sm:p-6 h-full overflow-y-auto">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 sm:mb-4">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="text-center font-medium text-gray-800 py-2">
-              {day}
+            <div key={day} className="text-center font-medium text-gray-800 py-1 sm:py-2 text-[11px] sm:text-base">
+              <span className="sm:hidden">{day.charAt(0)}</span>
+              <span className="hidden sm:inline">{day}</span>
             </div>
           ))}
         </div>
-        
-        <div className="grid grid-cols-7 gap-2">
+
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {days.map((day, index) => {
             if (!day) {
-              return <div key={`empty-${index}`} className="border border-gray-100 rounded-lg p-2 h-32" />;
+              return <div key={`empty-${index}`} className="border border-gray-100 rounded-lg p-1 sm:p-2 h-24 sm:h-32" />;
             }
 
             const summary = getDateSummary(day);
@@ -856,12 +886,12 @@ const CalendarView: React.FC = () => {
             return (
               <div
                 key={day.toISOString()}
-                className={`border border-gray-200 rounded-lg p-2 h-32 overflow-y-auto cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
+                className={`border border-gray-200 rounded-lg p-1 sm:p-2 h-24 sm:h-32 overflow-y-auto cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
                   day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
                 onClick={() => setSelectedDate(formatDateKey(day))}
               >
-                <div className="text-sm font-medium mb-1 sticky top-0">
+                <div className="text-xs sm:text-sm font-medium mb-1 sticky top-0">
                   {day.getDate()}
                 </div>
 
@@ -887,10 +917,15 @@ const CalendarView: React.FC = () => {
     
     const start = new Date(filters.dateRange.start);
     const end = new Date(filters.dateRange.end);
-    const rangeBookings = filteredBookings;
+    const rangeBookings = [...filteredBookings].sort((a, b) => {
+      const dateA = a.booking_date.split('T')[0];
+      const dateB = b.booking_date.split('T')[0];
+      if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+      return timeToMinutes(a.booking_time) - timeToMinutes(b.booking_time);
+    });
     
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 h-full overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">
           Bookings from {start.toLocaleDateString()} to {end.toLocaleDateString()}
         </h3>
@@ -1034,10 +1069,10 @@ const CalendarView: React.FC = () => {
   };
 
   return (
-      <div className="px-6 py-8 h-full flex flex-col">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+      <div className="px-2 sm:px-6 py-4 sm:py-8 h-full flex flex-col">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Booking Calendar</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Booking Calendar</h1>
             <p className="text-gray-600 mt-2">
               View and manage bookings
               {filteredBookings.length > 0 && (
@@ -1047,7 +1082,7 @@ const CalendarView: React.FC = () => {
               )}
             </p>
           </div>
-          <div className="flex gap-2 mt-4 sm:mt-0">
+          <div className="flex flex-wrap gap-2 mt-0 w-full sm:w-auto">
             <StandardButton
               variant="secondary"
               icon={RefreshCw}
@@ -1074,8 +1109,8 @@ const CalendarView: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-between">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center sm:justify-start">
               <StandardButton
                 variant="ghost"
                 size="sm"
@@ -1084,14 +1119,14 @@ const CalendarView: React.FC = () => {
               >
                 {''}
               </StandardButton>
-              
+
               <div className="relative">
                 <button
                   onClick={() => {
                     setPickerMonth(currentDate);
                     setShowDatePicker(!showDatePicker);
                   }}
-                  className={`text-xl font-semibold min-w-[250px] text-center px-4 py-2 rounded-lg hover:bg-${themeColor}-50 transition-colors flex items-center justify-center gap-2`}
+                  className={`text-base sm:text-xl font-semibold min-w-0 sm:min-w-[250px] text-center px-2 sm:px-4 py-2 rounded-lg hover:bg-${themeColor}-50 transition-colors flex items-center justify-center gap-2`}
                 >
                   <CalendarIcon className={`w-5 h-5 text-${fullColor}`} />
                   {getHeaderText()}
@@ -1210,7 +1245,7 @@ const CalendarView: React.FC = () => {
               )}
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
               <select
                 value={filters.view}
                 onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month' | 'range')}
@@ -1414,7 +1449,7 @@ const CalendarView: React.FC = () => {
         {selectedDate && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedDate(null)}>
             <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-semibold text-gray-900">
                     Scheduled for {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
@@ -1604,7 +1639,7 @@ const CalendarView: React.FC = () => {
         {selectedBooking && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedBooking(null)}>
             <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-semibold text-gray-900">
                     Booking Details
@@ -1953,7 +1988,7 @@ const CalendarView: React.FC = () => {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Link
                       to={`/bookings/${selectedBooking.id}?from=calendar`}
                       className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -2047,8 +2082,8 @@ const CalendarView: React.FC = () => {
         )}
 
         {showPaymentModal && selectedBooking && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleClosePaymentModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
                 <h2 className="text-xl font-bold text-gray-900">Process Payment</h2>
                 <p className="text-sm text-gray-600 mt-1">Booking: {selectedBooking.reference_number}</p>
