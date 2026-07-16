@@ -1112,7 +1112,7 @@ const CompanyDashboard: React.FC = () => {
 
                 {/* Breakdown popover */}
                 {isExpanded && (
-                  <div className="absolute top-full left-0 mt-1 z-40 bg-white rounded-xl border border-gray-200 shadow-xl p-3 min-w-[200px]">
+                  <div className="absolute top-full left-0 mt-1 z-40 bg-white rounded-xl border border-gray-200 shadow-xl p-3 min-w-[200px] max-w-[calc(100vw-2rem)]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-gray-700">{card.title} Breakdown</span>
                       <button onClick={() => setExpandedCard(null)} className="text-gray-400 hover:text-gray-600">

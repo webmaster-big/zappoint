@@ -1971,7 +1971,7 @@ const OnsiteBooking: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">{pkg.description}</p>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-3">{pkg.description}</p>
                     <div className="flex flex-wrap gap-2">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-${the}-50 text-${the}-700 border border-${the}-200">
                         <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

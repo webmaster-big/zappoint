@@ -1701,7 +1701,7 @@ const BookPackage: React.FC = () => {
           <div className={`mb-6 md:mb-8 bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-hidden relative${currentStep >= 2 ? ' hidden md:block' : ''}`}>
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-700 to-violet-600"></div>
             <h2 className="text-2xl md:text-xl font-bold mb-2 text-gray-900 leading-tight">{pkg.name}</h2>
-            <p className="text-gray-500 mb-3 md:mb-4 text-xs md:text-sm leading-relaxed">{pkg.description}</p>
+            <p className="text-gray-500 mb-3 md:mb-4 text-xs md:text-sm leading-relaxed line-clamp-3">{pkg.description}</p>
             {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) || 
               (typeof pkg.features === 'string' && pkg.features.trim() !== '')) && (
               <div className="mt-4">

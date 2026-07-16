@@ -141,7 +141,7 @@ const MainLayout: React.FC = () => {
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur px-8 flex items-center gap-4 ">
          
         </header>
-        <main className="bg-gray-50 flex-1 overflow-y-auto sm:p-6 p-2">
+        <main className="bg-gray-50 flex-1 overflow-y-auto overflow-x-hidden sm:p-6 p-2">
           <div className="animate-fade-in-up">
             <Outlet />
           </div>
