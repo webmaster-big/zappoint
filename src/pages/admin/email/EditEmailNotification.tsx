@@ -1134,7 +1134,7 @@ const EditEmailNotification: React.FC = () => {
                         onInput={handleBodyChange}
                         onFocus={(e) => e.currentTarget.classList.add('ring-2', 'ring-blue-500', 'border-blue-500')}
                         onBlur={(e) => e.currentTarget.classList.remove('ring-2', 'ring-blue-500', 'border-blue-500')}
-                        className="w-full min-h-[300px] overflow-y-auto px-4 py-3 border border-gray-300 rounded-b-lg focus:outline-none bg-white transition-all resize-y relative z-10"
+                        className="w-full min-h-[300px] overflow-y-auto overflow-x-auto px-4 py-3 border border-gray-300 rounded-b-lg focus:outline-none bg-white transition-all resize-y relative z-10"
                         style={{ whiteSpace: 'pre-wrap' }}
                       />
                     </div>
@@ -1261,7 +1261,7 @@ const EditEmailNotification: React.FC = () => {
                   <div>
                     <label className="text-sm font-medium text-gray-500">Body</label>
                     <div
-                      className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
+                      className="mt-2 prose prose-sm max-w-none overflow-x-auto border border-gray-200 rounded-lg p-4 bg-gray-50"
                       dangerouslySetInnerHTML={{ __html: previewBody ?? formData.body ?? '<p class="text-gray-400">(No content)</p>' }}
                     />
                   </div>

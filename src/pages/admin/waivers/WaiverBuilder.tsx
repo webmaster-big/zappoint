@@ -244,7 +244,7 @@ const WaiverBuilder = () => {
   return (
     <div className="min-h-screen px-6 py-8 max-w-5xl mx-auto">
       <WaiverPageTour steps={WAIVER_BUILDER_STEPS} storageKey="tour_waiver_builder" />
-      <div data-tour="builder-header" className="flex items-center justify-between mb-6 gap-3">
+      <div data-tour="builder-header" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers/templates')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
           <div>
@@ -252,7 +252,7 @@ const WaiverBuilder = () => {
             <p className="text-gray-500 text-sm mt-0.5">Editing the legal text creates a new version automatically.</p>
           </div>
         </div>
-        <div data-tour="builder-save" className="flex items-center gap-2">
+        <div data-tour="builder-save" className="flex flex-wrap items-center gap-2">
           {isEdit && (
             <StandardButton
               variant="secondary"

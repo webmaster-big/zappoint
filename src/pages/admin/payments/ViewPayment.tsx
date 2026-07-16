@@ -238,7 +238,7 @@ const ViewPayment: React.FC = () => {
         }
       `}</style>
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div className="flex items-center gap-4">
             <StandardButton
               variant="ghost"
@@ -253,7 +253,7 @@ const ViewPayment: React.FC = () => {
               <p className="text-gray-600 mt-1">Transaction ID: {payment.transaction_id || 'N/A'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             {isBooking && payableData && (
               <Link
                 to={`/bookings/${payment.payable_id || payment.booking_id}`}

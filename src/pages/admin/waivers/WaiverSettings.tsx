@@ -70,7 +70,7 @@ const WaiverSettings = () => {
   return (
     <div className="min-h-screen px-6 py-8 max-w-3xl mx-auto">
       <WaiverPageTour steps={WAIVER_SETTINGS_STEPS} storageKey="tour_waiver_settings" />
-      <div className="flex items-center justify-between mb-6 gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/waivers')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-gray-600" /></button>
           <div data-tour="settings-heading">

@@ -1659,7 +1659,7 @@ const LocationActivityLogs = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
           return (
@@ -1718,7 +1718,7 @@ const LocationActivityLogs = () => {
 
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">Action</label>
                 <select
