@@ -28,7 +28,9 @@ export type PurchaseTriggerType =
   | 'purchase_reminder'
   | 'purchase_followup';
 
-export type TriggerType = BookingTriggerType | PaymentTriggerType | PurchaseTriggerType;
+export type ReportTriggerType = 'end_of_day_sales_report';
+
+export type TriggerType = BookingTriggerType | PaymentTriggerType | PurchaseTriggerType | ReportTriggerType;
 
 export type EntityType = 'all' | 'package' | 'attraction';
 
@@ -45,7 +47,8 @@ export type DefaultNotificationKey =
   | 'purchase_confirmation_customer'
   | 'purchase_cancellation_customer'
   | 'payment_received_customer'
-  | 'payment_refunded_customer';
+  | 'payment_refunded_customer'
+  | 'end_of_day_sales_report';
 
 export interface EmailNotification {
   id: number;

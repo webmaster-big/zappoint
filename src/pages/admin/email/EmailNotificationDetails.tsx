@@ -83,6 +83,7 @@ const EmailNotificationDetails: React.FC = () => {
     purchase_refunded: 'Purchase Refunded',
     purchase_reminder: 'Purchase Reminder',
     purchase_followup: 'Purchase Follow-up',
+    end_of_day_sales_report: 'End of Day Sales Report',
   };
 
   const recipientTypeLabels: Record<RecipientType, string> = {

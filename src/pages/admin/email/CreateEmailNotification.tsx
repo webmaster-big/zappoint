@@ -27,6 +27,7 @@ import {
   Calendar,
   Ticket,
   CreditCard,
+  BarChart3,
   Clock,
   QrCode,
   Plus,
@@ -142,6 +143,10 @@ const CreateEmailNotification: React.FC = () => {
     { value: 'payment_pending', label: 'Payment Pending' },
   ];
 
+  const reportTriggers = [
+    { value: 'end_of_day_sales_report', label: 'End of Day Sales Report' },
+  ];
+
   const getAvailableTriggers = () => {
     const entityType = formData.entity_type;
     if (entityType === 'package') {
@@ -159,6 +164,7 @@ const CreateEmailNotification: React.FC = () => {
         { label: 'Booking Events', icon: Calendar, options: bookingTriggers },
         { label: 'Purchase Events', icon: Ticket, options: purchaseTriggers },
         { label: 'Payment Events', icon: CreditCard, options: paymentTriggers },
+        { label: 'Reports', icon: BarChart3, options: reportTriggers },
       ];
     }
   };
