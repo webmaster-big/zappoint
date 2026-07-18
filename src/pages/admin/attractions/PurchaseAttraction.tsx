@@ -197,9 +197,45 @@ const PurchaseAttraction = () => {
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
+  const [partialDayOffs, setPartialDayOffs] = useState<Record<string, Array<{ time_start?: string | null; time_end?: string | null }>>>({});
   const [scheduleError, setScheduleError] = useState<string>('');
 
   const dayNumberToName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const timeToMinutes = (time: string): number => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+
+  const addMinutesToTime = (time: string, minutes: number): string => {
+    const total = timeToMinutes(time) + minutes;
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
+  const isSlotBlockedByDayOff = (
+    slotStart: string,
+    slotEnd: string,
+    closures: Array<{ time_start?: string | null; time_end?: string | null }>
+  ): boolean => {
+    const start = timeToMinutes(slotStart);
+    const end = timeToMinutes(slotEnd);
+    return closures.some(({ time_start, time_end }) => {
+      if (!time_start && !time_end) return true;
+      if (time_start && !time_end) {
+        const close = timeToMinutes(time_start);
+        return start >= close || end > close;
+      }
+      if (!time_start && time_end) {
+        const open = timeToMinutes(time_end);
+        return start < open;
+      }
+      const rangeStart = timeToMinutes(time_start as string);
+      const rangeEnd = timeToMinutes(time_end as string);
+      return start < rangeEnd && end > rangeStart;
+    });
+  };
 
   const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
     const slots: string[] = [];
@@ -252,15 +288,19 @@ const PurchaseAttraction = () => {
 
     if (dayAvailability) {
       const slots = generateTimeSlots(dayAvailability.start_time, dayAvailability.end_time, 60);
-      setAvailableTimeSlots(slots);
-      if (!slots.includes(scheduledTime)) {
+      const closures = partialDayOffs[scheduledDate] || [];
+      const openSlots = closures.length === 0
+        ? slots
+        : slots.filter(slot => !isSlotBlockedByDayOff(slot, addMinutesToTime(slot, 60), closures));
+      setAvailableTimeSlots(openSlots);
+      if (!openSlots.includes(scheduledTime)) {
         setScheduledTime('');
       }
     } else {
       setAvailableTimeSlots([]);
       setScheduledTime('');
     }
-  }, [scheduledDate, attraction]);
+  }, [scheduledDate, attraction, partialDayOffs]);
 
   useEffect(() => {
     const fetchDayOffs = async () => {
@@ -271,22 +311,43 @@ const PurchaseAttraction = () => {
         const response = await dayOffService.getDayOffsByLocation(locationId);
         if (response.success && response.data) {
           const blocked = new Set<string>();
+          const partial: Record<string, Array<{ time_start?: string | null; time_end?: string | null }>> = {};
           const now = new Date();
           now.setHours(0, 0, 0, 0);
+          const toDateStr = (d: Date) => {
+            const y = d.getFullYear();
+            const m = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          const addPartial = (dateStr: string, off: DayOff) => {
+            if (!partial[dateStr]) partial[dateStr] = [];
+            partial[dateStr].push({ time_start: off.time_start, time_end: off.time_end });
+          };
           response.data.forEach((dayOff: DayOff) => {
+            const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length;
+            if (!isLocationWide) return;
             const offDate = new Date(dayOff.date);
-            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
-            if (hasTimeRestriction) return;
+            const hasTimeRestriction = !!(dayOff.time_start || dayOff.time_end);
+            const targetDates: string[] = [];
             if (dayOff.is_recurring) {
               const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
-              if (currYear >= now) blocked.add(currYear.toISOString().split('T')[0]);
-              blocked.add(nextYear.toISOString().split('T')[0]);
-            } else {
-              if (offDate >= now) blocked.add(dayOff.date);
+              if (currYear >= now) targetDates.push(toDateStr(currYear));
+              targetDates.push(toDateStr(nextYear));
+            } else if (offDate >= now) {
+              targetDates.push(dayOff.date);
             }
+            targetDates.forEach((dateStr) => {
+              if (hasTimeRestriction) {
+                addPartial(dateStr, dayOff);
+              } else {
+                blocked.add(dateStr);
+              }
+            });
           });
           setDayOffDates(blocked);
+          setPartialDayOffs(partial);
         }
       } catch {
       }
