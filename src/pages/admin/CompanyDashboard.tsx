@@ -666,12 +666,12 @@ const CompanyDashboard: React.FC = () => {
       key: 'packages',
       title: 'Packages',
       value: metrics.totalBookings,
-      description: `${metrics.confirmedBookings} confirmed`,
+      description: `${metrics.confirmedBookings} confirmed · ${metrics.pendingBookings} pending`,
       icon: PackageIcon,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.packageBreakdown ?? [],
-      explanation: 'Package bookings placed in the selected period (counted by the date the booking was made, not the party date). Cancelled bookings are excluded. "Confirmed" counts bookings that were confirmed, including those already checked in or completed.',
+      explanation: 'All package bookings placed in the selected period, counted by the date the booking was made (not the party date). Excludes cancelled bookings but still includes pending ones, so this total is higher than the confirmed count. Open the card for the split by status and by package.',
     },
     {
       key: 'partyParticipants',
@@ -1120,8 +1120,24 @@ const CompanyDashboard: React.FC = () => {
                       </button>
                     </div>
                     <p className="text-[11px] text-gray-500 leading-relaxed mb-2 pb-2 border-b border-gray-100">{card.explanation}</p>
+                    {card.key === 'packages' && Array.isArray(dashboardBreakdowns.packageStatusBreakdown) && dashboardBreakdowns.packageStatusBreakdown.length > 0 && (
+                      <div className="space-y-1.5 mb-2 pb-2 border-b border-gray-100">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">By status</span>
+                        {(dashboardBreakdowns.packageStatusBreakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
+                          <div key={item.label} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 truncate mr-2">{item.label}</span>
+                            <span className="text-gray-800 font-medium shrink-0">
+                              {item.count} <span className="text-gray-400">({item.percentage}%)</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {hasBreakdown ? (
                       <div className="space-y-1.5">
+                        {card.key === 'packages' && (
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">By package</span>
+                        )}
                         {(card.breakdown as Array<{label:string;count:number;percentage:number;items?:Array<{label:string;count:number;percentage:number}>}>).map((item) => (
                           <div key={item.label}>
                             <div className="flex items-center justify-between text-xs">

@@ -325,8 +325,9 @@ const PurchaseAttraction = () => {
             partial[dateStr].push({ time_start: off.time_start, time_end: off.time_end });
           };
           response.data.forEach((dayOff: DayOff) => {
-            const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length;
-            if (!isLocationWide) return;
+            const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
+            const appliesToAttraction = !!dayOff.attraction_ids?.includes(Number(attraction.id));
+            if (!isLocationWide && !appliesToAttraction) return;
             const offDate = new Date(dayOff.date);
             const hasTimeRestriction = !!(dayOff.time_start || dayOff.time_end);
             const targetDates: string[] = [];

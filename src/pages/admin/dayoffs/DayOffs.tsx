@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers, LayoutGrid, List, Filter, RefreshCcw, Edit3, Check } from 'lucide-react';
+import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers, LayoutGrid, List, Filter, RefreshCcw, Edit3, Check, Copy } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
-import { dayOffService, packageService, roomService } from '../../../services';
+import { dayOffService, packageService, roomService, attractionService } from '../../../services';
+import { eventService } from '../../../services/EventService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import type { DayOff, DayOffFilters, BlockingScope } from '../../../services/DayOffService';
 import type { Package } from '../../../services/PackageService';
 import type { Room } from '../../../services/RoomService';
+import type { Attraction } from '../../../services/AttractionService';
+import type { Event } from '../../../types/event.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
@@ -52,20 +55,28 @@ const DayOffs: React.FC = () => {
     const [blockingScope, setBlockingScope] = useState<BlockingScope>('location');
     const [selectedPackageIds, setSelectedPackageIds] = useState<number[]>([]);
     const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
-    
+    const [selectedAttractionIds, setSelectedAttractionIds] = useState<number[]>([]);
+    const [selectedEventIds, setSelectedEventIds] = useState<number[]>([]);
+
     const [availablePackages, setAvailablePackages] = useState<Package[]>([]);
     const [availableRooms, setAvailableRooms] = useState<Room[]>([]); // Called "spaces" in UI
+    const [availableAttractions, setAvailableAttractions] = useState<Attraction[]>([]);
+    const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
     const [loadingResources, setLoadingResources] = useState(false);
     const [resourcesCache, setResourcesCache] = useState<{
         locationId: number | null;
         packages: Package[];
         rooms: Room[];
+        attractions: Attraction[];
+        events: Event[];
         timestamp: number;
     } | null>(null);
-    
+
     const [bulkBlockingScope, setBulkBlockingScope] = useState<BlockingScope>('location');
     const [bulkSelectedPackageIds, setBulkSelectedPackageIds] = useState<number[]>([]);
     const [bulkSelectedRoomIds, setBulkSelectedRoomIds] = useState<number[]>([]);
+    const [bulkSelectedAttractionIds, setBulkSelectedAttractionIds] = useState<number[]>([]);
+    const [bulkSelectedEventIds, setBulkSelectedEventIds] = useState<number[]>([]);
 
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
@@ -138,38 +149,48 @@ const DayOffs: React.FC = () => {
 
     useEffect(() => {
         const fetchPackagesAndRooms = async () => {
-            const locationId = isCompanyAdmin && modalLocationId 
-                ? modalLocationId 
+            const locationId = isCompanyAdmin
+                ? (modalLocationId ?? selectedLocationId ?? undefined)
                 : currentUser?.location_id;
-            
+
             if (!locationId) return;
             
             const CACHE_TTL = 120000;
-            if (resourcesCache && 
-                resourcesCache.locationId === locationId && 
+            if (resourcesCache &&
+                resourcesCache.locationId === locationId &&
                 Date.now() - resourcesCache.timestamp < CACHE_TTL) {
                 setAvailablePackages(resourcesCache.packages);
                 setAvailableRooms(resourcesCache.rooms);
+                setAvailableAttractions(resourcesCache.attractions);
+                setAvailableEvents(resourcesCache.events);
                 return;
             }
-            
+
             setLoadingResources(true);
             try {
-                const [packagesRes, roomsRes] = await Promise.all([
+                const [packagesRes, roomsRes, attractionsRes, eventsRes] = await Promise.all([
                     packageService.getPackages({ location_id: locationId, is_active: true, per_page: 100 }),
-                    roomService.getRooms({ location_id: locationId, is_available: true, per_page: 100 })
+                    roomService.getRooms({ location_id: locationId, is_available: true, per_page: 100 }),
+                    attractionService.getAttractions({ location_id: locationId, is_active: true, per_page: 100 }),
+                    eventService.getEvents({ location_id: locationId, is_active: true, per_page: 100 })
                 ]);
-                
+
                 const packages = packagesRes.success && packagesRes.data?.packages ? packagesRes.data.packages : [];
                 const rooms = roomsRes.success && roomsRes.data?.rooms ? roomsRes.data.rooms : [];
-                
+                const attractions = attractionsRes.success && attractionsRes.data?.attractions ? attractionsRes.data.attractions : [];
+                const events = eventsRes.success && Array.isArray(eventsRes.data) ? eventsRes.data : [];
+
                 setAvailablePackages(packages);
                 setAvailableRooms(rooms);
-                
+                setAvailableAttractions(attractions);
+                setAvailableEvents(events);
+
                 setResourcesCache({
                     locationId,
                     packages,
                     rooms,
+                    attractions,
+                    events,
                     timestamp: Date.now()
                 });
             } catch {
@@ -181,7 +202,7 @@ const DayOffs: React.FC = () => {
         if (showCreateModal || showEditModal || showBulkModal) {
             fetchPackagesAndRooms();
         }
-    }, [modalLocationId, showCreateModal, showEditModal, showBulkModal, isCompanyAdmin, currentUser?.location_id, resourcesCache]);
+    }, [modalLocationId, selectedLocationId, showCreateModal, showEditModal, showBulkModal, isCompanyAdmin, currentUser?.location_id, resourcesCache]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
@@ -205,6 +226,8 @@ const DayOffs: React.FC = () => {
         setBlockingScope('location');
         setSelectedPackageIds([]);
         setSelectedRoomIds([]);
+        setSelectedAttractionIds([]);
+        setSelectedEventIds([]);
     };
 
     const handleCreateDayOff = async (e: React.FormEvent) => {
@@ -218,15 +241,25 @@ const DayOffs: React.FC = () => {
             showToast('Please select at least one space', 'error');
             return;
         }
-        
+        if (blockingScope === 'attractions' && selectedAttractionIds.length === 0) {
+            showToast('Please select at least one attraction', 'error');
+            return;
+        }
+        if (blockingScope === 'events' && selectedEventIds.length === 0) {
+            showToast('Please select at least one event', 'error');
+            return;
+        }
+
         try {
-            const locationId = isCompanyAdmin && modalLocationId 
-                ? modalLocationId 
+            const locationId = isCompanyAdmin && modalLocationId
+                ? modalLocationId
                 : (currentUser?.location_id || 1);
-            
+
             let package_ids: number[] | null = null;
             let room_ids: number[] | null = null;
-            
+            let attraction_ids: number[] | null = null;
+            let event_ids: number[] | null = null;
+
             switch (blockingScope) {
                 case 'packages':
                     package_ids = selectedPackageIds;
@@ -238,8 +271,14 @@ const DayOffs: React.FC = () => {
                     package_ids = selectedPackageIds;
                     room_ids = selectedRoomIds;
                     break;
+                case 'attractions':
+                    attraction_ids = selectedAttractionIds;
+                    break;
+                case 'events':
+                    event_ids = selectedEventIds;
+                    break;
             }
-            
+
             await dayOffService.createDayOff({
                 location_id: locationId,
                 date: formData.date,
@@ -248,7 +287,9 @@ const DayOffs: React.FC = () => {
                 time_start: sanitizeTimeValue(formData.time_start),
                 time_end: sanitizeTimeValue(formData.time_end),
                 package_ids,
-                room_ids
+                room_ids,
+                attraction_ids,
+                event_ids
             });
             
             showToast('Day Off created successfully!', 'success');
@@ -273,11 +314,21 @@ const DayOffs: React.FC = () => {
             showToast('Please select at least one space', 'error');
             return;
         }
+        if (blockingScope === 'attractions' && selectedAttractionIds.length === 0) {
+            showToast('Please select at least one attraction', 'error');
+            return;
+        }
+        if (blockingScope === 'events' && selectedEventIds.length === 0) {
+            showToast('Please select at least one event', 'error');
+            return;
+        }
 
         try {
             let package_ids: number[] | null = null;
             let room_ids: number[] | null = null;
-            
+            let attraction_ids: number[] | null = null;
+            let event_ids: number[] | null = null;
+
             switch (blockingScope) {
                 case 'packages':
                     package_ids = selectedPackageIds;
@@ -289,8 +340,14 @@ const DayOffs: React.FC = () => {
                     package_ids = selectedPackageIds;
                     room_ids = selectedRoomIds;
                     break;
+                case 'attractions':
+                    attraction_ids = selectedAttractionIds;
+                    break;
+                case 'events':
+                    event_ids = selectedEventIds;
+                    break;
             }
-            
+
             const updateData = {
                 location_id: selectedDayOff.location_id, // Include location_id from the original day off
                 date: formData.date,
@@ -299,7 +356,9 @@ const DayOffs: React.FC = () => {
                 time_start: sanitizeTimeValue(formData.time_start),
                 time_end: sanitizeTimeValue(formData.time_end),
                 package_ids,
-                room_ids
+                room_ids,
+                attraction_ids,
+                event_ids
             };
             
             await dayOffService.updateDayOff(selectedDayOff.id, updateData);
@@ -491,52 +550,95 @@ const DayOffs: React.FC = () => {
         }
     };
 
-    const handleEditClick = (dayOff: DayOff) => {
-        setSelectedDayOff(dayOff);
-        
-        const normalizeTime = (time: string | null | undefined): string => {
-            if (!time) return '';
-            const match = time.match(/^(\d{2}:\d{2})/);
-            return match ? match[1] : time;
-        };
-        
-        const timeStart = normalizeTime(dayOff.time_start);
-        const timeEnd = normalizeTime(dayOff.time_end);
-        
-        setFormData({
-            date: dayOff.date.split('T')[0], // Extract date part
-            reason: dayOff.reason || '',
-            is_recurring: dayOff.is_recurring,
-            time_start: timeStart,
-            time_end: timeEnd
-        });
-        
+    const normalizeTimeValue = (time: string | null | undefined): string => {
+        if (!time) return '';
+        const match = time.match(/^(\d{2}:\d{2})/);
+        return match ? match[1] : time;
+    };
+
+    const applyBlockingScopeFromDayOff = (dayOff: DayOff) => {
         const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
         const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
-        
-        if (hasPackages && hasRooms) {
+        const hasAttractions = dayOff.attraction_ids && dayOff.attraction_ids.length > 0;
+        const hasEvents = dayOff.event_ids && dayOff.event_ids.length > 0;
+
+        if (hasAttractions) {
+            setBlockingScope('attractions');
+            setSelectedAttractionIds(dayOff.attraction_ids || []);
+            setSelectedEventIds([]);
+            setSelectedPackageIds([]);
+            setSelectedRoomIds([]);
+        } else if (hasEvents) {
+            setBlockingScope('events');
+            setSelectedEventIds(dayOff.event_ids || []);
+            setSelectedAttractionIds([]);
+            setSelectedPackageIds([]);
+            setSelectedRoomIds([]);
+        } else if (hasPackages && hasRooms) {
             setBlockingScope('both');
             setSelectedPackageIds(dayOff.package_ids || []);
             setSelectedRoomIds(dayOff.room_ids || []);
+            setSelectedAttractionIds([]);
+            setSelectedEventIds([]);
         } else if (hasPackages) {
             setBlockingScope('packages');
             setSelectedPackageIds(dayOff.package_ids || []);
             setSelectedRoomIds([]);
+            setSelectedAttractionIds([]);
+            setSelectedEventIds([]);
         } else if (hasRooms) {
             setBlockingScope('rooms');
             setSelectedPackageIds([]);
             setSelectedRoomIds(dayOff.room_ids || []);
+            setSelectedAttractionIds([]);
+            setSelectedEventIds([]);
         } else {
             setBlockingScope('location');
             setSelectedPackageIds([]);
             setSelectedRoomIds([]);
+            setSelectedAttractionIds([]);
+            setSelectedEventIds([]);
         }
-        
+    };
+
+    const handleEditClick = (dayOff: DayOff) => {
+        setSelectedDayOff(dayOff);
+
+        setFormData({
+            date: dayOff.date.split('T')[0], // Extract date part
+            reason: dayOff.reason || '',
+            is_recurring: dayOff.is_recurring,
+            time_start: normalizeTimeValue(dayOff.time_start),
+            time_end: normalizeTimeValue(dayOff.time_end)
+        });
+
+        applyBlockingScopeFromDayOff(dayOff);
+
         if (dayOff.location_id) {
             setModalLocationId(dayOff.location_id);
         }
-        
+
         setShowEditModal(true);
+    };
+
+    const handleDuplicateClick = (dayOff: DayOff) => {
+        setSelectedDayOff(null);
+
+        setFormData({
+            date: dayOff.date.split('T')[0],
+            reason: dayOff.reason || '',
+            is_recurring: dayOff.is_recurring,
+            time_start: normalizeTimeValue(dayOff.time_start),
+            time_end: normalizeTimeValue(dayOff.time_end)
+        });
+
+        applyBlockingScopeFromDayOff(dayOff);
+
+        if (dayOff.location_id) {
+            setModalLocationId(dayOff.location_id);
+        }
+
+        setShowCreateModal(true);
     };
 
     const handleFilterChange = (key: keyof DayOffFilters, value: boolean | undefined) => {
@@ -616,10 +718,25 @@ const DayOffs: React.FC = () => {
         return { label: `${formatTime(dayOff.time_start)} - ${formatTime(dayOff.time_end)}`, color: 'bg-yellow-100 text-yellow-700' };
     };
 
+    const renderItemLocation = (locationId?: number, nestedName?: string) => {
+        if (!isCompanyAdmin) return null;
+        const name = nestedName || scopeLocations.find(loc => loc.id === locationId)?.name || '';
+        if (!name) return null;
+        return <span className="text-xs text-gray-400 truncate">{name}</span>;
+    };
+
     const getBlockingScopeBadge = (dayOff: DayOff): { label: string; color: string; icon: typeof Building2 } | null => {
         const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
         const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
-        
+        const hasAttractions = dayOff.attraction_ids && dayOff.attraction_ids.length > 0;
+        const hasEvents = dayOff.event_ids && dayOff.event_ids.length > 0;
+
+        if (hasAttractions) {
+            return { label: `${dayOff.attraction_ids!.length} Attraction${dayOff.attraction_ids!.length > 1 ? 's' : ''}`, color: 'bg-indigo-100 text-indigo-700', icon: LayoutGrid };
+        }
+        if (hasEvents) {
+            return { label: `${dayOff.event_ids!.length} Event${dayOff.event_ids!.length > 1 ? 's' : ''}`, color: 'bg-emerald-100 text-emerald-700', icon: Calendar };
+        }
         if (!hasPackages && !hasRooms) {
             return { label: 'Entire Location', color: 'bg-red-100 text-red-700', icon: Building2 };
         }
@@ -681,6 +798,14 @@ const DayOffs: React.FC = () => {
             setToast({ message: 'Please select at least one space', type: 'error' });
             return;
         }
+        if (bulkBlockingScope === 'attractions' && bulkSelectedAttractionIds.length === 0) {
+            setToast({ message: 'Please select at least one attraction', type: 'error' });
+            return;
+        }
+        if (bulkBlockingScope === 'events' && bulkSelectedEventIds.length === 0) {
+            setToast({ message: 'Please select at least one event', type: 'error' });
+            return;
+        }
 
         setBulkCreating(true);
         let successCount = 0;
@@ -694,7 +819,9 @@ const DayOffs: React.FC = () => {
 
         let package_ids: number[] | null = null;
         let room_ids: number[] | null = null;
-        
+        let attraction_ids: number[] | null = null;
+        let event_ids: number[] | null = null;
+
         switch (bulkBlockingScope) {
             case 'packages':
                 package_ids = bulkSelectedPackageIds;
@@ -705,6 +832,12 @@ const DayOffs: React.FC = () => {
             case 'both':
                 package_ids = bulkSelectedPackageIds;
                 room_ids = bulkSelectedRoomIds;
+                break;
+            case 'attractions':
+                attraction_ids = bulkSelectedAttractionIds;
+                break;
+            case 'events':
+                event_ids = bulkSelectedEventIds;
                 break;
         }
 
@@ -718,7 +851,9 @@ const DayOffs: React.FC = () => {
                     time_start: sanitizeTimeValue(bulkTimeStart),
                     time_end: sanitizeTimeValue(bulkTimeEnd),
                     package_ids,
-                    room_ids
+                    room_ids,
+                    attraction_ids,
+                    event_ids
                 });
                 successCount++;
             } catch {
@@ -747,6 +882,8 @@ const DayOffs: React.FC = () => {
         setBulkBlockingScope('location');
         setBulkSelectedPackageIds([]);
         setBulkSelectedRoomIds([]);
+        setBulkSelectedAttractionIds([]);
+        setBulkSelectedEventIds([]);
     };
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -776,8 +913,8 @@ const DayOffs: React.FC = () => {
                             setBulkSelectedDates(new Set());
                             setBulkReason('');
                             setBulkIsRecurring(false);
-                            if (isCompanyAdmin && scopeLocations.length > 0) {
-                                setModalLocationId(scopeLocations[0].id);
+                            if (isCompanyAdmin) {
+                                setModalLocationId(selectedLocationId ?? (scopeLocations.length > 0 ? scopeLocations[0].id : null));
                             }
                             setShowBulkModal(true);
                         }}
@@ -790,8 +927,8 @@ const DayOffs: React.FC = () => {
                     <StandardButton
                         onClick={() => {
                             resetForm();
-                            if (isCompanyAdmin && scopeLocations.length > 0) {
-                                setModalLocationId(scopeLocations[0].id);
+                            if (isCompanyAdmin) {
+                                setModalLocationId(selectedLocationId ?? (scopeLocations.length > 0 ? scopeLocations[0].id : null));
                             }
                             setShowCreateModal(true);
                         }}
@@ -1047,6 +1184,16 @@ const DayOffs: React.FC = () => {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                handleDuplicateClick(dayOff);
+                                                            }}
+                                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                                                            title="Duplicate"
+                                                        >
+                                                            <Copy className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
                                                             }}
                                                             className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
@@ -1129,7 +1276,7 @@ const DayOffs: React.FC = () => {
                                                 {isCompanyAdmin && (
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
                                                 )}
-                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">Actions</th>
+                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
@@ -1237,6 +1384,16 @@ const DayOffs: React.FC = () => {
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
+                                                                            handleDuplicateClick(dayOff);
+                                                                        }}
+                                                                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                                                                        title="Duplicate"
+                                                                    >
+                                                                        <Copy className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
                                                                             handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
                                                                         }}
                                                                         className="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
@@ -1270,8 +1427,8 @@ const DayOffs: React.FC = () => {
                         <StandardButton
                             onClick={() => {
                                 resetForm();
-                                if (isCompanyAdmin && scopeLocations.length > 0) {
-                                    setModalLocationId(scopeLocations[0].id);
+                                if (isCompanyAdmin) {
+                                    setModalLocationId(selectedLocationId ?? (scopeLocations.length > 0 ? scopeLocations[0].id : null));
                                 }
                                 setShowCreateModal(true);
                             }}
@@ -1316,7 +1473,14 @@ const DayOffs: React.FC = () => {
                                             }))}
                                             selectedLocation={modalLocationId?.toString() || ''}
                                             onLocationChange={(locationId) => {
-                                                setModalLocationId(locationId ? Number(locationId) : null);
+                                                const next = locationId ? Number(locationId) : null;
+                                                if (next !== modalLocationId) {
+                                                    setSelectedPackageIds([]);
+                                                    setSelectedRoomIds([]);
+                                                    setSelectedAttractionIds([]);
+                                                    setSelectedEventIds([]);
+                                                }
+                                                setModalLocationId(next);
                                             }}
                                             themeColor={themeColor}
                                             fullColor={fullColor}
@@ -1416,8 +1580,8 @@ const DayOffs: React.FC = () => {
                                             type="button"
                                             onClick={() => setBlockingScope('both')}
                                             className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'both' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                blockingScope === 'both'
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
                                                     : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                             style={blockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
@@ -1426,6 +1590,40 @@ const DayOffs: React.FC = () => {
                                             <div>
                                                 <div className="font-medium text-sm">Both</div>
                                                 <div className="text-xs text-gray-500">Packages & rooms</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('attractions')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'attractions'
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'attractions' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <LayoutGrid className={`w-5 h-5 ${blockingScope === 'attractions' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'attractions' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Attractions Only</div>
+                                                <div className="text-xs text-gray-500">Select attractions</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('events')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'events'
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'events' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <Calendar className={`w-5 h-5 ${blockingScope === 'events' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'events' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Events Only</div>
+                                                <div className="text-xs text-gray-500">Select events</div>
                                             </div>
                                         </button>
                                     </div>
@@ -1455,7 +1653,10 @@ const DayOffs: React.FC = () => {
                                                                 }}
                                                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                             />
-                                                            <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                                {renderItemLocation(pkg.location_id, pkg.location?.name)}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -1488,7 +1689,82 @@ const DayOffs: React.FC = () => {
                                                                 }}
                                                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                             />
-                                                            <span className="text-sm text-gray-700">{room.name}</span>
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{room.name}</span>
+                                                                {renderItemLocation(room.location_id)}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {blockingScope === 'attractions' && (
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select Attractions <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading attractions...</div>
+                                            ) : availableAttractions.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No active attractions found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availableAttractions.map(attraction => (
+                                                        <label key={attraction.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedAttractionIds.includes(attraction.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedAttractionIds([...selectedAttractionIds, attraction.id]);
+                                                                    } else {
+                                                                        setSelectedAttractionIds(selectedAttractionIds.filter(id => id !== attraction.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{attraction.name}</span>
+                                                                {renderItemLocation(attraction.location_id)}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {blockingScope === 'events' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select Events <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading events...</div>
+                                            ) : availableEvents.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No active events found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availableEvents.map(event => (
+                                                        <label key={event.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedEventIds.includes(event.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedEventIds([...selectedEventIds, event.id]);
+                                                                    } else {
+                                                                        setSelectedEventIds(selectedEventIds.filter(id => id !== event.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{event.name}</span>
+                                                                {renderItemLocation(event.location_id, event.location?.name)}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -1694,8 +1970,8 @@ const DayOffs: React.FC = () => {
                                             type="button"
                                             onClick={() => setBlockingScope('both')}
                                             className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'both' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                blockingScope === 'both'
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
                                                     : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                             style={blockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
@@ -1704,6 +1980,40 @@ const DayOffs: React.FC = () => {
                                             <div>
                                                 <div className="font-medium text-sm">Both</div>
                                                 <div className="text-xs text-gray-500">Packages & rooms</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('attractions')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'attractions'
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'attractions' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <LayoutGrid className={`w-5 h-5 ${blockingScope === 'attractions' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'attractions' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Attractions Only</div>
+                                                <div className="text-xs text-gray-500">Select attractions</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('events')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'events'
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'events' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <Calendar className={`w-5 h-5 ${blockingScope === 'events' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'events' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Events Only</div>
+                                                <div className="text-xs text-gray-500">Select events</div>
                                             </div>
                                         </button>
                                     </div>
@@ -1733,7 +2043,10 @@ const DayOffs: React.FC = () => {
                                                                 }}
                                                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                             />
-                                                            <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                                {renderItemLocation(pkg.location_id, pkg.location?.name)}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -1766,7 +2079,82 @@ const DayOffs: React.FC = () => {
                                                                 }}
                                                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                             />
-                                                            <span className="text-sm text-gray-700">{room.name}</span>
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{room.name}</span>
+                                                                {renderItemLocation(room.location_id)}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {blockingScope === 'attractions' && (
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select Attractions <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading attractions...</div>
+                                            ) : availableAttractions.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No active attractions found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availableAttractions.map(attraction => (
+                                                        <label key={attraction.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedAttractionIds.includes(attraction.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedAttractionIds([...selectedAttractionIds, attraction.id]);
+                                                                    } else {
+                                                                        setSelectedAttractionIds(selectedAttractionIds.filter(id => id !== attraction.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{attraction.name}</span>
+                                                                {renderItemLocation(attraction.location_id)}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {blockingScope === 'events' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select Events <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading events...</div>
+                                            ) : availableEvents.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No active events found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availableEvents.map(event => (
+                                                        <label key={event.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedEventIds.includes(event.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedEventIds([...selectedEventIds, event.id]);
+                                                                    } else {
+                                                                        setSelectedEventIds(selectedEventIds.filter(id => id !== event.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{event.name}</span>
+                                                                {renderItemLocation(event.location_id, event.location?.name)}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -1920,7 +2308,16 @@ const DayOffs: React.FC = () => {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                                         <select
                                             value={modalLocationId || ''}
-                                            onChange={(e) => setModalLocationId(Number(e.target.value))}
+                                            onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                if (next !== modalLocationId) {
+                                                    setBulkSelectedPackageIds([]);
+                                                    setBulkSelectedRoomIds([]);
+                                                    setBulkSelectedAttractionIds([]);
+                                                    setBulkSelectedEventIds([]);
+                                                }
+                                                setModalLocationId(next);
+                                            }}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             disabled={bulkCreating}
                                         >
@@ -2065,8 +2462,8 @@ const DayOffs: React.FC = () => {
                                                 onClick={() => setBulkBlockingScope('both')}
                                                 disabled={bulkCreating}
                                                 className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'both' 
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    bulkBlockingScope === 'both'
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50`
                                                         : 'border-gray-200 hover:border-gray-300'
                                                 }`}
                                                 style={bulkBlockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
@@ -2074,6 +2471,40 @@ const DayOffs: React.FC = () => {
                                                 <Layers className={`w-5 h-5 ${bulkBlockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'both' ? { color: fullColor } : undefined} />
                                                 <div>
                                                     <div className="font-medium text-sm">Both</div>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkBlockingScope('attractions')}
+                                                disabled={bulkCreating}
+                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                    bulkBlockingScope === 'attractions'
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                style={bulkBlockingScope === 'attractions' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                            >
+                                                <LayoutGrid className={`w-5 h-5 ${bulkBlockingScope === 'attractions' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'attractions' ? { color: fullColor } : undefined} />
+                                                <div>
+                                                    <div className="font-medium text-sm">Attractions Only</div>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkBlockingScope('events')}
+                                                disabled={bulkCreating}
+                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                    bulkBlockingScope === 'events'
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                style={bulkBlockingScope === 'events' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                            >
+                                                <Calendar className={`w-5 h-5 ${bulkBlockingScope === 'events' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'events' ? { color: fullColor } : undefined} />
+                                                <div>
+                                                    <div className="font-medium text-sm">Events Only</div>
                                                 </div>
                                             </button>
                                         </div>
@@ -2105,7 +2536,10 @@ const DayOffs: React.FC = () => {
                                                                         disabled={bulkCreating}
                                                                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                                     />
-                                                                    <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                                    <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                                {renderItemLocation(pkg.location_id, pkg.location?.name)}
+                                                            </span>
                                                                 </label>
                                                             ))}
                                                         </div>
@@ -2139,7 +2573,84 @@ const DayOffs: React.FC = () => {
                                                                         disabled={bulkCreating}
                                                                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                                     />
-                                                                    <span className="text-sm text-gray-700">{room.name}</span>
+                                                                    <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{room.name}</span>
+                                                                {renderItemLocation(room.location_id)}
+                                                            </span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {bulkBlockingScope === 'attractions' && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                        Select Attractions <span className="text-red-500">*</span>
+                                                    </label>
+                                                    {loadingResources ? (
+                                                        <div className="text-sm text-gray-500">Loading attractions...</div>
+                                                    ) : availableAttractions.length === 0 ? (
+                                                        <div className="text-sm text-gray-500">No active attractions found</div>
+                                                    ) : (
+                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                            {availableAttractions.map(attraction => (
+                                                                <label key={attraction.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={bulkSelectedAttractionIds.includes(attraction.id)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setBulkSelectedAttractionIds([...bulkSelectedAttractionIds, attraction.id]);
+                                                                            } else {
+                                                                                setBulkSelectedAttractionIds(bulkSelectedAttractionIds.filter(id => id !== attraction.id));
+                                                                            }
+                                                                        }}
+                                                                        disabled={bulkCreating}
+                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                    <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{attraction.name}</span>
+                                                                {renderItemLocation(attraction.location_id)}
+                                                            </span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {bulkBlockingScope === 'events' && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                        Select Events <span className="text-red-500">*</span>
+                                                    </label>
+                                                    {loadingResources ? (
+                                                        <div className="text-sm text-gray-500">Loading events...</div>
+                                                    ) : availableEvents.length === 0 ? (
+                                                        <div className="text-sm text-gray-500">No active events found</div>
+                                                    ) : (
+                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                            {availableEvents.map(event => (
+                                                                <label key={event.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={bulkSelectedEventIds.includes(event.id)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setBulkSelectedEventIds([...bulkSelectedEventIds, event.id]);
+                                                                            } else {
+                                                                                setBulkSelectedEventIds(bulkSelectedEventIds.filter(id => id !== event.id));
+                                                                            }
+                                                                        }}
+                                                                        disabled={bulkCreating}
+                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                    <span className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-700">{event.name}</span>
+                                                                {renderItemLocation(event.location_id, event.location?.name)}
+                                                            </span>
                                                                 </label>
                                                             ))}
                                                         </div>

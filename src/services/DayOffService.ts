@@ -22,7 +22,7 @@ api.interceptors.request.use(
   }
 );
 
-export type BlockingScope = 'location' | 'packages' | 'rooms' | 'both';
+export type BlockingScope = 'location' | 'packages' | 'rooms' | 'attractions' | 'events' | 'both';
 
 export interface DayOff {
   id: number;
@@ -34,6 +34,8 @@ export interface DayOff {
   time_end?: string | null;    // Delayed opening until this time (e.g., "16:00" for open at 4 PM)
   package_ids?: number[] | null;  // Array of package IDs to block, null = all packages
   room_ids?: number[] | null;     // Array of room IDs to block, null = all rooms
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
   created_at: string;
   updated_at: string;
   location?: {
@@ -56,6 +58,8 @@ export interface DayOffFilters {
   user_id?: number;
   package_id?: number;         // Filter day offs that apply to this package
   room_id?: number;            // Filter day offs that apply to this room
+  attraction_id?: number;
+  event_id?: number;
   location_wide_only?: boolean; // Only return location-wide blocks
 }
 
@@ -68,6 +72,8 @@ export interface CreateDayOffData {
   time_end?: string | null;    // Delayed opening until this time
   package_ids?: number[] | null;  // Array of package IDs to block
   room_ids?: number[] | null;     // Array of room IDs to block
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
 }
 
 export interface UpdateDayOffData {
@@ -79,6 +85,8 @@ export interface UpdateDayOffData {
   time_end?: string | null;    // Delayed opening until this time
   package_ids?: number[] | null;  // Array of package IDs to block
   room_ids?: number[] | null;     // Array of room IDs to block
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
 }
 
 export interface CheckDateData {

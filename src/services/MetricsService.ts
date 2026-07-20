@@ -29,11 +29,13 @@ export interface BreakdownItem {
   label: string;
   count: number;
   percentage: number;
+  status?: string;
   items?: BreakdownItem[];
 }
 
 export interface DashboardBreakdowns {
   packageBreakdown: BreakdownItem[];
+  packageStatusBreakdown: BreakdownItem[];
   participantBreakdown: BreakdownItem[];
   attractionBreakdown: BreakdownItem[];
   eventBreakdown: BreakdownItem[];

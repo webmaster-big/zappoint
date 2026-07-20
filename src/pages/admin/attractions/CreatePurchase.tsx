@@ -453,6 +453,9 @@ const CreatePurchase = () => {
           const now = new Date();
           now.setHours(0, 0, 0, 0);
           response.data.forEach((dayOff: DayOff) => {
+            const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
+            const appliesToAttraction = !!dayOff.attraction_ids?.includes(Number(selectedAttraction.id));
+            if (!isLocationWide && !appliesToAttraction) return;
             const offDate = new Date(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             if (hasTimeRestriction) return;
