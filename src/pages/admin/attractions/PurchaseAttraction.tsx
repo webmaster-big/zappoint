@@ -271,9 +271,30 @@ const PurchaseAttraction = () => {
       if (enabledDays.length === 0) return [];
       return [{ days: enabledDays, start_time: '09:00', end_time: '17:00' }];
     }
-    
+
     return [];
   };
+
+  const { effectiveDayOffDates, partialDayOffDates } = useMemo(() => {
+    const fullyBlocked = new Set<string>(dayOffDates);
+    const partial = new Set<string>();
+    const availability = getAttractionAvailability();
+    Object.entries(partialDayOffs).forEach(([dateStr, closures]) => {
+      if (dayOffDates.has(dateStr)) return;
+      const date = new Date(dateStr + 'T00:00:00');
+      const dayName = dayNumberToName[date.getDay()].toLowerCase();
+      const dayAvailability = availability.find(slot => slot.days.map(d => d.toLowerCase()).includes(dayName));
+      if (!dayAvailability) return;
+      const slots = generateTimeSlots(dayAvailability.start_time, dayAvailability.end_time, 60);
+      const openSlots = slots.filter(slot => !isSlotBlockedByDayOff(slot, addMinutesToTime(slot, 60), closures));
+      if (openSlots.length === 0) {
+        fullyBlocked.add(dateStr);
+      } else {
+        partial.add(dateStr);
+      }
+    });
+    return { effectiveDayOffDates: fullyBlocked, partialDayOffDates: partial };
+  }, [dayOffDates, partialDayOffs, attraction]);
 
   useEffect(() => {
     if (!scheduledDate || !attraction) {
@@ -1149,7 +1170,8 @@ const PurchaseAttraction = () => {
                     {getAttractionAvailability().length > 0 && (
                       <ScheduleCalendar
                         availability={getAttractionAvailability()}
-                        dayOffDates={dayOffDates}
+                        dayOffDates={effectiveDayOffDates}
+                        partialDayOffDates={partialDayOffDates}
                         scheduledDate={scheduledDate}
                         scheduledTime={scheduledTime}
                         availableTimeSlots={availableTimeSlots}

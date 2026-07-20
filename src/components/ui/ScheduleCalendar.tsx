@@ -10,6 +10,7 @@ interface AvailabilitySlot {
 interface ScheduleCalendarProps {
   availability: AvailabilitySlot[];
   dayOffDates: Set<string>; // Set of 'YYYY-MM-DD' strings
+  partialDayOffDates?: Set<string>;
   scheduledDate: string;
   scheduledTime: string;
   availableTimeSlots: string[];
@@ -32,6 +33,7 @@ const formatTime12Hour = (time24: string): string => {
 const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   availability,
   dayOffDates,
+  partialDayOffDates,
   scheduledDate,
   scheduledTime,
   availableTimeSlots,
@@ -87,11 +89,12 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
       isToday: boolean;
       isSelected: boolean;
       isDayOff: boolean;
+      isPartialDayOff: boolean;
       isPast: boolean;
     }> = [];
 
     for (let i = 0; i < startPad; i++) {
-      days.push({ date: null, selectable: false, isToday: false, isSelected: false, isDayOff: false, isPast: false });
+      days.push({ date: null, selectable: false, isToday: false, isSelected: false, isDayOff: false, isPartialDayOff: false, isPast: false });
     }
 
     for (let d = 1; d <= totalDays; d++) {
@@ -101,12 +104,13 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
       const isToday = dateStr === formatDateStr(today);
       const isSelected = dateStr === scheduledDate;
       const isDayOff = dayOffDates.has(dateStr);
+      const isPartialDayOff = !isDayOff && !!partialDayOffDates?.has(dateStr);
       const isPast = date < today;
-      days.push({ date, selectable, isToday, isSelected, isDayOff, isPast });
+      days.push({ date, selectable, isToday, isSelected, isDayOff, isPartialDayOff, isPast });
     }
 
     return days;
-  }, [viewYear, viewMonth, scheduledDate, today, isDateSelectable, dayOffDates]);
+  }, [viewYear, viewMonth, scheduledDate, today, isDateSelectable, dayOffDates, partialDayOffDates]);
 
   const monthName = new Date(viewYear, viewMonth).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
@@ -211,16 +215,18 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
               className={`aspect-square flex flex-col items-center justify-center rounded-lg font-medium transition-all relative
                 ${day.isSelected
                   ? `bg-${themeColor}-600 text-white shadow-md ring-2 ring-${themeColor}-200`
+                  : day.isPartialDayOff
+                  ? 'text-amber-800 bg-amber-50 ring-1 ring-amber-200 hover:bg-amber-100'
                   : day.isToday
                   ? `bg-${themeColor}-100 text-${themeColor}-800 font-bold ring-1 ring-${themeColor}-300 hover:bg-${themeColor}-200`
                   : `text-gray-800 bg-${themeColor}-50/60 hover:bg-${themeColor}-100 hover:shadow-sm`
                 }
                 text-[11px]`}
-              title={day.isToday ? 'Today' : undefined}
+              title={day.isPartialDayOff ? 'Limited hours — some times unavailable' : day.isToday ? 'Today' : undefined}
             >
               {dateNum}
               {!day.isSelected && (
-                <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${day.isToday ? `bg-${themeColor}-600` : `bg-${themeColor}-400`}`} />
+                <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${day.isPartialDayOff ? 'bg-amber-500' : day.isToday ? `bg-${themeColor}-600` : `bg-${themeColor}-400`}`} />
               )}
             </button>
           );
@@ -239,6 +245,10 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-sm bg-red-100 border border-red-200" />
           <span className="text-[9px] text-gray-500">Day Off</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-sm bg-amber-50 ring-1 ring-amber-300" />
+          <span className="text-[9px] text-gray-500">Limited hours</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-sm bg-gray-100" />

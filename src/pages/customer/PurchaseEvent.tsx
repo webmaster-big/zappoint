@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
+import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { customerService, type Customer } from '../../services/CustomerService';
 import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
@@ -124,6 +125,8 @@ const PurchaseEvent = () => {
   const [error, setError] = useState('');
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [partialClosureDates, setPartialClosureDates] = useState<Set<string>>(new Set());
+  const [fullyBlockedDates, setFullyBlockedDates] = useState<Set<string>>(new Set());
   const [selectedDate, setSelectedDate] = useState('');
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState('');
@@ -420,6 +423,106 @@ const PurchaseEvent = () => {
       setLoadingSlots(false);
     }
   };
+
+  useEffect(() => {
+    const computeClosures = async () => {
+      if (!event?.location_id) return;
+      try {
+        const response = await dayOffService.getDayOffsByLocation(event.location_id);
+        if (!response.success || !response.data) return;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const toDateStr = (d: Date) => {
+          const y = d.getFullYear();
+          const m = (d.getMonth() + 1).toString().padStart(2, '0');
+          const day = d.getDate().toString().padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        };
+        const toMinutes = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + (m || 0);
+        };
+        const fromMinutes = (total: number) => {
+          const h = Math.floor(total / 60);
+          const m = total % 60;
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        };
+        const interval = event.interval_minutes || 60;
+        const startM = toMinutes(event.time_start);
+        const endM = toMinutes(event.time_end);
+        const eventSlots: string[] = [];
+        for (let cur = startM; cur < endM; cur += interval) {
+          if (cur + interval > endM) break;
+          eventSlots.push(fromMinutes(cur));
+        }
+        const isSlotBlocked = (slotStart: string, slotEnd: string, closures: Array<{ time_start?: string | null; time_end?: string | null }>) => {
+          const start = toMinutes(slotStart);
+          const end = toMinutes(slotEnd);
+          return closures.some(({ time_start, time_end }) => {
+            if (!time_start && !time_end) return true;
+            if (time_start && !time_end) { const close = toMinutes(time_start); return start >= close || end > close; }
+            if (!time_start && time_end) { const open = toMinutes(time_end); return start < open; }
+            const rangeStart = toMinutes(time_start as string);
+            const rangeEnd = toMinutes(time_end as string);
+            return start < rangeEnd && end > rangeStart;
+          });
+        };
+        const partialByDate: Record<string, Array<{ time_start?: string | null; time_end?: string | null }>> = {};
+        const fullDay = new Set<string>();
+        response.data.forEach((dayOff: DayOff) => {
+          const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
+          const appliesToEvent = !!dayOff.event_ids?.includes(event.id);
+          if (!isLocationWide && !appliesToEvent) return;
+          const rawDate = dayOff.date.split('T')[0];
+          const offDate = new Date(rawDate + 'T00:00:00');
+          const hasTimeRestriction = !!(dayOff.time_start || dayOff.time_end);
+          const targetDates: string[] = [];
+          if (dayOff.is_recurring) {
+            const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
+            const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+            if (currYear >= now) targetDates.push(toDateStr(currYear));
+            targetDates.push(toDateStr(nextYear));
+          } else if (offDate >= now) {
+            targetDates.push(rawDate);
+          }
+          targetDates.forEach((dateStr) => {
+            if (hasTimeRestriction) {
+              if (!partialByDate[dateStr]) partialByDate[dateStr] = [];
+              partialByDate[dateStr].push({ time_start: dayOff.time_start, time_end: dayOff.time_end });
+            } else {
+              fullDay.add(dateStr);
+            }
+          });
+        });
+        const partial = new Set<string>();
+        const blocked = new Set<string>(fullDay);
+        Object.entries(partialByDate).forEach(([dateStr, closures]) => {
+          if (fullDay.has(dateStr)) return;
+          const openSlots = eventSlots.filter(slot => !isSlotBlocked(slot, fromMinutes(toMinutes(slot) + interval), closures));
+          if (openSlots.length === 0) {
+            blocked.add(dateStr);
+          } else {
+            partial.add(dateStr);
+          }
+        });
+        setPartialClosureDates(partial);
+        setFullyBlockedDates(blocked);
+      } catch {
+      }
+    };
+    computeClosures();
+  }, [event]);
+
+  useEffect(() => {
+    if (selectedDate && fullyBlockedDates.has(selectedDate)) {
+      setSelectedDate('');
+    }
+  }, [fullyBlockedDates, selectedDate]);
+
+  const selectableDates = useMemo(
+    () => availableDates.filter(d => !fullyBlockedDates.has(d)),
+    [availableDates, fullyBlockedDates]
+  );
 
   const eventPrice = event ? parseFloat(event.price) : 0;
   const ticketSubtotal = eventPrice * quantity;
@@ -809,11 +912,17 @@ const PurchaseEvent = () => {
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                       >
                         <option value="">Choose a date…</option>
-                        {availableDates.map(d => (
-                          <option key={d} value={d}>{formatDate(d)}</option>
+                        {selectableDates.map(d => (
+                          <option key={d} value={d}>{formatDate(d)}{partialClosureDates.has(d) ? ' — limited hours' : ''}</option>
                         ))}
                       </select>
                     </div>
+                  )}
+
+                  {selectableDates.length === 0 && (
+                    <p className="text-sm text-orange-600 bg-orange-50 rounded-lg p-3 border border-orange-100">
+                      This event is not available on any upcoming dates (closed for day off).
+                    </p>
                   )}
 
                   {selectedDate && (
