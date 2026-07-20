@@ -281,7 +281,8 @@ const PurchaseAttraction = () => {
     const availability = getAttractionAvailability();
     Object.entries(partialDayOffs).forEach(([dateStr, closures]) => {
       if (dayOffDates.has(dateStr)) return;
-      const date = new Date(dateStr + 'T00:00:00');
+      const date = new Date(dateStr.split('T')[0] + 'T00:00:00');
+      if (Number.isNaN(date.getTime())) return;
       const dayName = dayNumberToName[date.getDay()].toLowerCase();
       const dayAvailability = availability.find(slot => slot.days.map(d => d.toLowerCase()).includes(dayName));
       if (!dayAvailability) return;
@@ -349,7 +350,8 @@ const PurchaseAttraction = () => {
             const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
             const appliesToAttraction = !!dayOff.attraction_ids?.includes(Number(attraction.id));
             if (!isLocationWide && !appliesToAttraction) return;
-            const offDate = new Date(dayOff.date);
+            const normalizedDate = dayOff.date.split('T')[0];
+            const offDate = new Date(normalizedDate + 'T00:00:00');
             const hasTimeRestriction = !!(dayOff.time_start || dayOff.time_end);
             const targetDates: string[] = [];
             if (dayOff.is_recurring) {
@@ -358,7 +360,7 @@ const PurchaseAttraction = () => {
               if (currYear >= now) targetDates.push(toDateStr(currYear));
               targetDates.push(toDateStr(nextYear));
             } else if (offDate >= now) {
-              targetDates.push(dayOff.date);
+              targetDates.push(normalizedDate);
             }
             targetDates.forEach((dateStr) => {
               if (hasTimeRestriction) {

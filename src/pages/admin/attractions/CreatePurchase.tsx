@@ -456,16 +456,17 @@ const CreatePurchase = () => {
             const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
             const appliesToAttraction = !!dayOff.attraction_ids?.includes(Number(selectedAttraction.id));
             if (!isLocationWide && !appliesToAttraction) return;
-            const offDate = new Date(dayOff.date);
+            const normalizedDate = dayOff.date.split('T')[0];
+            const offDate = new Date(normalizedDate + 'T00:00:00');
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             if (hasTimeRestriction) return;
             if (dayOff.is_recurring) {
               const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
-              if (currYear >= now) blocked.add(currYear.toISOString().split('T')[0]);
-              blocked.add(nextYear.toISOString().split('T')[0]);
+              if (currYear >= now) blocked.add(`${currYear.getFullYear()}-${(currYear.getMonth() + 1).toString().padStart(2, '0')}-${currYear.getDate().toString().padStart(2, '0')}`);
+              blocked.add(`${nextYear.getFullYear()}-${(nextYear.getMonth() + 1).toString().padStart(2, '0')}-${nextYear.getDate().toString().padStart(2, '0')}`);
             } else {
-              if (offDate >= now) blocked.add(dayOff.date);
+              if (offDate >= now) blocked.add(normalizedDate);
             }
           });
           setDayOffDates(blocked);
