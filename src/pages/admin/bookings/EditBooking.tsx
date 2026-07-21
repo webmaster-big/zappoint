@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Package, User, Home, MapPin, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
+import { Calendar, Package, User, Home, MapPin, AlertCircle, ArrowLeft, Bell, BellOff, Save, Plus, Minus, Gift } from 'lucide-react';
 import QRCode from 'qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -16,7 +16,7 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import locationService, { type Location } from '../../../services/LocationService';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import DatePicker from '../../../components/ui/DatePicker';
-import { formatTimeTo12Hour, getStoredUser } from '../../../utils/storage';
+import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 
@@ -104,6 +104,7 @@ const EditBooking: React.FC = () => {
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
 
   const loadPackagesAndRoomsForLocation = useCallback(async (locationId: number) => {
     const [packagesResult, roomsResult] = await Promise.all([
@@ -204,7 +205,15 @@ const EditBooking: React.FC = () => {
 
         setOriginalBooking(bookingData);
         setOriginalAmountPaid(Number(bookingData.amount_paid || 0));
-        
+
+        const initialAddOns: { [id: number]: number } = {};
+        (bookingData.add_ons || []).forEach((a) => {
+          const addonId = a.pivot?.add_on_id ?? a.id;
+          const qty = Number(a.pivot?.quantity ?? 0);
+          if (addonId && qty > 0) initialAddOns[addonId] = qty;
+        });
+        setSelectedAddOns(initialAddOns);
+
         setFormData({
           customerName: bookingData.guest_name || '',
           email: bookingData.guest_email || '',
@@ -338,6 +347,7 @@ const EditBooking: React.FC = () => {
   const handlePackageChange = async (packageId: number) => {
     setFormData(prev => ({ ...prev, packageId, date: '', time: '' }));
     setAvailableTimeSlots([]);
+    setSelectedAddOns({});
     
     try {
       const cachedPackage = availablePackages.find(pkg => pkg.id === packageId);
@@ -457,6 +467,111 @@ const EditBooking: React.FC = () => {
     if (!packageDetails) return dayOffsWithTime;
     return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, packageDetails.id));
   }, [dayOffsWithTime, packageDetails]);
+
+  const availableAddOns = useMemo(() => {
+    const list: any[] = Array.isArray((packageDetails as any)?.add_ons)
+      ? [...(packageDetails as any).add_ons]
+      : [];
+    const ids = new Set(list.map((a: any) => a.id));
+    (originalBooking?.add_ons || []).forEach((a) => {
+      const addonId = a.pivot?.add_on_id ?? a.id;
+      if (!ids.has(addonId)) {
+        list.push({
+          id: addonId,
+          name: a.name,
+          price: a.price ?? a.pivot?.price_at_booking ?? 0,
+          pricing_type: 'flat',
+        });
+        ids.add(addonId);
+      }
+    });
+    return list;
+  }, [packageDetails, originalBooking]);
+
+  const frozenAddOnPrices = useMemo(() => {
+    const map: { [id: number]: number } = {};
+    (originalBooking?.add_ons || []).forEach((a) => {
+      const addonId = a.pivot?.add_on_id ?? a.id;
+      if (addonId != null && a.pivot?.price_at_booking != null) {
+        map[addonId] = Number(a.pivot.price_at_booking);
+      }
+    });
+    return map;
+  }, [originalBooking]);
+
+  const getAddOnUnitPrice = useCallback((addonId: number, addOn: any) => {
+    if (Object.prototype.hasOwnProperty.call(frozenAddOnPrices, addonId)) {
+      return frozenAddOnPrices[addonId];
+    }
+    return Number(addOn?.price) || 0;
+  }, [frozenAddOnPrices]);
+
+  const handleAddOnChange = (addOnId: number, change: number) => {
+    const addOn = availableAddOns.find((a: any) => a.id === addOnId);
+    const minQty = addOn?.min_quantity ?? 0;
+    const maxQty = addOn?.max_quantity ?? 99;
+
+    setSelectedAddOns(prev => {
+      const currentValue = prev[addOnId] || 0;
+      let newValue = currentValue + change;
+
+      if (newValue > maxQty) newValue = maxQty;
+
+      if (newValue <= 0) {
+        const { [addOnId]: _removed, ...rest } = prev;
+        return rest;
+      }
+
+      if (currentValue === 0 && change > 0 && minQty > 1) newValue = minQty;
+
+      return { ...prev, [addOnId]: newValue };
+    });
+  };
+
+  const computeAddonsTotal = useCallback((addons: { [id: number]: number }, participants: number) => {
+    return Object.entries(addons).reduce((sum, [id, quantity]) => {
+      const addonId = parseInt(id);
+      const addOn = availableAddOns.find((a: any) => a.id === addonId);
+      if (!addOn) return sum;
+      const price = getAddOnUnitPrice(addonId, addOn);
+      const lineTotal = addOn.pricing_type === 'per_person'
+        ? price * quantity * participants
+        : price * quantity;
+      return sum + lineTotal;
+    }, 0);
+  }, [availableAddOns, getAddOnUnitPrice]);
+
+  const buildAdditionalAddons = useCallback(() => {
+    return Object.entries(selectedAddOns)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([id, quantity]) => {
+        const addonId = parseInt(id);
+        const addOn = availableAddOns.find((a: any) => a.id === addonId);
+        if (isNaN(addonId) || !addOn) return null;
+        return {
+          addon_id: addonId,
+          quantity,
+          price_at_booking: getAddOnUnitPrice(addonId, addOn),
+        };
+      })
+      .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
+  }, [selectedAddOns, availableAddOns, getAddOnUnitPrice]);
+
+  const addOnsChanged = useMemo(() => {
+    const originalMap: { [id: number]: number } = {};
+    (originalBooking?.add_ons || []).forEach((a) => {
+      const addonId = a.pivot?.add_on_id ?? a.id;
+      const qty = Number(a.pivot?.quantity ?? 0);
+      if (addonId && qty > 0) originalMap[addonId] = qty;
+    });
+    const norm = (m: { [id: number]: number }) =>
+      Object.entries(m)
+        .filter(([, q]) => q > 0)
+        .map(([id, q]) => `${id}:${q}`)
+        .sort()
+        .join(',');
+    return norm(originalMap) !== norm(selectedAddOns);
+  }, [originalBooking, selectedAddOns]);
 
   const filteredTimeSlots = availableTimeSlots.filter(slot => {
     if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
@@ -629,35 +744,35 @@ const EditBooking: React.FC = () => {
       let updatedTotal: number | undefined = undefined;
       const isPackageChanged = formData.packageId !== originalBooking.package_id;
       const isParticipantsChanged = formData.participants !== originalBooking.participants;
-      
+
       const originalFees = originalBooking.applied_fees || [];
       const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
-      
-      if (isPackageChanged || isParticipantsChanged || feesChanged) {
+
+      if (isPackageChanged || isParticipantsChanged || feesChanged || addOnsChanged) {
         const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
         const minParticipants = packageDetails?.min_participants || 1;
         const pricePerAdditional = Number(packageDetails?.price_per_additional || 0);
         const additionalCount = Math.max(0, formData.participants - minParticipants);
         const packagePrice = basePackagePrice + (additionalCount * pricePerAdditional);
-        
-        const attractionsTotal = (originalBooking.attractions || []).reduce((sum, attr) => {
-          const price = Number(attr.pivot?.price_at_booking || 0);
-          const qty = Number(attr.pivot?.quantity || 1);
-          return sum + (price * qty);
-        }, 0);
-        
-        const addonsTotal = (originalBooking.add_ons || []).reduce((sum, addon) => {
-          const price = Number(addon.pivot?.price_at_booking || 0);
-          const qty = Number(addon.pivot?.quantity || 1);
-          return sum + (price * qty);
-        }, 0);
-        
+
+        const attractionsTotal = isPackageChanged
+          ? 0
+          : (originalBooking.attractions || []).reduce((sum, attr) => {
+              const price = Number(attr.pivot?.price_at_booking || 0);
+              const qty = Number(attr.pivot?.quantity || 1);
+              return sum + (price * qty);
+            }, 0);
+
+        const addonsTotal = computeAddonsTotal(selectedAddOns, formData.participants);
+
         const additiveFeeTotal = appliedFees
           .filter(f => f.fee_application_type === 'additive')
           .reduce((sum, f) => sum + f.fee_amount, 0);
-        
+
         updatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
       }
+
+      const additionalAddons = buildAdditionalAddons();
 
       const response = await bookingService.updateBooking(Number(originalBooking.id), {
         guest_name: formData.customerName,
@@ -669,13 +784,16 @@ const EditBooking: React.FC = () => {
         status: formData.status,
         location_id: formData.locationId || undefined,
         package_id: formData.packageId || undefined,
-        room_id: formData.roomId ?? null,
-        notes: formData.notes || undefined,
+        room_id: formData.roomId || null,
+        notes: formData.notes,
+        internal_notes: formData.internalNotes,
         send_notification: formData.sendNotification,
         applied_fees: appliedFees.length > 0 ? appliedFees : null,
         applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
         discount_amount: originalBooking.discount_amount ? Number(originalBooking.discount_amount) : undefined,
-        ...(updatedTotal !== undefined && { total_amount: updatedTotal }),
+        ...(addOnsChanged && { additional_addons: additionalAddons }),
+        ...(isPackageChanged && { additional_attractions: [] }),
+        ...(updatedTotal !== undefined && { total_amount: updatedTotal, amount_paid: originalAmountPaid }),
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
@@ -684,25 +802,6 @@ const EditBooking: React.FC = () => {
       if (response.success) {
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
-        }
-
-        try {
-          const notesValue = formData.internalNotes || null;
-          const notesRes = await bookingService.updateInternalNotes(
-            Number(originalBooking.id),
-            notesValue ?? ''
-          );
-          if (notesRes.success && notesRes.data) {
-            const cachedBooking = await bookingCacheService.getBookingFromCache(Number(originalBooking.id));
-            if (cachedBooking) {
-              await bookingCacheService.updateBookingInCache({
-                ...cachedBooking,
-                internal_notes: notesRes.data.internal_notes ?? formData.internalNotes,
-              });
-            }
-          }
-        } catch (notesError) {
-          console.error('⚠️ Failed to save internal notes:', notesError);
         }
 
         if (formData.sendNotification) {
@@ -1121,6 +1220,89 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
+            {availableAddOns.length > 0 && (
+              <div>
+                <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                  <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">Add or adjust extras for this booking. Changing add-ons updates the total.</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {availableAddOns.map((addOn: any) => {
+                    const quantity = selectedAddOns[addOn.id] || 0;
+                    const isSelected = quantity > 0;
+                    const maxQty = addOn.max_quantity ?? 99;
+                    return (
+                      <div
+                        key={addOn.id}
+                        className={`rounded-lg overflow-hidden border transition-all ${
+                          isSelected
+                            ? `border-${themeColor}-500 bg-${themeColor}-50`
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {addOn.image && (
+                          <img
+                            src={getImageUrl(addOn.image)}
+                            alt={addOn.name}
+                            className="w-full h-20 object-cover"
+                          />
+                        )}
+                        <div className="p-3">
+                          <h4 className="font-medium text-sm text-gray-900 line-clamp-1">{addOn.name}</h4>
+                          <div className="flex items-baseline gap-1 mb-2">
+                            <span className={`text-sm font-bold text-${themeColor}-600`}>${getAddOnUnitPrice(addOn.id, addOn).toFixed(2)}</span>
+                            <span className="text-[10px] text-gray-500">{addOn.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <StandardButton
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              icon={Minus}
+                              onClick={() => handleAddOnChange(addOn.id, -1)}
+                              disabled={!isSelected}
+                            >
+                              {''}
+                            </StandardButton>
+                            <input
+                              type="number"
+                              min="0"
+                              max={maxQty}
+                              value={quantity}
+                              onChange={(e) => {
+                                let newQty = parseInt(e.target.value) || 0;
+                                if (newQty > maxQty) newQty = maxQty;
+                                if (newQty <= 0) {
+                                  setSelectedAddOns(prev => {
+                                    const { [addOn.id]: _removed, ...rest } = prev;
+                                    return rest;
+                                  });
+                                } else {
+                                  setSelectedAddOns(prev => ({ ...prev, [addOn.id]: newQty }));
+                                }
+                              }}
+                              onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                              className="w-14 text-center font-bold text-sm text-gray-900 border border-gray-300 rounded px-1 py-1"
+                            />
+                            <StandardButton
+                              type="button"
+                              variant="primary"
+                              size="sm"
+                              icon={Plus}
+                              onClick={() => handleAddOnChange(addOn.id, 1)}
+                              disabled={quantity >= maxQty}
+                            >
+                              {''}
+                            </StandardButton>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {packageDetails?.has_guest_of_honor && (
               <div>
                 <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
@@ -1427,7 +1609,7 @@ const EditBooking: React.FC = () => {
                   </span>
                 </div>
                 
-                {originalBooking?.attractions && originalBooking.attractions.length > 0 && (
+                {formData.packageId === originalBooking?.package_id && originalBooking?.attractions && originalBooking.attractions.length > 0 && (
                   <div className="pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500 mb-2">Attractions</p>
                     {originalBooking.attractions.map((attr, idx) => {
@@ -1445,18 +1627,22 @@ const EditBooking: React.FC = () => {
                   </div>
                 )}
                 
-                {originalBooking?.add_ons && originalBooking.add_ons.length > 0 && (
+                {Object.keys(selectedAddOns).length > 0 && (
                   <div className="pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500 mb-2">Add-ons</p>
-                    {originalBooking.add_ons.map((addon, idx) => {
-                      const price = Number(addon.pivot?.price_at_booking || 0);
-                      const qty = Number(addon.pivot?.quantity || 1);
+                    {Object.entries(selectedAddOns).map(([id, qty]) => {
+                      const addOn = availableAddOns.find((a: any) => a.id === parseInt(id));
+                      if (!addOn) return null;
+                      const unit = getAddOnUnitPrice(parseInt(id), addOn);
+                      const lineTotal = addOn.pricing_type === 'per_person'
+                        ? unit * qty * formData.participants
+                        : unit * qty;
                       return (
-                        <div key={idx} className="flex justify-between text-sm">
+                        <div key={id} className="flex justify-between text-sm">
                           <span className="text-gray-600">
-                            {addon.name} {qty > 1 && `×${qty}`}
+                            {addOn.name} {qty > 1 && `×${qty}`}{addOn.pricing_type === 'per_person' ? ` × ${formData.participants}` : ''}
                           </span>
-                          <span className="text-gray-900">${(price * qty).toFixed(2)}</span>
+                          <span className="text-gray-900">${lineTotal.toFixed(2)}</span>
                         </div>
                       );
                     })}
@@ -1471,29 +1657,27 @@ const EditBooking: React.FC = () => {
                   const additionalParticipantCost = additionalCount * pricePerAdditional;
                   const packagePrice = basePackagePrice + additionalParticipantCost;
                   
-                  const attractionsTotal = (originalBooking?.attractions || []).reduce((sum, attr) => {
-                    const price = Number(attr.pivot?.price_at_booking || 0);
-                    const qty = Number(attr.pivot?.quantity || 1);
-                    return sum + (price * qty);
-                  }, 0);
-                  
-                  const addonsTotal = (originalBooking?.add_ons || []).reduce((sum, addon) => {
-                    const price = Number(addon.pivot?.price_at_booking || 0);
-                    const qty = Number(addon.pivot?.quantity || 1);
-                    return sum + (price * qty);
-                  }, 0);
-                  
+                  const attractionsTotal = formData.packageId !== originalBooking?.package_id
+                    ? 0
+                    : (originalBooking?.attractions || []).reduce((sum, attr) => {
+                        const price = Number(attr.pivot?.price_at_booking || 0);
+                        const qty = Number(attr.pivot?.quantity || 1);
+                        return sum + (price * qty);
+                      }, 0);
+
+                  const addonsTotal = computeAddonsTotal(selectedAddOns, formData.participants);
+
                   const originalTotal = Number(originalBooking?.total_amount || 0);
-                  
+
                   const additiveFeeTotal = appliedFees
                     .filter(f => f.fee_application_type === 'additive')
                     .reduce((sum, f) => sum + f.fee_amount, 0);
-                  
+
                   const isPackageChanged = formData.packageId !== originalBooking?.package_id;
                   const isParticipantsChanged = formData.participants !== originalBooking?.participants;
                   const originalFees = originalBooking?.applied_fees || [];
                   const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
-                  const needsRecalc = isPackageChanged || isParticipantsChanged || feesChanged;
+                  const needsRecalc = isPackageChanged || isParticipantsChanged || feesChanged || addOnsChanged;
                   
                   const calculatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
                   const displayTotal = needsRecalc ? calculatedTotal : originalTotal;

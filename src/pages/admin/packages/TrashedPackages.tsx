@@ -6,6 +6,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
+import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
 
 interface UserData {
@@ -18,10 +19,10 @@ interface UserData {
 
 const TrashedPackages: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [trashedPackages, setTrashedPackages] = useState<Package[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filterLocation, setFilterLocation] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -119,9 +120,8 @@ const TrashedPackages: React.FC = () => {
   useEffect(() => {
     let result = [...trashedPackages];
 
-    if (filterLocation !== "all") {
-      const locationId = parseInt(filterLocation);
-      result = result.filter(pkg => pkg.location_id === locationId);
+    if (effectiveLocationId) {
+      result = result.filter(pkg => pkg.location_id === effectiveLocationId);
     }
 
     if (searchTerm.trim()) {
@@ -134,16 +134,7 @@ const TrashedPackages: React.FC = () => {
     }
 
     setFilteredPackages(result);
-  }, [trashedPackages, filterLocation, searchTerm]);
-
-  const uniqueLocations = trashedPackages
-    .filter(pkg => pkg.location)
-    .reduce((acc, pkg) => {
-      if (pkg.location && !acc.find(loc => loc.id === pkg.location!.id)) {
-        acc.push({ id: pkg.location.id, name: pkg.location.name });
-      }
-      return acc;
-    }, [] as Array<{ id: number; name: string }>);
+  }, [trashedPackages, effectiveLocationId, searchTerm]);
 
   const isCompanyAdmin = userData?.role === 'company_admin';
 
@@ -266,20 +257,6 @@ const TrashedPackages: React.FC = () => {
             </div>
           </div>
 
-          {isCompanyAdmin && uniqueLocations.length > 0 && (
-            <div className="sm:w-48">
-              <select
-                value={filterLocation}
-                onChange={(e) => setFilterLocation(e.target.value)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-              >
-                <option value="all">All Locations</option>
-                {uniqueLocations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
       </div>
 
@@ -291,7 +268,7 @@ const TrashedPackages: React.FC = () => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Deleted Packages</h3>
             <p className="text-gray-500">
-              {searchTerm || filterLocation !== "all" 
+              {searchTerm
                 ? "No deleted packages match your search criteria."
                 : "There are no deleted packages to manage."}
             </p>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, Minus, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Minus, Calendar, Clock, CreditCard, DollarSign } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -13,8 +13,10 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import StandardButton from '../../../components/ui/StandardButton';
 import roomService from '../../../services/RoomService';
-import { locationService } from '../../../services/LocationService';
-import LocationSelector from '../../../components/admin/LocationSelector';
+import { loadAcceptJS, processCardPayment, validateCardNumber, getCardType, formatCardNumber, createPayment } from '../../../services/PaymentService';
+import { PAYMENT_TYPE } from '../../../types/Payment.types';
+import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser, getImageUrl, formatTimeTo12Hour } from '../../../utils/storage';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { derivePaymentStatus } from '../../../types/Bookings.types';
@@ -67,12 +69,10 @@ const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
-  
+  const { effectiveLocationId } = useLocationScope();
+
   const [bookingMode, setBookingMode] = useState<'flexible' | 'standard'>('standard');
   
-  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [pkg, setPkg] = useState<any>(null);
@@ -87,7 +87,17 @@ const ManualBooking: React.FC = () => {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  
+
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardMonth, setCardMonth] = useState('');
+  const [cardYear, setCardYear] = useState('');
+  const [cardCVV, setCardCVV] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
+  const [authorizeClientKey, setAuthorizeClientKey] = useState('');
+  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
@@ -104,7 +114,7 @@ const ManualBooking: React.FC = () => {
     bookingDate: string;
     bookingTime: string;
     participants: number;
-    paymentMethod: 'in-store' | 'paylater';
+    paymentMethod: 'in-store' | 'paylater' | 'authorize.net';
     paymentStatus: 'paid' | 'partial' | 'pending';
     status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
     notes: string;
@@ -203,24 +213,32 @@ const ManualBooking: React.FC = () => {
   );
 
   useEffect(() => {
-    if (isCompanyAdmin) {
-      const fetchLocations = async () => {
-        try {
-          const response = await locationService.getLocations();
-          if (response.success && response.data) {
-            setLocations(Array.isArray(response.data) ? response.data : []);
-          }
-        } catch (error) {
-          console.error('Error fetching locations:', error);
-        }
-      };
-      fetchLocations();
-    }
-  }, [isCompanyAdmin]);
+    loadPackages();
+  }, [effectiveLocationId]);
 
   useEffect(() => {
-    loadPackages();
-  }, [selectedLocation]);
+    const loadAuthorizeNetSettings = async () => {
+      try {
+        setAuthorizeApiLoginId('');
+        const locationId = pkg?.location_id || effectiveLocationId || currentUser?.location_id || 1;
+        const settings = await getAuthorizeNetPublicKey(locationId);
+        if (settings && settings.api_login_id) {
+          setAuthorizeApiLoginId(settings.api_login_id);
+          setAuthorizeClientKey(settings.client_key || settings.api_login_id);
+          const env = (settings.environment || 'sandbox') as 'sandbox' | 'production';
+          setAuthorizeEnvironment(env);
+          await loadAcceptJS(env);
+        } else {
+          setAuthorizeApiLoginId('');
+        }
+      } catch (error) {
+        console.error('Failed to load Authorize.Net settings:', error);
+        setAuthorizeApiLoginId('');
+      }
+    };
+
+    loadAuthorizeNetSettings();
+  }, [pkg?.location_id, effectiveLocationId, currentUser?.location_id]);
 
   useEffect(() => {
     if (form.packageId) {
@@ -241,10 +259,10 @@ const ManualBooking: React.FC = () => {
         return;
       }
 
-      const cacheFilters = selectedLocation !== null 
-        ? { location_id: selectedLocation, status: 'active' as const }
-        : { status: 'active' as const };
-      
+      const cacheFilters = effectiveLocationId !== null
+        ? { location_id: effectiveLocationId, is_active: true }
+        : { is_active: true };
+
       const cachedPackages = await packageCacheService.getFilteredPackagesFromCache(cacheFilters);
       
       if (cachedPackages && cachedPackages.length > 0) {
@@ -258,8 +276,8 @@ const ManualBooking: React.FC = () => {
       }
 
       const params: any = {user_id: user.id};
-      if (selectedLocation !== null) {
-        params.location_id = selectedLocation;
+      if (effectiveLocationId !== null) {
+        params.location_id = effectiveLocationId;
       }
       const response = await bookingService.getPackages(params);
       
@@ -406,9 +424,9 @@ const ManualBooking: React.FC = () => {
     if (bookingMode !== 'standard') return;
     
     const fetchDayOffs = async () => {
-      const locationId = selectedLocation || (isCompanyAdmin ? null : currentUser?.location_id);
+      const locationId = pkg?.location_id || effectiveLocationId || currentUser?.location_id;
       if (!locationId) return;
-      
+
       try {
         const response = await dayOffService.getDayOffsByLocation(locationId);
         if (response.success && response.data) {
@@ -460,7 +478,7 @@ const ManualBooking: React.FC = () => {
     };
     
     fetchDayOffs();
-  }, [selectedLocation, isCompanyAdmin, currentUser?.location_id, bookingMode]);
+  }, [pkg?.location_id, effectiveLocationId, currentUser?.location_id, bookingMode]);
 
   useEffect(() => {
     if (bookingMode !== 'standard' || !pkg || !form.bookingDate) {
@@ -526,6 +544,12 @@ const ManualBooking: React.FC = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCardNumber(e.target.value);
+    setCardNumber(formatted);
+    setPaymentError('');
   };
 
   const handleAddOnChange = (addOnId: number, change: number) => {
@@ -695,7 +719,7 @@ const ManualBooking: React.FC = () => {
           entity_type: 'package',
           entity_id: pkg.id,
           base_price: basePrice,
-          location_id: pkg.location_id || selectedLocation || undefined,
+          location_id: pkg.location_id || undefined,
         });
         if (response.success && response.data) {
           setFeeBreakdown(response.data);
@@ -706,7 +730,7 @@ const ManualBooking: React.FC = () => {
       }
     };
     fetchFeeBreakdown();
-  }, [pkg, form.participants, selectedAddOns, selectedAttractions, selectedLocation]);
+  }, [pkg, form.participants, selectedAddOns, selectedAttractions]);
 
   useEffect(() => {
     const fetchSpecialPricing = async () => {
@@ -749,8 +773,7 @@ const ManualBooking: React.FC = () => {
     }
 
     isSubmittingRef.current = true;
-    lastSubmitTimeRef.current = now;
-    
+
     if (!form.customerName || !form.email || !form.packageId || !form.bookingDate || !form.bookingTime) {
       setToast({ message: 'Please fill in all required fields', type: 'error' });
       isSubmittingRef.current = false;
@@ -768,6 +791,8 @@ const ManualBooking: React.FC = () => {
       isSubmittingRef.current = false;
       return;
     }
+
+    lastSubmitTimeRef.current = now;
 
     try {
       setLoading(true);
@@ -850,8 +875,27 @@ const ManualBooking: React.FC = () => {
         finalDurationUnit = 'hours';
       }
       
-      const locationId = selectedLocation || user?.location_id || 1;
-      
+      const locationId = pkg?.location_id || effectiveLocationId || user?.location_id || 1;
+
+      const isCardPayment = form.paymentMethod === 'authorize.net';
+      const chargeAmount = finalAmountPaid;
+
+      if (isCardPayment) {
+        if (!authorizeApiLoginId) {
+          setToast({ message: 'Card payments are not configured for this location. Please choose another payment method.', type: 'error' });
+          return;
+        }
+        if (!(chargeAmount > 0)) {
+          setToast({ message: 'Enter an amount greater than $0 to charge the card.', type: 'error' });
+          return;
+        }
+        if (!validateCardNumber(cardNumber) || !cardMonth || !cardYear || !cardCVV) {
+          setPaymentError('Please enter valid card details (number, expiry, and CVV).');
+          setToast({ message: 'Please enter valid card details.', type: 'error' });
+          return;
+        }
+      }
+
       const bookingData: ExtendedBookingData = {
         guest_name: form.customerName,
         guest_email: form.email,
@@ -866,7 +910,7 @@ const ManualBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: finalTotalAmount,
         amount_paid: finalAmountPaid,
-        payment_method: form.paymentMethod as 'in-store' | 'paylater',
+        payment_method: form.paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
         payment_status: derivedPaymentStatus,
         status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
         notes: form.notes || undefined,
@@ -911,48 +955,172 @@ const ManualBooking: React.FC = () => {
       });
       console.log('================================\n');
       
-      const response = await bookingService.createBooking(bookingData);
-      
-      console.log('✅ Booking creation response:', response);
-      
-      if (response.success && response.data) {
-        const bookingId = response.data.id;
-        const referenceNumber = response.data.reference_number;
-        
+      let bookingId = 0;
+      let referenceNumber = '';
+
+      if (isCardPayment) {
+        setIsProcessingPayment(true);
+        setPaymentError('');
+
+        if (!window.Accept) {
+          await loadAcceptJS(authorizeEnvironment);
+        }
+
+        const response = await bookingService.createBooking(bookingData);
+        console.log('✅ Booking creation response (card):', response);
+
+        if (!response.success || !response.data) {
+          const errorMsg = response.message || 'Unknown error occurred';
+          setToast({ message: `Failed to create booking: ${errorMsg}`, type: 'error' });
+          return;
+        }
+
+        bookingId = response.data.id;
+        referenceNumber = response.data.reference_number;
+        const createdCustomerId = response.data.customer_id;
+
+        try {
+          await bookingCacheService.addBookingToCache(response.data);
+
+          const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#000000', light: '#FFFFFF' }
+          });
+
+          const nameParts = form.customerName.trim().split(/\s+/);
+          const customerData = {
+            first_name: nameParts[0] || '',
+            last_name: nameParts.slice(1).join(' ') || '',
+            email: form.email || '',
+            phone: form.phone || '',
+            address: form.guestAddress || '',
+            city: form.guestCity || '',
+            state: form.guestState || '',
+            zip: form.guestZip || '',
+            country: form.guestCountry || '',
+          };
+
+          const paymentResult = await processCardPayment(
+            {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              month: cardMonth,
+              year: cardYear,
+              cardCode: cardCVV,
+            },
+            {
+              location_id: locationId,
+              amount: chargeAmount,
+              order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
+              description: `Manual Booking: ${pkg.name}`,
+              customer_id: createdCustomerId || undefined,
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING,
+              send_email: sendEmail,
+              qr_code: qrCodeBase64,
+            },
+            authorizeApiLoginId,
+            authorizeClientKey,
+            customerData
+          );
+
+          if (!paymentResult.success) {
+            try {
+              await bookingService.forceDeleteBooking(bookingId);
+              await bookingCacheService.removeBookingFromCache(bookingId);
+            } catch (deleteErr) {
+              console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
+            }
+            const rawMsg = (paymentResult.message || '').toLowerCase();
+            let friendlyMsg = 'Payment could not be processed. The booking has been cancelled and no charges were made. Please check the card details and try again.';
+            if (rawMsg.includes('declin')) {
+              friendlyMsg = 'The card was declined. The booking has been cancelled and no charges were made.';
+            } else if (rawMsg.includes('insufficient')) {
+              friendlyMsg = 'Insufficient funds on the card. The booking has been cancelled and no charges were made.';
+            } else if (rawMsg.includes('expir')) {
+              friendlyMsg = 'The card appears to be expired. The booking has been cancelled and no charges were made.';
+            } else if (rawMsg.includes('cvv') || rawMsg.includes('security code')) {
+              friendlyMsg = 'Invalid security code (CVV). The booking has been cancelled and no charges were made.';
+            }
+            setPaymentError(friendlyMsg);
+            setToast({ message: friendlyMsg, type: 'error' });
+            return;
+          }
+
+          console.log('✅ Card payment charged:', paymentResult.transaction_id);
+        } catch (paymentErr: any) {
+          try {
+            await bookingService.forceDeleteBooking(bookingId);
+            await bookingCacheService.removeBookingFromCache(bookingId);
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+          }
+          const msg = /https/i.test(paymentErr?.message || '')
+            ? 'Authorize.Net requires a secure (HTTPS) connection to process card payments.'
+            : (paymentErr?.message || 'Failed to process payment. Please try again.');
+          setPaymentError(msg);
+          setToast({ message: msg, type: 'error' });
+          return;
+        }
+      } else {
+        const response = await bookingService.createBooking(bookingData);
+        console.log('✅ Booking creation response:', response);
+
+        if (!response.success || !response.data) {
+          const errorMsg = response.message || 'Unknown error occurred';
+          console.error('Booking creation failed:', errorMsg);
+          setToast({ message: `Failed to create booking: ${errorMsg}`, type: 'error' });
+          return;
+        }
+
+        bookingId = response.data.id;
+        referenceNumber = response.data.reference_number;
+        const createdCustomerId = response.data.customer_id;
+
         console.log('✅ Booking created:', { bookingId, referenceNumber });
-        
         await bookingCacheService.addBookingToCache(response.data);
-        
+
         try {
           const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
             width: 300,
             margin: 2,
             color: { dark: '#000000', light: '#FFFFFF' }
           });
-          
-          console.log('📱 QR Code generated for reference:', referenceNumber);
-          
           const qrResponse = await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
           console.log('✅ QR code stored with response:', qrResponse);
-          console.log('✅ Email preference sent:', sendEmail);
         } catch (qrError) {
           console.error('⚠️ Failed to generate/store QR code:', qrError);
         }
-        
-        const emailStatus = sendEmail ? ' Confirmation email sent.' : '';
-        const successMsg = bookingMode === 'standard'
-          ? `Booking created successfully! Reference: ${referenceNumber}${emailStatus}`
-          : `Booking recorded successfully! Reference: ${referenceNumber}${emailStatus}`;
-        setToast({ message: successMsg, type: 'success' });
-        
-        setTimeout(() => {
-          navigate('/bookings');
-        }, 1500);
-      } else {
-        const errorMsg = response.message || 'Unknown error occurred';
-        console.error('Booking creation failed:', errorMsg);
-        setToast({ message: `Failed to create booking: ${errorMsg}`, type: 'error' });
+
+        if (form.paymentMethod === 'in-store' && finalAmountPaid > 0) {
+          try {
+            await createPayment({
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING,
+              customer_id: createdCustomerId || null,
+              amount: finalAmountPaid,
+              currency: 'USD',
+              method: 'in-store',
+              status: 'completed',
+              location_id: locationId,
+              notes: `In-store payment for booking ${referenceNumber}`,
+            });
+            console.log('✅ In-store payment record created for booking:', bookingId);
+          } catch (paymentError) {
+            console.error('⚠️ Failed to create payment record:', paymentError);
+          }
+        }
       }
+
+      const emailStatus = sendEmail ? ' Confirmation email sent.' : '';
+      const successMsg = bookingMode === 'standard'
+        ? `Booking created successfully! Reference: ${referenceNumber}${emailStatus}`
+        : `Booking recorded successfully! Reference: ${referenceNumber}${emailStatus}`;
+      setToast({ message: successMsg, type: 'success' });
+
+      setTimeout(() => {
+        navigate('/bookings');
+      }, 1500);
     } catch (error: unknown) {
       console.error('❌ Error creating booking:', error);
       const err = error as { 
@@ -998,6 +1166,7 @@ const ManualBooking: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setIsProcessingPayment(false);
       isSubmittingRef.current = false;
     }
   };
@@ -1057,24 +1226,6 @@ const ManualBooking: React.FC = () => {
                   Flexible
                 </button>
               </div>
-              
-              {isCompanyAdmin && (
-                <LocationSelector
-                  locations={locations.map(loc => ({
-                    id: loc.id.toString(),
-                    name: loc.name,
-                    address: loc.address || '',
-                    city: loc.city || '',
-                    state: loc.state || ''
-                  }))}
-                  selectedLocation={selectedLocation?.toString() || ''}
-                  onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
-                  themeColor={themeColor}
-                  fullColor={fullColor}
-                  variant="compact"
-                  showAllOption={true}
-                />
-              )}
             </div>
           </div>
         </div>
@@ -1826,6 +1977,116 @@ const ManualBooking: React.FC = () => {
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-2">Payment Method</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <StandardButton
+                          type="button"
+                          variant={form.paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
+                          onClick={() => setForm(prev => ({ ...prev, paymentMethod: 'authorize.net' }))}
+                        >
+                          <CreditCard className="h-5 w-5 mx-auto mb-1" />
+                          <span className="text-xs font-medium">Card</span>
+                        </StandardButton>
+                        <StandardButton
+                          type="button"
+                          variant={form.paymentMethod === 'in-store' ? 'primary' : 'secondary'}
+                          onClick={() => setForm(prev => ({ ...prev, paymentMethod: 'in-store' }))}
+                        >
+                          <DollarSign className="h-5 w-5 mx-auto mb-1" />
+                          <span className="text-xs font-medium">In-Store</span>
+                        </StandardButton>
+                        <StandardButton
+                          type="button"
+                          variant={form.paymentMethod === 'paylater' ? 'primary' : 'secondary'}
+                          onClick={() => setForm(prev => ({ ...prev, paymentMethod: 'paylater' }))}
+                        >
+                          <Clock className="h-5 w-5 mx-auto mb-1" />
+                          <span className="text-xs font-medium">Pay Later</span>
+                        </StandardButton>
+                      </div>
+                    </div>
+
+                    {form.paymentMethod === 'authorize.net' && (
+                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        {!authorizeApiLoginId ? (
+                          <p className="text-xs text-red-700">
+                            Card payments are not configured for this location. Connect an Authorize.Net account in Settings, or choose another payment method.
+                          </p>
+                        ) : (
+                          <>
+                            <h4 className="text-xs font-medium text-gray-700 mb-3">Card Details</h4>
+                            <div className="mb-3">
+                              <label className="block text-[11px] font-medium text-gray-600 mb-1">Card Number</label>
+                              <input
+                                type="text"
+                                value={cardNumber}
+                                onChange={handleCardNumberChange}
+                                placeholder="1234 5678 9012 3456"
+                                maxLength={19}
+                                disabled={isProcessingPayment}
+                                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${cardNumber && validateCardNumber(cardNumber) ? 'border-green-400 bg-green-50' : cardNumber ? 'border-red-400' : 'border-gray-300'}`}
+                              />
+                              {cardNumber && <p className="text-[10px] mt-1 text-gray-600">{getCardType(cardNumber)}</p>}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[11px] font-medium text-gray-600 mb-1">Month</label>
+                                <select
+                                  value={cardMonth}
+                                  onChange={(e) => setCardMonth(e.target.value)}
+                                  disabled={isProcessingPayment}
+                                  className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                                >
+                                  <option value="">MM</option>
+                                  {Array.from({ length: 12 }, (_, i) => {
+                                    const m = (i + 1).toString().padStart(2, '0');
+                                    return <option key={m} value={m}>{m}</option>;
+                                  })}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-medium text-gray-600 mb-1">Year</label>
+                                <select
+                                  value={cardYear}
+                                  onChange={(e) => setCardYear(e.target.value)}
+                                  disabled={isProcessingPayment}
+                                  className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                                >
+                                  <option value="">YYYY</option>
+                                  {Array.from({ length: 10 }, (_, i) => {
+                                    const y = (new Date().getFullYear() + i).toString();
+                                    return <option key={y} value={y}>{y}</option>;
+                                  })}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-medium text-gray-600 mb-1">CVV</label>
+                                <input
+                                  type="text"
+                                  value={cardCVV}
+                                  onChange={(e) => {
+                                    const v = e.target.value.replace(/\D/g, '');
+                                    if (v.length <= 4) setCardCVV(v);
+                                  }}
+                                  placeholder="123"
+                                  maxLength={4}
+                                  disabled={isProcessingPayment}
+                                  className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm font-mono"
+                                />
+                              </div>
+                            </div>
+                            {paymentError && (
+                              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">{paymentError}</div>
+                            )}
+                            <p className="mt-3 text-[11px] text-gray-500">
+                              Secure payment powered by Authorize.Net. The card is charged for the Amount Paid value below.
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Total Amount</label>
@@ -1861,21 +2122,9 @@ const ManualBooking: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Method</label>
-                        <select
-                          name="paymentMethod"
-                          value={form.paymentMethod}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        >
-                          <option value="in-store">In-Store</option>
-                          <option value="paylater">Pay Later</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Payment Status</label>
                         {(() => {
                           const feeTotalForStatus = feeBreakdown 
                             ? feeBreakdown.total - (specialPricingBreakdown?.total_discount || 0)

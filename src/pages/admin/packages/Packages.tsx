@@ -7,6 +7,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, locationService, type Package, type CreatePackageData } from '../../../services';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { createSlugWithId } from '../../../utils/slug';
 
 interface UserData {
@@ -20,10 +21,10 @@ interface UserData {
 const Packages: React.FC = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [packages, setPackages] = useState<Package[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [filterLocation, setFilterLocation] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -181,9 +182,8 @@ const Packages: React.FC = () => {
   useEffect(() => {
     let result = [...packages];
 
-    if (filterLocation !== "all") {
-      const locationId = parseInt(filterLocation);
-      result = result.filter(pkg => pkg.location_id === locationId);
+    if (effectiveLocationId) {
+      result = result.filter(pkg => pkg.location_id === effectiveLocationId);
     }
 
     if (filterCategory !== "all") {
@@ -230,19 +230,10 @@ const Packages: React.FC = () => {
     });
 
     setFilteredPackages(result);
-  }, [packages, filterCategory, filterLocation, searchTerm, sortBy, sortOrder]);
+  }, [packages, filterCategory, effectiveLocationId, searchTerm, sortBy, sortOrder]);
 
   const categories = ["all", ...new Set(packages.map(pkg => pkg.category).filter(Boolean))];
 
-  const uniqueLocations = packages
-    .filter(pkg => pkg.location)
-    .reduce((acc, pkg) => {
-      if (pkg.location && !acc.find(loc => loc.id === pkg.location!.id)) {
-        acc.push({ id: pkg.location.id, name: pkg.location.name });
-      }
-      return acc;
-    }, [] as Array<{ id: number; name: string }>);
-  
   const isCompanyAdmin = userData?.role === 'company_admin';
 
   const handleDragStart = (index: number) => {
@@ -687,21 +678,6 @@ const Packages: React.FC = () => {
             </div>
             
             <div className="flex flex-wrap gap-1 items-center">
-              {isCompanyAdmin && uniqueLocations.length > 0 && (
-                <select
-                  value={filterLocation}
-                  onChange={(e) => setFilterLocation(e.target.value)}
-                  className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Locations</option>
-                  {uniqueLocations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -903,16 +879,14 @@ const Packages: React.FC = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No packages found</h3>
             <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
-              {searchTerm 
-                ? `No packages match "${searchTerm}"` 
-                : filterLocation !== "all"
-                  ? `No packages for the selected location`
-                  : filterCategory !== "all" 
-                    ? `No packages in the "${filterCategory}" category` 
-                    : "Create your first package to get started"
+              {searchTerm
+                ? `No packages match "${searchTerm}"`
+                : filterCategory !== "all"
+                  ? `No packages in the "${filterCategory}" category`
+                  : "Create your first package to get started"
               }
             </p>
-            {(searchTerm || filterCategory !== "all" || filterLocation !== "all") && (
+            {(searchTerm || filterCategory !== "all") && (
               <StandardButton
                 variant="secondary"
                 size="md"
@@ -920,7 +894,6 @@ const Packages: React.FC = () => {
                 onClick={() => {
                   setSearchTerm("");
                   setFilterCategory("all");
-                  setFilterLocation("all");
                 }}
               >
                 Clear Filters

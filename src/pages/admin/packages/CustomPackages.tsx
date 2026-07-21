@@ -5,16 +5,9 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, packageCacheService, type Package } from '../../../services';
 import { getStoredUser } from "../../../utils/storage";
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { createSlugWithId } from '../../../utils/slug';
 import Toast from '../../../components/ui/Toast';
-
-interface UserData {
-  name: string;
-  company: string;
-  subcompany?: string;
-  position: string;
-  role: 'attendant' | 'location_manager' | 'company_admin';
-}
 
 const packageTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
   custom: { label: 'Custom', icon: Sparkles, color: 'text-blue-600', bgColor: 'bg-blue-50' },
@@ -25,25 +18,17 @@ const packageTypeConfig: Record<string, { label: string; icon: React.ElementType
 
 const CustomPackages: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [packages, setPackages] = useState<Package[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [filterLocation, setFilterLocation] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userData, setUserData] = useState<UserData | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('zapzone_user');
-    if (stored) {
-      setUserData(JSON.parse(stored));
-    }
-  }, []);
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -125,9 +110,8 @@ const CustomPackages: React.FC = () => {
       result = result.filter(pkg => pkg.package_type === filterType);
     }
 
-    if (filterLocation !== "all") {
-      const locationId = parseInt(filterLocation);
-      result = result.filter(pkg => pkg.location_id === locationId);
+    if (effectiveLocationId) {
+      result = result.filter(pkg => pkg.location_id === effectiveLocationId);
     }
 
     if (filterCategory !== "all") {
@@ -174,22 +158,12 @@ const CustomPackages: React.FC = () => {
     });
 
     setFilteredPackages(result);
-  }, [packages, filterType, filterCategory, filterLocation, searchTerm, sortBy, sortOrder]);
+  }, [packages, filterType, filterCategory, effectiveLocationId, searchTerm, sortBy, sortOrder]);
 
   const categories = ["all", ...new Set(packages.map(pkg => pkg.category).filter(Boolean))];
 
   const packageTypes = ["all", ...new Set(packages.map(pkg => pkg.package_type).filter(Boolean))];
 
-  const uniqueLocations = packages
-    .filter(pkg => pkg.location)
-    .reduce((acc, pkg) => {
-      if (pkg.location && !acc.find(loc => loc.id === pkg.location!.id)) {
-        acc.push({ id: pkg.location.id, name: pkg.location.name });
-      }
-      return acc;
-    }, [] as Array<{ id: number; name: string }>);
-  
-  const isCompanyAdmin = userData?.role === 'company_admin';
 
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
@@ -336,19 +310,6 @@ const CustomPackages: React.FC = () => {
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
-
-              {isCompanyAdmin && uniqueLocations.length > 0 && (
-                <select
-                  value={filterLocation}
-                  onChange={(e) => setFilterLocation(e.target.value)}
-                  className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                >
-                  <option value="all">All Locations</option>
-                  {uniqueLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>{loc.name}</option>
-                  ))}
-                </select>
-              )}
 
               <select
                 value={sortBy}

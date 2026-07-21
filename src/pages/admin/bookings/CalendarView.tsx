@@ -29,7 +29,6 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
-import { locationService } from '../../../services/LocationService';
 import attractionPurchaseService, { type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import { AttractionScheduleCard, EventScheduleCard } from '../../../components/admin/calendar/ScheduledActivity';
@@ -61,14 +60,6 @@ const timeToMinutes = (time?: string | null): number => {
   return hours * 60 + (Number.isNaN(mins) ? 0 : mins);
 };
 
-interface UserData {
-  name: string;
-  company: string;
-  subcompany?: string;
-  position: string;
-  role: 'attendant' | 'location_manager' | 'company_admin';
-}
-
 const CalendarView: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const { effectiveLocationId } = useLocationScope();
@@ -92,9 +83,6 @@ const CalendarView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [filterLocation, setFilterLocation] = useState<string>('all');
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
   const [showColorLegend, setShowColorLegend] = useState(false);
@@ -110,29 +98,6 @@ const CalendarView: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('zapzone_user');
-    if (stored) {
-      setUserData(JSON.parse(stored));
-    }
-  }, []);
-  
-  useEffect(() => {
-    const fetchLocations = async () => {
-      if (userData?.role === 'company_admin') {
-        try {
-          const response = await locationService.getLocations();
-          if (response.success && response.data) {
-            setLocations(Array.isArray(response.data) ? response.data : []);
-          }
-        } catch (error) {
-          console.error('Error fetching locations:', error);
-        }
-      }
-    };
-    fetchLocations();
-  }, [userData]);
 
   const loadBookings = useCallback(async (silent = false) => {
     try {
@@ -328,11 +293,6 @@ const CalendarView: React.FC = () => {
       result = result.filter(booking => booking.location_id === effectiveLocationId);
     }
 
-    if (filterLocation !== 'all') {
-      const locationId = parseInt(filterLocation);
-      result = result.filter(booking => booking.location_id === locationId);
-    }
-
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(booking =>
@@ -352,7 +312,7 @@ const CalendarView: React.FC = () => {
 
     setFilteredBookings(result);
     console.log('Filtered bookings:', result.length, 'of', bookings.length);
-  }, [bookings, filters.search, filters.packages, filterLocation, effectiveLocationId]);
+  }, [bookings, filters.search, filters.packages, effectiveLocationId]);
 
   const handleFilterChange = (key: keyof CalendarViewFilterOptions, value: string | string[]) => {
     setFilters(prev => ({
@@ -391,7 +351,6 @@ const CalendarView: React.FC = () => {
       },
       search: ''
     });
-    setFilterLocation('all');
   };
 
   const navigateDate = (direction: 'prev' | 'next') => {
@@ -533,24 +492,16 @@ const CalendarView: React.FC = () => {
     if (effectiveLocationId) {
       result = result.filter(p => (p.location_id ?? p.attraction?.location_id) === effectiveLocationId);
     }
-    if (filterLocation !== 'all') {
-      const locationId = parseInt(filterLocation);
-      result = result.filter(p => (p.location_id ?? p.attraction?.location_id) === locationId);
-    }
     return result;
-  }, [attractionPurchases, filterLocation, effectiveLocationId]);
+  }, [attractionPurchases, effectiveLocationId]);
 
   const filteredEventPurchases = useMemo(() => {
     let result = eventPurchases;
     if (effectiveLocationId) {
       result = result.filter(p => p.location_id === effectiveLocationId);
     }
-    if (filterLocation !== 'all') {
-      const locationId = parseInt(filterLocation);
-      result = result.filter(p => p.location_id === locationId);
-    }
     return result;
-  }, [eventPurchases, filterLocation, effectiveLocationId]);
+  }, [eventPurchases, effectiveLocationId]);
 
   const getAttractionsForDate = (date: Date): AttractionPurchase[] => {
     const dateString = formatDateKey(date);
@@ -589,12 +540,6 @@ const CalendarView: React.FC = () => {
     
     return [...new Set(packages)];
   };
-
-  const getUniqueLocations = () => {
-    return locations;
-  };
-
-  const isCompanyAdmin = userData?.role === 'company_admin';
 
   const getBookingTitle = (booking: Booking) => {
     return booking.package?.name || 'Package Booking';
@@ -1321,27 +1266,6 @@ const CalendarView: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {isCompanyAdmin && getUniqueLocations().length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-2">
-                    <MapPin className="h-4 w-4 inline mr-1" />
-                    Location
-                  </label>
-                  <select
-                    value={filterLocation}
-                    onChange={(e) => setFilterLocation(e.target.value)}
-                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${fullColor}`}
-                  >
-                    <option value="all">All Locations</option>
-                    {getUniqueLocations().map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
                 <div className="relative">

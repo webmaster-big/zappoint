@@ -5,7 +5,6 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import DatePicker from '../../../components/ui/DatePicker';
-import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { 
   OnsiteBookingPackage, 
@@ -16,7 +15,7 @@ import { bookingCacheService } from '../../../services/BookingCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
-import { locationService } from '../../../services/LocationService';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
 
@@ -97,7 +96,8 @@ const OnsiteBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  
+  const { effectiveLocationId } = useLocationScope();
+
   const scrollToTop = () => {
     const mainContent = document.querySelector('main');
     if (mainContent) {
@@ -107,8 +107,7 @@ const OnsiteBooking: React.FC = () => {
     }
   };
   
-  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+  const selectedLocation = effectiveLocationId;
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
@@ -255,25 +254,6 @@ const OnsiteBooking: React.FC = () => {
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
   );
 
-  useEffect(() => {
-    if (isCompanyAdmin) {
-      const fetchLocations = async () => {
-        try {
-          const response = await locationService.getLocations();
-          console.log('Locations response:', response);
-          if (response.success && response.data) {
-            setLocations(Array.isArray(response.data) ? response.data : []);
-          } else {
-            setLocations([]);
-          }
-        } catch (error) {
-          console.error('Error fetching locations:', error);
-          setLocations([]);
-        }
-      };
-      fetchLocations();
-    }
-  }, [isCompanyAdmin]);
 
   useEffect(() => {
     if (!selectedPackage) {
@@ -3344,24 +3324,6 @@ const OnsiteBooking: React.FC = () => {
       <div className="py-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8 px-1">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 sm:ml-4">On-site Booking</h1>
-        
-        {isCompanyAdmin && (
-          <LocationSelector
-            variant="compact"
-            locations={locations.map(loc => ({
-              id: loc.id.toString(),
-              name: loc.name,
-              address: loc.address || '',
-              city: loc.city || '',
-              state: loc.state || ''
-            }))}
-            selectedLocation={selectedLocation?.toString() || ''}
-            onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
-            themeColor={themeColor}
-            fullColor={fullColor}
-            showAllOption={true}
-          />
-        )}
       </div>
       
       <div className="mb-8 px-4">
