@@ -68,6 +68,7 @@ const EditAttraction = () => {
   const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
+  const [attractionLocationId, setAttractionLocationId] = useState<number | null>(null);
 
   const handleAddOnDragStart = (index: number) => {
     setDraggedAddOnIndex(index);
@@ -110,7 +111,11 @@ const EditAttraction = () => {
         console.log('🔐 Loading attraction for edit - Auth Token:', authToken ? 'Present' : 'Missing');
         const response = await attractionService.getAttraction(Number(id));
         const attraction = response.data;
-        
+
+        if (attraction.location_id != null) {
+          setAttractionLocationId(attraction.location_id);
+        }
+
         setFormData({
           name: attraction.name || '',
           description: attraction.description || '',
@@ -170,10 +175,18 @@ const EditAttraction = () => {
       }
     };
     
+    fetchCategories();
+  }, [id]);
+
+  useEffect(() => {
+    if (attractionLocationId == null) {
+      setAddOns([]);
+      return;
+    }
     const fetchAddOns = async () => {
       try {
-        const params: { user_id?: number } = { user_id: getStoredUser()?.id };
-        const cacheFilters = { is_active: true as const };
+        const params: { user_id?: number; location_id: number } = { user_id: getStoredUser()?.id, location_id: attractionLocationId };
+        const cacheFilters = { location_id: attractionLocationId, is_active: true as const };
         const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache(cacheFilters);
 
         if (cachedAddOns && cachedAddOns.length > 0) {
@@ -191,10 +204,8 @@ const EditAttraction = () => {
         console.error('Error fetching add-ons:', error);
       }
     };
-    
-    fetchCategories();
     fetchAddOns();
-  }, [id]);
+  }, [attractionLocationId]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

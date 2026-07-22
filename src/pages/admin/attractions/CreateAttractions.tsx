@@ -13,6 +13,7 @@ import { addOnCacheService } from '../../../services/AddOnCacheService';
 import type { Location } from '../../../services/LocationService';
 import type { Category } from '../../../services/CategoryService';
 import LocationSelector from '../../../components/admin/LocationSelector';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { Plus, Trash2, Info, Tag, Calendar, Clock, GripVertical, X } from 'lucide-react';
 import { formatDurationDisplay, formatTimeRange } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -22,6 +23,7 @@ const CreateAttraction = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId } = useLocationScope();
 
   const getAuthToken = () => {
     const userData = localStorage.getItem('zapzone_user');
@@ -62,7 +64,7 @@ const CreateAttraction = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>(effectiveLocationId != null ? String(effectiveLocationId) : '');
   const [categories, setCategories] = useState<Category[]>([]);
   const [displayCapacityToCustomers, setDisplayCapacityToCustomers] = useState(true);
 
@@ -105,7 +107,7 @@ const CreateAttraction = () => {
       const response = await locationService.getLocations();
       const locationsArray = Array.isArray(response.data) ? response.data : [];
       setLocations(locationsArray);
-      if (locationsArray.length > 0) {
+      if (locationsArray.length > 0 && !selectedLocation) {
         setSelectedLocation(locationsArray[0].id.toString());
       }
     } catch (error) {
@@ -129,16 +131,26 @@ const CreateAttraction = () => {
   React.useEffect(() => {
     fetchLocations();
     fetchCategories();
-    fetchAddOns();
   }, []);
 
+  React.useEffect(() => {
+    if (effectiveLocationId != null) {
+      setSelectedLocation(String(effectiveLocationId));
+    }
+  }, [effectiveLocationId]);
+
+  React.useEffect(() => {
+    fetchAddOns();
+  }, [selectedLocation]);
+
   const fetchAddOns = async () => {
+    if (!selectedLocation) {
+      setAddOns([]);
+      return;
+    }
     try {
-      const params: { user_id?: number; location_id?: number } = { user_id: getStoredUser()?.id };
-      if (selectedLocation) {
-        params.location_id = Number(selectedLocation);
-      }
-      const cacheFilters = selectedLocation ? { location_id: Number(selectedLocation), is_active: true } : { is_active: true };
+      const params: { user_id?: number; location_id?: number } = { user_id: getStoredUser()?.id, location_id: Number(selectedLocation) };
+      const cacheFilters = { location_id: Number(selectedLocation), is_active: true };
       const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache(cacheFilters);
 
       if (cachedAddOns && cachedAddOns.length > 0) {

@@ -30,6 +30,7 @@ import type {
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
 import { getStoredUser } from "../../../utils/storage";
+import { useLocationScope } from '../../../contexts/LocationContext';
 
 const getOrdinal = (n: number): string => {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -61,8 +62,13 @@ const CreatePackage: React.FC = () => {
     
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
+    const { effectiveLocationId } = useLocationScope();
     const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
-    const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+    const [selectedLocation, setSelectedLocation] = useState<number | null>(effectiveLocationId);
+
+    useEffect(() => {
+        setSelectedLocation(effectiveLocationId);
+    }, [effectiveLocationId]);
 
     useEffect(() => {
         if (isCompanyAdmin) {
@@ -84,43 +90,77 @@ const CreatePackage: React.FC = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                
-                const params: { user_id: any; location_id?: number } = {user_id: getStoredUser()?.id};
-                if (selectedLocation !== null && selectedLocation !== undefined) {
-                    params.location_id = selectedLocation;
+
+                const [promosRes, giftCardsRes, categoriesRes] = await Promise.all([
+                    promoService.getPromos(),
+                    giftCardService.getGiftCards(),
+                    categoryService.getCategories()
+                ]);
+
+                const promosData = promosRes.data?.promos?.filter(promo =>
+                    promo.status === "active" && !promo.deleted
+                ).map(promo => ({
+                    id: promo.id,
+                    name: promo.name,
+                    code: promo.code,
+                    description: promo.description || ''
+                })) || [];
+
+                const giftCardsData = giftCardsRes.data?.gift_cards?.filter(gc =>
+                    gc.status === "active" && !gc.deleted
+                ).map(gc => ({
+                    id: gc.id,
+                    name: gc.code, // Use code as display name
+                    code: gc.code,
+                    description: gc.description || ''
+                })) || [];
+
+                const categoriesData = categoriesRes.data || [];
+
+                setPromos(promosData);
+                setGiftCards(giftCardsData);
+                setCategories(categoriesData);
+
+                if (selectedLocation === null || selectedLocation === undefined) {
+                    setAttractions([]);
+                    setAddOns([]);
+                    setRooms([]);
+                    return;
                 }
-                
-                const cacheFilters = selectedLocation ? { location_id: selectedLocation } : {};
-                
+
+                const params = {
+                    user_id: getStoredUser()?.id,
+                    location_id: selectedLocation
+                };
+
+                const cacheFilters = { location_id: selectedLocation };
+
                 const [cachedRooms, cachedAttractions, cachedAddOns] = await Promise.all([
                     roomCacheService.getFilteredRoomsFromCache(cacheFilters),
                     attractionCacheService.getFilteredAttractionsFromCache({ ...cacheFilters, is_active: true }),
                     addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true })
                 ]);
-                
+
                 if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground(params);
                 if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground(params);
                 if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(params);
-                
-                const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
+
+                const roomsPromise = (cachedRooms && cachedRooms.length > 0)
                     ? Promise.resolve({ data: { rooms: cachedRooms } })
                     : roomService.getRooms(params);
-                    
+
                 const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
                     ? Promise.resolve({ data: { attractions: cachedAttractions } })
                     : attractionService.getAttractions(params);
-                    
+
                 const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
                     ? Promise.resolve({ data: { add_ons: cachedAddOns } })
                     : addOnService.getAddOns(params);
-                
-                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
+
+                const [attractionsRes, addOnsRes, roomsRes] = await Promise.all([
                     attractionsPromise,
                     addOnsPromise,
-                    roomsPromise,
-                    promoService.getPromos(),
-                    giftCardService.getGiftCards(),
-                    categoryService.getCategories()
+                    roomsPromise
                 ]);
 
                 const attractionsData = attractionsRes.data?.attractions?.map(attr => ({
@@ -143,20 +183,20 @@ const CreatePackage: React.FC = () => {
                     name: room.name,
                     area_group: room.area_group || undefined
                 }));
-                
+
                 if (!cachedRooms || cachedRooms.length === 0) {
                     if (roomsList.length > 0) {
                         await roomCacheService.cacheRooms(roomsList);
                     }
                 }
-                
+
                 if (!cachedAttractions || cachedAttractions.length === 0) {
                     const attractionsList = attractionsRes.data?.attractions || [];
                     if (attractionsList.length > 0) {
                         await attractionCacheService.cacheAttractions(attractionsList);
                     }
                 }
-                
+
                 if (!cachedAddOns || cachedAddOns.length === 0) {
                     const addOnsList = addOnsRes.data?.add_ons || [];
                     if (addOnsList.length > 0) {
@@ -164,32 +204,9 @@ const CreatePackage: React.FC = () => {
                     }
                 }
 
-                const promosData = promosRes.data?.promos?.filter(promo => 
-                    promo.status === "active" && !promo.deleted
-                ).map(promo => ({
-                    id: promo.id,
-                    name: promo.name,
-                    code: promo.code,
-                    description: promo.description || ''
-                })) || [];
-
-                const giftCardsData = giftCardsRes.data?.gift_cards?.filter(gc => 
-                    gc.status === "active" && !gc.deleted
-                ).map(gc => ({
-                    id: gc.id,
-                    name: gc.code, // Use code as display name
-                    code: gc.code,
-                    description: gc.description || ''
-                })) || [];
-
-                const categoriesData = categoriesRes.data || [];
-
                 setAttractions(attractionsData);
                 setAddOns(addOnsData);
                 setRooms(roomsData);
-                setPromos(promosData);
-                setGiftCards(giftCardsData);
-                setCategories(categoriesData);
             } catch (error) {
                 console.error('Error fetching data:', error);
                 showToast('Error loading data from server', 'error');
@@ -511,7 +528,12 @@ const CreatePackage: React.FC = () => {
             showToast("Please add at least one availability schedule", "error");
             return;
         }
-        
+
+        if (selectedLocation === null || selectedLocation === undefined) {
+            showToast("Please select a location for this package", "error");
+            return;
+        }
+
         setSubmitting(true);
         try {
             const price = parseFloat(form.price);
@@ -570,7 +592,7 @@ const CreatePackage: React.FC = () => {
                 duration_unit: form.durationUnit,
                 image: form.image,
                 status: 'active' as const,
-                location_id: selectedLocation || 1,
+                location_id: selectedLocation,
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,
@@ -745,9 +767,14 @@ const CreatePackage: React.FC = () => {
                                         maxWidth="100%"
                                         showAllOption={false}
                                     />
+                                    {selectedLocation === null && (
+                                        <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                            Select a location to load its rooms, add-ons, and attractions.
+                                        </p>
+                                    )}
                                 </div>
                             )}
-                            
+
                             <div>
                                 <label className="block font-semibold mb-2 text-base text-neutral-800">Package Image</label>
                                 <input

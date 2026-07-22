@@ -26,6 +26,7 @@ import { attractionCacheService } from '../../../services/AttractionCacheService
 import { eventCacheService } from '../../../services/EventCacheService';
 import { locationService } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -98,6 +99,7 @@ const SpecialPricings: React.FC = () => {
 
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const userLocationId = currentUser?.location_id || null;
+  const { effectiveLocationId } = useLocationScope();
 
   const entityTypeParam = searchParams.get('entity_type');
   const initialEntityType: 'package' | 'attraction' | 'event' | 'all' =
@@ -168,30 +170,38 @@ const SpecialPricings: React.FC = () => {
     }
   }, []);
 
-  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'all') => {
+  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'all', locationId: number | null) => {
     setLoadingEntities(true);
     try {
       if (entityType === 'package' || entityType === 'all') {
-        const cachedPackages = await packageCacheService.getCachedPackages();
+        const cachedPackages = locationId != null
+          ? await packageCacheService.getFilteredPackagesFromCache({ location_id: locationId })
+          : await packageCacheService.getCachedPackages();
         if (cachedPackages && cachedPackages.length > 0) {
           setPackages(cachedPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
         } else {
-          const freshPackages = await packageCacheService.getPackages({ user_id: currentUser?.id });
+          const freshPackages = await packageCacheService.getPackages({ user_id: currentUser?.id, location_id: locationId ?? undefined });
           setPackages(freshPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
         }
       }
       if (entityType === 'attraction' || entityType === 'all') {
-        const cachedAttractions = await attractionCacheService.getCachedAttractions();
+        const cachedAttractions = locationId != null
+          ? await attractionCacheService.getFilteredAttractionsFromCache({ location_id: locationId })
+          : await attractionCacheService.getCachedAttractions();
         if (cachedAttractions && cachedAttractions.length > 0) {
           setAttractions(cachedAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         } else {
-          const freshAttractions = await attractionCacheService.getAttractions({ user_id: currentUser?.id });
+          const freshAttractions = await attractionCacheService.getAttractions({ user_id: currentUser?.id, location_id: locationId ?? undefined });
           setAttractions(freshAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         }
       }
       if (entityType === 'event' || entityType === 'all') {
-        const cached = await eventCacheService.getCachedEvents();
-        const eventList = cached || await eventCacheService.getEvents({ user_id: currentUser?.id });
+        const cached = locationId != null
+          ? await eventCacheService.getFilteredEventsFromCache({ location_id: locationId })
+          : await eventCacheService.getCachedEvents();
+        const eventList = (cached && cached.length > 0)
+          ? cached
+          : await eventCacheService.getEvents({ user_id: currentUser?.id, location_id: locationId ?? undefined });
         const today = new Date().toISOString().split('T')[0];
         const activeEvents = eventList.filter((e) => {
           if (e.is_active === false) return false;
@@ -199,7 +209,7 @@ const SpecialPricings: React.FC = () => {
           return true;
         });
         setEvents(activeEvents.map((e: { id: number; name: string }) => ({ id: e.id, name: e.name })));
-        if (cached) eventCacheService.syncInBackground({ user_id: currentUser?.id });
+        if (cached && cached.length > 0) eventCacheService.syncInBackground({ user_id: currentUser?.id, location_id: locationId ?? undefined });
       }
     } catch {
       console.error('Failed to load entities');
@@ -208,13 +218,15 @@ const SpecialPricings: React.FC = () => {
     }
   }, [currentUser?.id]);
 
+  const entityScopeLocationId = (form.location_id ?? effectiveLocationId) ?? null;
+
   useEffect(() => { loadSpecialPricings(); loadLocations(); }, [loadSpecialPricings, loadLocations]);
 
   useEffect(() => {
     if (showModal) {
-      loadEntities(form.entity_type);
+      loadEntities(form.entity_type, entityScopeLocationId);
     }
-  }, [showModal, form.entity_type, loadEntities]);
+  }, [showModal, form.entity_type, entityScopeLocationId, loadEntities]);
 
   const locationName = useCallback((sp: SpecialPricing) => {
     if (sp.location_id === null) return 'All Locations';

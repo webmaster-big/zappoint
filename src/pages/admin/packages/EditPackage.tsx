@@ -27,6 +27,7 @@ import type {
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
+import { getStoredUser } from '../../../utils/storage';
 
 const getOrdinal = (n: number): string => {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -111,26 +112,51 @@ const EditPackage: React.FC = () => {
             }
 
             try {
-                const cachedRooms = await roomCacheService.getCachedRooms();
-                const cachedAddOns = await addOnCacheService.getCachedAddOns();
-                const cachedAttractions = await attractionCacheService.getCachedAttractions();
-                
-                if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground();
-                if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground();
-                if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground();
-                
-                const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
+                console.log('Fetching package with ID:', id);
+                const response = await packageService.getPackage(parseInt(id));
+                console.log('Package API response:', response);
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const pkg = response.data as any; // Using 'any' to handle time slot fields that may not be in type yet
+
+                console.log("Loaded package data:", pkg);
+
+                if (!pkg || !pkg.id) {
+                    console.error('Package data is empty or missing ID');
+                    setNotFound(true);
+                    setLoading(false);
+                    return;
+                }
+
+                const locId: number = pkg.location_id ?? 1;
+                setPackageLocationId(locId);
+
+                const scopeParams = {
+                    user_id: getStoredUser()?.id,
+                    location_id: locId
+                };
+                const cacheFilters = { location_id: locId };
+
+                const cachedRooms = await roomCacheService.getFilteredRoomsFromCache(cacheFilters);
+                const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true });
+                const cachedAttractions = await attractionCacheService.getFilteredAttractionsFromCache({ ...cacheFilters, is_active: true });
+
+                if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground(scopeParams);
+                if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground(scopeParams);
+                if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(scopeParams);
+
+                const roomsPromise = (cachedRooms && cachedRooms.length > 0)
                     ? Promise.resolve({ data: { rooms: cachedRooms } })
-                    : roomService.getRooms();
-                    
+                    : roomService.getRooms(scopeParams);
+
                 const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
                     ? Promise.resolve({ data: { add_ons: cachedAddOns } })
-                    : addOnService.getAddOns();
+                    : addOnService.getAddOns(scopeParams);
 
                 const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
                     ? Promise.resolve({ data: { attractions: cachedAttractions } })
-                    : attractionService.getAttractions();
-                
+                    : attractionService.getAttractions(scopeParams);
+
                 const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
                     attractionsPromise,
                     addOnsPromise,
@@ -208,26 +234,6 @@ const EditPackage: React.FC = () => {
                 setGiftCards(giftCardsData);
                 setCategories(categoriesData);
                 setCategories(categoriesData);
-
-                console.log('Fetching package with ID:', id);
-                const response = await packageService.getPackage(parseInt(id));
-                console.log('Package API response:', response);
-                
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const pkg = response.data as any; // Using 'any' to handle time slot fields that may not be in type yet
-                
-                console.log("Loaded package data:", pkg);
-
-                if (!pkg || !pkg.id) {
-                    console.error('Package data is empty or missing ID');
-                    setNotFound(true);
-                    setLoading(false);
-                    return;
-                }
-
-                if (pkg.location_id) {
-                    setPackageLocationId(pkg.location_id);
-                }
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const attractionNames = pkg.attractions?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];

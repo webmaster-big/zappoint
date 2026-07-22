@@ -24,6 +24,7 @@ import { locationService } from '../../../services/LocationService';
 import { eventCacheService } from '../../../services/EventCacheService';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import { getStoredUser } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -47,6 +48,7 @@ const FeeSupports: React.FC = () => {
 
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const userLocationId = currentUser?.location_id || null;
+  const { effectiveLocationId } = useLocationScope();
 
   const entityTypeParam = searchParams.get('entity_type');
   const initialEntityType: 'package' | 'attraction' | 'event' | 'membership' | 'all' =
@@ -109,31 +111,39 @@ const FeeSupports: React.FC = () => {
     }
   }, []);
 
-  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'membership') => {
+  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'membership', locationId: number | null) => {
     setLoadingEntities(true);
     try {
       if (entityType === 'membership') {
         const plans = await membershipCache.getPlans();
         setMembershipPlans(plans.map((p) => ({ id: p.id, name: p.name })));
       } else if (entityType === 'package') {
-        const cachedPackages = await packageCacheService.getCachedPackages();
+        const cachedPackages = locationId != null
+          ? await packageCacheService.getFilteredPackagesFromCache({ location_id: locationId })
+          : await packageCacheService.getCachedPackages();
         if (cachedPackages && cachedPackages.length > 0) {
           setPackages(cachedPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
         } else {
-          const freshPackages = await packageCacheService.getPackages({ user_id: currentUser?.id });
+          const freshPackages = await packageCacheService.getPackages({ user_id: currentUser?.id, location_id: locationId ?? undefined });
           setPackages(freshPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
         }
       } else if (entityType === 'attraction') {
-        const cachedAttractions = await attractionCacheService.getCachedAttractions();
+        const cachedAttractions = locationId != null
+          ? await attractionCacheService.getFilteredAttractionsFromCache({ location_id: locationId })
+          : await attractionCacheService.getCachedAttractions();
         if (cachedAttractions && cachedAttractions.length > 0) {
           setAttractions(cachedAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         } else {
-          const freshAttractions = await attractionCacheService.getAttractions({ user_id: currentUser?.id });
+          const freshAttractions = await attractionCacheService.getAttractions({ user_id: currentUser?.id, location_id: locationId ?? undefined });
           setAttractions(freshAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         }
       } else if (entityType === 'event') {
-        const cached = await eventCacheService.getCachedEvents();
-        let eventList = cached || await eventCacheService.getEvents({ user_id: currentUser?.id });
+        const cached = locationId != null
+          ? await eventCacheService.getFilteredEventsFromCache({ location_id: locationId })
+          : await eventCacheService.getCachedEvents();
+        const eventList = (cached && cached.length > 0)
+          ? cached
+          : await eventCacheService.getEvents({ user_id: currentUser?.id, location_id: locationId ?? undefined });
         const today = new Date().toISOString().split('T')[0];
         const activeEvents = eventList.filter(ev => {
           if (ev.is_active === false) return false;
@@ -142,7 +152,7 @@ const FeeSupports: React.FC = () => {
           return true;
         });
         setEvents(activeEvents.map(ev => ({ id: ev.id, name: ev.name })));
-        if (cached) eventCacheService.syncInBackground({ user_id: currentUser?.id });
+        if (cached && cached.length > 0) eventCacheService.syncInBackground({ user_id: currentUser?.id, location_id: locationId ?? undefined });
       }
     } catch {
       console.error('Failed to load entities');
@@ -151,13 +161,15 @@ const FeeSupports: React.FC = () => {
     }
   }, [currentUser?.id]);
 
+  const entityScopeLocationId = (form.location_id ?? effectiveLocationId) ?? null;
+
   useEffect(() => { loadFeeSupports(); loadLocations(); }, [loadFeeSupports, loadLocations]);
 
   useEffect(() => {
     if (showModal) {
-      loadEntities(form.entity_type);
+      loadEntities(form.entity_type, entityScopeLocationId);
     }
-  }, [showModal, form.entity_type, loadEntities]);
+  }, [showModal, form.entity_type, entityScopeLocationId, loadEntities]);
 
   const formatFeeAmount = (fs: FeeSupport) => {
     if (fs.fee_calculation_type === 'percentage') return `${parseFloat(fs.fee_amount)}%`;

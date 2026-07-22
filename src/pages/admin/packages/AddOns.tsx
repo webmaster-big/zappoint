@@ -83,29 +83,28 @@ const ManageAddons = () => {
   useEffect(() => {
     const loadPackages = async () => {
       if (!showModal) return;
-      
+
+      const locationId = isCompanyAdmin ? modalLocationId : currentUser?.location_id;
+
+      if (!locationId) {
+        setPackages([]);
+        return;
+      }
+
       try {
         setLoadingPackages(true);
-        
-        const locationId = isCompanyAdmin ? modalLocationId : currentUser?.location_id;
-        
-        const params: { user_id?: number; location_id?: number } = { user_id: getStoredUser()?.id };
-        if (locationId) {
-          params.location_id = locationId;
-        }
-        
-        const cachedPackages = await packageCacheService.getPackages(params);
-        
+
+        const params: { user_id?: number; location_id?: number } = { user_id: getStoredUser()?.id, location_id: locationId };
+
+        const cachedPackages = await packageCacheService.getFilteredPackagesFromCache({ location_id: locationId });
+
         if (cachedPackages && cachedPackages.length > 0) {
-          console.log('[AddOns] Loaded packages from cache:', cachedPackages.length);
           setPackages(cachedPackages);
         } else {
-          console.log('[AddOns] Fetching packages from API...');
           const response = await packageService.getPackages(params);
           if (response.data?.packages) {
             setPackages(response.data.packages);
             await packageCacheService.cachePackages(response.data.packages);
-            console.log('[AddOns] Cached', response.data.packages.length, 'packages');
           }
         }
       } catch (error) {

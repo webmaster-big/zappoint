@@ -51,6 +51,38 @@ const EditEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    const loadAddOns = async () => {
+      if (!selectedLocation) {
+        setAllAddOns([]);
+        return;
+      }
+      const locId = parseInt(selectedLocation);
+      try {
+        const cached = await addOnCacheService.getFilteredAddOnsFromCache({ location_id: locId });
+        if (cached && cached.length > 0) {
+          setAllAddOns(cached.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+          addOnCacheService.syncInBackground({ user_id: currentUser?.id, location_id: locId });
+          return;
+        }
+        const addOnRes = await addOnService.getAddOns({ user_id: currentUser?.id, location_id: locId });
+        const raw = addOnRes as unknown as Record<string, unknown>;
+        let addOnList: Array<{ id: number; name: string; price: number | null }> = [];
+        if (raw.data && typeof raw.data === 'object' && Array.isArray((raw.data as Record<string, unknown>).add_ons)) {
+          addOnList = (raw.data as Record<string, unknown>).add_ons as typeof addOnList;
+        } else if (Array.isArray(raw.add_ons)) {
+          addOnList = raw.add_ons as typeof addOnList;
+        } else if (Array.isArray(raw.data)) {
+          addOnList = raw.data as typeof addOnList;
+        }
+        setAllAddOns(addOnList.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+      } catch {
+        console.error('EditEvent: Failed to load add-ons');
+      }
+    };
+    loadAddOns();
+  }, [selectedLocation]);
+
   const populateEventForm = (event: Event) => {
     setName(event.name || '');
     setDescription(event.description || '');
@@ -117,29 +149,6 @@ const EditEvent = () => {
             setLocations(locList.map((l) => ({ id: l.id, name: l.name })));
           } catch {
             console.error('EditEvent: Failed to load locations');
-          }
-        })(),
-        (async () => {
-          try {
-            const cached = await addOnCacheService.getCachedAddOns();
-            if (cached && cached.length > 0) {
-              setAllAddOns(cached.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
-              addOnCacheService.syncInBackground({ user_id: currentUser?.id });
-            } else {
-              const addOnRes = await addOnService.getAddOns({ user_id: currentUser?.id });
-              const raw = addOnRes as unknown as Record<string, unknown>;
-              let addOnList: Array<{ id: number; name: string; price: number | null }> = [];
-              if (raw.data && typeof raw.data === 'object' && Array.isArray((raw.data as Record<string, unknown>).add_ons)) {
-                addOnList = (raw.data as Record<string, unknown>).add_ons as typeof addOnList;
-              } else if (Array.isArray(raw.add_ons)) {
-                addOnList = raw.add_ons as typeof addOnList;
-              } else if (Array.isArray(raw.data)) {
-                addOnList = raw.data as typeof addOnList;
-              }
-              setAllAddOns(addOnList.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
-            }
-          } catch {
-            console.error('EditEvent: Failed to load add-ons');
           }
         })(),
         (async () => {

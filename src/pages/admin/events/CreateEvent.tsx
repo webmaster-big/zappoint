@@ -8,6 +8,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import type { CreateEventData } from '../../../types/event.types';
 import { Plus, Trash2, GripVertical, X, Calendar, Clock, DollarSign, MapPin, Star, Package } from 'lucide-react';
 
@@ -16,9 +17,10 @@ const CreateEvent = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const { effectiveLocationId } = useLocationScope();
 
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>(effectiveLocationId != null ? String(effectiveLocationId) : '');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -43,9 +45,18 @@ const CreateEvent = () => {
 
   useEffect(() => {
     loadLocations();
-    loadAddOns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (effectiveLocationId != null) {
+      setSelectedLocation(String(effectiveLocationId));
+    }
+  }, [effectiveLocationId]);
+
+  useEffect(() => {
+    loadAddOns();
+  }, [selectedLocation]);
 
   const loadLocations = async () => {
     try {
@@ -60,8 +71,12 @@ const CreateEvent = () => {
   };
 
   const loadAddOns = async () => {
+    if (!selectedLocation) {
+      setAllAddOns([]);
+      return;
+    }
     try {
-      const res = await addOnService.getAddOns({ user_id: currentUser?.id });
+      const res = await addOnService.getAddOns({ user_id: currentUser?.id, location_id: parseInt(selectedLocation) });
       const list = res.data?.add_ons || [];
       setAllAddOns(list.map((a: { id: number; name: string; price: number | null }) => ({ id: a.id, name: a.name, price: a.price || 0 })));
     } catch {

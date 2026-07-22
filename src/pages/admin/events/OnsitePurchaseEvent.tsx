@@ -33,11 +33,13 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import { useLocationScope } from '../../../contexts/LocationContext';
 
 const OnsitePurchaseEvent = () => {
   const navigate = useNavigate();
   const { themeColor } = useThemeColor();
   const currentUser = getStoredUser();
+  const { effectiveLocationId } = useLocationScope();
 
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [eventSearch, setEventSearch] = useState('');
@@ -107,15 +109,20 @@ const OnsitePurchaseEvent = () => {
     const fetchEvents = async () => {
       setLoadingEvents(true);
       try {
-        const cached = await eventCacheService.getCachedEvents();
+        const inScope = (e: Event) => e.is_active && (effectiveLocationId == null || e.location_id === effectiveLocationId);
+        const scopeParams = { user_id: currentUser?.id, ...(effectiveLocationId != null ? { location_id: effectiveLocationId } : {}) };
+
+        const cached = effectiveLocationId != null
+          ? await eventCacheService.getFilteredEventsFromCache({ location_id: effectiveLocationId })
+          : await eventCacheService.getCachedEvents();
         if (cached && cached.length > 0) {
-          setAllEvents(cached.filter(e => e.is_active));
+          setAllEvents(cached.filter(inScope));
           setLoadingEvents(false);
-          eventCacheService.syncInBackground({ user_id: currentUser?.id });
+          eventCacheService.syncInBackground(scopeParams);
           return;
         }
 
-        const res = await eventService.getEvents({ user_id: currentUser?.id });
+        const res = await eventService.getEvents(scopeParams);
         let list: Event[] = [];
         if (Array.isArray(res.data)) {
           list = res.data;
@@ -128,7 +135,7 @@ const OnsitePurchaseEvent = () => {
           list = res as unknown as Event[];
         }
         await eventCacheService.cacheEvents(list);
-        list = list.filter(e => e.is_active);
+        list = list.filter(inScope);
         setAllEvents(list);
       } catch {
         setToast({ message: 'Failed to load events', type: 'error' });
@@ -138,7 +145,7 @@ const OnsitePurchaseEvent = () => {
     };
     fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveLocationId]);
 
   useEffect(() => {
     if (selectedDate && event) loadTimeSlots(selectedDate);
