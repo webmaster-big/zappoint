@@ -27,6 +27,8 @@ import {
   Loader2,
   PackageIcon,
   House,
+  IdCard,
+  FileSignature,
 } from 'lucide-react';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import StandardButton from '../../components/ui/StandardButton';
@@ -525,6 +527,8 @@ const AttendantDashboard: React.FC = () => {
      { title: 'Attractions', icon: Ticket, link: '/attractions' },
      { title: 'Ticket Check-in', icon: Ticket, link: '/attractions/check-in' },
      { title: 'Customers', icon: Users, link: '/customers' },
+     { title: 'Memberships', icon: IdCard, link: '/memberships' },
+     { title: 'Waivers', icon: FileSignature, link: '/waivers' },
      { title: 'Bookings', icon: TrendingUp, link: '/bookings' },
    ];
 

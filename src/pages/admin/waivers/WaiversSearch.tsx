@@ -80,6 +80,7 @@ const WaiversSearch = () => {
   const currentUser = getStoredUser();
   const isAdmin = currentUser?.role === 'company_admin';
   const isManager = currentUser?.role === 'location_manager';
+  const isAttendant = currentUser?.role === 'attendant';
 
   const [waivers, setWaivers] = useState<Waiver[]>([]);
   const [loading, setLoading] = useState(true);
@@ -493,17 +494,19 @@ const WaiversSearch = () => {
           <ActionMenu
             label="Manage"
             items={[
-              { label: 'Templates', icon: FileText, onClick: () => navigate('/waivers/templates') },
-              { label: 'Group Invites', icon: Users, onClick: () => navigate('/waivers/bulk') },
+              { label: 'Templates', icon: FileText, onClick: () => navigate('/waivers/templates'), hidden: !(isAdmin || isManager) },
+              { label: 'Group Invites', icon: Users, onClick: () => navigate('/waivers/bulk'), hidden: !(isAdmin || isManager) },
               { label: 'Reports', icon: BarChart3, onClick: () => navigate('/waivers/reports') },
               { label: 'Deletion Log', icon: ClipboardList, onClick: () => navigate('/waivers/deletion-log'), hidden: !(isAdmin || isManager), dividerBefore: true },
               { label: 'Settings', icon: SettingsIcon, onClick: () => navigate('/waivers/settings'), hidden: !isAdmin },
             ]}
           />
           </span>
+          {!isAttendant && (
           <span data-tour="waivers-assign-btn">
           <StandardButton variant="primary" size="md" icon={Plus} onClick={() => setShowAssign(true)}>Assign Waiver</StandardButton>
           </span>
+          )}
         </div>
       </div>
 
@@ -573,7 +576,9 @@ const WaiversSearch = () => {
                   <UserCheck className="w-3.5 h-3.5" />Check In
                 </button>
               )}
-              <button onClick={() => handlePrint(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Print"><Printer className="w-4 h-4" /></button>
+              {!isAttendant && (
+                <button onClick={() => handlePrint(w)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Print"><Printer className="w-4 h-4" /></button>
+              )}
               {isAdmin && (
                 <button onClick={() => setDeleteTarget(w)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
               )}
@@ -594,6 +599,7 @@ const WaiversSearch = () => {
           onClose={() => setDetail(null)}
           onCheckIn={async (w) => { await handleCheckIn(w); openDetail(w); }}
           onUndoCheckIn={async (w) => { await handleUndoCheckIn(w); openDetail(w); }}
+          canPrint={!isAttendant}
         />
       )}
       {showAssign && <AssignWaiverModal onClose={() => setShowAssign(false)} onSaved={() => { setShowAssign(false); load(); setToast({ message: 'Waiver assigned & link sent', type: 'success' }); }} themeColor={themeColor} />}
@@ -625,11 +631,12 @@ const DetailSection = ({ icon: Icon, title, children }: { icon: ComponentType<{ 
   </div>
 );
 
-const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn }: {
+const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn, canPrint = true }: {
   data: { waiver: Waiver; rendered_body: string };
   onClose: () => void;
   onCheckIn: (w: Waiver) => Promise<void>;
   onUndoCheckIn: (w: Waiver) => Promise<void>;
+  canPrint?: boolean;
 }) => {
   const w = data.waiver;
   const [checkInBusy, setCheckInBusy] = useState(false);
@@ -737,7 +744,9 @@ const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn }: {
             <StandardButton variant="secondary" icon={Undo2} disabled={checkInBusy} onClick={() => runCheckInAction(onUndoCheckIn)}>Undo Check-In</StandardButton>
           )}
           <StandardButton variant="secondary" onClick={onClose}>Close</StandardButton>
-          <StandardButton variant="secondary" icon={Printer} onClick={async () => { try { const blob = await waiverService.print(w.id); const url = URL.createObjectURL(blob); window.open(url, '_blank'); } catch { /* noop */ } }}>Print</StandardButton>
+          {canPrint && (
+            <StandardButton variant="secondary" icon={Printer} onClick={async () => { try { const blob = await waiverService.print(w.id); const url = URL.createObjectURL(blob); window.open(url, '_blank'); } catch { /* noop */ } }}>Print</StandardButton>
+          )}
           {w.status === 'completed' && !w.checked_in_at && (
             <StandardButton variant="primary" icon={UserCheck} disabled={checkInBusy} onClick={() => runCheckInAction(onCheckIn)}>Check In</StandardButton>
           )}

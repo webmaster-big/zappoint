@@ -80,7 +80,6 @@ const WaiverBuilder = () => {
 
   const currentUser = getStoredUser();
   const isAdmin = currentUser?.role === 'company_admin' || currentUser?.role === 'admin';
-  const isManager = currentUser?.role === 'location_manager';
 
   const [form, setForm] = useState<WaiverTemplatePayload>(defaultForm);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -308,7 +307,7 @@ const WaiverBuilder = () => {
                 </select>
               </div>
             )}
-            {isManager && currentUser?.location_name && (
+            {!isAdmin && currentUser?.location_name && (
               <div className="sm:col-span-2 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
                 This template will be assigned to <span className="font-medium text-gray-700">{currentUser.location_name}</span>

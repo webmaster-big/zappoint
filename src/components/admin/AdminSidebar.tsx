@@ -186,7 +186,18 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
         { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
-          { label: 'Waiver Records', href: '/waivers', icon: List }
+          { label: 'Waiver Records', href: '/waivers', icon: List },
+          { label: 'Reports', href: '/waivers/reports', icon: BarChart3 }
+        ]},
+        { label: 'Customers', icon: Users, section: 'Customers', items: [
+          { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
+          { label: 'Customers', href: '/customers', icon: Users }
+        ]},
+        { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
+          { label: 'Memberships', href: '/memberships', icon: List },
+          { label: 'Plans', href: '/memberships/plans', icon: Package },
+          { label: 'Check-In', href: '/memberships/check-in', icon: ScanLine },
+          { label: 'Reports', href: '/memberships/reports', icon: BarChart3 }
         ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },

@@ -88,6 +88,7 @@ const MembershipDetails = () => {
   const { themeColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const canManageMembership = isCompanyAdmin || currentUser?.role === 'location_manager';
   // Pre-fill from the list cache so the page shows content immediately;
   // a fresh network fetch happens in the background.
   const cachedM = id ? membershipCache.getMembershipFromCache(Number(id)) : null;
@@ -400,7 +401,7 @@ const MembershipDetails = () => {
               <InfoTooltip content="Pause billing and access until a chosen date. No charges fire while frozen." />
             </div>
           )}
-          {m.status === 'frozen' && (
+          {m.status === 'frozen' && canManageMembership && (
             <div className="inline-flex items-center gap-1">
               <StandardButton variant="secondary" size="sm" loading={acting === 'status'} onClick={() => changeStatus('active')}>
                 Unfreeze
@@ -408,7 +409,7 @@ const MembershipDetails = () => {
               <InfoTooltip content="Resume the membership now. Billing schedule continues from the original cycle dates." />
             </div>
           )}
-          {m.status === 'suspended' && (
+          {m.status === 'suspended' && canManageMembership && (
             <div className="inline-flex items-center gap-1">
               <StandardButton variant="secondary" size="sm" loading={acting === 'status'} onClick={() => changeStatus('active')}>
                 Reactivate
@@ -432,12 +433,14 @@ const MembershipDetails = () => {
               </div>
             </>
           )}
-          <div className="inline-flex items-center gap-1">
-            <StandardButton variant="secondary" size="sm" icon={CalendarPlus} loading={acting === 'extend'} onClick={extend}>
-              Extend
-            </StandardButton>
-            <InfoTooltip content="Manually set a new term end date. Extends access beyond the plan's season end or revives an expired/past-due membership." />
-          </div>
+          {canManageMembership && (
+            <div className="inline-flex items-center gap-1">
+              <StandardButton variant="secondary" size="sm" icon={CalendarPlus} loading={acting === 'extend'} onClick={extend}>
+                Extend
+              </StandardButton>
+              <InfoTooltip content="Manually set a new term end date. Extends access beyond the plan's season end or revives an expired/past-due membership." />
+            </div>
+          )}
           {isCompanyAdmin && m.status === 'canceled' && (
             <div className="inline-flex items-center gap-1">
               <StandardButton variant="danger" size="sm" icon={Trash2} loading={acting === 'delete'} onClick={remove}>
@@ -551,7 +554,7 @@ const MembershipDetails = () => {
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {p.status === 'succeeded' && (
+                      {p.status === 'succeeded' && canManageMembership && (
                         <button
                           onClick={() => handleRefundOpen(p)}
                           className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 transition"
@@ -560,7 +563,7 @@ const MembershipDetails = () => {
                           <RotateCcw size={11} /> Refund
                         </button>
                       )}
-                      {p.status === 'pending' && (
+                      {p.status === 'pending' && canManageMembership && (
                         <button
                           onClick={() => { setVoidTarget(p); setVoidNote(''); }}
                           className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition"
