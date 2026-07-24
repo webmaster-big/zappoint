@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapPin, Package as PackageIcon, Ticket, CalendarDays } from 'lucide-react';
 import { locationService } from '../../services/LocationService';
-import { packageCacheService } from '../../services/PackageCacheService';
-import { attractionCacheService } from '../../services/AttractionCacheService';
-import { eventCacheService } from '../../services/EventCacheService';
+import { packageService } from '../../services/PackageService';
+import { attractionService } from '../../services/AttractionService';
+import { eventService } from '../../services/EventService';
 import { useLocationScope } from '../../contexts/LocationContext';
 
 export interface TargetingValue {
@@ -26,6 +26,58 @@ interface Props {
 
 type Axis = 'location_ids' | 'package_ids' | 'attraction_ids' | 'event_ids';
 type ItemKey = 'package' | 'attraction' | 'event';
+
+// Per-location, session-level cache (keyed by location) with stale-while-revalidate.
+// Cached locations render instantly; stale/missing entries revalidate in the background.
+const ITEM_TTL = 5 * 60 * 1000;
+interface CacheEntry {
+  data: Option[];
+  ts: number;
+}
+const itemStores: Record<ItemKey, Map<number, CacheEntry>> = {
+  package: new Map(),
+  attraction: new Map(),
+  event: new Map(),
+};
+
+const toOption = (x: { id: number; name: string; location_id?: number }): Option => ({
+  id: x.id,
+  name: x.name,
+  location_id: x.location_id,
+});
+
+const itemFetchers: Record<ItemKey, (locationId: number) => Promise<Option[]>> = {
+  package: (id) =>
+    packageService.getPackagesByLocation(id).then((r) => (r.data || []).map(toOption)).catch(() => []),
+  attraction: (id) =>
+    attractionService.getAttractions({ location_id: id, per_page: 200 }).then((r) => (r.data?.attractions || []).map(toOption)).catch(() => []),
+  event: (id) =>
+    eventService.getEventsByLocation(id).then((r) => (r.data || []).map(toOption)).catch(() => []),
+};
+
+function peekItems(kind: ItemKey, ids: number[]): Option[] {
+  const store = itemStores[kind];
+  const out: Option[] = [];
+  for (const id of ids) {
+    const entry = store.get(id);
+    if (entry) out.push(...entry.data);
+  }
+  return dedupe(out);
+}
+
+async function ensureItems(kind: ItemKey, ids: number[]): Promise<Option[]> {
+  const store = itemStores[kind];
+  const now = Date.now();
+  await Promise.all(
+    ids.map(async (id) => {
+      const entry = store.get(id);
+      if (entry && now - entry.ts < ITEM_TTL) return; // fresh
+      const data = await itemFetchers[kind](id);
+      store.set(id, { data, ts: Date.now() });
+    })
+  );
+  return peekItems(kind, ids);
+}
 
 export default function TargetingSelector({ value, onChange }: Props) {
   const { locations: scopeLocations } = useLocationScope();
@@ -68,65 +120,39 @@ export default function TargetingSelector({ value, onChange }: Props) {
   const scopeKey = scopedLocationIds.join(',');
   const hasLocation = scopedLocationIds.length > 0;
 
-  useEffect(() => {
-    if (!modes.package || !hasLocation) {
-      setAllPackages([]);
-      return;
+  const loadItems = (
+    kind: ItemKey,
+    active: boolean,
+    setItems: (o: Option[]) => void
+  ) => {
+    if (!active || !hasLocation) {
+      setItems([]);
+      return undefined;
     }
     let cancelled = false;
-    setLoading((s) => ({ ...s, package: true }));
-    Promise.all(
-      scopedLocationIds.map((id) => packageCacheService.getPackages({ location_id: id, is_active: true }).catch(() => []))
-    ).then((groups) => {
+    const cached = peekItems(kind, scopedLocationIds);
+    if (cached.length > 0) {
+      setItems(cached);
+      setLoading((s) => ({ ...s, [kind]: false }));
+    } else {
+      setLoading((s) => ({ ...s, [kind]: true }));
+    }
+    ensureItems(kind, scopedLocationIds).then((data) => {
       if (cancelled) return;
-      setAllPackages(dedupe(groups.flat().map((p) => ({ id: p.id, name: p.name, location_id: p.location_id }))));
-      setLoading((s) => ({ ...s, package: false }));
+      setItems(data);
+      setLoading((s) => ({ ...s, [kind]: false }));
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modes.package, scopeKey, hasLocation]);
+  };
 
-  useEffect(() => {
-    if (!modes.attraction || !hasLocation) {
-      setAllAttractions([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading((s) => ({ ...s, attraction: true }));
-    Promise.all(
-      scopedLocationIds.map((id) => attractionCacheService.getAttractions({ location_id: id }).catch(() => []))
-    ).then((groups) => {
-      if (cancelled) return;
-      setAllAttractions(dedupe(groups.flat().map((a) => ({ id: a.id, name: a.name, location_id: a.location_id }))));
-      setLoading((s) => ({ ...s, attraction: false }));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modes.attraction, scopeKey, hasLocation]);
-
-  useEffect(() => {
-    if (!modes.event || !hasLocation) {
-      setAllEvents([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading((s) => ({ ...s, event: true }));
-    Promise.all(
-      scopedLocationIds.map((id) => eventCacheService.getEvents({ location_id: id }).catch(() => []))
-    ).then((groups) => {
-      if (cancelled) return;
-      setAllEvents(dedupe(groups.flat().map((e) => ({ id: e.id, name: e.name, location_id: e.location_id }))));
-      setLoading((s) => ({ ...s, event: false }));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modes.event, scopeKey, hasLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => loadItems('package', modes.package, setAllPackages), [modes.package, scopeKey, hasLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => loadItems('attraction', modes.attraction, setAllAttractions), [modes.attraction, scopeKey, hasLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => loadItems('event', modes.event, setAllEvents), [modes.event, scopeKey, hasLocation]);
 
   const summary = useMemo(() => {
     const nameOf = (list: Option[], id: number) => list.find((o) => o.id === id)?.name;
@@ -185,13 +211,6 @@ export default function TargetingSelector({ value, onChange }: Props) {
     onChange({ ...value, [axis]: nextIds.length > 0 ? nextIds : null });
   };
 
-  const itemProps = (key: ItemKey, options: Option[]) => ({
-    loading: loading[key],
-    options,
-    needsLocation: !hasLocation,
-    locationNameById,
-  });
-
   return (
     <div className="space-y-4">
       <div className="text-xs bg-blue-50 text-blue-900 rounded-md px-3 py-2 border border-blue-100">
@@ -217,11 +236,14 @@ export default function TargetingSelector({ value, onChange }: Props) {
         allLabel="All packages"
         emptyLabel="No packages at the selected location(s)."
         specific={modes.package}
+        loading={loading.package}
+        needsLocation={!hasLocation}
+        options={allPackages}
         selected={value.package_ids}
+        locationNameById={locationNameById}
         onSetAll={() => setAll('package_ids', 'package')}
         onSetSpecific={() => setSpecific('package')}
         onToggle={(id) => toggleId('package_ids', id)}
-        {...itemProps('package', allPackages)}
       />
 
       <AxisSection
@@ -230,11 +252,14 @@ export default function TargetingSelector({ value, onChange }: Props) {
         allLabel="All attractions"
         emptyLabel="No attractions at the selected location(s)."
         specific={modes.attraction}
+        loading={loading.attraction}
+        needsLocation={!hasLocation}
+        options={allAttractions}
         selected={value.attraction_ids}
+        locationNameById={locationNameById}
         onSetAll={() => setAll('attraction_ids', 'attraction')}
         onSetSpecific={() => setSpecific('attraction')}
         onToggle={(id) => toggleId('attraction_ids', id)}
-        {...itemProps('attraction', allAttractions)}
       />
 
       <AxisSection
@@ -243,11 +268,14 @@ export default function TargetingSelector({ value, onChange }: Props) {
         allLabel="All events"
         emptyLabel="No events at the selected location(s)."
         specific={modes.event}
+        loading={loading.event}
+        needsLocation={!hasLocation}
+        options={allEvents}
         selected={value.event_ids}
+        locationNameById={locationNameById}
         onSetAll={() => setAll('event_ids', 'event')}
         onSetSpecific={() => setSpecific('event')}
         onToggle={(id) => toggleId('event_ids', id)}
-        {...itemProps('event', allEvents)}
       />
     </div>
   );
