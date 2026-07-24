@@ -25,6 +25,7 @@ interface Props {
 }
 
 type Axis = 'location_ids' | 'package_ids' | 'attraction_ids' | 'event_ids';
+type ItemKey = 'package' | 'attraction' | 'event';
 
 export default function TargetingSelector({ value, onChange }: Props) {
   const { locations: scopeLocations } = useLocationScope();
@@ -54,8 +55,6 @@ export default function TargetingSelector({ value, onChange }: Props) {
     [locations]
   );
 
-  const allLocationIds = useMemo(() => locations.map((l) => l.id), [locations]);
-
   useEffect(() => {
     if (scopeLocations.length > 0) return;
     locationService
@@ -64,15 +63,20 @@ export default function TargetingSelector({ value, onChange }: Props) {
       .catch(() => setFallbackLocations([]));
   }, [scopeLocations.length]);
 
-  // Lazy-load packages only when the Packages axis is set to "Specific".
+  // Items are scoped to the selected locations (location-first).
+  const scopedLocationIds = useMemo(() => value.location_ids ?? [], [value.location_ids]);
+  const scopeKey = scopedLocationIds.join(',');
+  const hasLocation = scopedLocationIds.length > 0;
+
   useEffect(() => {
-    if (!modes.package || allPackages.length > 0 || allLocationIds.length === 0) return;
+    if (!modes.package || !hasLocation) {
+      setAllPackages([]);
+      return;
+    }
     let cancelled = false;
     setLoading((s) => ({ ...s, package: true }));
     Promise.all(
-      allLocationIds.map((id) =>
-        packageCacheService.getPackages({ location_id: id, is_active: true }).catch(() => [])
-      )
+      scopedLocationIds.map((id) => packageCacheService.getPackages({ location_id: id, is_active: true }).catch(() => []))
     ).then((groups) => {
       if (cancelled) return;
       setAllPackages(dedupe(groups.flat().map((p) => ({ id: p.id, name: p.name, location_id: p.location_id }))));
@@ -81,16 +85,18 @@ export default function TargetingSelector({ value, onChange }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [modes.package, allLocationIds, allPackages.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modes.package, scopeKey, hasLocation]);
 
   useEffect(() => {
-    if (!modes.attraction || allAttractions.length > 0 || allLocationIds.length === 0) return;
+    if (!modes.attraction || !hasLocation) {
+      setAllAttractions([]);
+      return;
+    }
     let cancelled = false;
     setLoading((s) => ({ ...s, attraction: true }));
     Promise.all(
-      allLocationIds.map((id) =>
-        attractionCacheService.getAttractions({ location_id: id }).catch(() => [])
-      )
+      scopedLocationIds.map((id) => attractionCacheService.getAttractions({ location_id: id }).catch(() => []))
     ).then((groups) => {
       if (cancelled) return;
       setAllAttractions(dedupe(groups.flat().map((a) => ({ id: a.id, name: a.name, location_id: a.location_id }))));
@@ -99,46 +105,65 @@ export default function TargetingSelector({ value, onChange }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [modes.attraction, allLocationIds, allAttractions.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modes.attraction, scopeKey, hasLocation]);
 
   useEffect(() => {
-    if (!modes.event || allEvents.length > 0) return;
+    if (!modes.event || !hasLocation) {
+      setAllEvents([]);
+      return;
+    }
     let cancelled = false;
     setLoading((s) => ({ ...s, event: true }));
-    eventCacheService
-      .getEvents()
-      .then((events) => {
-        if (cancelled) return;
-        setAllEvents(dedupe(events.map((e) => ({ id: e.id, name: e.name, location_id: e.location_id }))));
-        setLoading((s) => ({ ...s, event: false }));
-      })
-      .catch(() => {
-        if (!cancelled) setLoading((s) => ({ ...s, event: false }));
-      });
+    Promise.all(
+      scopedLocationIds.map((id) => eventCacheService.getEvents({ location_id: id }).catch(() => []))
+    ).then((groups) => {
+      if (cancelled) return;
+      setAllEvents(dedupe(groups.flat().map((e) => ({ id: e.id, name: e.name, location_id: e.location_id }))));
+      setLoading((s) => ({ ...s, event: false }));
+    });
     return () => {
       cancelled = true;
     };
-  }, [modes.event, allEvents.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modes.event, scopeKey, hasLocation]);
 
-  const effectiveLocationIds = useMemo(() => {
-    if (value.location_ids && value.location_ids.length > 0) {
-      return value.location_ids;
+  const summary = useMemo(() => {
+    const nameOf = (list: Option[], id: number) => list.find((o) => o.id === id)?.name;
+    const describe = (ids: number[] | null | undefined, list: Option[], noun: string): string | null => {
+      if (!ids || ids.length === 0) return null;
+      const names = ids.map((id) => nameOf(list, id)).filter(Boolean) as string[];
+      if (names.length === ids.length && ids.length <= 3) return names.join(', ');
+      return `${ids.length} ${noun}${ids.length === 1 ? '' : 's'}`;
+    };
+
+    const locText =
+      value.location_ids && value.location_ids.length > 0
+        ? describe(value.location_ids, locations, 'location')
+        : 'all locations';
+
+    const hasItemTarget =
+      (value.package_ids?.length ?? 0) + (value.attraction_ids?.length ?? 0) + (value.event_ids?.length ?? 0) > 0;
+
+    let itemText: string;
+    if (!hasItemTarget) {
+      itemText = 'all packages, attractions & events';
+    } else {
+      const parts: string[] = [];
+      const p = describe(value.package_ids, allPackages, 'package');
+      const a = describe(value.attraction_ids, allAttractions, 'attraction');
+      const e = describe(value.event_ids, allEvents, 'event');
+      if (p) parts.push(`packages (${p})`);
+      if (a) parts.push(`attractions (${a})`);
+      if (e) parts.push(`events (${e})`);
+      itemText = `only ${parts.join('; ')}`;
     }
-    return allLocationIds;
-  }, [value.location_ids, allLocationIds]);
 
-  const inScope = useMemo(() => {
-    const set = new Set(effectiveLocationIds);
-    return (o: Option) => o.location_id === undefined || set.has(o.location_id);
-  }, [effectiveLocationIds]);
-
-  const packages = useMemo(() => allPackages.filter(inScope), [allPackages, inScope]);
-  const attractions = useMemo(() => allAttractions.filter(inScope), [allAttractions, inScope]);
-  const events = useMemo(() => allEvents.filter(inScope), [allEvents, inScope]);
+    return `${itemText} · ${locText}`;
+  }, [value, locations, allPackages, allAttractions, allEvents]);
 
   const setSpecific = (key: keyof typeof modes) => {
     setModes((m) => ({ ...m, [key]: true }));
-    // keep any existing selection; value stays as-is until items are checked
   };
 
   const setAll = (axis: Axis, key: keyof typeof modes) => {
@@ -160,8 +185,19 @@ export default function TargetingSelector({ value, onChange }: Props) {
     onChange({ ...value, [axis]: nextIds.length > 0 ? nextIds : null });
   };
 
+  const itemProps = (key: ItemKey, options: Option[]) => ({
+    loading: loading[key],
+    options,
+    needsLocation: !hasLocation,
+    locationNameById,
+  });
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      <div className="text-xs bg-blue-50 text-blue-900 rounded-md px-3 py-2 border border-blue-100">
+        <span className="font-semibold">Applies to:</span> {summary}
+      </div>
+
       <AxisSection
         icon={<MapPin className="w-4 h-4" />}
         title="Locations"
@@ -179,45 +215,39 @@ export default function TargetingSelector({ value, onChange }: Props) {
         icon={<PackageIcon className="w-4 h-4" />}
         title="Packages"
         allLabel="All packages"
-        emptyLabel="No packages for the selected locations."
+        emptyLabel="No packages at the selected location(s)."
         specific={modes.package}
-        loading={loading.package}
-        options={packages}
         selected={value.package_ids}
-        locationNameById={locationNameById}
         onSetAll={() => setAll('package_ids', 'package')}
         onSetSpecific={() => setSpecific('package')}
         onToggle={(id) => toggleId('package_ids', id)}
+        {...itemProps('package', allPackages)}
       />
 
       <AxisSection
         icon={<Ticket className="w-4 h-4" />}
         title="Attractions"
         allLabel="All attractions"
-        emptyLabel="No attractions for the selected locations."
+        emptyLabel="No attractions at the selected location(s)."
         specific={modes.attraction}
-        loading={loading.attraction}
-        options={attractions}
         selected={value.attraction_ids}
-        locationNameById={locationNameById}
         onSetAll={() => setAll('attraction_ids', 'attraction')}
         onSetSpecific={() => setSpecific('attraction')}
         onToggle={(id) => toggleId('attraction_ids', id)}
+        {...itemProps('attraction', allAttractions)}
       />
 
       <AxisSection
         icon={<CalendarDays className="w-4 h-4" />}
         title="Events"
         allLabel="All events"
-        emptyLabel="No events for the selected locations."
+        emptyLabel="No events at the selected location(s)."
         specific={modes.event}
-        loading={loading.event}
-        options={events}
         selected={value.event_ids}
-        locationNameById={locationNameById}
         onSetAll={() => setAll('event_ids', 'event')}
         onSetSpecific={() => setSpecific('event')}
         onToggle={(id) => toggleId('event_ids', id)}
+        {...itemProps('event', allEvents)}
       />
     </div>
   );
@@ -230,6 +260,7 @@ interface AxisSectionProps {
   emptyLabel: string;
   specific: boolean;
   loading?: boolean;
+  needsLocation?: boolean;
   options: Option[];
   selected: number[] | null;
   locationNameById?: Record<number, string>;
@@ -245,6 +276,7 @@ function AxisSection({
   emptyLabel,
   specific,
   loading,
+  needsLocation,
   options,
   selected,
   locationNameById,
@@ -277,7 +309,9 @@ function AxisSection({
       </div>
 
       {specific && (
-        loading ? (
+        needsLocation ? (
+          <p className="text-xs text-amber-600">Select one or more locations above first.</p>
+        ) : loading ? (
           <p className="text-xs text-gray-400">Loading…</p>
         ) : options.length === 0 ? (
           <p className="text-xs text-gray-400">{emptyLabel}</p>
