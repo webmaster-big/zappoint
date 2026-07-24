@@ -282,16 +282,16 @@ function AxisSection({
         ) : options.length === 0 ? (
           <p className="text-xs text-gray-400">{emptyLabel}</p>
         ) : (
-          <div className="max-h-44 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          <div className="max-h-56 overflow-y-auto flex flex-col gap-0.5">
             {options.map((opt) => {
               const checked = Array.isArray(selected) && selected.includes(opt.id);
               const locName = locationNameById && opt.location_id !== undefined ? locationNameById[opt.location_id] : undefined;
               return (
-                <label key={opt.id} className="flex items-center gap-2 text-sm text-gray-700 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
-                  <input type="checkbox" checked={checked} onChange={() => onToggle(opt.id)} className="rounded border-gray-300 flex-shrink-0" />
-                  <span className="truncate">
+                <label key={opt.id} className="flex items-start gap-2 text-sm text-gray-700 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                  <input type="checkbox" checked={checked} onChange={() => onToggle(opt.id)} className="rounded border-gray-300 flex-shrink-0 mt-0.5" />
+                  <span className="min-w-0 break-words">
                     {opt.name}
-                    {locName && <span className="ml-1 text-xs text-gray-400">· {locName}</span>}
+                    {locName && <span className="block text-xs text-gray-400">{locName}</span>}
                   </span>
                 </label>
               );

@@ -529,7 +529,7 @@ const GiftCard: React.FC = () => {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto">
             <StandardButton 
               className="absolute top-4 right-4" 
               variant="ghost" 
@@ -634,7 +634,7 @@ const GiftCard: React.FC = () => {
 
       {editIndex !== null && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto">
             <StandardButton 
               className="absolute top-4 right-4" 
               variant="ghost" 
