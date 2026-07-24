@@ -4,6 +4,7 @@ import { locationService } from '../../services/LocationService';
 import { packageService } from '../../services/PackageService';
 import { attractionService } from '../../services/AttractionService';
 import { eventService } from '../../services/EventService';
+import { useLocationScope } from '../../contexts/LocationContext';
 
 export interface TargetingValue {
   location_ids: number[] | null;
@@ -26,18 +27,27 @@ interface Props {
 type Axis = 'location_ids' | 'package_ids' | 'attraction_ids' | 'event_ids';
 
 export default function TargetingSelector({ value, onChange }: Props) {
-  const [locations, setLocations] = useState<Option[]>([]);
+  const { locations: scopeLocations } = useLocationScope();
+  const [fallbackLocations, setFallbackLocations] = useState<Option[]>([]);
   const [packages, setPackages] = useState<Option[]>([]);
   const [attractions, setAttractions] = useState<Option[]>([]);
   const [events, setEvents] = useState<Option[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
 
+  const locations: Option[] = useMemo(() => {
+    if (scopeLocations.length > 0) {
+      return scopeLocations.map((l) => ({ id: l.id, name: l.name }));
+    }
+    return fallbackLocations;
+  }, [scopeLocations, fallbackLocations]);
+
   useEffect(() => {
+    if (scopeLocations.length > 0) return;
     locationService
-      .getLocations()
-      .then((res) => setLocations((res.data || []).map((l) => ({ id: l.id, name: l.name }))))
-      .catch(() => setLocations([]));
-  }, []);
+      .getLocations({ per_page: 100 })
+      .then((res) => setFallbackLocations((res.data || []).map((l) => ({ id: l.id, name: l.name }))))
+      .catch(() => setFallbackLocations([]));
+  }, [scopeLocations.length]);
 
   const effectiveLocationIds = useMemo(() => {
     if (value.location_ids && value.location_ids.length > 0) {
@@ -109,6 +119,7 @@ export default function TargetingSelector({ value, onChange }: Props) {
         icon={<MapPin className="w-4 h-4" />}
         title="Locations"
         allLabel="All locations"
+        emptyLabel="No locations available."
         options={locations}
         selected={value.location_ids}
         onModeAll={() => setAxis('location_ids', null)}
@@ -119,6 +130,7 @@ export default function TargetingSelector({ value, onChange }: Props) {
         icon={<PackageIcon className="w-4 h-4" />}
         title="Packages"
         allLabel="All packages"
+        emptyLabel="No packages available for the selected locations."
         options={packages}
         selected={value.package_ids}
         loading={loadingItems}
@@ -130,6 +142,7 @@ export default function TargetingSelector({ value, onChange }: Props) {
         icon={<Ticket className="w-4 h-4" />}
         title="Attractions"
         allLabel="All attractions"
+        emptyLabel="No attractions available for the selected locations."
         options={attractions}
         selected={value.attraction_ids}
         loading={loadingItems}
@@ -141,6 +154,7 @@ export default function TargetingSelector({ value, onChange }: Props) {
         icon={<CalendarDays className="w-4 h-4" />}
         title="Events"
         allLabel="All events"
+        emptyLabel="No events available for the selected locations."
         options={events}
         selected={value.event_ids}
         loading={loadingItems}
@@ -155,6 +169,7 @@ interface AxisSectionProps {
   icon: React.ReactNode;
   title: string;
   allLabel: string;
+  emptyLabel: string;
   options: Option[];
   selected: number[] | null;
   loading?: boolean;
@@ -162,7 +177,7 @@ interface AxisSectionProps {
   onToggle: (id: number) => void;
 }
 
-function AxisSection({ icon, title, allLabel, options, selected, loading, onModeAll, onToggle }: AxisSectionProps) {
+function AxisSection({ icon, title, allLabel, emptyLabel, options, selected, loading, onModeAll, onToggle }: AxisSectionProps) {
   const isSpecific = Array.isArray(selected) && selected.length > 0;
 
   return (
@@ -188,7 +203,7 @@ function AxisSection({ icon, title, allLabel, options, selected, loading, onMode
       {loading ? (
         <p className="text-xs text-gray-400">Loading…</p>
       ) : options.length === 0 ? (
-        <p className="text-xs text-gray-400">No items available for the selected locations.</p>
+        <p className="text-xs text-gray-400">{emptyLabel}</p>
       ) : (
         <div className="max-h-44 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           {options.map((opt) => {
