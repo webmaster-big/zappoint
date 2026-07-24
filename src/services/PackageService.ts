@@ -80,16 +80,6 @@ export interface Package {
     name: string;
     capacity?: number;
   }>;
-  gift_cards?: Array<{
-    id: number;
-    code: string;
-    value: number;
-  }>;
-  promos?: Array<{
-    id: number;
-    code: string;
-    name: string;
-  }>;
 }
 
 export interface PackageFilters {
@@ -150,8 +140,6 @@ export interface CreatePackageData {
   attraction_ids?: (number | undefined)[];
   room_ids?: (number | undefined)[];
   addon_ids?: (number | undefined)[];
-  promo_ids?: (number | undefined)[];
-  gift_card_ids?: (number | undefined)[];
   display_order?: number;
 }
 
@@ -261,8 +249,6 @@ class PackageService {
     attraction_ids?: number[];
     addon_ids?: number[];
     room_ids?: number[];
-    gift_card_ids?: number[];
-    promo_ids?: number[];
   }>): Promise<{
     success: boolean;
     message: string;

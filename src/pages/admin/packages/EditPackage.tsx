@@ -2,14 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
-import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { 
-    attractionService, 
-    addOnService, 
-    roomService, 
-    promoService, 
-    giftCardService,
+import {
+    attractionService,
+    addOnService,
+    roomService,
     packageService,
     categoryService
 } from '../../../services';
@@ -19,12 +17,10 @@ import { addOnCacheService } from '../../../services/AddOnCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Category } from '../../../services/CategoryService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
-import type { 
-    CreatePackageAttraction, 
-    CreatePackageAddOn, 
-    CreatePackageRoom,
-    CreatePackagePromo,
-    CreatePackageGiftCard
+import type {
+    CreatePackageAttraction,
+    CreatePackageAddOn,
+    CreatePackageRoom
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { getStoredUser } from '../../../utils/storage';
@@ -57,8 +53,6 @@ const EditPackage: React.FC = () => {
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
     const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]);
-    const [promos, setPromos] = useState<CreatePackagePromo[]>([]);
-    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]);
 
     const [form, setForm] = useState({
         name: "",
@@ -76,8 +70,6 @@ const EditPackage: React.FC = () => {
         durationUnit: "hours" as "hours" | "minutes" | "hours and minutes",
         durationHours: "",
         durationMinutes: "",
-        promos: [] as string[], // will store promo.code
-        giftCards: [] as string[], // will store giftCard.code
         addOns: [] as string[],
         availabilityType: "daily" as "daily" | "weekly" | "monthly",
         availableDays: [] as string[],
@@ -157,12 +149,10 @@ const EditPackage: React.FC = () => {
                     ? Promise.resolve({ data: { attractions: cachedAttractions } })
                     : attractionService.getAttractions(scopeParams);
 
-                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
+                const [attractionsRes, addOnsRes, roomsRes, categoriesRes] = await Promise.all([
                     attractionsPromise,
                     addOnsPromise,
                     roomsPromise,
-                    promoService.getPromos(),
-                    giftCardService.getGiftCards(),
                     categoryService.getCategories()
                 ]);
 
@@ -207,40 +197,15 @@ const EditPackage: React.FC = () => {
                     }
                 }
 
-                const promosData = promosRes.data?.promos?.filter(promo => 
-                    promo.status === "active" && !promo.deleted
-                ).map(promo => ({
-                    id: promo.id,
-                    name: promo.name,
-                    code: promo.code,
-                    description: promo.description || ''
-                })) || [];
-
-                const giftCardsData = giftCardsRes.data?.gift_cards?.filter(gc => 
-                    gc.status === "active" && !gc.deleted
-                ).map(gc => ({
-                    id: gc.id,
-                    name: gc.code, // Use code as display name
-                    code: gc.code,
-                    description: gc.description || ''
-                })) || [];
-
                 const categoriesData = categoriesRes.data || [];
 
                 setAttractions(attractionsData);
                 setAddOns(addOnsData);
                 setRooms(roomsData);
-                setPromos(promosData);
-                setGiftCards(giftCardsData);
-                setCategories(categoriesData);
                 setCategories(categoriesData);
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const attractionNames = pkg.attractions?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const promoCodes = pkg.promos?.map((p: any) => typeof p === 'string' ? p : (p.code || '')) || [];
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const giftCardCodes = pkg.gift_cards?.map((g: any) => typeof g === 'string' ? g : (g.code || '')) || [];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const addOnNames = pkg.add_ons?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
                 const orderedAddOnNames = (pkg.add_ons_order && pkg.add_ons_order.length > 0) 
@@ -251,8 +216,6 @@ const EditPackage: React.FC = () => {
                 
                 console.log("Extracted data:", {
                     attractionNames,
-                    promoCodes,
-                    giftCardCodes,
                     addOnNames,
                     orderedAddOnNames,
                     roomNames
@@ -301,8 +264,6 @@ const EditPackage: React.FC = () => {
                     durationUnit: pkg.duration_unit || "hours",
                     durationHours: durationHours,
                     durationMinutes: durationMinutes,
-                    promos: promoCodes,
-                    giftCards: giftCardCodes,
                     addOns: orderedAddOnNames,
                     availabilityType: pkg.availability_type || "daily",
                     availableDays: availableDays,
@@ -463,17 +424,6 @@ const EditPackage: React.FC = () => {
         setDraggedAddOnIndex(null);
     };
 
-    const handleMultiSelectCheckbox = (name: 'promos' | 'giftCards', value: string) => {
-        setForm((prev) => {
-            const arr = prev[name] as string[];
-            if (arr.includes(value)) {
-                return { ...prev, [name]: arr.filter((v) => v !== value) };
-            } else {
-                return { ...prev, [name]: [...arr, value] };
-            }
-        });
-    };
-
     const handleMultiSelect = (name: string, value: string) => {
         setForm((prev) => {
             const arr = prev[name as keyof typeof prev] as string[];
@@ -525,9 +475,9 @@ const EditPackage: React.FC = () => {
         updateSchedule(index, { day_configuration: allSelected ? [] : allDays });
     };
 
-    const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
-        if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
-        
+    const handleAddOption = async (type: string, value: string, _code?: string, extra?: string) => {
+        if (!value.trim()) return;
+
         try {
             switch(type) {
                 case 'addon':
@@ -575,47 +525,6 @@ const EditPackage: React.FC = () => {
                         const updated = [...rooms, { id: tempId, name: value }];
                         setRooms(updated);
                         showToast("Space added!", "success");
-                    }
-                    break;
-                case 'promo':
-                    if (!promos.some(p => p.name === value)) {
-                        const description = extra || '';
-                        await promoService.createPromo({
-                            name: value,
-                            code: code || '',
-                            description,
-                            type: 'fixed' as const,
-                            value: 0,
-                            start_date: new Date().toISOString().split('T')[0],
-                            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                            usage_limit_per_user: 1,
-                            status: 'active' as const,
-                            created_by: 1 // Default user ID
-                        });
-                        const tempId = Date.now();
-                        const updated = [...promos, { id: tempId, name: value, code: code || '', description }];
-                        setPromos(updated);
-                        showToast("Promo added!", "success");
-                    }
-                    break;
-                case 'giftcard':
-                    if (!giftCards.some(g => g.code === code)) {
-                        const description = extra || '';
-                        const initialValue = 100;
-                        await giftCardService.createGiftCard({
-                            code: code || '',
-                            type: 'fixed' as const,
-                            initial_value: initialValue,
-                            balance: initialValue,
-                            max_usage: 1,
-                            description,
-                            status: 'active' as const,
-                            created_by: 1 // Default user ID
-                        });
-                        const tempId = Date.now();
-                        const updated = [...giftCards, { id: tempId, name: code || '', code: code || '', description }];
-                        setGiftCards(updated);
-                        showToast("Gift card added!", "success");
                     }
                     break;
             }
@@ -700,14 +609,6 @@ const EditPackage: React.FC = () => {
                 .map(name => rooms.find(r => r.name === name)?.id)
                 .filter(Boolean) as number[];
 
-            const promo_ids = form.promos
-                .map(code => promos.find(p => p.code === code)?.id)
-                .filter(Boolean) as number[];
-
-            const gift_card_ids = form.giftCards
-                .map(code => giftCards.find(g => g.code === code)?.id)
-                .filter(Boolean) as number[];
-
             const updateData = {
                 name: form.name,
                 description: form.description,
@@ -733,8 +634,6 @@ const EditPackage: React.FC = () => {
                 attraction_ids,
                 addon_ids,
                 room_ids,
-                promo_ids,
-                gift_card_ids,
                 add_ons_order: form.addOns,
                 is_active: form.isActive,
                 display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
@@ -1633,107 +1532,6 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
                         
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
-                                    <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Promos
-                                </h3>
-                                {promos.length > 0 && (
-                                    <StandardButton
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => {
-                                            if (form.promos.length === promos.length) {
-                                                setForm(prev => ({ ...prev, promos: [] }));
-                                            } else {
-                                                setForm(prev => ({ ...prev, promos: promos.map(p => p.code) }));
-                                            }
-                                        }}
-                                    >
-                                        {form.promos.length === promos.length ? 'Deselect All' : 'Select All'}
-                                    </StandardButton>
-                                )}
-                            </div>
-                            {promos.length === 0 ? (
-                                <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                    No active promos available. Create promos in the Promo Management section.
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {promos.map((promo) => (
-                                        <label
-                                            key={promo.code}
-                                            className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={form.promos.includes(promo.code)}
-                                                onChange={() => handleMultiSelectCheckbox('promos', promo.code)}
-                                                className="mt-1"
-                                            />
-                                            <div className="flex-1">
-                                                <div className="font-semibold text-neutral-900">{promo.name}</div>
-                                                <div className="text-sm text-gray-500">Code: {promo.code}</div>
-                                                {promo.description && (
-                                                    <div className="text-sm text-gray-600 mt-1">{promo.description}</div>
-                                                )}
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
-                                    <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Gift Cards
-                                </h3>
-                                {giftCards.length > 0 && (
-                                    <StandardButton
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => {
-                                            if (form.giftCards.length === giftCards.length) {
-                                                setForm(prev => ({ ...prev, giftCards: [] }));
-                                            } else {
-                                                setForm(prev => ({ ...prev, giftCards: giftCards.map(g => g.code) }));
-                                            }
-                                        }}
-                                    >
-                                        {form.giftCards.length === giftCards.length ? 'Deselect All' : 'Select All'}
-                                    </StandardButton>
-                                )}
-                            </div>
-                            {giftCards.length === 0 ? (
-                                <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                    No active gift cards available. Create gift cards in the Gift Card Management section.
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {giftCards.map((giftCard) => (
-                                        <label
-                                            key={giftCard.code}
-                                            className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={form.giftCards.includes(giftCard.code)}
-                                                onChange={() => handleMultiSelectCheckbox('giftCards', giftCard.code)}
-                                                className="mt-1"
-                                            />
-                                            <div className="flex-1">
-                                                <div className="font-semibold text-neutral-900">{giftCard.name}</div>
-                                                <div className="text-sm text-gray-500">Code: {giftCard.code}</div>
-                                                {giftCard.description && (
-                                                    <div className="text-sm text-gray-600 mt-1">{giftCard.description}</div>
-                                                )}
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                         
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
@@ -2134,28 +1932,6 @@ const EditPackage: React.FC = () => {
                             <span className="font-semibold">Add-ons:</span> <span className="text-neutral-800 text-sm">{form.addOns.length > 0
                                 ? form.addOns.join(", ")
                                 : "No add-ons selected"}</span>
-                        </div>
-                        <div className="mb-2 flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold">Promos:</span>
-                            {(form.promos || []).length ? (form.promos || []).map((code: string) => {
-                                const promo = promos.find(p => p.code === code);
-                                return promo ? (
-                                    <span key={code} className={`px-2 py-1 bg-${themeColor}-100 text-${fullColor} text-xs rounded-md font-semibold`}>
-                                        {promo.name}
-                                    </span>
-                                ) : null;
-                            }) : <span className="text-neutral-800 text-sm">No promos selected</span>}
-                        </div>
-                        <div className="mb-2 flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold">Gift Cards:</span>
-                            {(form.giftCards || []).length ? (form.giftCards || []).map((code: string) => {
-                                const giftCard = giftCards.find(g => g.code === code);
-                                return giftCard ? (
-                                    <span key={code} className={`px-2 py-1 bg-${themeColor}-100 text-${fullColor} text-xs rounded-md font-semibold`}>
-                                        {giftCard.name}
-                                    </span>
-                                ) : null;
-                            }) : <span className="text-neutral-800 text-sm">No gift cards selected</span>}
                         </div>
                         {form.minParticipants && form.pricePerAdditional && parseFloat(form.pricePerAdditional) > 0 && (
                             <div className="mb-2">

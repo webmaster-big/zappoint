@@ -11,6 +11,13 @@ export interface AccountingSummary {
   balance_due: number;   // what's still owed
   collected_via_gateway: number;     // payments collected through Authorize.Net
   collected_via_gateway_net: number; // gateway collected minus fees and taxes
+  discount_by_source?: {
+    special_pricing: number;
+    membership: number;
+    promo: number;
+    gift_card: number;
+    other: number;
+  };
 }
 
 export interface CategoryItem {

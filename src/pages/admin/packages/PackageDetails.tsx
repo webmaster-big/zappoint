@@ -448,37 +448,6 @@ const PackageDetails = () => {
             </div>
           )}
 
-          {packageData.promos && packageData.promos.length > 0 && (
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Active Promotions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {packageData.promos.map((promo: string | { name?: string; code?: string }, idx: number) => {
-                  const promoObj = typeof promo === 'string' ? { name: promo } : promo;
-                  return (
-                    <div key={idx} className={`bg-${themeColor}-50 rounded-lg p-4 border border-${themeColor}-200`}>
-                      <p className="text-gray-900 font-medium">{promoObj.name || promoObj.code || String(promo)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {packageData.gift_cards && packageData.gift_cards.length > 0 && (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Applicable Gift Cards</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {packageData.gift_cards.map((giftCard: string | { code?: string }, idx: number) => {
-                  const cardObj = typeof giftCard === 'string' ? { code: giftCard } : giftCard;
-                  return (
-                    <div key={idx} className={`bg-${themeColor}-50 rounded-lg p-4 border border-${themeColor}-200`}>
-                      <p className="text-gray-900 font-medium">{cardObj.code || String(giftCard)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

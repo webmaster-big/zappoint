@@ -66,8 +66,6 @@ export interface OnsiteBookingPackage {
   attractions: OnsiteBookingAttraction[];
   addOns: OnsiteBookingAddOn[];
   addOnsOrder?: string[];  // Add-on names in display order
-  giftCards: OnsiteBookingGiftCard[];
-  promos: OnsiteBookingPromo[];
   duration: string;
   durationUnit: "hours" | "minutes" | "hours and minutes";
   pricePerAdditional30min: string;

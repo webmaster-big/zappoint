@@ -12,8 +12,6 @@ export interface PackagesPackage {
   pricePerAdditional: string | number;
   duration: string;
   durationUnit: "hours" | "minutes" | "hours and minutes";
-  promos: Array<{ name: string; code: string; description: string }>;
-  giftCards: Array<{ name: string; code: string; description: string }>;
   addOns: Array<{ name: string; price: number }>;
   availabilityType: "daily" | "weekly" | "monthly";
   availableDays?: string[];

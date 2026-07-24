@@ -5,10 +5,20 @@ import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { giftCardService } from '../../../services';
 import { getStoredUser } from '../../../utils/storage';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
+import TargetingSelector, { type TargetingValue } from '../../../components/admin/TargetingSelector';
+
+const EMPTY_TARGETING: TargetingValue = {
+  location_ids: null,
+  package_ids: null,
+  attraction_ids: null,
+  event_ids: null,
+};
 
 const GiftCard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [giftCards, setGiftCards] = useState<GiftCardItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -29,6 +39,8 @@ const GiftCard: React.FC = () => {
   });
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<null | Partial<Record<string, string>>>(null);
+  const [targeting, setTargeting] = useState<TargetingValue>(EMPTY_TARGETING);
+  const [editTargeting, setEditTargeting] = useState<TargetingValue>(EMPTY_TARGETING);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
@@ -42,15 +54,13 @@ const GiftCard: React.FC = () => {
   useEffect(() => {
     loadGiftCards();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const adminLocationId = getStoredUser()?.location_id;
+  }, [effectiveLocationId]);
 
   const loadGiftCards = async () => {
     try {
       setLoading(true);
       const response = await giftCardService.getGiftCards(
-        adminLocationId ? { location_id: adminLocationId } : undefined
+        effectiveLocationId ? { location_id: effectiveLocationId } : undefined
       );
       
       if (response.data && response.data.gift_cards) {
@@ -123,12 +133,16 @@ const GiftCard: React.FC = () => {
         description: form.description,
         status: 'active',
         created_by: getStoredUser()?.id || 1,
-        location_id: adminLocationId || undefined,
+        location_ids: targeting.location_ids,
+        package_ids: targeting.package_ids,
+        attraction_ids: targeting.attraction_ids,
+        event_ids: targeting.event_ids,
       });
 
       showToast('Gift card created successfully!', 'success');
       await loadGiftCards();
       setForm({ type: "fixed", initial_value: "", balance: "", expiry_date: "", description: "", max_usage: "1" });
+      setTargeting(EMPTY_TARGETING);
       setShowModal(false);
     } catch (error) {
       console.error('Error creating gift card:', error);
@@ -150,6 +164,12 @@ const GiftCard: React.FC = () => {
       expiry_date: card.expiry_date ? card.expiry_date.slice(0, 10) : '',
       status: card.status,
     });
+    setEditTargeting({
+      location_ids: card.location_ids ?? null,
+      package_ids: card.package_ids ?? null,
+      attraction_ids: card.attraction_ids ?? null,
+      event_ids: card.event_ids ?? null,
+    });
   };
   const closeEditModal = () => {
     setEditIndex(null);
@@ -162,7 +182,7 @@ const GiftCard: React.FC = () => {
   const handleEditSave = async () => {
     if (editIndex === null || !editForm) return;
     const card = giftCards[editIndex];
-    const cardId = (card as unknown as { id?: number }).id;
+    const cardId = card.id;
     if (!cardId) {
       showToast('Cannot update: gift card has no ID', 'error');
       return;
@@ -178,6 +198,10 @@ const GiftCard: React.FC = () => {
         description: editForm.description,
         expiry_date: editForm.expiry_date || undefined,
         status: (editForm.status as 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted') || undefined,
+        location_ids: editTargeting.location_ids,
+        package_ids: editTargeting.package_ids,
+        attraction_ids: editTargeting.attraction_ids,
+        event_ids: editTargeting.event_ids,
       });
       showToast('Gift card updated successfully!', 'success');
       await loadGiftCards();
@@ -586,11 +610,15 @@ const GiftCard: React.FC = () => {
                     value={form.description} 
                     onChange={handleChange} 
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                    rows={2} 
+                    rows={2}
                     placeholder="Optional description"
                   />
                 </div>
-                <StandardButton 
+                <div>
+                  <p className="text-sm font-medium text-gray-800 mb-2">Where this gift card applies</p>
+                  <TargetingSelector value={targeting} onChange={setTargeting} />
+                </div>
+                <StandardButton
                   type="submit"
                   variant="primary"
                   size="md"
@@ -705,9 +733,13 @@ const GiftCard: React.FC = () => {
                     <option value="deleted">Deleted</option>
                   </select>
                 </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-800 mb-2">Where this gift card applies</p>
+                  <TargetingSelector value={editTargeting} onChange={setEditTargeting} />
+                </div>
                 <div className="flex gap-3 mt-6">
-                  <StandardButton 
-                    onClick={handleEditSave} 
+                  <StandardButton
+                    onClick={handleEditSave}
                     variant="primary"
                     size="md"
                     className="flex-1"

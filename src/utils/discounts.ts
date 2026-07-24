@@ -8,6 +8,10 @@ export interface AppliedDiscount {
   discount_type: 'fixed' | 'percentage';
   original_price: number;
   special_pricing_id: number | null;
+  source?: 'special_pricing' | 'membership' | 'promo' | 'gift_card';
+  code?: string;
+  promo_id?: number;
+  gift_card_id?: number;
 }
 
 export function buildAppliedDiscounts(breakdown: SpecialPricingBreakdown | null): AppliedDiscount[] {

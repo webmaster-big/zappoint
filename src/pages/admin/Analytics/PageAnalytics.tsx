@@ -14,6 +14,7 @@ import {
   Sparkles,
   Search,
   Tag,
+  Gift,
   ChevronRight,
   RefreshCw,
 } from 'lucide-react';
@@ -52,6 +53,7 @@ import PageAnalyticsService, {
   type OverviewMetrics,
   type PaginatedResponse,
   type PromoPerformanceRow,
+  type GiftCardPerformanceRow,
   type SearchesResponse,
   type SourcesResponse,
   type TimeseriesResponse,
@@ -162,6 +164,7 @@ const PageAnalytics: React.FC = () => {
   const [conversions, setConversions] = useState<PaginatedResponse<ConversionRow> | null>(null);
   const [searches, setSearches] = useState<SearchesResponse | null>(null);
   const [promos, setPromos] = useState<PromoPerformanceRow[]>([]);
+  const [giftCards, setGiftCards] = useState<GiftCardPerformanceRow[]>([]);
   const [attribution, setAttribution] = useState<AttributionRow[]>([]);
   const [live, setLive] = useState<LiveResponse | null>(null);
 
@@ -186,7 +189,7 @@ const PageAnalytics: React.FC = () => {
     setLoadError(null);
     try {
       const [
-        ov, ts, tp, lb, src, dev, fn, lp, conv, srch, prm, attr,
+        ov, ts, tp, lb, src, dev, fn, lp, conv, srch, prm, attr, gc,
       ] = await Promise.all([
         PageAnalyticsService.getOverview(filter),
         PageAnalyticsService.getTimeseries(filter, 'day').catch((): TimeseriesResponse => ({ bucket: 'day', series: [] })),
@@ -200,6 +203,7 @@ const PageAnalytics: React.FC = () => {
         PageAnalyticsService.getSearches(filter).catch(() => ({ top_queries: [], zero_result_queries: [] })),
         PageAnalyticsService.getPromoPerformance(filter).catch(() => []),
         PageAnalyticsService.getAttribution(filter).catch(() => []),
+        PageAnalyticsService.getGiftCardPerformance(filter).catch(() => []),
       ]);
       setOverview(ov);
       setTimeseries(ts);
@@ -213,6 +217,7 @@ const PageAnalytics: React.FC = () => {
       setSearches(srch);
       setPromos(prm);
       setAttribution(attr);
+      setGiftCards(gc);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
       const status = (e as { response?: { status?: number } })?.response?.status;
@@ -563,7 +568,7 @@ const PageAnalytics: React.FC = () => {
         </Section>
       </div>
 
-      {(promos.length > 0 || (Array.isArray(searches?.top_queries) && searches!.top_queries.length > 0)) && (
+      {(promos.length > 0 || giftCards.length > 0 || (Array.isArray(searches?.top_queries) && searches!.top_queries.length > 0)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {promos.length > 0 && (
             <Section title="Promo performance" icon={Tag}>
@@ -575,6 +580,19 @@ const PageAnalytics: React.FC = () => {
                   (p.applications ?? 0).toLocaleString(),
                   (p.failures ?? 0).toLocaleString(),
                   fmtCurrency(p.revenue),
+                ])}
+              />
+            </Section>
+          )}
+          {giftCards.length > 0 && (
+            <Section title="Gift card performance" icon={Gift}>
+              <SimpleTable
+                columns={['Code', 'Redemptions', 'Redeemed', 'Balance']}
+                rows={giftCards.map((g) => [
+                  g.code,
+                  (g.redemptions ?? 0).toLocaleString(),
+                  fmtCurrency(g.amount_redeemed),
+                  fmtCurrency(g.balance),
                 ])}
               />
             </Section>

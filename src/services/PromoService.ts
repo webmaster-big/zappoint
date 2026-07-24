@@ -43,12 +43,16 @@ export interface Promo {
   created_at: string;
   updated_at: string;
   creator?: { id: number; first_name: string; last_name: string };
-  packages?: { id: number; name: string }[];
+  location_ids?: number[] | null;
+  package_ids?: number[] | null;
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
 }
 
 export interface PromoFilters {
   status?: 'active' | 'inactive' | 'expired' | 'exhausted';
   type?: 'fixed' | 'percentage';
+  location_id?: number;
   search?: string;
   sort_by?: 'code' | 'name' | 'value' | 'start_date' | 'end_date' | 'created_at';
   sort_order?: 'asc' | 'desc';
@@ -68,9 +72,38 @@ export interface CreatePromoData {
   status?: 'active' | 'inactive' | 'expired' | 'exhausted';
   description?: string;
   created_by: number;
+  location_ids?: number[] | null;
+  package_ids?: number[] | null;
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
 }
 
 export type UpdatePromoData = Partial<CreatePromoData>;
+
+export interface DiscountValidationContextItem {
+  type: 'package' | 'attraction' | 'event';
+  id: number;
+}
+
+export interface DiscountValidationContext {
+  location_id?: number | null;
+  subtotal?: number;
+  items?: DiscountValidationContextItem[];
+  customer_id?: number | null;
+}
+
+export interface CodeValidationResult {
+  success: boolean;
+  message?: string;
+  data: {
+    is_valid: boolean;
+    discount_amount?: number;
+    discount_type?: 'fixed' | 'percentage';
+    eligible_subtotal?: number;
+    applied_discount?: Record<string, unknown> | null;
+    promo?: Promo | null;
+  };
+}
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -121,6 +154,11 @@ class PromoService {
 
   async togglePromoStatus(id: number): Promise<ApiResponse<Promo>> {
     const response = await api.patch(`/promos/${id}/toggle-status`);
+    return response.data;
+  }
+
+  async validateCode(code: string, context: DiscountValidationContext = {}): Promise<CodeValidationResult> {
+    const response = await api.post('/promos/validate-code', { code, ...context });
     return response.data;
   }
 

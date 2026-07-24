@@ -32,6 +32,8 @@ import { feeSupportService } from '../../../services/FeeSupportService';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
+import { promoService } from '../../../services/PromoService';
+import { giftCardService } from '../../../services/GiftCardService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
@@ -147,8 +149,9 @@ const BookPackage: React.FC = () => {
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [promoCode, setPromoCode] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<BookPackagePackage['promos'][0] | null>(null);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<BookPackagePackage['gift_cards'][0] | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; name: string; discount_amount: number } | null>(null);
+  const [appliedGiftCard, setAppliedGiftCard] = useState<{ code: string; name: string; discount_amount: number } | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<number>(pkg?.min_participants || 1);
   const [form, setForm] = useState({
     firstName: "",
@@ -734,14 +737,48 @@ const BookPackage: React.FC = () => {
     setSelectedAttractions((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
 
-  const handleApplyCode = (type: "promo" | "giftcard") => {
+  const handleApplyCode = async (type: "promo" | "giftcard") => {
     if (!pkg) return;
-    if (type === "promo") {
-      const found = pkg.promos.find((p) => p.code === promoCode);
-      setAppliedPromo(found || null);
-    } else {
-      const found = pkg.gift_cards.find((g) => g.code === giftCardCode);
-      setAppliedGiftCard(found || null);
+    setCodeError(null);
+    const base = Math.max(0, subtotal - specialPricingDiscount - membershipDiscount);
+    const items = [{ type: 'package' as const, id: pkg.id }];
+
+    try {
+      if (type === "promo") {
+        const res = await promoService.validateCode(promoCode, {
+          location_id: pkg.location_id,
+          subtotal: base,
+          items,
+        });
+        if (res.success && res.data.is_valid) {
+          setAppliedPromo({
+            code: promoCode,
+            name: res.data.promo?.name || promoCode,
+            discount_amount: Number(res.data.discount_amount || 0),
+          });
+        } else {
+          setAppliedPromo(null);
+          setCodeError(res.message || 'Promo code is not valid for this order');
+        }
+      } else {
+        const res = await giftCardService.validateCode(giftCardCode, {
+          location_id: pkg.location_id,
+          subtotal: Math.max(0, base - promoDiscount),
+          items,
+        });
+        if (res.success && res.data.is_valid) {
+          setAppliedGiftCard({
+            code: giftCardCode,
+            name: giftCardCode,
+            discount_amount: Number(res.data.discount_amount || 0),
+          });
+        } else {
+          setAppliedGiftCard(null);
+          setCodeError(res.message || 'Gift card is not valid for this order');
+        }
+      }
+    } catch {
+      setCodeError('Could not validate code. Please try again.');
     }
   };
   
@@ -865,8 +902,8 @@ const BookPackage: React.FC = () => {
     return sum + price * qty * (isPerPerson ? participants : 1);
   }, 0);
   
-  const promoDiscount = appliedPromo ? Number(appliedPromo.discount_value || 0) : 0;
-  const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_value || 0) : 0;
+  const promoDiscount = appliedPromo ? Number(appliedPromo.discount_amount || 0) : 0;
+  const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_amount || 0) : 0;
 
   const benefitItems = useMemo<MembershipBenefitQuoteItem[]>(() => {
     if (!pkg) return [];
@@ -1111,7 +1148,7 @@ const BookPackage: React.FC = () => {
         participants,
         duration: pkg.duration,
         duration_unit: pkg.duration_unit,
-        total_amount: finalTotal,
+        total_amount: finalTotal + promoDiscount + giftCardDiscount,
         amount_paid: amountToPay,
         payment_method: 'authorize.net' as const,
         send_email: false,
@@ -2027,18 +2064,17 @@ const BookPackage: React.FC = () => {
                 )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {pkg.promos && pkg.promos.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Promo Code</label>
                       <div className="flex gap-2 items-center">
-                        <input 
-                          type="text" 
-                          value={promoCode} 
-                          onChange={e => setPromoCode(e.target.value)} 
-                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
-                          placeholder="Enter code" 
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={e => setPromoCode(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
+                          placeholder="Enter code"
                         />
-                        <StandardButton 
+                        <StandardButton
                           type="button"
                           variant="primary"
                           size="md"
@@ -2049,23 +2085,21 @@ const BookPackage: React.FC = () => {
                       </div>
                       {appliedPromo && (
                         <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
-                          ✅ Applied: {appliedPromo.name}
+                          ✅ Applied: {appliedPromo.name} (-${promoDiscount.toFixed(2)})
                         </div>
                       )}
                     </div>
-                  )}
-                  {pkg.gift_cards && pkg.gift_cards.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Gift Card</label>
                       <div className="flex gap-2 items-center">
-                        <input 
-                          type="text" 
-                          value={giftCardCode} 
-                          onChange={e => setGiftCardCode(e.target.value)} 
-                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
-                          placeholder="Enter code" 
+                        <input
+                          type="text"
+                          value={giftCardCode}
+                          onChange={e => setGiftCardCode(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
+                          placeholder="Enter code"
                         />
-                        <StandardButton 
+                        <StandardButton
                           type="button"
                           variant="primary"
                           size="md"
@@ -2076,12 +2110,14 @@ const BookPackage: React.FC = () => {
                       </div>
                       {appliedGiftCard && (
                         <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
-                          ✅ Applied: {appliedGiftCard.name}
+                          ✅ Applied: {appliedGiftCard.name} (-${giftCardDiscount.toFixed(2)})
                         </div>
                       )}
                     </div>
-                  )}
                 </div>
+                {codeError && (
+                  <div className="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-xs">{codeError}</div>
+                )}
                 
                 <div className="flex justify-end pt-4">
                   <StandardButton 

@@ -2,15 +2,13 @@ import React, { useState, useEffect } from "react";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
 import LocationSelector from '../../../components/admin/LocationSelector';
-import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home, Trash2, X, GripVertical, FileText } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Home, Trash2, X, GripVertical, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { 
-    attractionService, 
-    addOnService, 
-    roomService, 
-    promoService, 
-    giftCardService,
+import {
+    attractionService,
+    addOnService,
+    roomService,
     packageService,
     locationService,
     categoryService
@@ -22,12 +20,10 @@ import { attractionCacheService } from '../../../services/AttractionCacheService
 import type { Category } from '../../../services/CategoryService';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
-import type { 
-    CreatePackageAttraction, 
-    CreatePackageAddOn, 
-    CreatePackageRoom,
-    CreatePackagePromo,
-    CreatePackageGiftCard
+import type {
+    CreatePackageAttraction,
+    CreatePackageAddOn,
+    CreatePackageRoom
 } from '../../../types/createPackage.types';
 import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -55,8 +51,6 @@ const CreatePackage: React.FC = () => {
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]); // must include id
     const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]); // must include id
-    const [promos, setPromos] = useState<CreatePackagePromo[]>([]); // must include id
-    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]); // must include id
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     
@@ -91,34 +85,9 @@ const CreatePackage: React.FC = () => {
             try {
                 setLoading(true);
 
-                const [promosRes, giftCardsRes, categoriesRes] = await Promise.all([
-                    promoService.getPromos(),
-                    giftCardService.getGiftCards(),
-                    categoryService.getCategories()
-                ]);
-
-                const promosData = promosRes.data?.promos?.filter(promo =>
-                    promo.status === "active" && !promo.deleted
-                ).map(promo => ({
-                    id: promo.id,
-                    name: promo.name,
-                    code: promo.code,
-                    description: promo.description || ''
-                })) || [];
-
-                const giftCardsData = giftCardsRes.data?.gift_cards?.filter(gc =>
-                    gc.status === "active" && !gc.deleted
-                ).map(gc => ({
-                    id: gc.id,
-                    name: gc.code, // Use code as display name
-                    code: gc.code,
-                    description: gc.description || ''
-                })) || [];
-
+                const categoriesRes = await categoryService.getCategories();
                 const categoriesData = categoriesRes.data || [];
 
-                setPromos(promosData);
-                setGiftCards(giftCardsData);
                 setCategories(categoriesData);
 
                 if (selectedLocation === null || selectedLocation === undefined) {
@@ -234,8 +203,6 @@ const CreatePackage: React.FC = () => {
         durationUnit: "hours" as "hours" | "minutes" | "hours and minutes",
         durationHours: "",
         durationMinutes: "",
-        promos: [] as string[], // will store promo.code
-        giftCards: [] as string[], // will store giftCard.code
         addOns: [] as string[],
         image: "" as string, // base64 or data url
         partialPaymentPercentage: "0", // Percentage for partial payments
@@ -358,17 +325,6 @@ const CreatePackage: React.FC = () => {
         setDraggedAddOnIndex(null);
     };
 
-    const handleMultiSelectCheckbox = (name: 'promos' | 'giftCards', value: string) => {
-        setForm((prev) => {
-            const arr = prev[name] as string[];
-            if (arr.includes(value)) {
-                return { ...prev, [name]: arr.filter((v) => v !== value) };
-            } else {
-                return { ...prev, [name]: [...arr, value] };
-            }
-        });
-    };
-
     const handleMultiSelect = (name: string, value: string) => {
         setForm((prev) => {
             const arr = prev[name as keyof typeof prev] as string[];
@@ -421,9 +377,9 @@ const CreatePackage: React.FC = () => {
         updateSchedule(index, { day_configuration: allSelected ? [] : allDays });
     };
 
-    const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
-        if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
-        
+    const handleAddOption = async (type: string, value: string, _code?: string, extra?: string) => {
+        if (!value.trim()) return;
+
         try {
             switch(type) {
                 case 'addon':
@@ -471,47 +427,6 @@ const CreatePackage: React.FC = () => {
                         const updated = [...rooms, { id: tempId, name: value }];
                         setRooms(updated);
                         showToast("Space added!", "success");
-                    }
-                    break;
-                case 'promo':
-                    if (!promos.some(p => p.name === value)) {
-                        const description = extra || '';
-                        await promoService.createPromo({
-                            name: value,
-                            code: code || '',
-                            description,
-                            type: 'fixed' as const,
-                            value: 0,
-                            start_date: new Date().toISOString().split('T')[0],
-                            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                            usage_limit_per_user: 1,
-                            status: 'active' as const,
-                            created_by: 1 // Default user ID
-                        });
-                        const tempId = Date.now();
-                        const updated = [...promos, { id: tempId, name: value, code: code || '', description }];
-                        setPromos(updated);
-                        showToast("Promo added!", "success");
-                    }
-                    break;
-                case 'giftcard':
-                    if (!giftCards.some(g => g.code === code)) {
-                        const description = extra || '';
-                        const initialValue = 100;
-                        await giftCardService.createGiftCard({
-                            code: code || '',
-                            type: 'fixed' as const,
-                            initial_value: initialValue,
-                            balance: initialValue,
-                            max_usage: 1,
-                            description,
-                            status: 'active' as const,
-                            created_by: 1 // Default user ID
-                        });
-                        const tempId = Date.now();
-                        const updated = [...giftCards, { id: tempId, name: code || '', code: code || '', description }];
-                        setGiftCards(updated);
-                        showToast("Gift card added!", "success");
                     }
                     break;
             }
@@ -617,14 +532,6 @@ const CreatePackage: React.FC = () => {
                 }).filter(Boolean),
                 add_ons_order: form.addOns,
                 display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
-                promo_ids: form.promos.map(code => {
-                    const found = promos.find(p => p.code === code);
-                    return found?.id;
-                }).filter(Boolean),
-                gift_card_ids: form.giftCards.map(code => {
-                    const found = giftCards.find(g => g.code === code);
-                    return found?.id;
-                }).filter(Boolean)
             };
 
                         console.log("Package created:", packageData);
@@ -668,8 +575,6 @@ const CreatePackage: React.FC = () => {
                 durationUnit: "hours",
                 durationHours: "",
                 durationMinutes: "",
-                promos: [],
-                giftCards: [],
                 addOns: [],
                 image: "",
                 partialPaymentPercentage: "0",
@@ -1550,137 +1455,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
-                                        <Tag className="w-5 h-5 text-primary" /> Promos
-                                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                            Link promotional codes that can be applied as discounts for this package
-                                        </span>
-                                    </h3>
-                                    {promos.length > 0 && (
-                                        <StandardButton
-                                            type="button"
-                                            onClick={() => {
-                                                if (form.promos.length === promos.length) {
-                                                    setForm(prev => ({ ...prev, promos: [] }));
-                                                } else {
-                                                    setForm(prev => ({ ...prev, promos: promos.map(p => p.code) }));
-                                                }
-                                            }}
-                                            variant={form.promos.length === promos.length ? 'primary' : 'ghost'}
-                                            size="sm"
-                                        >
-                                            {form.promos.length === promos.length ? 'Deselect All' : 'Select All'}
-                                        </StandardButton>
-                                    )}
-                                </div>
-                                {promos.length === 0 ? (
-                                    <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
-                                        <p className="text-gray-500 mb-3 text-sm">No promos available yet</p>
-                                        <StandardButton
-                                            type="button"
-                                            onClick={() => navigate('/packages/promos')}
-                                            variant="primary"
-                                            size="sm"
-                                            icon={Plus}
-                                        >
-                                            Create Promo
-                                        </StandardButton>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-wrap gap-2 items-center mb-2">
-                                        {promos.map((promo) => (
-                                            <label key={promo.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30 ${form.promos.includes(promo.code) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={form.promos.includes(promo.code)}
-                                                    onChange={() => handleMultiSelectCheckbox('promos', promo.code)}
-                                                    className={`accent-${fullColor}`}
-                                                />
-                                                <span className="relative group cursor-pointer flex items-center gap-1">
-                                                    {promo.name}
-                                                    <span className="text-xs text-gray-400 ml-1">[{promo.code}]</span>
-                                                    {promo.description && (
-                                                        <span className="ml-1">
-                                                            <Info className="w-4 h-4 text-gray-400 group-hover:text-primary transition" />
-                                                            <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
-                                                                {promo.description}
-                                                            </span>
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
-                                        <Gift className="w-5 h-5 text-primary" /> Gift Cards
-                                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                            Associate gift card codes that can be redeemed when booking this package
-                                        </span>
-                                    </h3>
-                                    {giftCards.length > 0 && (
-                                        <StandardButton
-                                            type="button"
-                                            onClick={() => {
-                                                if (form.giftCards.length === giftCards.length) {
-                                                    setForm(prev => ({ ...prev, giftCards: [] }));
-                                                } else {
-                                                    setForm(prev => ({ ...prev, giftCards: giftCards.map(gc => gc.code) }));
-                                                }
-                                            }}
-                                            variant={form.giftCards.length === giftCards.length ? 'primary' : 'ghost'}
-                                            size="sm"
-                                        >
-                                            {form.giftCards.length === giftCards.length ? 'Deselect All' : 'Select All'}
-                                        </StandardButton>
-                                    )}
-                                </div>
-                                {giftCards.length === 0 ? (
-                                    <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
-                                        <p className="text-gray-500 mb-3 text-sm">No gift cards available yet</p>
-                                        <StandardButton
-                                            type="button"
-                                            onClick={() => navigate('/packages/giftcards')}
-                                            variant="primary"
-                                            size="sm"
-                                            icon={Plus}
-                                        >
-                                            Create Gift Card
-                                        </StandardButton>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-wrap gap-2 items-center mb-2">
-                                        {giftCards.map((gc) => (
-                                            <label key={gc.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus-within:ring-2 focus-within:ring-emerald-200 ${form.giftCards.includes(gc.code) ? "bg-emerald-50 border-emerald-400 text-emerald-800" : "bg-white border-gray-200 text-neutral-800"}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={form.giftCards.includes(gc.code)}
-                                                    onChange={() => handleMultiSelectCheckbox('giftCards', gc.code)}
-                                                    className="accent-emerald-500"
-                                                />
-                                                <span className="relative group cursor-pointer flex items-center gap-1">
-                                                    {gc.name}
-                                                    <span className="text-xs text-gray-400 ml-1">[{gc.code}]</span>
-                                                    {gc.description && (
-                                                        <span className="ml-1">
-                                                            <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-800 transition" />
-                                                            <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
-                                                                {gc.description}
-                                                            </span>
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
                             
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
@@ -2019,8 +1793,6 @@ const CreatePackage: React.FC = () => {
                                         durationUnit: "hours",
                                         durationHours: "",
                                         durationMinutes: "",
-                                        promos: [],
-                                        giftCards: [],
                                         addOns: [],
                                         image: "",
                                         partialPaymentPercentage: "0",
@@ -2088,46 +1860,6 @@ const CreatePackage: React.FC = () => {
                                     const found = addOns.find(a => a.name === add);
                                     return found ? `${found.name} ($${found.price})` : add;
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>
-                            </div>
-                            <div className="mb-2 flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold">Promos:</span>
-                                {(form.promos || []).length ? (form.promos || []).map((code: string) => {
-                                    const found = promos.find(p => p.code === code);
-                                    return found ? (
-                                        <span key={code} className="relative group cursor-pointer text-primary flex items-center gap-1">
-                                            {found.name}
-                                            {found.code && <span className="ml-1 text-gray-400">[{found.code}]</span>}
-                                            {found.description && (
-                                                <span className="ml-1">
-                                                    <Info className="w-4 h-4 text-primary group-hover:text-primary/80 transition" />
-                                                    <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
-                                                        {found.description}
-                                                    </span>
-                                                </span>
-                                            )}
-                                        </span>
-                                    ) : null;
-                                }) : <span className='text-gray-300'>None</span>}
-                            </div>
-                            <div className="mb-2 flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold">Gift Cards:</span>
-                                {(form.giftCards || []).length ? (form.giftCards || []).map((code: string) => {
-                                    const found = giftCards.find(g => g.code === code);
-                                    return found ? (
-                                        <span key={code} className="relative group cursor-pointer text-emerald-800 flex items-center gap-1">
-                                            {found.name}
-                                            {found.code && <span className="ml-1 text-gray-400">[{found.code}]</span>}
-                                            {found.description && (
-                                                <span className="ml-1">
-                                                    <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-800 transition" />
-                                                    <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
-                                                        {found.description}
-                                                    </span>
-                                                </span>
-                                            )}
-                                        </span>
-                                    ) : null;
-                                }) : <span className='text-gray-300'>None</span>}
                             </div>
                             {form.minParticipants && form.pricePerAdditional && parseFloat(form.pricePerAdditional) > 0 && (
                                 <div className="mb-2">

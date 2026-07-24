@@ -359,8 +359,6 @@ const Packages: React.FC = () => {
           attraction_ids: cleanPkg.attraction_ids || [],
           addon_ids: cleanPkg.addon_ids || [],
           room_ids: cleanPkg.room_ids || [],
-          gift_card_ids: cleanPkg.gift_card_ids || [],
-          promo_ids: cleanPkg.promo_ids || [],
         };
       });
 
@@ -1087,7 +1085,7 @@ const Packages: React.FC = () => {
                   <li>• JSON must be an array of package objects</li>
                   <li>• Each package must have at least a name and price</li>
                   <li>• Package IDs and location data will be ignored; packages will be registered to the selected location</li>
-                  <li>• You can include relationship IDs (attraction_ids, addon_ids, room_ids, gift_card_ids, promo_ids)</li>
+                  <li>• You can include relationship IDs (attraction_ids, addon_ids, room_ids)</li>
                 </ul>
               </div>
             </div>

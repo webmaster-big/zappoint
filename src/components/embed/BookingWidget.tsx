@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { promoService } from "../../services/PromoService";
+import { giftCardService } from "../../services/GiftCardService";
 
 interface Attraction { name: string; price: number; unit?: string; }
 interface PromoOrGiftCard { name: string; code: string; description?: string; }
+interface AppliedCode { code: string; name: string; discount_amount: number; }
 interface Package {
   id: string;
   name: string;
@@ -40,8 +43,8 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
   const [promoCode, setPromoCode] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<PromoOrGiftCard | null>(null);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<PromoOrGiftCard | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<AppliedCode | null>(null);
+  const [appliedGiftCard, setAppliedGiftCard] = useState<AppliedCode | null>(null);
   const [participants, setParticipants] = useState(1);
   const [form, setForm] = useState({
     firstName: "",
@@ -143,14 +146,29 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     setSelectedAttractions((prev) => ({ ...prev, [name]: Math.max(0, qty) }));
   };
 
-  const handleApplyCode = (type: "promo" | "giftcard") => {
+  const handleApplyCode = async (type: "promo" | "giftcard") => {
     if (!pkg) return;
-    if (type === "promo") {
-      const found = (pkg.promos as PromoOrGiftCard[]).find((p) => p.code === promoCode);
-      setAppliedPromo(found || null);
-    } else {
-      const found = (pkg.giftCards as PromoOrGiftCard[]).find((g) => g.code === giftCardCode);
-      setAppliedGiftCard(found || null);
+    const items = [{ type: "package" as const, id: Number(pkg.id) }];
+    const base = basePrice + addOnsTotal + attractionsTotal;
+    try {
+      if (type === "promo") {
+        const res = await promoService.validateCode(promoCode, { subtotal: base, items });
+        setAppliedPromo(
+          res.success && res.data.is_valid
+            ? { code: promoCode, name: res.data.promo?.name || promoCode, discount_amount: Number(res.data.discount_amount || 0) }
+            : null
+        );
+      } else {
+        const res = await giftCardService.validateCode(giftCardCode, { subtotal: base, items });
+        setAppliedGiftCard(
+          res.success && res.data.is_valid
+            ? { code: giftCardCode, name: giftCardCode, discount_amount: Number(res.data.discount_amount || 0) }
+            : null
+        );
+      }
+    } catch {
+      if (type === "promo") setAppliedPromo(null);
+      else setAppliedGiftCard(null);
     }
   };
 
@@ -191,8 +209,8 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
     return sum + price * qty;
   }, 0);
   
-  const promoDiscount = appliedPromo ? 10 : 0;
-  const giftCardDiscount = appliedGiftCard ? 10 : 0;
+  const promoDiscount = appliedPromo ? Number(appliedPromo.discount_amount || 0) : 0;
+  const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_amount || 0) : 0;
   
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
   const taxRate = 0.06; // Michigan tax

@@ -332,6 +332,22 @@ const AccountingAnalytics: React.FC = () => {
               );
             })}
             </div>
+            {summary.discount_by_source && (
+              <div className="mt-3 bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                <p className="text-[11px] font-medium text-gray-500 mb-2">Discounts by source</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                  {([
+                    ['Special Pricing', summary.discount_by_source.special_pricing],
+                    ['Membership', summary.discount_by_source.membership],
+                    ['Promo', summary.discount_by_source.promo],
+                    ['Gift Card', summary.discount_by_source.gift_card],
+                    ['Other', summary.discount_by_source.other],
+                  ] as [string, number][]).map(([label, val]) => (
+                    <span key={label} className="text-gray-600">{label}: <span className="text-red-600 font-medium">-{formatCurrency(val)}</span></span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}

@@ -34,6 +34,10 @@ export interface GiftCard {
   expiry_date?: string;
   created_by: number;
   location_id?: number;
+  location_ids?: number[] | null;
+  package_ids?: number[] | null;
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
   deleted: boolean;
   created_at: string;
   updated_at: string;
@@ -61,9 +65,26 @@ export interface CreateGiftCardData {
   expiry_date?: string;
   created_by: number;
   location_id?: number;
+  location_ids?: number[] | null;
+  package_ids?: number[] | null;
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
 }
 
 export type UpdateGiftCardData = Partial<CreateGiftCardData>;
+
+export interface GiftCardCodeValidationResult {
+  success: boolean;
+  message?: string;
+  data: {
+    is_valid: boolean;
+    balance?: number;
+    discount_amount?: number;
+    eligible_subtotal?: number;
+    applied_discount?: Record<string, unknown> | null;
+    gift_card?: GiftCard | null;
+  };
+}
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -109,6 +130,14 @@ class GiftCardService {
 
   async deleteGiftCard(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/gift-cards/${id}`);
+    return response.data;
+  }
+
+  async validateCode(
+    code: string,
+    context: { location_id?: number | null; subtotal?: number; items?: { type: 'package' | 'attraction' | 'event'; id: number }[] } = {}
+  ): Promise<GiftCardCodeValidationResult> {
+    const response = await api.post('/gift-cards/validate-code', { code, ...context });
     return response.data;
   }
 }

@@ -233,6 +233,15 @@ export interface PromoPerformanceRow {
   revenue: number;
 }
 
+export interface GiftCardPerformanceRow {
+  entity_id: number;
+  code: string;
+  redemptions: number;
+  amount_redeemed: number;
+  balance: number;
+  initial_value: number;
+}
+
 export interface AttributionRow {
   source?: string | null;
   medium?: string | null;
@@ -656,6 +665,23 @@ const PageAnalyticsService = {
         applications: toNumber(raw.applications),
         failures:     toNumber(raw.failures),
         revenue:      toNumber(raw.revenue ?? raw.revenue_attributed),
+      };
+    });
+  },
+
+  async getGiftCardPerformance(filter: DateRangeFilter): Promise<GiftCardPerformanceRow[]> {
+    const r = await api.get('/page-analytics/gift-card-performance', { params: buildParams(filter) });
+    const d = unwrap<GiftCardPerformanceRow[] | { rows: GiftCardPerformanceRow[] }>(r.data);
+    const rows = Array.isArray(d) ? d : (d as { rows?: GiftCardPerformanceRow[] }).rows ?? [];
+    return rows.map((row) => {
+      const raw = row as unknown as Record<string, unknown>;
+      return {
+        entity_id:       toNumber(raw.entity_id),
+        code:            String(raw.code ?? ''),
+        redemptions:     toNumber(raw.redemptions),
+        amount_redeemed: toNumber(raw.amount_redeemed),
+        balance:         toNumber(raw.balance),
+        initial_value:   toNumber(raw.initial_value),
       };
     });
   },

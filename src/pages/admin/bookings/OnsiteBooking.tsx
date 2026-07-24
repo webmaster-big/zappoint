@@ -11,6 +11,8 @@ import type {
   OnsiteBookingData 
 } from '../../../types/onsiteBooking.types';
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
+import { promoService } from '../../../services/PromoService';
+import { giftCardService } from '../../../services/GiftCardService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
@@ -139,6 +141,9 @@ const OnsiteBooking: React.FC = () => {
   const [sendEmailToStaff, setSendEmailToStaff] = useState(true);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [giftDiscount, setGiftDiscount] = useState(0);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -369,30 +374,6 @@ const OnsiteBooking: React.FC = () => {
               capacity: r.capacity
             })) || [],
             image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
-            giftCards: pkg.gift_cards?.map((gc: any) => ({
-              id: gc.id,
-              code: gc.code,
-              type: gc.type,
-              value: gc.discount_value,
-              initial_value: gc.discount_value,
-              remaining_usage: gc.remaining_usage || 0,
-              max_usage: gc.max_usage || 1,
-              status: gc.status,
-              expiry_date: gc.expiry_date,
-              description: gc.description || ''
-            })) || [],
-            promos: pkg.promos?.map((p: any) => ({
-              id: p.id,
-              code: p.code,
-              type: p.type,
-              value: p.discount_value,
-              status: p.status,
-              start_date: p.start_date,
-              end_date: p.end_date,
-              usage_limit_per_user: p.usage_limit_per_user || 1,
-              usage_limit_total: p.usage_limit_total || 100,
-              description: p.description || ''
-            })) || [],
             duration: pkg.duration?.toString() || '2',
             durationUnit: pkg.duration_unit || 'hours',
             pricePerAdditional30min: pkg.price_per_additional_30min?.toString() || '0',
@@ -482,31 +463,6 @@ const OnsiteBooking: React.FC = () => {
             })) || [],
             image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            giftCards: pkg.gift_cards?.map((gc: any) => ({
-              id: gc.id,
-              code: gc.code,
-              type: gc.type,
-              value: gc.discount_value,
-              initial_value: gc.discount_value,
-              remaining_usage: gc.remaining_usage || 0,
-              max_usage: gc.max_usage || 1,
-              status: gc.status,
-              expiry_date: gc.expiry_date,
-              description: gc.description || ''
-            })) || [],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            promos: pkg.promos?.map((p: any) => ({
-              id: p.id,
-              code: p.code,
-              type: p.type,
-              value: p.discount_value,
-              status: p.status,
-              start_date: p.start_date,
-              end_date: p.end_date,
-              usage_limit_per_user: p.usage_limit_per_user || 1,
-              usage_limit_total: p.usage_limit_total || 100,
-              description: p.description || ''
-            })) || [],
             duration: pkg.duration?.toString() || '2',
             durationUnit: pkg.duration_unit || 'hours',
             pricePerAdditional30min: pkg.price_per_additional_30min?.toString() || '0',
@@ -1117,33 +1073,48 @@ const OnsiteBooking: React.FC = () => {
       }
     });
     
-    if (bookingData.giftCardCode && selectedPackage) {
-      const giftCard = selectedPackage.giftCards.find(gc => gc.code === bookingData.giftCardCode && gc.status === 'active');
-      if (giftCard) {
-        if (giftCard.type === 'percentage') {
-          total -= total * (giftCard.value / 100);
-        } else {
-          total -= giftCard.value;
-        }
-      }
-    }
-    
-    if (bookingData.promoCode && selectedPackage) {
-      const promo = selectedPackage.promos.find(p => p.code === bookingData.promoCode && p.status === 'active');
-      if (promo) {
-        if (promo.type === 'percentage') {
-          total -= total * (promo.value / 100);
-        } else {
-          total -= promo.value;
-        }
-      }
-    }
-    
+    total -= promoDiscount;
+    total -= giftDiscount;
+
     return Math.max(0, total);
+  };
+
+  const validateOnsiteCode = async (type: 'promo' | 'giftcard') => {
+    if (!selectedPackage) return;
+    setCodeError(null);
+
+    const base = calculateTotal() + promoDiscount + giftDiscount;
+    const locationId = selectedLocation ?? undefined;
+    const items = [{ type: 'package' as const, id: selectedPackage.id }];
+
+    try {
+      if (type === 'promo') {
+        const res = await promoService.validateCode(bookingData.promoCode, { location_id: locationId, subtotal: base, items });
+        if (res.success && res.data.is_valid) {
+          setPromoDiscount(Number(res.data.discount_amount || 0));
+        } else {
+          setPromoDiscount(0);
+          setCodeError(res.message || 'Promo code is not valid for this order');
+        }
+      } else {
+        const res = await giftCardService.validateCode(bookingData.giftCardCode, { location_id: locationId, subtotal: Math.max(0, base - promoDiscount), items });
+        if (res.success && res.data.is_valid) {
+          setGiftDiscount(Number(res.data.discount_amount || 0));
+        } else {
+          setGiftDiscount(0);
+          setCodeError(res.message || 'Gift card is not valid for this order');
+        }
+      }
+    } catch {
+      setCodeError('Could not validate code. Please try again.');
+    }
   };
 
   const resetForm = () => {
     setSelectedPackage(null);
+    setPromoDiscount(0);
+    setGiftDiscount(0);
+    setCodeError(null);
     setBookingData({
       packageId: null,
       selectedAttractions: [],
@@ -1258,19 +1229,6 @@ const OnsiteBooking: React.FC = () => {
         finalDurationUnit = 'hours';
       }
       
-      let promoId: number | undefined;
-      let giftCardId: number | undefined;
-      
-      if (bookingData.promoCode && selectedPackage.promos) {
-        const promo = selectedPackage.promos.find(p => p.code === bookingData.promoCode);
-        promoId = promo?.id;
-      }
-      
-      if (bookingData.giftCardCode && selectedPackage.giftCards) {
-        const giftCard = selectedPackage.giftCards.find(gc => gc.code === bookingData.giftCardCode);
-        giftCardId = giftCard?.id;
-      }
-      
       console.log('📦 Building additional attractions/addons...', {
         selectedAttractions: bookingData.selectedAttractions,
         selectedAddOns: bookingData.selectedAddOns,
@@ -1323,9 +1281,10 @@ const OnsiteBooking: React.FC = () => {
         })
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
-      const totalAmount = feeBreakdown ? feeBreakdown.total : calculateTotal();
+      const totalAmount = feeBreakdown ? feeBreakdown.total : (calculateTotal() + promoDiscount + giftDiscount);
+      const netTotal = Math.max(0, totalAmount - promoDiscount - giftDiscount);
       const partialAmount = calculatePartialAmount();
-      let amountPaid = totalAmount;
+      let amountPaid = netTotal;
       
       if (bookingData.paymentMethod === 'paylater') {
         amountPaid = 0;
@@ -1333,16 +1292,16 @@ const OnsiteBooking: React.FC = () => {
         if (bookingData.inStoreAmountPaid > 0) {
           amountPaid = bookingData.inStoreAmountPaid;
         } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
-          amountPaid = Math.min(bookingData.customPaymentAmount, totalAmount);
+          amountPaid = Math.min(bookingData.customPaymentAmount, netTotal);
         } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
           amountPaid = partialAmount;
         } else if (bookingData.paymentType === 'full') {
-          amountPaid = totalAmount;
+          amountPaid = netTotal;
         } else {
           amountPaid = 0; // No amount specified
         }
       } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
-        amountPaid = Math.min(bookingData.customPaymentAmount, totalAmount);
+        amountPaid = Math.min(bookingData.customPaymentAmount, netTotal);
       } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
         amountPaid = partialAmount;
       }
@@ -1369,13 +1328,13 @@ const OnsiteBooking: React.FC = () => {
         payment_method: (bookingData.paymentMethod === 'in-store' ? 'in-store' : bookingData.paymentMethod) as 'authorize.net' | 'in-store' | 'paylater',
         ...(bookingData.paymentMethod === 'in-store' ? {
           status: 'confirmed' as const,
-          payment_status: amountPaid >= totalAmount ? 'paid' as const : (amountPaid > 0 ? 'partial' as const : 'pending' as const),
+          payment_status: amountPaid >= netTotal ? 'paid' as const : (amountPaid > 0 ? 'partial' as const : 'pending' as const),
         } : bookingData.paymentMethod === 'paylater' ? {
           payment_status: 'pending' as const,
         } : {
         }),
-        promo_id: promoId,
-        gift_card_id: giftCardId,
+        promo_code: bookingData.promoCode || undefined,
+        gift_card_code: bookingData.giftCardCode || undefined,
         notes: bookingData.notes || undefined,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
@@ -2477,45 +2436,55 @@ const OnsiteBooking: React.FC = () => {
           </div>
         </div>
 
-        {((selectedPackage?.giftCards && selectedPackage.giftCards.length > 0) || 
-          (selectedPackage?.promos && selectedPackage.promos.length > 0)) && (
+        {selectedPackage && (
           <div className="pt-4 border-t border-gray-200">
             <h3 className="font-semibold text-gray-900 mb-4">Discounts & Promotions</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedPackage?.giftCards && selectedPackage.giftCards.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                     <Gift className="w-4 h-4 mr-2" />
                     Gift Card Code
                   </label>
-                  <input
-                    type="text"
-                    name="giftCardCode"
-                    value={bookingData.giftCardCode}
-                    onChange={handleInputChange}
-                    className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
-                    placeholder="GIFT-XXXX"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="giftCardCode"
+                      value={bookingData.giftCardCode}
+                      onChange={handleInputChange}
+                      className={`flex-1 border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
+                      placeholder="GIFT-XXXX"
+                    />
+                    <StandardButton type="button" variant="primary" size="md" onClick={() => validateOnsiteCode('giftcard')}>Apply</StandardButton>
+                  </div>
+                  {giftDiscount > 0 && (
+                    <p className="mt-2 text-xs text-green-600">Applied: -${giftDiscount.toFixed(2)}</p>
+                  )}
                 </div>
-              )}
-              
-              {selectedPackage?.promos && selectedPackage.promos.length > 0 && (
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                     <Tag className="w-4 h-4 mr-2" />
                     Promo Code
                   </label>
-                  <input
-                    type="text"
-                    name="promoCode"
-                    value={bookingData.promoCode}
-                    onChange={handleInputChange}
-                    className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
-                    placeholder="PROMO-XXXX"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="promoCode"
+                      value={bookingData.promoCode}
+                      onChange={handleInputChange}
+                      className={`flex-1 border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
+                      placeholder="PROMO-XXXX"
+                    />
+                    <StandardButton type="button" variant="primary" size="md" onClick={() => validateOnsiteCode('promo')}>Apply</StandardButton>
+                  </div>
+                  {promoDiscount > 0 && (
+                    <p className="mt-2 text-xs text-green-600">Applied: -${promoDiscount.toFixed(2)}</p>
+                  )}
                 </div>
-              )}
             </div>
+            {codeError && (
+              <div className="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-xs">{codeError}</div>
+            )}
           </div>
         )}
         

@@ -6,13 +6,23 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { promoService } from '../../../services';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from "../../../utils/storage";
+import { useLocationScope } from "../../../contexts/LocationContext";
 import BatchListTab from "../../../components/admin/promos/BatchListTab";
 import BatchDetailView from "../../../components/admin/promos/BatchDetailView";
+import TargetingSelector, { type TargetingValue } from "../../../components/admin/TargetingSelector";
+
+const EMPTY_TARGETING: TargetingValue = {
+  location_ids: null,
+  package_ids: null,
+  attraction_ids: null,
+  event_ids: null,
+};
 
 type Tab = "single" | "bulk";
 
 const Promo: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const [activeTab, setActiveTab] = useState<Tab>("single");
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
@@ -36,6 +46,8 @@ const Promo: React.FC = () => {
     usage_limit_per_user: "",
     description: "",
   });
+  const [targeting, setTargeting] = useState<TargetingValue>(EMPTY_TARGETING);
+  const [editTargeting, setEditTargeting] = useState<TargetingValue>(EMPTY_TARGETING);
 
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
   const showToast = (message: string, type?: "success" | "error" | "info") => {
@@ -46,7 +58,9 @@ const Promo: React.FC = () => {
   const loadPromos = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await promoService.getPromos();
+      const response = await promoService.getPromos(
+        effectiveLocationId ? { location_id: effectiveLocationId } : undefined
+      );
 
       if (response.data && response.data.promos) {
         const formattedPromos: PromoItem[] = response.data.promos
@@ -79,7 +93,7 @@ const Promo: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [effectiveLocationId]);
 
   useEffect(() => {
     if (activeTab === "single") {
@@ -122,7 +136,11 @@ const Promo: React.FC = () => {
         usage_limit_per_user: form.usage_limit_per_user ? Number(form.usage_limit_per_user) : undefined,
         description: form.description,
         status: 'active',
-        created_by: getStoredUser()?.id
+        created_by: getStoredUser()?.id,
+        location_ids: targeting.location_ids,
+        package_ids: targeting.package_ids,
+        attraction_ids: targeting.attraction_ids,
+        event_ids: targeting.event_ids,
       });
 
       showToast('Promo code created successfully!', 'success');
@@ -138,6 +156,7 @@ const Promo: React.FC = () => {
         usage_limit_per_user: "",
         description: "",
       });
+      setTargeting(EMPTY_TARGETING);
       setShowModal(false);
     } catch (error) {
       console.error('Error creating promo:', error);
@@ -160,6 +179,12 @@ const Promo: React.FC = () => {
       usage_limit_per_user: promo.usage_limit_per_user,
       status: promo.status,
       description: promo.description,
+    });
+    setEditTargeting({
+      location_ids: promo.location_ids ?? null,
+      package_ids: promo.package_ids ?? null,
+      attraction_ids: promo.attraction_ids ?? null,
+      event_ids: promo.event_ids ?? null,
     });
   };
 
@@ -194,6 +219,10 @@ const Promo: React.FC = () => {
       if (editForm.usage_limit_per_user !== undefined) updateData.usage_limit_per_user = Number(editForm.usage_limit_per_user);
       if (editForm.status) updateData.status = editForm.status;
       if (editForm.description !== undefined) updateData.description = editForm.description;
+      updateData.location_ids = editTargeting.location_ids;
+      updateData.package_ids = editTargeting.package_ids;
+      updateData.attraction_ids = editTargeting.attraction_ids;
+      updateData.event_ids = editTargeting.event_ids;
 
       await promoService.updatePromo(promo.id, updateData);
       showToast('Promo updated successfully!', 'success');
@@ -685,12 +714,16 @@ const Promo: React.FC = () => {
                       value={form.description} 
                       onChange={handleChange} 
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                      rows={2} 
+                      rows={2}
                       placeholder="Optional description"
                     />
                   </div>
                 </div>
-                <StandardButton 
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-800 mb-2">Where this promo applies</p>
+                  <TargetingSelector value={targeting} onChange={setTargeting} />
+                </div>
+                <StandardButton
                   type="submit"
                   disabled={loading}
                   variant="primary"
@@ -810,6 +843,10 @@ const Promo: React.FC = () => {
                       rows={2}
                     />
                   </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-800 mb-2">Where this promo applies</p>
+                  <TargetingSelector value={editTargeting} onChange={setEditTargeting} />
                 </div>
                 <div className="flex gap-3 mt-6">
                   <StandardButton

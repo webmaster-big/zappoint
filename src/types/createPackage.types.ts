@@ -21,20 +21,6 @@ export interface CreatePackageRoom {
   area_group?: string;
 }
 
-export interface CreatePackagePromo {
-  id: number;
-  name: string;
-  code: string;
-  description: string;
-}
-
-export interface CreatePackageGiftCard {
-  id: number;
-  name: string;
-  code: string;
-  description: string;
-}
-
 export interface CreatePackageForm {
   name: string;
   description: string;
@@ -47,8 +33,6 @@ export interface CreatePackageForm {
   pricePerAdditional: string;
   duration: string;
   durationUnit: CreatePackageDurationUnit;
-  promos: string[];
-  giftCards: string[];
   addOns: string[];
   availabilityType: CreatePackageAvailabilityType;
   availableDays: string[];

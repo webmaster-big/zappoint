@@ -23,7 +23,10 @@ export interface PromoItem {
   updated_at?: string;
   deleted?: boolean;
   creator?: { id: number; first_name: string; last_name: string };
-  packages?: { id: number; name: string }[];
+  location_ids?: number[] | null;
+  package_ids?: number[] | null;
+  attraction_ids?: number[] | null;
+  event_ids?: number[] | null;
 }
 
 export interface PromoBatch {

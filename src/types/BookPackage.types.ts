@@ -51,15 +51,6 @@ export interface BookPackageRoom {
   };
 }
 
-export interface BookPackagePromoOrGiftCard { 
-  id: number;
-  name: string; 
-  code: string; 
-  description?: string;
-  discount_type?: string;
-  discount_value?: string;
-}
-
 export interface BookPackageAvailabilitySchedule {
   id: number;
   package_id: number;
@@ -125,8 +116,6 @@ export interface BookPackagePackage {
   add_ons: BookPackageAddOn[];
   add_ons_order?: string[];  // Add-on names in display order
   rooms: BookPackageRoom[];
-  promos: BookPackagePromoOrGiftCard[];
-  gift_cards: BookPackagePromoOrGiftCard[];
 }
 
 export interface BookPackageBooking {
