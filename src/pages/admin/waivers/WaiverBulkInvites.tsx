@@ -8,6 +8,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_BULK_STEPS } from '../../../components/waiver/tour/tourSteps';
+import { formatDateLong } from '../../../utils/timeFormat';
 
 interface BulkInvite {
   id: number;
@@ -109,7 +110,7 @@ const WaiverBulkInvites = () => {
                       <div className="text-xs text-gray-400">{inv.chaperone_email || inv.chaperone_phone || ''}</div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{inv.template?.title || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{inv.selected_date}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{formatDateLong(inv.selected_date)}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{inv.recipients_count ?? 0}</td>
                     <td className="px-4 py-3">{inv.allow_shareable_link ? <span className="text-xs text-emerald-600 font-medium">Enabled</span> : <span className="text-xs text-gray-300">—</span>}</td>
                     <td className="px-4 py-3 text-right">
