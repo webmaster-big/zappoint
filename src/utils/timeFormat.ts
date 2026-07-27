@@ -108,7 +108,15 @@ export function formatDurationDisplay(
   return `${durationValue} ${durationUnit || 'hours'}`;
 }
 
-const MICHIGAN_TZ = 'America/Detroit';
+export const MICHIGAN_TZ = 'America/Detroit';
+
+export function toMichiganDate(iso?: string | null): string {
+  if (!iso) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.split('T')[0] || '';
+  return date.toLocaleDateString('en-CA', { timeZone: MICHIGAN_TZ });
+}
 
 export function getMichiganNow(): { year: number; month: number; day: number; hour: number; minute: number; dayOfWeek: number; date: Date } {
   const now = new Date();

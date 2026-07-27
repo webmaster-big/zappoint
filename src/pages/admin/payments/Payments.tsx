@@ -65,6 +65,7 @@ import {
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef, DateRangeValue } from '../../../components/admin/table';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
+import { MICHIGAN_TZ } from '../../../utils/timeFormat';
 import type { PaymentsPagePayment, PaymentsMetrics } from '../../../types/Payments.types';
 import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
 import type { PaymentPayableType } from '../../../types/Payment.types';
@@ -161,6 +162,7 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
+    timeZone: MICHIGAN_TZ,
     year: 'numeric',
     month: 'short',
     day: 'numeric',

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toMichiganDate } from '../../../utils/timeFormat';
 import type {
   AdminFilterDef,
   AdminTableConfig,
@@ -223,7 +224,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
           result = result.filter(row => {
             const raw = def.getDate(row);
             if (!raw) return false;
-            const date = raw.split('T')[0];
+            const date = toMichiganDate(raw);
             if (range.start && date < range.start) return false;
             if (range.end && date > range.end) return false;
             return true;
