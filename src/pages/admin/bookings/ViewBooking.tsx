@@ -250,7 +250,7 @@ const ViewBooking: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Booking Information</h2>
-            <div className="grid grid-cols-1 gap-6">
+            <div className="flex flex-col gap-6">
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <User className={`h-5 w-5 text-${fullColor}`} />
@@ -402,7 +402,7 @@ const ViewBooking: React.FC = () => {
 
           <div className="p-6 border-b border-gray-100 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
-            <div className="grid grid-cols-1 gap-6">
+            <div className="flex flex-col gap-6">
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
@@ -551,7 +551,7 @@ const ViewBooking: React.FC = () => {
           {((booking.attractions && booking.attractions.length > 0) || ((booking as any).add_ons && (booking as any).add_ons.length > 0)) && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Services</h2>
-              <div className="grid grid-cols-1 gap-6">
+              <div className="flex flex-col gap-6">
                 {booking.attractions && booking.attractions.length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Attractions ({booking.attractions.length})</h3>
