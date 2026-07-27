@@ -34,6 +34,15 @@ const formatDateTime = (iso?: string | null) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
+const formatDate = (val?: string | null) => {
+  if (!val) return '';
+  const datePart = val.split('T')[0].split(' ')[0];
+  const d = new Date(`${datePart}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? datePart : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const waiverName = (w: ConnectedWaiver) => w.adult_name || w.adult_email || w.adult_phone || 'Awaiting signature';
+
 const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, checkInActions = true }: Props) => {
   const { themeColor, fullColor } = useThemeColor();
   const [waivers, setWaivers] = useState<ConnectedWaiver[]>([]);
@@ -180,7 +189,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
           <div key={w.id} className="py-2.5 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-gray-900 truncate">{w.adult_name || 'Unnamed'}</span>
+                <span className="text-sm font-medium text-gray-900 truncate">{waiverName(w)}</span>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${statusStyles[w.status] || statusStyles.pending}`}>{statusLabel[w.status] || w.status}</span>
                 {checkInActions && (
                   w.checked_in_at ? (
@@ -194,7 +203,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
               </div>
               {!compact && (
                 <div className="text-[11px] text-gray-400 mt-0.5">
-                  {w.template ? `${w.template} · ` : ''}{w.selected_date}
+                  {w.template ? `${w.template} · ` : ''}{formatDate(w.selected_date)}
                   {w.minors.length > 0 && <span> · Minors: {w.minors.join(', ')}</span>}
                   {w.submitted_at && <span> · Signed {formatDateTime(w.submitted_at)}</span>}
                   {w.checked_in_at && <span> · Checked in {formatDateTime(w.checked_in_at)}</span>}
