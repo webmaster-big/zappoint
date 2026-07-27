@@ -1726,7 +1726,7 @@ const BookPackage: React.FC = () => {
         }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40 flex flex-col items-center justify-center py-8 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40 flex flex-col items-center justify-center py-8 px-4 overflow-x-clip">
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
         <div className="flex-1 min-w-0">
           {currentStep >= 2 && (
@@ -2071,13 +2071,14 @@ const BookPackage: React.FC = () => {
                           type="text"
                           value={promoCode}
                           onChange={e => setPromoCode(e.target.value)}
-                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
+                          className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
                           placeholder="Enter code"
                         />
                         <StandardButton
                           type="button"
                           variant="primary"
                           size="md"
+                          className="shrink-0 whitespace-nowrap"
                           onClick={() => handleApplyCode("promo")}
                         >
                           Apply
@@ -2096,13 +2097,14 @@ const BookPackage: React.FC = () => {
                           type="text"
                           value={giftCardCode}
                           onChange={e => setGiftCardCode(e.target.value)}
-                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
+                          className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
                           placeholder="Enter code"
                         />
                         <StandardButton
                           type="button"
                           variant="primary"
                           size="md"
+                          className="shrink-0 whitespace-nowrap"
                           onClick={() => handleApplyCode("giftcard")}
                         >
                           Apply
@@ -2913,7 +2915,7 @@ const BookPackage: React.FC = () => {
 
       <button
         onClick={() => setShowMobileOrderSummary(true)}
-        className="fixed top-4 left-4 z-40 md:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
+        className="fixed bottom-4 right-4 z-40 md:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
         aria-label="View Order Summary"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

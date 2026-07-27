@@ -78,6 +78,7 @@ export interface AdminTableConfig<T> {
   columns: AdminColumn<T>[];
   getRowId: (row: T) => string;
   storageKey: string;
+  columnsVersion?: string | number;
   filterDefs?: AdminFilterDef<T>[];
   searchFields?: (row: T) => Array<string | number | null | undefined>;
   serverSearch?: (term: string) => Promise<T[] | null>;

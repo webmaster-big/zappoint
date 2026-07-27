@@ -183,6 +183,15 @@ const WaiversSearch = () => {
       ),
     },
     {
+      key: 'phone',
+      label: 'Phone',
+      group: 'Customer',
+      sortable: true,
+      sortValue: (w) => w.adult_phone || '',
+      exportValue: (w) => w.adult_phone || '',
+      render: (w) => <span className="text-sm text-gray-600">{w.adult_phone || '—'}</span>,
+    },
+    {
       key: 'linked',
       label: 'Linked to',
       group: 'Details',
@@ -372,6 +381,7 @@ const WaiversSearch = () => {
     columns,
     getRowId: (w) => String(w.id),
     storageKey: 'waivers_search_v3',
+    columnsVersion: 'phone-default-2026-07',
     filterDefs,
     searchFields: (w) => [
       w.id,
@@ -425,7 +435,6 @@ const WaiversSearch = () => {
       rows: table.filteredRows,
       extraColumns: [
         { label: 'Email', value: (w) => w.adult_email || '' },
-        { label: 'Phone', value: (w) => w.adult_phone || '' },
         { label: 'Adult DOB', value: (w) => w.adult_dob || '' },
         { label: 'Relationship', value: (w) => w.relationship || '' },
         { label: 'Typed Legal Name', value: (w) => w.typed_legal_name || '' },

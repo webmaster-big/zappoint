@@ -482,13 +482,13 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
                     type="text" 
                     value={promoCode} 
                     onChange={e => setPromoCode(e.target.value)} 
-                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
+                    className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
                     placeholder="Enter code" 
                   />
                   <button 
                     type="button" 
                     onClick={() => handleApplyCode("promo")}
-                    className="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm shadow-sm"
+                    className="shrink-0 whitespace-nowrap px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm shadow-sm"
                   >
                     Apply
                   </button>
@@ -507,13 +507,13 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
                     type="text" 
                     value={giftCardCode} 
                     onChange={e => setGiftCardCode(e.target.value)} 
-                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
+                    className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
                     placeholder="Enter code" 
                   />
                   <button 
                     type="button" 
                     onClick={() => handleApplyCode("giftcard")}
-                    className="px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition text-sm shadow-sm"
+                    className="shrink-0 whitespace-nowrap px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition text-sm shadow-sm"
                   >
                     Apply
                   </button>

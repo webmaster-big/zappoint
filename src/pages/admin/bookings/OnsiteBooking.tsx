@@ -2451,10 +2451,10 @@ const OnsiteBooking: React.FC = () => {
                       name="giftCardCode"
                       value={bookingData.giftCardCode}
                       onChange={handleInputChange}
-                      className={`flex-1 border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
+                      className={`flex-1 min-w-0 border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
                       placeholder="GIFT-XXXX"
                     />
-                    <StandardButton type="button" variant="primary" size="md" onClick={() => validateOnsiteCode('giftcard')}>Apply</StandardButton>
+                    <StandardButton type="button" variant="primary" size="md" className="shrink-0 whitespace-nowrap" onClick={() => validateOnsiteCode('giftcard')}>Apply</StandardButton>
                   </div>
                   {giftDiscount > 0 && (
                     <p className="mt-2 text-xs text-green-600">Applied: -${giftDiscount.toFixed(2)}</p>
@@ -2472,10 +2472,10 @@ const OnsiteBooking: React.FC = () => {
                       name="promoCode"
                       value={bookingData.promoCode}
                       onChange={handleInputChange}
-                      className={`flex-1 border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
+                      className={`flex-1 min-w-0 border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors uppercase`}
                       placeholder="PROMO-XXXX"
                     />
-                    <StandardButton type="button" variant="primary" size="md" onClick={() => validateOnsiteCode('promo')}>Apply</StandardButton>
+                    <StandardButton type="button" variant="primary" size="md" className="shrink-0 whitespace-nowrap" onClick={() => validateOnsiteCode('promo')}>Apply</StandardButton>
                   </div>
                   {promoDiscount > 0 && (
                     <p className="mt-2 text-xs text-green-600">Applied: -${promoDiscount.toFixed(2)}</p>

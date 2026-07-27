@@ -71,6 +71,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
     columns,
     getRowId,
     storageKey,
+    columnsVersion,
     filterDefs = [],
     searchFields,
     serverSearch,
@@ -82,13 +83,31 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const columnKeys = useMemo(() => columns.map(c => c.key), [columns]);
   const visibilityStorageKey = `${storageKey}_column_visibility`;
   const orderStorageKey = `${storageKey}_column_order`;
+  const versionStorageKey = `${storageKey}_columns_version`;
+
+  const versionMatches = useMemo(() => {
+    if (columnsVersion === undefined) return true;
+    const stored = readJson<string | number>(versionStorageKey);
+    return stored !== null && String(stored) === String(columnsVersion);
+  }, [columnsVersion, versionStorageKey]);
+
+  useEffect(() => {
+    if (columnsVersion === undefined || versionMatches) return;
+    localStorage.removeItem(visibilityStorageKey);
+    localStorage.removeItem(orderStorageKey);
+    try {
+      localStorage.setItem(versionStorageKey, JSON.stringify(columnsVersion));
+    } catch {
+      // ignore write failures
+    }
+  }, [columnsVersion, versionMatches, visibilityStorageKey, orderStorageKey, versionStorageKey]);
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
     const defaults: Record<string, boolean> = {};
     columns.forEach(c => {
       defaults[c.key] = c.defaultVisible !== false;
     });
-    const saved = readJson<Record<string, boolean>>(visibilityStorageKey);
+    const saved = versionMatches ? readJson<Record<string, boolean>>(visibilityStorageKey) : null;
     if (saved) {
       columnKeys.forEach(k => {
         if (typeof saved[k] === 'boolean') defaults[k] = saved[k];
@@ -101,7 +120,7 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   });
 
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-    const saved = readJson<string[]>(orderStorageKey);
+    const saved = versionMatches ? readJson<string[]>(orderStorageKey) : null;
     return saved ? mergeOrder(saved, columnKeys) : [...columnKeys];
   });
 
