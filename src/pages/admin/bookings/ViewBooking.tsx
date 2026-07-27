@@ -250,8 +250,8 @@ const ViewBooking: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Booking Information</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+            <div className="grid grid-cols-1 gap-6">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <User className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -264,7 +264,7 @@ const ViewBooking: React.FC = () => {
               </div>
 
               {booking.package ? (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                     <Package className={`h-5 w-5 text-${fullColor}`} />
                   </div>
@@ -276,7 +276,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               ) : null}
 
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <Calendar className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -294,7 +294,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <Clock className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -304,7 +304,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <Users className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -315,7 +315,7 @@ const ViewBooking: React.FC = () => {
               </div>
 
               {(booking.location && typeof booking.location === 'object') ? (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                     <MapPin className={`h-5 w-5 text-${fullColor}`} />
                   </div>
@@ -332,7 +332,7 @@ const ViewBooking: React.FC = () => {
               ) : null}
 
               {(booking.room && typeof booking.room === 'object') ? (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                     <Home className={`h-5 w-5 text-${fullColor}`} />
                   </div>
@@ -343,7 +343,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               ) : null}
 
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -362,7 +362,7 @@ const ViewBooking: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Guest of Honor</h3>
                   </div>
                   
-                  <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                  <div className="flex items-start gap-3">
                     <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                       <User className={`h-5 w-5 text-${fullColor}`} />
                     </div>
@@ -373,7 +373,7 @@ const ViewBooking: React.FC = () => {
                   </div>
 
                   {(booking as any).guest_of_honor_age && (
-                    <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                    <div className="flex items-start gap-3">
                       <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                         <User className={`h-5 w-5 text-${fullColor}`} />
                       </div>
@@ -385,7 +385,7 @@ const ViewBooking: React.FC = () => {
                   )}
 
                   {(booking as any).guest_of_honor_gender && (
-                    <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                    <div className="flex items-start gap-3">
                       <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                         <User className={`h-5 w-5 text-${fullColor}`} />
                       </div>
@@ -402,8 +402,8 @@ const ViewBooking: React.FC = () => {
 
           <div className="p-6 border-b border-gray-100 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Information</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+            <div className="grid grid-cols-1 gap-6">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -413,7 +413,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -424,7 +424,7 @@ const ViewBooking: React.FC = () => {
               </div>
 
               {Number(booking.total_amount) - Number(booking.amount_paid) > 0 && (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-red-100 rounded-lg`}>
                     <DollarSign className={`h-5 w-5 text-red-600`} />
                   </div>
@@ -436,7 +436,7 @@ const ViewBooking: React.FC = () => {
               )}
 
               {booking.discount_amount && Number(booking.discount_amount) > 0 && (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                     <DollarSign className={`h-5 w-5 text-${fullColor}`} />
                   </div>
@@ -460,7 +460,7 @@ const ViewBooking: React.FC = () => {
               )}
 
               {(booking as any).promo && (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-green-100 rounded-lg`}>
                     <CheckCircle className={`h-5 w-5 text-green-600`} />
                   </div>
@@ -475,7 +475,7 @@ const ViewBooking: React.FC = () => {
               )}
 
               {(booking as any).gift_card && (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-purple-100 rounded-lg`}>
                     <CheckCircle className={`h-5 w-5 text-purple-600`} />
                   </div>
@@ -488,7 +488,7 @@ const ViewBooking: React.FC = () => {
               )}
 
               {booking.payment_method && (
-                <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+                <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                     <DollarSign className={`h-5 w-5 text-${fullColor}`} />
                   </div>
@@ -499,7 +499,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex items-start gap-3 min-w-0 break-words [&>div]:min-w-0">
+              <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
                 </div>
@@ -551,7 +551,7 @@ const ViewBooking: React.FC = () => {
           {((booking.attractions && booking.attractions.length > 0) || ((booking as any).add_ons && (booking as any).add_ons.length > 0)) && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Services</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {booking.attractions && booking.attractions.length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Attractions ({booking.attractions.length})</h3>
