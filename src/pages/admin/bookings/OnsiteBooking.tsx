@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X } from 'lucide-react';
+import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -382,7 +382,8 @@ const OnsiteBooking: React.FC = () => {
             partialPaymentPercentage: pkg.partial_payment_percentage || 0,
             partialPaymentFixed: pkg.partial_payment_fixed || 0,
             has_guest_of_honor: pkg.has_guest_of_honor || false,
-            customerNotes: pkg.customer_notes || ''
+            customerNotes: pkg.customer_notes || '',
+            location: pkg.location || undefined
           }));
           
           setPackages(transformedPackages);
@@ -471,7 +472,8 @@ const OnsiteBooking: React.FC = () => {
             partialPaymentPercentage: pkg.partial_payment_percentage || 0,
             partialPaymentFixed: pkg.partial_payment_fixed || 0,
             has_guest_of_honor: pkg.has_guest_of_honor || false,
-            customerNotes: pkg.customer_notes || ''
+            customerNotes: pkg.customer_notes || '',
+            location: pkg.location || undefined
             };
           });
           
@@ -1912,6 +1914,12 @@ const OnsiteBooking: React.FC = () => {
                     </div>
                     <p className="text-sm text-gray-600 mb-3 line-clamp-3">{pkg.description}</p>
                     <div className="flex flex-wrap gap-2">
+                      {isCompanyAdmin && pkg.location?.name && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          <MapPin className="w-3.5 h-3.5 mr-1" />
+                          {pkg.location.name}
+                        </span>
+                      )}
                       <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-${the}-50 text-${the}-700 border border-${the}-200">
                         <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
