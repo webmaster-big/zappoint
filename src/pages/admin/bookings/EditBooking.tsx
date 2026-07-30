@@ -435,6 +435,8 @@ const EditBooking: React.FC = () => {
       }
       if (dayOff.package_ids && dayOff.package_ids.length > 0) {
         if (!dayOff.package_ids.includes(packageDetails.id)) return false;
+      } else if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+        return false;
       }
       return true;
     });
@@ -461,9 +463,14 @@ const EditBooking: React.FC = () => {
     return false;
   };
 
-  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
-    if (!dayOff.package_ids || dayOff.package_ids.length === 0) return true;
-    return dayOff.package_ids.includes(packageId);
+  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null; room_ids?: number[] | null }, packageId: number): boolean => {
+    if (dayOff.package_ids && dayOff.package_ids.length > 0) {
+      return dayOff.package_ids.includes(packageId);
+    }
+    if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+      return false;
+    }
+    return true;
   };
 
   const filteredDayOffsWithTime = useMemo(() => {

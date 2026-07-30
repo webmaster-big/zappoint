@@ -180,6 +180,8 @@ const ManualBooking: React.FC = () => {
         if (!dayOff.package_ids.includes(pkg.id)) {
           return false;
         }
+      } else if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+        return false;
       }
       return true;
     });
@@ -213,7 +215,7 @@ const ManualBooking: React.FC = () => {
   );
 
   const filteredDayOffsWithTime = pkg
-    ? dayOffsWithTime.filter(d => !d.package_ids || d.package_ids.length === 0 || d.package_ids.includes(pkg.id))
+    ? dayOffsWithTime.filter(d => (d.package_ids && d.package_ids.length > 0) ? d.package_ids.includes(pkg.id) : !(d.room_ids && d.room_ids.length > 0))
     : dayOffsWithTime;
 
   useEffect(() => {

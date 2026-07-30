@@ -10,6 +10,7 @@ import {
   XCircle,
   Clock,
   Eye,
+  Pencil,
   DollarSign,
   RotateCcw,
   Archive
@@ -829,6 +830,13 @@ const ManagePurchases = () => {
                   title="View Details"
                 >
                   <Eye className="h-4 w-4" />
+                </Link>
+                <Link
+                  to={`/attractions/purchases/${purchase.id}/edit?from=purchases`}
+                  className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                  title="Edit"
+                >
+                  <Pencil className="h-4 w-4" />
                 </Link>
                 <button
                   onClick={() => handleDeletePurchase(purchase.id)}

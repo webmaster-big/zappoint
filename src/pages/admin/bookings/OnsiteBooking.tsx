@@ -207,8 +207,10 @@ const OnsiteBooking: React.FC = () => {
       
       if (dayOff.package_ids && dayOff.package_ids.length > 0) {
         if (!dayOff.package_ids.includes(selectedPackage.id)) {
-          return false; // This day off doesn't apply to the selected package
+          return false;
         }
+      } else if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+        return false;
       }
       
       return true;
@@ -238,11 +240,14 @@ const OnsiteBooking: React.FC = () => {
     return false;
   };
 
-  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
-    if (!dayOff.package_ids || dayOff.package_ids.length === 0) {
-      return true;
+  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null; room_ids?: number[] | null }, packageId: number): boolean => {
+    if (dayOff.package_ids && dayOff.package_ids.length > 0) {
+      return dayOff.package_ids.includes(packageId);
     }
-    return dayOff.package_ids.includes(packageId);
+    if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+      return false;
+    }
+    return true;
   };
 
   const filteredDayOffs = React.useMemo(() => {

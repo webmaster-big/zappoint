@@ -8,6 +8,7 @@ import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { roomService, type BreakTime } from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
+import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getStoredUser } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
@@ -37,6 +38,7 @@ const SpaceSchedule = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [spaces, setSpaces] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
   const [initialLoading, setInitialLoading] = useState(true); // Only for first load
   const [bookingsLoading, setBookingsLoading] = useState(false); // For date changes
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -125,6 +127,90 @@ const SpaceSchedule = () => {
   const displaySpaces = useMemo(
     () => (effectiveLocationId ? spaces.filter(s => s.location_id === effectiveLocationId) : spaces),
     [spaces, effectiveLocationId]
+  );
+
+  useEffect(() => {
+    if (!effectiveLocationId) {
+      setDayOffs([]);
+      return;
+    }
+    let cancelled = false;
+    dayOffService
+      .getDayOffsByLocation(effectiveLocationId)
+      .then(res => {
+        if (!cancelled && res.success && res.data) setDayOffs(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setDayOffs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveLocationId]);
+
+  const spaceClosures = useMemo(() => {
+    const map = new Map<number, { fullDay: boolean; ranges: Array<{ time_start: string | null; time_end: string | null }> }>();
+    const selY = selectedDate.getFullYear();
+    const selM = selectedDate.getMonth();
+    const selD = selectedDate.getDate();
+    const appliesOnDate = (d: DayOff) => {
+      const od = parseLocalDate(d.date);
+      const exact = od.getFullYear() === selY && od.getMonth() === selM && od.getDate() === selD;
+      const recurring = d.is_recurring && od.getMonth() === selM && od.getDate() === selD;
+      return exact || recurring;
+    };
+    const relevant = dayOffs.filter(appliesOnDate);
+    for (const space of displaySpaces) {
+      const forSpace = relevant.filter(d => {
+        const isLocationWide = !d.package_ids?.length && !d.room_ids?.length && !d.attraction_ids?.length && !d.event_ids?.length;
+        const targetsRoom = !!d.room_ids?.length && d.room_ids.includes(space.id);
+        return isLocationWide || targetsRoom;
+      });
+      if (forSpace.length === 0) continue;
+      const fullDay = forSpace.some(d => !d.time_start && !d.time_end);
+      const ranges = forSpace
+        .filter(d => d.time_start || d.time_end)
+        .map(d => ({ time_start: d.time_start ?? null, time_end: d.time_end ?? null }));
+      map.set(space.id, { fullDay, ranges });
+    }
+    return map;
+  }, [dayOffs, selectedDate, displaySpaces]);
+
+  const isSpaceSlotClosed = useCallback(
+    (spaceId: number, slotMinutes: number): boolean => {
+      const c = spaceClosures.get(spaceId);
+      if (!c) return false;
+      if (c.fullDay) return true;
+      return c.ranges.some(r => {
+        const toMin = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m;
+        };
+        const s = r.time_start ? toMin(r.time_start) : null;
+        const e = r.time_end ? toMin(r.time_end) : null;
+        if (s !== null && e === null) return slotMinutes >= s;
+        if (s === null && e !== null) return slotMinutes < e;
+        if (s !== null && e !== null) return slotMinutes >= s && slotMinutes < e;
+        return false;
+      });
+    },
+    [spaceClosures]
+  );
+
+  const getSpaceClosureLabel = useCallback(
+    (spaceId: number): string | null => {
+      const c = spaceClosures.get(spaceId);
+      if (!c) return null;
+      if (c.fullDay) return 'Closed all day';
+      const parts = c.ranges.map(r => {
+        if (r.time_start && r.time_end) return `${formatTime12Hour(r.time_start)}–${formatTime12Hour(r.time_end)}`;
+        if (r.time_start) return `after ${formatTime12Hour(r.time_start)}`;
+        if (r.time_end) return `until ${formatTime12Hour(r.time_end)}`;
+        return '';
+      }).filter(Boolean);
+      return parts.length ? `Closed ${parts.join(', ')}` : 'Closed';
+    },
+    [spaceClosures]
   );
 
   const naturalSort = (a: Room, b: Room): number => {
@@ -761,6 +847,11 @@ const SpaceSchedule = () => {
                             <Users className="w-3 h-3" />
                             Max {space.capacity}
                           </span>
+                          {spaceClosures.has(space.id) && (
+                            <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
+                              {getSpaceClosureLabel(space.id)}
+                            </span>
+                          )}
                         </div>
                       </th>
                     ))
@@ -894,6 +985,18 @@ const SpaceSchedule = () => {
                               </span>
                             </div>
                           </div>
+                        </td>
+                      );
+                    }
+
+                    if (isSpaceSlotClosed(space.id, slot.hour * 60 + slot.minute)) {
+                      return (
+                        <td
+                          key={space.id}
+                          className="px-2 py-2 border-r border-gray-200 bg-red-50 text-center"
+                          style={{ height: '60px' }}
+                        >
+                          <span className="text-[10px] font-medium text-red-500">Closed</span>
                         </td>
                       );
                     }
