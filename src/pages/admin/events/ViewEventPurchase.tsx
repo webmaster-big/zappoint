@@ -14,6 +14,7 @@ import {
   DollarSign,
   FileText,
   Hash,
+  Pencil,
 } from 'lucide-react';
 import { formatLocalDateTime, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -140,6 +141,15 @@ const ViewEventPurchase = () => {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Event Purchase Details</h1>
               <p className="text-gray-600 mt-1">Reference: {purchase.reference_number}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <StandardButton
+              variant="secondary"
+              icon={Pencil}
+              onClick={() => navigate(`/events/purchases/${id}/edit${from ? `?from=${from}` : ''}`)}
+            >
+              Edit
+            </StandardButton>
           </div>
         </div>
 

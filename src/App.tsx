@@ -65,6 +65,7 @@ import DayOffs from "./pages/admin/dayoffs/DayOffs";
 import ViewBooking from "./pages/admin/bookings/ViewBooking";
 import AttractionDetails from "./pages/admin/attractions/AttractionDetails";
 import PurchaseDetails from "./pages/admin/attractions/PurchaseDetails";
+import EditPurchase from "./pages/admin/attractions/EditPurchase";
 import PackageDetails from "./pages/admin/packages/PackageDetails";
 import TrashedPackages from "./pages/admin/packages/TrashedPackages";
 import GlobalNotes from "./pages/admin/packages/GlobalNotes";
@@ -100,6 +101,7 @@ import EditEvent from "./pages/admin/events/EditEvent";
 import OnsitePurchaseEvent from "./pages/admin/events/OnsitePurchaseEvent";
 import EventPurchases from "./pages/admin/events/EventPurchases";
 import ViewEventPurchase from "./pages/admin/events/ViewEventPurchase";
+import EditEventPurchase from "./pages/admin/events/EditEventPurchase";
 import PurchaseEvent from "./pages/customer/PurchaseEvent";
 import MyEvents from "./pages/customer/MyEvents";
 import MyAttractions from "./pages/customer/MyAttractions";
@@ -184,6 +186,7 @@ function App() {
           <Route path="/attractions/details/:slug" element={<AttractionDetails />} />
           <Route path="/attractions/purchases" element={<ManagePurchases />} />
           <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
+          <Route path="/attractions/purchases/:id/edit" element={<EditPurchase />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
           <Route path="/attractions/check-in" element={<AttractionCheckIn />} />
           
@@ -193,6 +196,7 @@ function App() {
           <Route path="/events/onsite-purchase" element={<OnsitePurchaseEvent />} />
           <Route path="/events/purchases" element={<EventPurchases />} />
           <Route path="/events/purchases/:id" element={<ViewEventPurchase />} />
+          <Route path="/events/purchases/:id/edit" element={<EditEventPurchase />} />
           
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages/edit/:id" element={<EditPackage />} />

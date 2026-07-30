@@ -15,6 +15,7 @@ import {
   FileText,
   QrCode,
   Download,
+  Pencil,
   X
 } from 'lucide-react';
 import { formatDurationDisplay, formatLocalDateTime, convertTo12Hour } from '../../../utils/timeFormat';
@@ -175,6 +176,13 @@ const PurchaseDetails = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <StandardButton
+              variant="secondary"
+              icon={Pencil}
+              onClick={() => navigate(`/attractions/purchases/${id}/edit${from ? `?from=${from}` : ''}`)}
+            >
+              Edit
+            </StandardButton>
             <StandardButton
               variant="primary"
               icon={QrCode}

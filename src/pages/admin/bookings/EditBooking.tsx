@@ -21,7 +21,7 @@ import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 
 const parseLocalDate = (isoDateString: string): Date => {
-  const [year, month, day] = isoDateString.split('-').map(Number);
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
@@ -377,6 +377,9 @@ const EditBooking: React.FC = () => {
           today.setHours(0, 0, 0, 0);
 
           response.data.forEach((dayOff: DayOff) => {
+            const targetsAttractionOrEvent = !!(dayOff.attraction_ids?.length || dayOff.event_ids?.length);
+            const targetsPackageOrRoom = !!(dayOff.package_ids?.length || dayOff.room_ids?.length);
+            if (targetsAttractionOrEvent && !targetsPackageOrRoom) return;
             const offDate = parseLocalDate(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
 

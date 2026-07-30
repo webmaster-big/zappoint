@@ -12,6 +12,7 @@ import {
   Zap,
   Tag,
   DollarSign,
+  Info,
 } from 'lucide-react';
 import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
@@ -1665,8 +1666,8 @@ const PurchaseEvent = () => {
         className="fixed top-4 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
         aria-label="View Order Summary"
       >
-        <ShoppingCart className="w-4 h-4" />
-        <span className="text-sm font-medium">${totalAmount.toFixed(2)}</span>
+        <Info className="w-4 h-4" />
+        <span className="text-sm font-medium">Info</span>
       </button>
 
       {showMobileSummary && (

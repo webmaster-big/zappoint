@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from 'qrcode';
-import { MapPin } from 'lucide-react';
+import { MapPin, Info } from 'lucide-react';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
@@ -41,7 +41,7 @@ import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 
 const parseLocalDate = (isoDateString: string): Date => {
-  const [year, month, day] = isoDateString.split('-').map(Number);
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
@@ -442,11 +442,15 @@ const BookPackage: React.FC = () => {
         if (response.success && response.data) {
           const allDayOffs: DayOffWithTime[] = [];
           const today = new Date();
+          today.setHours(0, 0, 0, 0);
           const futureLimit = new Date();
           futureLimit.setFullYear(futureLimit.getFullYear() + 1); // Look 1 year ahead
           
           response.data.forEach((dayOff: DayOff) => {
-            const offDate = new Date(dayOff.date);
+            const targetsAttractionOrEvent = !!(dayOff.attraction_ids?.length || dayOff.event_ids?.length);
+            const targetsPackageOrRoom = !!(dayOff.package_ids?.length || dayOff.room_ids?.length);
+            if (targetsAttractionOrEvent && !targetsPackageOrRoom) return;
+            const offDate = new Date(dayOff.date.split('T')[0] + 'T00:00:00');
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
             const dayOffData = {
@@ -2918,10 +2922,8 @@ const BookPackage: React.FC = () => {
         className="fixed bottom-4 right-4 z-40 md:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
         aria-label="View Order Summary"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-        <span className="text-sm font-medium">${finalTotal.toFixed(2)}</span>
+        <Info className="w-5 h-5" />
+        <span className="text-sm font-medium">Info</span>
       </button>
 
       {showMobileOrderSummary && (

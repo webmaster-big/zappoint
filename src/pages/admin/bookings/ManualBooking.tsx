@@ -29,7 +29,7 @@ import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 
 const parseLocalDate = (isoDateString: string): Date => {
-  const [year, month, day] = isoDateString.split('-').map(Number);
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
@@ -208,9 +208,13 @@ const ManualBooking: React.FC = () => {
     return false;
   };
 
-  const filteredTimeSlots = availableTimeSlots.filter(slot => 
+  const filteredTimeSlots = availableTimeSlots.filter(slot =>
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
   );
+
+  const filteredDayOffsWithTime = pkg
+    ? dayOffsWithTime.filter(d => !d.package_ids || d.package_ids.length === 0 || d.package_ids.includes(pkg.id))
+    : dayOffsWithTime;
 
   useEffect(() => {
     loadPackages();
@@ -435,6 +439,9 @@ const ManualBooking: React.FC = () => {
           today.setHours(0, 0, 0, 0);
           
           response.data.forEach((dayOff: DayOff) => {
+            const targetsAttractionOrEvent = !!(dayOff.attraction_ids?.length || dayOff.event_ids?.length);
+            const targetsPackageOrRoom = !!(dayOff.package_ids?.length || dayOff.room_ids?.length);
+            if (targetsAttractionOrEvent && !targetsPackageOrRoom) return;
             const offDate = parseLocalDate(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
@@ -1454,7 +1461,7 @@ const ManualBooking: React.FC = () => {
                             }}
                             availableDates={availableDates}
                             dayOffs={dayOffs}
-                            dayOffsWithTime={dayOffsWithTime}
+                            dayOffsWithTime={filteredDayOffsWithTime}
                           />
                         </div>
 

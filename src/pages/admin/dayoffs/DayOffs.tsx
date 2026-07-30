@@ -297,7 +297,8 @@ const DayOffs: React.FC = () => {
             resetForm();
             fetchDayOffs();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Error creating Day Off';
+            const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+                || (error instanceof Error ? error.message : 'Error creating Day Off');
             showToast(message, 'error');
         }
     };
@@ -368,7 +369,8 @@ const DayOffs: React.FC = () => {
             resetForm();
             fetchDayOffs();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Error updating Day Off';
+            const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+                || (error instanceof Error ? error.message : 'Error updating Day Off');
             showToast(message, 'error');
         }
     };
@@ -407,11 +409,11 @@ const DayOffs: React.FC = () => {
             if (!dayOff) return;
 
             await dayOffService.updateDayOff(editingCell.dayOffId, {
-                date: dayOff.date,
+                date: dayOff.date.split('T')[0],
                 reason: editingCell.field === 'reason' ? editValue : dayOff.reason,
                 is_recurring: dayOff.is_recurring,
-                time_start: dayOff.time_start || undefined,
-                time_end: dayOff.time_end || undefined,
+                time_start: sanitizeTimeValue(dayOff.time_start) ?? undefined,
+                time_end: sanitizeTimeValue(dayOff.time_end) ?? undefined,
             });
 
             setDayOffs(prev => prev.map(d => 
@@ -625,7 +627,7 @@ const DayOffs: React.FC = () => {
         setSelectedDayOff(null);
 
         setFormData({
-            date: dayOff.date.split('T')[0],
+            date: '',
             reason: dayOff.reason || '',
             is_recurring: dayOff.is_recurring,
             time_start: normalizeTimeValue(dayOff.time_start),
@@ -656,7 +658,7 @@ const DayOffs: React.FC = () => {
     };
 
     const parseLocalDate = (isoDateString: string): Date => {
-        const [year, month, day] = isoDateString.split('-').map(Number);
+        const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
         return new Date(year, month - 1, day);
     };
 
@@ -780,7 +782,7 @@ const DayOffs: React.FC = () => {
     const isBulkDatePast = (dateStr: string) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const date = new Date(dateStr);
+        const date = parseLocalDate(dateStr);
         return date < today;
     };
 
@@ -1149,12 +1151,7 @@ const DayOffs: React.FC = () => {
                                                     )}
                                                     <div className="min-w-0">
                                                         <h3 className="font-semibold text-base text-gray-900 truncate">
-                                                            {new Date(dayOff.date).toLocaleDateString('en-US', { 
-                                                                weekday: 'short',
-                                                                month: 'short', 
-                                                                day: 'numeric', 
-                                                                year: 'numeric' 
-                                                            })}
+                                                            {formatDate(dayOff.date)}
                                                         </h3>
                                                         <div className="flex items-center gap-2 mt-0.5">
                                                             {dayOff.is_recurring && (
@@ -1312,12 +1309,7 @@ const DayOffs: React.FC = () => {
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className={`w-4 h-4 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
                                                                 <span className={`font-medium ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
-                                                                    {new Date(dayOff.date).toLocaleDateString('en-US', { 
-                                                                        weekday: 'short',
-                                                                        month: 'short', 
-                                                                        day: 'numeric', 
-                                                                        year: 'numeric' 
-                                                                    })}
+                                                                    {formatDate(dayOff.date)}
                                                                 </span>
                                                                 {dayOff.is_recurring && (
                                                                     <span title="Recurring annually">
