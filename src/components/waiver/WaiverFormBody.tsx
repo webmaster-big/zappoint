@@ -129,7 +129,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       adult_phone: adultPhone.trim(),
       adult_dob: adultDob,
       typed_legal_name: typedLegalName.trim(),
-      signature_image: signatureImage,
+      signature_image: signatureImage || undefined,
       agreement_accepted: agreementAccepted,
       electronic_consent_accepted: tpl?.electronic_consent_enabled ? electronicConsent : undefined,
       photo_video_consent: tpl?.photo_video_release_enabled ? photoVideoConsent : undefined,
