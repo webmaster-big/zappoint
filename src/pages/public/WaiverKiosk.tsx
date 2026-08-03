@@ -64,7 +64,7 @@ const WaiverKiosk = () => {
       if (idleTimer.current) clearTimeout(idleTimer.current);
       idleTimer.current = setTimeout(resetForm, timeoutSeconds * 1000);
     };
-    const events: Array<keyof DocumentEventMap> = ['mousedown', 'keydown', 'touchstart', 'pointerdown'];
+    const events: Array<keyof DocumentEventMap> = ['mousedown', 'keydown', 'touchstart', 'pointerdown', 'wheel'];
     events.forEach((e) => document.addEventListener(e, arm));
     arm();
     return () => {

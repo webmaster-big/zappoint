@@ -6,7 +6,7 @@ import type {
   WaiverMinor,
 } from '../../types/waiver.types';
 import WaiverFormTour from './tour/WaiverFormTour';
-import SignaturePad from './SignaturePad';
+import SignatureCapture from '../SignatureCapture';
 import DateOfBirthSelect from './DateOfBirthSelect';
 import { getDeviceId } from '../../utils/deviceId';
 
@@ -51,10 +51,12 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
 
   const openedAt = useRef(Date.now());
   const electronicTouched = useRef(false);
+  const signatureLogged = useRef(false);
   const auditTrail = useRef<Array<{ event: string; at: string; meta?: Record<string, unknown> }>>([]);
   const gps = useRef<{ lat?: number; lng?: number; acc?: number }>({});
 
   const logAudit = (event: string, meta?: Record<string, unknown>) => {
+    if (auditTrail.current.length >= 180) return;
     auditTrail.current.push({ event, at: new Date().toISOString(), ...(meta ? { meta } : {}) });
   };
 
@@ -100,7 +102,6 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     if (!adultPhone.trim()) errs.adultPhone = 'Required';
     if (!adultDob) errs.adultDob = 'Required';
     if (!typedLegalName.trim()) errs.typedLegalName = 'Please type your full legal name';
-    if (!signatureImage) errs.signature = 'Please draw your signature';
     if (!agreementAccepted) errs.agreement = 'You must agree to the waiver to continue';
     if (tpl?.electronic_consent_enabled && !electronicConsent)
       errs.electronicConsent = 'Electronic consent is required';
@@ -425,17 +426,23 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           </div>
 
           <div data-tour="wf-signature">
-            <SignaturePad
-              onChange={(dataUrl) => {
-                setSignatureImage(dataUrl);
-                if (dataUrl) logAudit('signature_drawn');
+            <SignatureCapture
+              required={false}
+              onSignatureChange={(base64) => {
+                setSignatureImage(base64 ?? '');
+                if (base64) {
+                  if (!signatureLogged.current) {
+                    signatureLogged.current = true;
+                    logAudit('signature_drawn');
+                  }
+                } else {
+                  signatureLogged.current = false;
+                }
               }}
-              onStrokeStart={() => logAudit('signature_started')}
-              error={!!formErrors.signature}
             />
-            {formErrors.signature && (
-              <p className="text-[11px] text-red-600 mt-1">{formErrors.signature}</p>
-            )}
+            <p className="text-[11px] text-gray-400 mt-1">
+              Optional — your typed name above is your signature. You may also draw one here.
+            </p>
           </div>
 
           {tpl?.electronic_consent_enabled && (
