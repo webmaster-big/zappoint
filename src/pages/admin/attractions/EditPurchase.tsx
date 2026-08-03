@@ -16,6 +16,7 @@ import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import { generateTimeSlots } from '../../../utils/timeSlots';
 
 type AttractionStatus = 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
 type AttractionPaymentMethod = 'card' | 'in-store' | 'paylater' | 'authorize.net';
@@ -28,21 +29,6 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   'checked-in': { color: 'bg-green-100 text-green-800', label: 'Checked In' },
   cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' },
   refunded: { color: 'bg-purple-100 text-purple-800', label: 'Refunded' },
-};
-
-const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
-  const slots: string[] = [];
-  const [sH, sM] = startTime.split(':').map(Number);
-  const [eH, eM] = endTime.split(':').map(Number);
-  let cur = sH * 60 + sM;
-  const end = eH * 60 + eM;
-  while (cur < end) {
-    const h = Math.floor(cur / 60);
-    const m = cur % 60;
-    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-    cur += intervalMinutes;
-  }
-  return slots;
 };
 
 const EditPurchase: React.FC = () => {

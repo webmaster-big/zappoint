@@ -20,6 +20,8 @@ import {
   Loader2,
   ChevronRight,
   Link2,
+  Fingerprint,
+  ListChecks,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
@@ -743,10 +745,41 @@ const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn, canPrint =
               <div className="pt-2.5 mt-1 border-t border-gray-200">
                 <div className="text-xs text-gray-400 uppercase tracking-wide">Signed electronically by</div>
                 <div className="text-base font-semibold text-gray-900 mt-0.5" style={{ fontFamily: 'Georgia, serif' }}>{w.typed_legal_name || '—'}</div>
+                {w.signature_image && (
+                  <img src={w.signature_image} alt="Signature" className="mt-2 max-h-24 border border-gray-200 rounded-lg bg-white p-1" />
+                )}
                 <div className="text-xs text-gray-500 mt-0.5">{formatDateTimeET(w.submitted_at)}</div>
               </div>
             </div>
           </DetailSection>
+
+          <DetailSection icon={Fingerprint} title="Capture & Verification">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <DetailField label="IP address" value={w.ip_address} />
+              <DetailField label="Read time" value={w.read_seconds != null ? `${Math.floor(w.read_seconds / 60)}m ${w.read_seconds % 60}s` : undefined} />
+              <DetailField label="Browser" value={w.browser} />
+              <DetailField label="Operating system" value={w.operating_system} />
+              <DetailField label="Device ID" value={w.device_id} />
+              <DetailField label="Channel" value={w.device} />
+              {w.gps_latitude != null && w.gps_longitude != null && (
+                <DetailField label="GPS location" value={`${w.gps_latitude}, ${w.gps_longitude}`} />
+              )}
+              {w.pdf_hash && <DetailField label="PDF SHA-256" value={w.pdf_hash} />}
+            </div>
+          </DetailSection>
+
+          {w.audit_events && w.audit_events.length > 0 && (
+            <DetailSection icon={ListChecks} title={`Audit Trail (${w.audit_events.length})`}>
+              <div className="border border-gray-100 rounded-lg divide-y divide-gray-50">
+                {w.audit_events.map((ev) => (
+                  <div key={ev.id} className="px-3 py-2 flex items-center justify-between text-sm gap-2">
+                    <span className="text-gray-900 font-medium">{ev.event.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())}</span>
+                    <span className="text-gray-500 text-right text-xs">{ev.occurred_at ? formatDateTimeET(ev.occurred_at) : '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </DetailSection>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           {w.checked_in_at && (

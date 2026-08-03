@@ -52,6 +52,7 @@ export interface WaiverTemplate {
   max_minors: number;
   duplicate_rule: DuplicateRule;
   reminder_eligible: boolean;
+  highlight_points?: string | null;
   assigned_package_ids: number[] | null;
   assigned_attraction_ids: number[] | null;
   assigned_event_ids: number[] | null;
@@ -89,11 +90,24 @@ export interface Waiver {
   adult_dob?: string | null;
   relationship?: string | null;
   typed_legal_name?: string | null;
+  signature_image?: string | null;
   agreement_accepted: boolean;
   electronic_consent_accepted: boolean;
   photo_video_consent?: boolean | null;
   marketing_consent_status: MarketingConsentStatus;
   source: WaiverSource;
+  ip_address?: string | null;
+  device?: string | null;
+  device_id?: string | null;
+  browser?: string | null;
+  operating_system?: string | null;
+  read_seconds?: number | null;
+  gps_latitude?: number | null;
+  gps_longitude?: number | null;
+  gps_accuracy?: number | null;
+  pdf_hash?: string | null;
+  pdf_generated_at?: string | null;
+  audit_events?: Array<{ id: number; event: string; occurred_at: string | null; meta?: Record<string, unknown> | null }>;
   submitted_at?: string | null;
   checked_in_at?: string | null;
   checked_in_by?: number | null;
@@ -111,6 +125,7 @@ export interface WaiverFormTemplate {
   id: number;
   title: string;
   version: number | null;
+  highlight_points?: string | null;
   max_minors: number;
   minor_section_enabled: boolean;
   dob_required: boolean;
@@ -139,7 +154,7 @@ export interface WaiverFormContext {
   }>;
   selected_date?: string;
   kiosk?: boolean;
-  settings?: { inactivity_timeout_seconds: number; disable_autofill: boolean };
+  settings?: { inactivity_timeout_seconds?: number; disable_autofill?: boolean; gps_capture_enabled?: boolean };
 }
 
 export interface WaiverSubmission {
@@ -150,10 +165,17 @@ export interface WaiverSubmission {
   adult_dob?: string;
   relationship?: string;
   typed_legal_name: string;
+  signature_image?: string;
   agreement_accepted: boolean;
   electronic_consent_accepted?: boolean;
   photo_video_consent?: boolean;
   marketing_consent?: boolean;
+  device_id?: string;
+  read_seconds?: number;
+  gps_latitude?: number;
+  gps_longitude?: number;
+  gps_accuracy?: number;
+  audit_trail?: Array<{ event: string; at: string; meta?: Record<string, unknown> }>;
   minors?: WaiverMinor[];
   selected_date?: string;
 }
@@ -191,6 +213,7 @@ export interface WaiverSettings {
   search_auto_refresh_seconds: number;
   kiosk_inactivity_timeout_seconds: number;
   kiosk_disable_autofill: boolean;
+  gps_capture_enabled: boolean;
   admin_delete_enabled: boolean;
   manager_print_export_enabled: boolean;
   manager_can_build_templates: boolean;

@@ -38,6 +38,7 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import { generateTimeSlots } from '../../../utils/timeSlots';
 
 const CreatePurchase = () => {
   const { themeColor } = useThemeColor();
@@ -423,20 +424,6 @@ const CreatePurchase = () => {
     return [];
   };
 
-  const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
-    const slots: string[] = [];
-    const [sH, sM] = startTime.split(':').map(Number);
-    const [eH, eM] = endTime.split(':').map(Number);
-    let cur = sH * 60 + sM;
-    const end = eH * 60 + eM;
-    while (cur < end) {
-      const h = Math.floor(cur / 60);
-      const m = cur % 60;
-      slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-      cur += intervalMinutes;
-    }
-    return slots;
-  };
 
   useEffect(() => {
     const fetchDayOffs = async () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import type {
   WaiverFormContext,
@@ -6,6 +6,9 @@ import type {
   WaiverMinor,
 } from '../../types/waiver.types';
 import WaiverFormTour from './tour/WaiverFormTour';
+import SignaturePad from './SignaturePad';
+import DateOfBirthSelect from './DateOfBirthSelect';
+import { getDeviceId } from '../../utils/deviceId';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -36,14 +39,44 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
   const [adultPhone, setAdultPhone] = useState(prefill?.adult_phone ?? '');
   const [adultDob, setAdultDob] = useState(prefill?.adult_dob ?? '');
   const [typedLegalName, setTypedLegalName] = useState('');
+  const [signatureImage, setSignatureImage] = useState('');
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [electronicConsent, setElectronicConsent] = useState(false);
   const [photoVideoConsent, setPhotoVideoConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(true);
   const [minors, setMinors] = useState<MinorRow[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const autoCompleteOff = noAutofill || disableBrowserAutofill ? 'off' : undefined;
+
+  const openedAt = useRef(Date.now());
+  const electronicTouched = useRef(false);
+  const auditTrail = useRef<Array<{ event: string; at: string; meta?: Record<string, unknown> }>>([]);
+  const gps = useRef<{ lat?: number; lng?: number; acc?: number }>({});
+
+  const logAudit = (event: string, meta?: Record<string, unknown>) => {
+    auditTrail.current.push({ event, at: new Date().toISOString(), ...(meta ? { meta } : {}) });
+  };
+
+  const highlightPoints = (tpl?.highlight_points ?? '')
+    .split('\n')
+    .map((line) => line.replace(/^[\s•*-]+/, '').trim())
+    .filter(Boolean);
+
+  useEffect(() => {
+    logAudit('form_opened');
+    if (context.settings?.gps_capture_enabled && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          gps.current = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+          logAudit('gps_captured');
+        },
+        () => logAudit('gps_declined'),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addMinor = () => {
     if (tpl && minors.length >= tpl.max_minors) return;
@@ -67,6 +100,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     if (!adultPhone.trim()) errs.adultPhone = 'Required';
     if (!adultDob) errs.adultDob = 'Required';
     if (!typedLegalName.trim()) errs.typedLegalName = 'Please type your full legal name';
+    if (!signatureImage) errs.signature = 'Please draw your signature';
     if (!agreementAccepted) errs.agreement = 'You must agree to the waiver to continue';
     if (tpl?.electronic_consent_enabled && !electronicConsent)
       errs.electronicConsent = 'Electronic consent is required';
@@ -85,6 +119,8 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    logAudit('submitted');
+    const readSeconds = Math.max(0, Math.round((Date.now() - openedAt.current) / 1000));
     const payload: WaiverSubmission = {
       adult_first_name: adultFirstName.trim(),
       adult_last_name: adultLastName.trim(),
@@ -92,10 +128,17 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       adult_phone: adultPhone.trim(),
       adult_dob: adultDob,
       typed_legal_name: typedLegalName.trim(),
+      signature_image: signatureImage,
       agreement_accepted: agreementAccepted,
       electronic_consent_accepted: tpl?.electronic_consent_enabled ? electronicConsent : undefined,
       photo_video_consent: tpl?.photo_video_release_enabled ? photoVideoConsent : undefined,
       marketing_consent: tpl?.marketing_consent_enabled ? marketingConsent : undefined,
+      device_id: getDeviceId(),
+      read_seconds: readSeconds,
+      gps_latitude: gps.current.lat,
+      gps_longitude: gps.current.lng,
+      gps_accuracy: gps.current.acc,
+      audit_trail: auditTrail.current,
       minors: minors.length
         ? minors.map((m) => ({
             first_name: m.first_name.trim(),
@@ -113,6 +156,20 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     <>
     <WaiverFormTour />
     <form onSubmit={handleSubmit} className="space-y-5" autoComplete={autoCompleteOff}>
+      {highlightPoints.length > 0 && (
+        <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-5 py-4">
+          <h2 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">Please note</h2>
+          <ul className="space-y-1.5">
+            {highlightPoints.map((point, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-blue-900/90 leading-relaxed">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Legal body */}
       {context.body && (
         <div data-tour="wf-legal-body" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -124,10 +181,20 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
               </span>
             )}
           </div>
-          <div
-            className="px-5 py-4 max-h-[42vh] overflow-y-auto text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(context.body) }}
-          />
+          <div className="max-h-[42vh] overflow-y-auto">
+            <div
+              className="px-5 py-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(context.body) }}
+            />
+            {tpl?.photo_video_release_enabled && tpl?.photo_video_release_text && (
+              <div className="px-5 py-4 border-t border-gray-100">
+                <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Photo &amp; Video Release</h3>
+                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                  {tpl.photo_video_release_text}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -187,12 +254,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           </div>
           <div data-tour="wf-adult-dob">
             <label className={labelClass}>Date of Birth *</label>
-            <input
-              type="date"
+            <DateOfBirthSelect
               value={adultDob}
-              autoComplete={autoCompleteOff}
-              onChange={(e) => setAdultDob(e.target.value)}
-              className={`${inputClass} ${formErrors.adultDob ? 'border-red-300' : ''}`}
+              onChange={setAdultDob}
+              error={!!formErrors.adultDob}
             />
             {formErrors.adultDob && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultDob}</p>}
           </div>
@@ -259,12 +324,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
                     <label className={labelClass}>
                       Date of Birth {tpl.dob_required ? '*' : <span className="text-gray-400 font-normal">(optional)</span>}
                     </label>
-                    <input
-                      type="date"
+                    <DateOfBirthSelect
                       value={m.date_of_birth ?? ''}
-                      autoComplete={autoCompleteOff}
-                      onChange={(e) => updateMinor(m._key, 'date_of_birth', e.target.value)}
-                      className={`${inputClass} ${formErrors[`minor_${i}_dob`] ? 'border-red-300' : ''}`}
+                      onChange={(v) => updateMinor(m._key, 'date_of_birth', v)}
+                      error={!!formErrors[`minor_${i}_dob`]}
                     />
                   </div>
                   <div>
@@ -294,23 +357,20 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
         </div>
         <div className="p-5 space-y-4">
           {tpl?.photo_video_release_enabled && (
-            <div data-tour="wf-photo-consent" className="border border-gray-100 rounded-lg overflow-hidden">
-              <div className="px-3.5 py-2 border-b border-gray-100 bg-gray-50/60">
-                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Photo & Video Release</span>
-              </div>
-              <div className="px-3.5 py-2.5 max-h-20 overflow-y-auto text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
-                {tpl.photo_video_release_text || 'I consent to the use of photos and video taken during this visit for promotional purposes.'}
-              </div>
-              <label className="flex items-center gap-2.5 px-3.5 py-2.5 border-t border-gray-100 cursor-pointer bg-gray-50/40">
-                <input
-                  type="checkbox"
-                  checked={photoVideoConsent}
-                  onChange={(e) => setPhotoVideoConsent(e.target.checked)}
-                  className="h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-xs font-medium text-gray-700">I agree to the photo & video release.</span>
-              </label>
-            </div>
+            <label data-tour="wf-photo-consent" className="flex items-start gap-2.5 cursor-pointer border border-gray-100 rounded-lg px-3.5 py-3 bg-gray-50/40">
+              <input
+                type="checkbox"
+                checked={photoVideoConsent}
+                onChange={(e) => {
+                  setPhotoVideoConsent(e.target.checked);
+                  logAudit(e.target.checked ? 'photo_consent_checked' : 'photo_consent_unchecked');
+                }}
+                className="mt-0.5 h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <span className="text-xs font-medium text-gray-700 leading-relaxed">
+                I agree to the Photo &amp; Video Release described in the waiver above.
+              </span>
+            </label>
           )}
 
           {tpl?.marketing_consent_enabled && (
@@ -328,7 +388,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
                 <input
                   type="checkbox"
                   checked={marketingConsent}
-                  onChange={(e) => setMarketingConsent(e.target.checked)}
+                  onChange={(e) => {
+                    setMarketingConsent(e.target.checked);
+                    logAudit(e.target.checked ? 'marketing_consent_checked' : 'marketing_consent_unchecked');
+                  }}
                   className="h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
                 />
                 <span className="text-xs font-medium text-gray-700">Yes, keep me updated.</span>
@@ -342,7 +405,14 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
               type="text"
               value={typedLegalName}
               autoComplete={autoCompleteOff}
-              onChange={(e) => setTypedLegalName(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setTypedLegalName(value);
+                if (value.trim() && !electronicTouched.current) {
+                  setElectronicConsent(true);
+                  logAudit('electronic_consent_auto_checked');
+                }
+              }}
               placeholder="Full legal name"
               className={`${inputClass} ${formErrors.typedLegalName ? 'border-red-300' : ''}`}
             />
@@ -354,16 +424,34 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             </p>
           </div>
 
+          <div data-tour="wf-signature">
+            <SignaturePad
+              onChange={(dataUrl) => {
+                setSignatureImage(dataUrl);
+                if (dataUrl) logAudit('signature_drawn');
+              }}
+              onStrokeStart={() => logAudit('signature_started')}
+              error={!!formErrors.signature}
+            />
+            {formErrors.signature && (
+              <p className="text-[11px] text-red-600 mt-1">{formErrors.signature}</p>
+            )}
+          </div>
+
           {tpl?.electronic_consent_enabled && (
             <label data-tour="wf-electronic-consent" className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={electronicConsent}
-                onChange={(e) => setElectronicConsent(e.target.checked)}
+                onChange={(e) => {
+                  electronicTouched.current = true;
+                  setElectronicConsent(e.target.checked);
+                  logAudit(e.target.checked ? 'electronic_consent_checked' : 'electronic_consent_unchecked');
+                }}
                 className="mt-0.5 h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
               />
               <span className="text-xs text-gray-600 leading-relaxed">
-                I agree that my electronic signature is the legal equivalent of my handwritten signature.
+                I agree that my electronic signature is the legal equivalent of my handwritten signature. *
               </span>
             </label>
           )}
@@ -375,7 +463,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             <input
               type="checkbox"
               checked={agreementAccepted}
-              onChange={(e) => setAgreementAccepted(e.target.checked)}
+              onChange={(e) => {
+                setAgreementAccepted(e.target.checked);
+                logAudit(e.target.checked ? 'agreement_accepted' : 'agreement_unaccepted');
+              }}
               className="mt-3 h-4 w-4 text-blue-700 rounded border-gray-300 focus:ring-blue-500"
             />
             <span className="text-xs text-gray-700 font-medium leading-relaxed mt-2.5">

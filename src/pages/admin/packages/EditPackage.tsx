@@ -1247,16 +1247,19 @@ const EditPackage: React.FC = () => {
                                                                     const [startHour, startMin] = schedule.time_slot_start.split(':').map(Number);
                                                                     const [endHour, endMin] = schedule.time_slot_end.split(':').map(Number);
                                                                     let currentMinutes = startHour * 60 + startMin;
-                                                                    const endMinutes = endHour * 60 + endMin;
+                                                                    let endMinutes = endHour * 60 + endMin;
+                                                                    if (endMinutes <= currentMinutes) endMinutes += 24 * 60;
                                                                     const slots = [];
                                                                     
                                                                     while (currentMinutes < endMinutes) {
                                                                         const slotEndMinutes = currentMinutes + slotDuration;
                                                                         if (slotEndMinutes <= endMinutes) {
-                                                                            const startH = Math.floor(currentMinutes / 60);
-                                                                            const startM = currentMinutes % 60;
-                                                                            const endH = Math.floor(slotEndMinutes / 60);
-                                                                            const endM = slotEndMinutes % 60;
+                                                                            const displayStart = currentMinutes % (24 * 60);
+                                                                            const displayEnd = slotEndMinutes % (24 * 60);
+                                                                            const startH = Math.floor(displayStart / 60);
+                                                                            const startM = displayStart % 60;
+                                                                            const endH = Math.floor(displayEnd / 60);
+                                                                            const endM = displayEnd % 60;
                                                                             const startTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
                                                                             const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
                                                                             slots.push(

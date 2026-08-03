@@ -120,6 +120,7 @@ const WaiverSettings = () => {
           </div>
           <div className="mt-2">
             {toggle('kiosk_disable_autofill', 'Disable autofill in kiosk mode', 'Recommended for shared iPads')}
+            {toggle('gps_capture_enabled', 'Capture GPS location on signing', 'Optional; asks the guest for location permission (requires HTTPS)')}
           </div>
         </div>
 

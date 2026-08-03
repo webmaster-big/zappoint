@@ -51,6 +51,7 @@ const defaultForm: WaiverTemplatePayload = {
   is_default: false,
   location_id: null,
   body_text: '',
+  highlight_points: '',
   validity_duration_days: null,
   max_minors: 10,
   duplicate_rule: 'manager_only',
@@ -137,6 +138,7 @@ const WaiverBuilder = () => {
               is_default: t.is_default,
               location_id: t.location_id ?? null,
               body_text: t.body_text,
+              highlight_points: t.highlight_points ?? '',
               validity_duration_days: t.validity_duration_days,
               max_minors: t.max_minors,
               duplicate_rule: t.duplicate_rule,
@@ -370,6 +372,19 @@ const WaiverBuilder = () => {
           </div>
         </div>
 
+        {/* Highlighted points */}
+        <div className={card}>
+          <h2 className="text-sm font-bold text-gray-900 mb-1">Highlighted points</h2>
+          <p className="text-[11px] text-gray-400 mb-3">Stand-out items shown in a callout at the top of the waiver and kiosk. One bullet per line. Merge tags like {'{{company_name}}'} autofill.</p>
+          <textarea
+            value={form.highlight_points ?? ''}
+            onChange={(e) => set('highlight_points', e.target.value)}
+            rows={4}
+            className={`${fieldCls} leading-relaxed`}
+            placeholder={'No re-entry after leaving the facility\nSocks are required on all attractions\nGuests under 18 must have a signed waiver'}
+          />
+        </div>
+
         {/* Rules */}
         <div data-tour="builder-rules" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-4">Rules</h2>
@@ -441,7 +456,7 @@ const WaiverBuilder = () => {
                 <label className={labelCls}>Helper text <span className="text-gray-400 font-normal">(fine print)</span></label>
                 <input type="text" value={form.marketing_helper_text ?? ''} onChange={(e) => set('marketing_helper_text', e.target.value)} className={fieldCls} />
               </div>
-              <p className="text-[11px] text-gray-400">The box is always unchecked by default — guests must opt in.</p>
+              <p className="text-[11px] text-gray-400">The box is pre-checked by default — guests can opt out.</p>
             </div>
           )}
         </div>

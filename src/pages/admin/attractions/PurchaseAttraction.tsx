@@ -42,6 +42,7 @@ import { buildAppliedFees } from '../../../utils/fees';
 import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
+import { generateTimeSlots } from '../../../utils/timeSlots';
 
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -238,23 +239,6 @@ const PurchaseAttraction = () => {
     });
   };
 
-  const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
-    const slots: string[] = [];
-    const [startHours, startMins] = startTime.split(':').map(Number);
-    const [endHours, endMins] = endTime.split(':').map(Number);
-    
-    let currentMinutes = startHours * 60 + startMins;
-    const endMinutes = endHours * 60 + endMins;
-    
-    while (currentMinutes < endMinutes) {
-      const hours = Math.floor(currentMinutes / 60);
-      const mins = currentMinutes % 60;
-      slots.push(`${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`);
-      currentMinutes += intervalMinutes;
-    }
-    
-    return slots;
-  };
 
   const getAttractionAvailability = (): Array<{ days: string[]; start_time: string; end_time: string }> => {
     if (!attraction) return [];
