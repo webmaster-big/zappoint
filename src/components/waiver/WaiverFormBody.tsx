@@ -6,7 +6,7 @@ import type {
   WaiverMinor,
 } from '../../types/waiver.types';
 import WaiverFormTour from './tour/WaiverFormTour';
-import SignatureCapture from '../SignatureCapture';
+import WaiverSignaturePad from './WaiverSignaturePad';
 import DateOfBirthSelect from './DateOfBirthSelect';
 import { getDeviceId } from '../../utils/deviceId';
 
@@ -426,11 +426,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           </div>
 
           <div data-tour="wf-signature">
-            <SignatureCapture
-              required={false}
-              onSignatureChange={(base64) => {
-                setSignatureImage(base64 ?? '');
-                if (base64) {
+            <WaiverSignaturePad
+              onChange={(dataUrl) => {
+                setSignatureImage(dataUrl);
+                if (dataUrl) {
                   if (!signatureLogged.current) {
                     signatureLogged.current = true;
                     logAudit('signature_drawn');
@@ -440,9 +439,6 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
                 }
               }}
             />
-            <p className="text-[11px] text-gray-400 mt-1">
-              Optional — your typed name above is your signature. You may also draw one here.
-            </p>
           </div>
 
           {tpl?.electronic_consent_enabled && (
