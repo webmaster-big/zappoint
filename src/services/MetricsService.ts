@@ -23,6 +23,12 @@ export interface DashboardMetrics {
   totalMemberships: number;
   activeMemberships: number;
   newMemberships: number;
+  totalWaivers?: number;
+  completedWaivers?: number;
+  pendingWaivers?: number;
+  checkedInWaivers?: number;
+  adultWaivers?: number;
+  minorWaivers?: number;
 }
 
 export interface BreakdownItem {
@@ -42,6 +48,9 @@ export interface DashboardBreakdowns {
   membershipBreakdown: BreakdownItem[];
   customerBreakdown: BreakdownItem[];
   confirmedBreakdown: BreakdownItem[];
+  waiverBreakdown?: BreakdownItem[];
+  waiverStatusBreakdown?: BreakdownItem[];
+  waiverAgeBreakdown?: BreakdownItem[];
 }
 
 export type TimeframeType = 'today' | 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';

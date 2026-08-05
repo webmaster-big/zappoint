@@ -15,6 +15,9 @@ import {
   Building2,
   Boxes,
   CalendarDays,
+  FileSignature,
+  UserCheck,
+  Baby,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -176,7 +179,7 @@ const CompanyAnalytics: React.FC = () => {
     );
   }
 
-  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions, available_locations, top_events } = analyticsData;
+  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions, available_locations, top_events, waivers } = analyticsData;
   
   const allLocations = available_locations || location_performance.map(loc => ({
     id: loc.location_id,
@@ -437,6 +440,55 @@ const CompanyAnalytics: React.FC = () => {
             </div>
           </div>
         )}
+        {waivers && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Waivers Signed</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  <CounterAnimation value={waivers.summary.completed} className="text-2xl font-bold text-gray-900" />
+                </div>
+                <p className="text-xs mt-1 text-gray-600">{waivers.summary.total} total · {waivers.summary.pending} pending</p>
+              </div>
+              <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+                <FileSignature className={`w-5 h-5 text-${themeColor}-600`} />
+              </div>
+            </div>
+          </div>
+        )}
+        {waivers && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Adults / Minors</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  <CounterAnimation value={waivers.summary.adult_signers} className="text-2xl font-bold text-gray-900" />
+                  <span className="text-gray-400 font-normal"> / {waivers.summary.minors_covered}</span>
+                </div>
+                <p className="text-xs mt-1 text-gray-600">{waivers.summary.people_covered} people covered</p>
+              </div>
+              <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+                <Baby className={`w-5 h-5 text-${themeColor}-600`} />
+              </div>
+            </div>
+          </div>
+        )}
+        {waivers && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Checked In</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  <CounterAnimation value={waivers.summary.checked_in} className="text-2xl font-bold text-gray-900" />
+                </div>
+                <p className="text-xs mt-1 text-gray-600">{waivers.summary.signed_not_checked_in} signed, not checked in</p>
+              </div>
+              <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+                <UserCheck className={`w-5 h-5 text-${themeColor}-600`} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -623,6 +675,90 @@ const CompanyAnalytics: React.FC = () => {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        {waivers && (
+          <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">Waivers Per Day</h3>
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                    Waivers created per day across the selected period and locations. Longer ranges are grouped by month.
+                  </div>
+                </div>
+              </div>
+              <FileSignature className="w-4 h-4 text-gray-400" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={waivers.per_day}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="label" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" allowDecimals={false} />
+                <Tooltip />
+                <Area type="monotone" dataKey="count" stroke={`var(--color-${themeColor}-500)`} fill={`var(--color-${themeColor}-500)`} fillOpacity={0.15} name="Waivers" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {waivers && (
+          <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">Adult Age Brackets</h3>
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                    Age distribution of adult signers, computed from the date of birth on signed waivers.
+                  </div>
+                </div>
+              </div>
+              <Users className="w-4 h-4 text-gray-400" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={waivers.age_brackets}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="bracket" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} name="Adults" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {waivers && waivers.by_source.length > 0 && (
+          <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">Waivers by Source</h3>
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                    Where waivers in the period originated: kiosk, email, SMS, staff-sent, bulk invite, or checkout.
+                  </div>
+                </div>
+              </div>
+              <Boxes className="w-4 h-4 text-gray-400" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={waivers.by_source}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  dataKey="count"
+                  label={({ source, count }) => `${source}: ${count}`}
+                >
+                  {waivers.by_source.map((entry, index) => (
+                    <Cell key={`wsrc-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

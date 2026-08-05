@@ -34,6 +34,7 @@ import {
   Ticket,
   Columns,
   UserPlus,
+  FileSignature,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -113,7 +114,7 @@ const CompanyDashboard: React.FC = () => {
     const key = user?.id ? `dashboard_card_visibility_${user.id}` : 'dashboard_card_visibility';
     const saved = localStorage.getItem(key);
     if (saved) { try { return JSON.parse(saved); } catch {} }
-    return { packages: true, partyParticipants: true, attractionsSold: true, eventsSold: true, memberships: true, uniqueCustomers: true, confirmedBookings: true };
+    return { packages: true, partyParticipants: true, attractionsSold: true, eventsSold: true, memberships: true, uniqueCustomers: true, confirmedBookings: true, waivers: true };
   };
   const [cardVisibility, setCardVisibility] = useState<Record<string,boolean>>(getDefaultCardVisibility);
   const [showCardSelector, setShowCardSelector] = useState(false);
@@ -163,6 +164,12 @@ const CompanyDashboard: React.FC = () => {
     totalMemberships: 0,
     activeMemberships: 0,
     newMemberships: 0,
+    totalWaivers: 0,
+    completedWaivers: 0,
+    pendingWaivers: 0,
+    checkedInWaivers: 0,
+    adultWaivers: 0,
+    minorWaivers: 0,
   });
 
   const getWeekDates = (date: Date): Date[] => {
@@ -739,6 +746,17 @@ const CompanyDashboard: React.FC = () => {
       breakdown: dashboardBreakdowns.confirmedBreakdown ?? [],
       explanation: 'All confirmed sales in the period combined by quantity: package bookings + event tickets + attraction tickets, matching the counts on the sold cards. Sales that progressed to checked-in or completed still count as confirmed. Click the card for the split by type.',
     },
+    {
+      key: 'waivers',
+      title: 'Waivers',
+      value: metrics.totalWaivers ?? 0,
+      description: `${metrics.completedWaivers ?? 0} signed · ${metrics.pendingWaivers ?? 0} pending`,
+      icon: FileSignature,
+      accent: 'bg-indigo-100 text-indigo-700',
+      timeframe: timeframeDescription,
+      breakdown: dashboardBreakdowns.waiverBreakdown ?? [],
+      explanation: 'Waivers created in the selected period (by creation date), scoped to the selected location. "Signed" are completed waivers; pending are not yet signed. Open the card for the split by status, by source, adults vs minors covered, and the adult age brackets.',
+    },
   ];
 
   const visibleDashboardCards = allDashboardCards.filter(c => cardVisibility[c.key] !== false);
@@ -1075,7 +1093,7 @@ const CompanyDashboard: React.FC = () => {
 
       {/* Summary metric cards */}
       {visibleDashboardCards.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
           {visibleDashboardCards.map((card) => {
             const Icon = card.icon;
             const isExpanded = expandedCard === card.key;
@@ -1133,10 +1151,39 @@ const CompanyDashboard: React.FC = () => {
                         ))}
                       </div>
                     )}
+                    {card.key === 'waivers' && Array.isArray(dashboardBreakdowns.waiverStatusBreakdown) && dashboardBreakdowns.waiverStatusBreakdown.length > 0 && (
+                      <div className="space-y-1.5 mb-2 pb-2 border-b border-gray-100">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">By status</span>
+                        {(dashboardBreakdowns.waiverStatusBreakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
+                          <div key={item.label} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 truncate mr-2">{item.label}</span>
+                            <span className="text-gray-800 font-medium shrink-0">
+                              {item.count} <span className="text-gray-400">({item.percentage}%)</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {card.key === 'waivers' && Array.isArray(dashboardBreakdowns.waiverAgeBreakdown) && dashboardBreakdowns.waiverAgeBreakdown.length > 0 && (
+                      <div className="space-y-1.5 mb-2 pb-2 border-b border-gray-100">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Adult age brackets (signed)</span>
+                        {(dashboardBreakdowns.waiverAgeBreakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
+                          <div key={item.label} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 truncate mr-2">{item.label}</span>
+                            <span className="text-gray-800 font-medium shrink-0">
+                              {item.count} <span className="text-gray-400">({item.percentage}%)</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {hasBreakdown ? (
                       <div className="space-y-1.5">
                         {card.key === 'packages' && (
                           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">By package</span>
+                        )}
+                        {card.key === 'waivers' && (
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">By source</span>
                         )}
                         {(card.breakdown as Array<{label:string;count:number;percentage:number;items?:Array<{label:string;count:number;percentage:number}>}>).map((item) => (
                           <div key={item.label}>

@@ -276,6 +276,25 @@ export interface CompanyAnalyticsResponse {
     tickets_sold: number;
     revenue: number;
   }>;
+  waivers?: {
+    summary: {
+      total: number;
+      completed: number;
+      pending: number;
+      checked_in: number;
+      signed_not_checked_in: number;
+      adult_signers: number;
+      minors_covered: number;
+      people_covered: number;
+      with_minors: number;
+      adults_only: number;
+      marketing_opted_in: number;
+      expired: number;
+    };
+    per_day: Array<{ date: string; label: string; count: number }>;
+    age_brackets: Array<{ bracket: string; count: number }>;
+    by_source: Array<{ source: string; count: number; color: string }>;
+  };
 }
 
 class AnalyticsService {
