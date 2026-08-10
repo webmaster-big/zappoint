@@ -14,14 +14,12 @@ import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_BUILDER_STEPS } from '../../../components/waiver/tour/tourSteps';
 
 type ClauseKey =
-  | 'minor_section_enabled' | 'dob_required' | 'relationship_required'
+  | 'minor_section_enabled'
   | 'photo_video_release_enabled' | 'medical_ack_enabled' | 'property_damage_enabled'
   | 'group_leader_clause_enabled' | 'electronic_consent_enabled';
 
 const clauseFields: Array<{ key: ClauseKey; label: string; hint?: string }> = [
-  { key: 'minor_section_enabled', label: 'Minor section', hint: 'Allow adding children to this waiver' },
-  { key: 'dob_required', label: 'Require minor date of birth' },
-  { key: 'relationship_required', label: 'Require minor relationship' },
+  { key: 'minor_section_enabled', label: 'Minor section', hint: 'Allow adding children to this waiver — date of birth and relationship are always required for each child' },
   { key: 'photo_video_release_enabled', label: 'Photo / video release clause' },
   { key: 'medical_ack_enabled', label: 'Medical acknowledgment clause' },
   { key: 'property_damage_enabled', label: 'Property damage clause' },
@@ -60,8 +58,8 @@ const defaultForm: WaiverTemplatePayload = {
   assigned_attraction_ids: [],
   assigned_event_ids: [],
   minor_section_enabled: true,
-  dob_required: false,
-  relationship_required: false,
+  dob_required: true,
+  relationship_required: true,
   photo_video_release_enabled: false,
   photo_video_release_text: '',
   medical_ack_enabled: false,

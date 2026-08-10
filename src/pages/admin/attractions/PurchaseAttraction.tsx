@@ -16,6 +16,8 @@ import {
   Info
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { resolveBullets } from '../../../utils/bullets';
+import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo, PurchaseAttractionAddOn } from '../../../types/PurchaseAttraction.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
@@ -259,6 +261,14 @@ const PurchaseAttraction = () => {
 
     return [];
   };
+
+  const included = useMemo(() => resolveBullets(null, attraction?.description), [attraction?.description]);
+
+  const basePriceUnit = attraction?.pricingType === 'per_person' ? 'per person'
+    : attraction?.pricingType === 'per_group' ? 'per group'
+    : attraction?.pricingType === 'per_hour' ? 'per hour'
+    : attraction?.pricingType === 'per_game' ? 'per game'
+    : 'fixed price';
 
   const { effectiveDayOffDates, partialDayOffDates } = useMemo(() => {
     const fullyBlocked = new Set<string>(dayOffDates);
@@ -1071,6 +1081,19 @@ const PurchaseAttraction = () => {
               )}
             </div>
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
+              {currentStep === 1 && (
+                <MobilePurchaseIntro
+                  className="lg:hidden border-b border-gray-100"
+                  name={attraction.name}
+                  image={attraction.images?.[0]}
+                  price={Number(attraction.price)}
+                  priceUnit={basePriceUnit}
+                  priceNote="Add-ons, fees and any discounts are applied at checkout."
+                  description={attraction.description}
+                  bullets={included.bullets}
+                  bulletsFromDescription={included.fromDescription}
+                />
+              )}
               <div className="bg-gradient-to-r from-gray-50 to-white">
                 <div className="px-4 md:px-6 py-4 md:py-5">
                   <div className="flex items-center justify-between mb-2">
@@ -1107,7 +1130,7 @@ const PurchaseAttraction = () => {
                     <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity of <span className="text-xl md:text-2xl font-extrabold text-blue-800">{attraction.name}</span></h2>
                     <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
                   </div>
-                  
+
                   <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-center mb-4">
                       <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 text-blue-600" />

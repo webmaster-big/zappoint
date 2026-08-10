@@ -336,9 +336,7 @@ export const WAIVER_BUILDER_STEPS: Step[] = [
       <>
         <p style={{ margin: 0, marginBottom: 8 }}>Toggle optional sections that add specific fields or checkboxes to the signing form.</p>
         <div>
-          {row('Minor section', 'shows the "Add a child" panel; required if you want minors on waivers')}
-          {row('Require minor date of birth', 'makes the DOB field mandatory for each child added')}
-          {row('Require minor relationship', 'makes the relationship field (e.g. Parent, Guardian) mandatory per child')}
+          {row('Minor section', 'shows the "Add a child" panel; each child always requires a name, date of birth and relationship')}
           {row('Photo / video release', 'adds a consent checkbox for the venue to use images from the visit')}
           {row('Medical acknowledgment', 'adds a checkbox confirming the guest is aware of health requirements')}
           {row('Property damage', 'adds a liability clause for damage the guest may cause')}

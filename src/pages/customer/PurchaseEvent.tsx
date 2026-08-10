@@ -38,6 +38,8 @@ import type { SpecialPricingBreakdown } from '../../types/SpecialPricing.types';
 import type { Event, EventAddOn } from '../../types/event.types';
 import { useMembershipBenefits } from '../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../types/Membership.types';
+import { resolveBullets } from '../../utils/bullets';
+import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
@@ -525,6 +527,11 @@ const PurchaseEvent = () => {
     [availableDates, fullyBlockedDates]
   );
 
+  const included = useMemo(
+    () => resolveBullets(event?.features, event?.description),
+    [event?.features, event?.description]
+  );
+
   const eventPrice = event ? parseFloat(event.price) : 0;
   const ticketSubtotal = eventPrice * quantity;
   const addOnTotal = event?.add_ons
@@ -867,6 +874,19 @@ const PurchaseEvent = () => {
               )}
             </div>
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
+              {currentStep === 1 && (
+                <MobilePurchaseIntro
+                  className="lg:hidden border-b border-gray-100"
+                  name={event.name}
+                  image={event.image ? getImageUrl(event.image) : null}
+                  price={eventPrice}
+                  priceUnit="per ticket"
+                  priceNote="Add-ons, fees and any discounts are applied at checkout."
+                  description={event.description}
+                  bullets={included.bullets}
+                  bulletsFromDescription={included.fromDescription}
+                />
+              )}
 
               <div className="bg-gradient-to-r from-gray-50 to-white">
                 <div className="px-4 md:px-6 py-4 md:py-5">

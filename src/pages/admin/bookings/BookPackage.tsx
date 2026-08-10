@@ -39,6 +39,8 @@ import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
 import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
+import { resolveBullets } from '../../../utils/bullets';
+import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -141,6 +143,19 @@ const BookPackage: React.FC = () => {
   const isCustomerMode = useMemo(() => !getStoredUser(), []);
 
   const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
+  const included = useMemo(
+    () => resolveBullets(pkg?.features, pkg?.description),
+    [pkg?.features, pkg?.description]
+  );
+  const packageBasePriceNote = useMemo(() => {
+    if (!pkg) return undefined;
+    const included = Number(pkg.min_participants || 1);
+    const perAdditional = Number(pkg.price_per_additional || 0);
+    const parts: string[] = [`Covers ${included} ${included === 1 ? 'participant' : 'participants'}`];
+    if (perAdditional > 0) parts.push(`$${perAdditional.toFixed(2)} per additional participant`);
+    parts.push('add-ons and fees are applied at checkout');
+    return `${parts.join(' · ')}.`;
+  }, [pkg]);
   const [loadingPackage, setLoadingPackage] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [globalNotes, setGlobalNotes] = useState<GlobalNote[]>([]);
@@ -1744,11 +1759,25 @@ const BookPackage: React.FC = () => {
               <h2 className="text-xl font-bold text-gray-900 leading-tight">{pkg.name}</h2>
             </div>
           )}
-          <div className={`mb-6 md:mb-8 bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-hidden relative${currentStep >= 2 ? ' hidden md:block' : ''}`}>
+          {currentStep === 1 && (
+            <MobilePurchaseIntro
+              className="mb-4 md:hidden rounded-2xl shadow-md overflow-hidden border-t-4 border-blue-700"
+              name={pkg.name}
+              showName
+              image={pkg.image ? getImageUrl(pkg.image) : null}
+              price={Number(pkg.price)}
+              priceUnit="per package"
+              priceNote={packageBasePriceNote}
+              description={pkg.description}
+              bullets={included.bullets}
+              bulletsFromDescription={included.fromDescription}
+            />
+          )}
+          <div className="mb-6 md:mb-8 bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-hidden relative hidden md:block">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-700 to-violet-600"></div>
             <h2 className="text-2xl md:text-xl font-bold mb-2 text-gray-900 leading-tight">{pkg.name}</h2>
             <p className="text-gray-500 mb-3 md:mb-4 text-xs md:text-sm leading-relaxed line-clamp-3">{pkg.description}</p>
-            {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) || 
+            {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) ||
               (typeof pkg.features === 'string' && pkg.features.trim() !== '')) && (
               <div className="mt-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Features:</h3>

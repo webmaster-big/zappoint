@@ -68,7 +68,7 @@ export const WAIVER_FORM_TOUR_STEPS: Step[] = [
     placement: 'auto',
     disableBeacon: true,
     title: 'Date of birth',
-    content: 'Your date of birth is optional unless the venue requires it for age verification. Leave it blank if not marked required.',
+    content: 'Your date of birth is required. The person signing must be 18 or older — if you are under 18, a parent or legal guardian needs to sign for you and can add you as a minor below.',
   },
   {
     target: '[data-tour="wf-minors-section"]',
@@ -81,8 +81,8 @@ export const WAIVER_FORM_TOUR_STEPS: Step[] = [
         <div>
           {row('+ Add Minor button', 'adds a new child entry row')}
           {row('Name fields', 'required for each child')}
-          {row('Date of birth', 'required for each child if the waiver has age rules')}
-          {row('Relationship', 'required if the waiver asks for it (e.g. Parent, Guardian)')}
+          {row('Date of birth', 'required for each child')}
+          {row('Relationship', 'required — pick how the child relates to you (e.g. Son, Daughter, Legal Ward)')}
         </div>
         <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>Each child is covered by this same waiver up to the template's max-minors limit.</p>
       </>

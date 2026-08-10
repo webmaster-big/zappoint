@@ -8,7 +8,9 @@ import type {
 import WaiverFormTour from './tour/WaiverFormTour';
 import WaiverSignaturePad from './WaiverSignaturePad';
 import DateOfBirthSelect from './DateOfBirthSelect';
+import RelationshipSelect from './RelationshipSelect';
 import { getDeviceId } from '../../utils/deviceId';
+import { ADULT_AGE, calculateAge, isFutureDate } from '../../utils/age';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -49,6 +51,8 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
 
   const autoCompleteOff = noAutofill || disableBrowserAutofill ? 'off' : undefined;
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const revealErrors = useRef(false);
   const openedAt = useRef(Date.now());
   const electronicTouched = useRef(false);
   const signatureLogged = useRef(false);
@@ -80,6 +84,15 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!revealErrors.current) return;
+    revealErrors.current = false;
+    const target = formRef.current?.querySelector('.border-red-300, .text-red-600');
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [formErrors]);
+
   const addMinor = () => {
     if (tpl && minors.length >= tpl.max_minors) return;
     setMinors((prev) => [
@@ -93,6 +106,14 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
   const updateMinor = (key: number, field: keyof WaiverMinor, value: string) =>
     setMinors((prev) => prev.map((m) => (m._key === key ? { ...m, [field]: value } : m)));
 
+  const signerAge = calculateAge(adultDob);
+  const signerIsMinor = signerAge !== null && signerAge < ADULT_AGE;
+
+  const minorIsAdult = (dob?: string | null): boolean => {
+    const age = calculateAge(dob);
+    return age !== null && age >= ADULT_AGE;
+  };
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!adultFirstName.trim()) errs.adultFirstName = 'Required';
@@ -101,6 +122,8 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adultEmail)) errs.adultEmail = 'Invalid email';
     if (!adultPhone.trim()) errs.adultPhone = 'Required';
     if (!adultDob) errs.adultDob = 'Required';
+    else if (isFutureDate(adultDob)) errs.adultDob = 'Please check this date — it cannot be in the future';
+    else if (signerIsMinor) errs.adultDob = `The person signing must be ${ADULT_AGE} or older`;
     if (!typedLegalName.trim()) errs.typedLegalName = 'Please type your full legal name';
     if (!agreementAccepted) errs.agreement = 'You must agree to the waiver to continue';
     if (tpl?.electronic_consent_enabled && !electronicConsent)
@@ -109,8 +132,9 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     minors.forEach((m, i) => {
       if (!m.first_name.trim()) errs[`minor_${i}_first`] = 'Required';
       if (!m.last_name.trim()) errs[`minor_${i}_last`] = 'Required';
-      if (tpl?.dob_required && !m.date_of_birth) errs[`minor_${i}_dob`] = 'Required';
-      if (tpl?.relationship_required && !m.relationship?.trim()) errs[`minor_${i}_rel`] = 'Required';
+      if (!m.date_of_birth) errs[`minor_${i}_dob`] = 'Required';
+      else if (isFutureDate(m.date_of_birth)) errs[`minor_${i}_dob`] = 'Cannot be in the future';
+      if (!m.relationship?.trim()) errs[`minor_${i}_rel`] = 'Required';
     });
 
     setFormErrors(errs);
@@ -119,7 +143,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      revealErrors.current = true;
+      return;
+    }
     logAudit('submitted');
     const readSeconds = Math.max(0, Math.round((Date.now() - openedAt.current) / 1000));
     const payload: WaiverSubmission = {
@@ -156,7 +183,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
   return (
     <>
     <WaiverFormTour />
-    <form onSubmit={handleSubmit} className="space-y-5" autoComplete={autoCompleteOff}>
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" autoComplete={autoCompleteOff}>
       {highlightPoints.length > 0 && (
         <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-5 py-4">
           <h2 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">Please note</h2>
@@ -257,12 +284,31 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             <label className={labelClass}>Date of Birth *</label>
             <DateOfBirthSelect
               value={adultDob}
-              onChange={setAdultDob}
+              onChange={(v) => {
+                setAdultDob(v);
+                setFormErrors((prev) => {
+                  if (!prev.adultDob) return prev;
+                  const next = { ...prev };
+                  delete next.adultDob;
+                  return next;
+                });
+              }}
               error={!!formErrors.adultDob}
             />
             {formErrors.adultDob && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultDob}</p>}
           </div>
         </div>
+        {signerIsMinor && (
+          <div className="mx-5 mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <h3 className="text-xs font-bold text-amber-900">A parent or guardian needs to sign for you</h3>
+            <p className="mt-1 text-xs leading-relaxed text-amber-900/90">
+              Thanks for getting started! Because you are under {ADULT_AGE}, we are not able to accept your signature on
+              this waiver. Please ask a parent or legal guardian to fill this out — they enter their own details above
+              {tpl?.minor_section_enabled ? ', then add you in the Minors section below' : ''}. Sorry for the extra step,
+              and see you soon!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Minors */}
@@ -310,6 +356,9 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
                       onChange={(e) => updateMinor(m._key, 'first_name', e.target.value)}
                       className={`${inputClass} ${formErrors[`minor_${i}_first`] ? 'border-red-300' : ''}`}
                     />
+                    {formErrors[`minor_${i}_first`] && (
+                      <p className="text-[11px] text-red-600 mt-1">{formErrors[`minor_${i}_first`]}</p>
+                    )}
                   </div>
                   <div>
                     <label className={labelClass}>Last Name *</label>
@@ -320,31 +369,41 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
                       onChange={(e) => updateMinor(m._key, 'last_name', e.target.value)}
                       className={`${inputClass} ${formErrors[`minor_${i}_last`] ? 'border-red-300' : ''}`}
                     />
+                    {formErrors[`minor_${i}_last`] && (
+                      <p className="text-[11px] text-red-600 mt-1">{formErrors[`minor_${i}_last`]}</p>
+                    )}
                   </div>
                   <div>
-                    <label className={labelClass}>
-                      Date of Birth {tpl.dob_required ? '*' : <span className="text-gray-400 font-normal">(optional)</span>}
-                    </label>
+                    <label className={labelClass}>Date of Birth *</label>
                     <DateOfBirthSelect
                       value={m.date_of_birth ?? ''}
                       onChange={(v) => updateMinor(m._key, 'date_of_birth', v)}
                       error={!!formErrors[`minor_${i}_dob`]}
                     />
+                    {formErrors[`minor_${i}_dob`] && (
+                      <p className="text-[11px] text-red-600 mt-1">{formErrors[`minor_${i}_dob`]}</p>
+                    )}
                   </div>
                   <div>
-                    <label className={labelClass}>
-                      Relationship {tpl.relationship_required ? '*' : <span className="text-gray-400 font-normal">(optional)</span>}
-                    </label>
-                    <input
-                      type="text"
+                    <label className={labelClass}>Relationship *</label>
+                    <RelationshipSelect
                       value={m.relationship ?? ''}
+                      direction="minor_to_signer"
                       autoComplete={autoCompleteOff}
-                      placeholder="e.g. son, daughter"
-                      onChange={(e) => updateMinor(m._key, 'relationship', e.target.value)}
-                      className={`${inputClass} ${formErrors[`minor_${i}_rel`] ? 'border-red-300' : ''}`}
+                      onChange={(v) => updateMinor(m._key, 'relationship', v)}
+                      error={!!formErrors[`minor_${i}_rel`]}
                     />
+                    {formErrors[`minor_${i}_rel`] && (
+                      <p className="text-[11px] text-red-600 mt-1">{formErrors[`minor_${i}_rel`]}</p>
+                    )}
                   </div>
                 </div>
+                {minorIsAdult(m.date_of_birth) && (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+                    This date of birth is {ADULT_AGE} or older, so they will need to sign their own waiver rather than be
+                    added here. Please double-check the date.
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -483,10 +542,12 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       <button
         data-tour="wf-submit"
         type="submit"
-        disabled={submitting}
+        disabled={submitting || signerIsMinor}
         className="w-full py-3 bg-blue-700 text-white text-sm font-semibold rounded-lg hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {submitting ? (
+        {signerIsMinor ? (
+          'A parent or guardian must sign'
+        ) : submitting ? (
           <span className="flex items-center justify-center gap-2">
             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             Submitting...
