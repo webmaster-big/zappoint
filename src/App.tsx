@@ -114,6 +114,17 @@ import Memberships from "./pages/admin/memberships/Memberships";
 import MembershipDetails from "./pages/admin/memberships/MembershipDetails";
 import MembershipCheckIn from "./pages/admin/memberships/MembershipCheckIn";
 import MembershipReports from "./pages/admin/memberships/MembershipReports";
+import PhotoKiosk from "./pages/public/PhotoKiosk";
+import PhotoSlideshow from "./pages/public/PhotoSlideshow";
+import PhotoQrLanding from "./pages/public/PhotoQrLanding";
+import CustomerPhotos from "./pages/public/CustomerPhotos";
+import PhotoCapture from "./pages/admin/photos/PhotoCapture";
+import PhotoLibrary from "./pages/admin/photos/PhotoLibrary";
+import SlideshowQueuePage from "./pages/admin/photos/SlideshowQueue";
+import PhotoOverlays from "./pages/admin/photos/PhotoOverlays";
+import PhotoDeliveryLog from "./pages/admin/photos/PhotoDeliveryLog";
+import PhotoSettings from "./pages/admin/photos/PhotoSettings";
+import PhotoReports from "./pages/admin/photos/PhotoReports";
 
 const GoogleCalendarRedirect = () => {
   const location = useLocation();
@@ -161,6 +172,11 @@ function App() {
         <Route path="/waiver/kiosk-session/:token" element={<><PageViewBeacon pageType="waiver_kiosk_session" /><WaiverKioskSession /></>} />
         <Route path="/waiver/bulk/:manageToken" element={<><PageViewBeacon pageType="waiver_bulk" /><WaiverBulk /></>} />
         <Route path="/waiver/:token" element={<><PageViewBeacon pageType="waiver_sign" /><WaiverForm /></>} />
+
+        <Route path="/photos/kiosk/:locationId" element={<PhotoKiosk />} />
+        <Route path="/photos/slideshow/:locationId" element={<PhotoSlideshow />} />
+        <Route path="/photos/qr/:qrToken" element={<PhotoQrLanding />} />
+        <Route path="/photos/:accessToken" element={<><PageViewBeacon pageType="customer_photos" /><CustomerPhotos /></>} />
         
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
@@ -221,6 +237,14 @@ function App() {
           <Route path="/waivers/deletion-log" element={<WaiverDeletionLog />} />
           <Route path="/waivers/reports" element={<WaiverReports />} />
           <Route path="/waivers/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><WaiverSettings /></ProtectedRoute>} />
+
+          <Route path="/photos/capture" element={<PhotoCapture />} />
+          <Route path="/photos/library" element={<PhotoLibrary />} />
+          <Route path="/photos/slideshow-queue" element={<SlideshowQueuePage />} />
+          <Route path="/photos/overlays" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><PhotoOverlays /></ProtectedRoute>} />
+          <Route path="/photos/delivery-log" element={<PhotoDeliveryLog />} />
+          <Route path="/photos/reports" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><PhotoReports /></ProtectedRoute>} />
+          <Route path="/photos/settings" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><PhotoSettings /></ProtectedRoute>} />
 
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/location-change-requests" element={<LocationChangeRequests />} />

@@ -46,7 +46,12 @@ import {
   Calculator,
   Activity,
   IdCard,
-  FileSignature
+  FileSignature,
+  Camera,
+  Images,
+  MonitorPlay,
+  Layers,
+  Send as SendIcon
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -104,7 +109,15 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Notifications': 'Manage your notification preferences',
     'User Management': 'Administer user accounts and permissions',
     'Manage Accounts': 'View and edit user accounts',
-    'Payments': 'Manage and view all payment transactions'
+    'Payments': 'Manage and view all payment transactions',
+    'Photos': 'Capture, deliver and display customer photos',
+    'Take Photos': 'Capture up to three photos and send them to a waiver or a QR code',
+    'Photo Library': 'Browse, download and resend photos grouped by operating day',
+    'Slideshow Queue': 'Manage what the venue screen is showing right now',
+    'Overlays': 'Upload and schedule the branded frame applied to photos',
+    'Delivery Log': 'Track every email and SMS photo link, retry or cancel',
+    'Photo Reports': 'Capture, delivery, QR, kiosk and slideshow tracking',
+    'Photo Settings': 'Kiosk and slideshow passcodes, date layer and retention'
   };
 
   return navItems.map(item => {
@@ -189,6 +202,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Waiver Records', href: '/waivers', icon: List },
           { label: 'Reports', href: '/waivers/reports', icon: BarChart3 }
         ]},
+        { label: 'Photos', icon: Camera, section: 'Photos', items: [
+          { label: 'Take Photos', href: '/photos/capture', icon: Camera },
+          { label: 'Photo Library', href: '/photos/library', icon: Images },
+          { label: 'Slideshow Queue', href: '/photos/slideshow-queue', icon: MonitorPlay },
+          { label: 'Delivery Log', href: '/photos/delivery-log', icon: SendIcon }
+        ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users }
@@ -253,6 +272,15 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Waiver Records', href: '/waivers', icon: List },
           { label: 'Templates', href: '/waivers/templates', icon: FileText },
           { label: 'Group Invites', href: '/waivers/bulk', icon: Users }
+        ]},
+        { label: 'Photos', icon: Camera, section: 'Photos', items: [
+          { label: 'Take Photos', href: '/photos/capture', icon: Camera },
+          { label: 'Photo Library', href: '/photos/library', icon: Images },
+          { label: 'Slideshow Queue', href: '/photos/slideshow-queue', icon: MonitorPlay },
+          { label: 'Overlays', href: '/photos/overlays', icon: Layers },
+          { label: 'Delivery Log', href: '/photos/delivery-log', icon: SendIcon },
+          { label: 'Photo Reports', href: '/photos/reports', icon: BarChart3 },
+          { label: 'Photo Settings', href: '/photos/settings', icon: Settings }
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
@@ -329,6 +357,15 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Waiver Records', href: '/waivers', icon: List },
           { label: 'Templates', href: '/waivers/templates', icon: FileText },
           { label: 'Group Invites', href: '/waivers/bulk', icon: Users }
+        ]},
+        { label: 'Photos', icon: Camera, section: 'Photos', items: [
+          { label: 'Take Photos', href: '/photos/capture', icon: Camera },
+          { label: 'Photo Library', href: '/photos/library', icon: Images },
+          { label: 'Slideshow Queue', href: '/photos/slideshow-queue', icon: MonitorPlay },
+          { label: 'Overlays', href: '/photos/overlays', icon: Layers },
+          { label: 'Delivery Log', href: '/photos/delivery-log', icon: SendIcon },
+          { label: 'Photo Reports', href: '/photos/reports', icon: BarChart3 },
+          { label: 'Photo Settings', href: '/photos/settings', icon: Settings }
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
