@@ -114,7 +114,12 @@ const photoService = {
 
   deliver: async (
     sessionId: number,
-    payload: { method: 'waiver_message' | 'staff_qr'; schedule?: string; waiver_ids?: number[] },
+    payload: {
+      method: 'waiver_message' | 'staff_qr';
+      schedule?: string;
+      waiver_ids?: number[];
+      slideshow_opt_in?: boolean;
+    },
   ): Promise<{ data: PhotoSessionRecord; message?: string }> => {
     const res = await api.post(`/photo-sessions/${sessionId}/deliver`, payload);
     return { data: res.data.data, message: res.data.message };
@@ -143,6 +148,9 @@ const photoService = {
     photoId: number,
     payload: { waiver_ids: number[]; schedule?: string },
   ): Promise<PhotoSessionRecord> => (await api.post(`/photo-library/${photoId}/send`, payload)).data.data,
+
+  setPhotoOnSlideshow: async (photoId: number, include: boolean): Promise<string> =>
+    (await api.post(`/slideshow-photos/${photoId}/inclusion`, { include })).data.message,
 
   deletePhoto: async (photoId: number): Promise<string> =>
     (await api.delete(`/photo-library/${photoId}`)).data.message,

@@ -18,7 +18,10 @@ const PhotoSlideshow = () => {
   const [unlocking, setUnlocking] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [busyServer, setBusyServer] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [index, setIndex] = useState(0);
+  const failuresRef = useRef(0);
 
   const feedRef = useRef<SlideshowFeed | null>(null);
   feedRef.current = feed;
@@ -32,8 +35,11 @@ const PhotoSlideshow = () => {
     try {
       const next = await photoService.getSlideshowFeed(locationId);
       setFeed(next);
+      failuresRef.current = 0;
       setOffline(false);
+      setBusyServer(false);
       setDisabled(false);
+      setLastUpdated(new Date());
     } catch (e) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -47,7 +53,18 @@ const PhotoSlideshow = () => {
         setLocked(true);
         return;
       }
-      setOffline(true);
+
+      // Rate limiting is not an outage: keep the rotation running and say so plainly,
+      // rather than claiming the display has lost its connection.
+      if (status === 429) {
+        setBusyServer(true);
+        return;
+      }
+
+      // One dropped poll is normal on venue wifi. Only call it offline once it persists,
+      // so the banner means something when it does appear.
+      failuresRef.current += 1;
+      if (failuresRef.current >= 2) setOffline(true);
     }
   }, [locationId]);
 
@@ -222,6 +239,26 @@ const PhotoSlideshow = () => {
             Reconnecting — showing the cached rotation
           </span>
         )}
+        {busyServer && !offline && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 text-white/70 px-3 py-1 text-xs">
+            Waiting its turn — the rotation keeps playing
+          </span>
+        )}
+      </div>
+
+      {/* A visible heartbeat, so anyone can tell at a glance that the display is live. */}
+      <div className="absolute bottom-5 left-6 flex items-center gap-2 text-xs text-white/60">
+        <span
+          className={`inline-block h-2 w-2 rounded-full ${
+            offline ? 'bg-amber-400' : 'bg-green-400 animate-pulse'
+          }`}
+        />
+        {offline
+          ? 'Not connected'
+          : lastUpdated
+            ? `Live · checked ${lastUpdated.toLocaleTimeString()}`
+            : 'Connecting…'}
+        {feed?.operating_day ? ` · ${feed.operating_day}` : ''}
       </div>
 
       {photos.length > 0 && (

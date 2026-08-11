@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
+  MonitorPlay,
+  MonitorOff,
   Download,
   Images,
   MapPin,
@@ -48,6 +50,7 @@ const PhotoLibrary = () => {
 
   const [confirmDelete, setConfirmDelete] = useState<{ photos: PhotoRecord[]; bulk: boolean } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [slideshowBusyId, setSlideshowBusyId] = useState<number | null>(null);
 
   const [sendFor, setSendFor] = useState<PhotoRecord | null>(null);
   const [query, setQuery] = useState('');
@@ -135,6 +138,23 @@ const PhotoLibrary = () => {
       setDeleting(false);
     }
   }, [confirmDelete, load]);
+
+  const toggleSlideshow = useCallback(
+    async (photo: PhotoRecord) => {
+      const include = !(photo.slideshow_eligible && photo.slideshow_state === 'visible');
+      setSlideshowBusyId(photo.id);
+      try {
+        const message = await photoService.setPhotoOnSlideshow(photo.id, include);
+        setToast({ message, type: 'success' });
+        await load();
+      } catch (e) {
+        setToast({ message: errorMessage(e, 'That change could not be saved.'), type: 'error' });
+      } finally {
+        setSlideshowBusyId(null);
+      }
+    },
+    [load],
+  );
 
   const runSearch = useCallback(async () => {
     if (query.trim().length < 2) return;
@@ -369,6 +389,32 @@ const PhotoLibrary = () => {
                         >
                           <Send className="w-3.5 h-3.5" />
                           Send
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleSlideshow(photo)}
+                          disabled={slideshowBusyId === photo.id}
+                          title={
+                            photo.slideshow_eligible && photo.slideshow_state === 'visible'
+                              ? 'Take off the venue slideshow'
+                              : 'Show on the venue slideshow'
+                          }
+                          aria-label={
+                            photo.slideshow_eligible && photo.slideshow_state === 'visible'
+                              ? `Take photo ${photo.id} off the slideshow`
+                              : `Show photo ${photo.id} on the slideshow`
+                          }
+                          className={`inline-flex items-center justify-center text-xs border rounded-lg px-2 py-1.5 disabled:opacity-40 ${
+                            photo.slideshow_eligible && photo.slideshow_state === 'visible'
+                              ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100'
+                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {photo.slideshow_eligible && photo.slideshow_state === 'visible' ? (
+                            <MonitorOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <MonitorPlay className="w-3.5 h-3.5" />
+                          )}
                         </button>
                         {canDelete && (
                           <button

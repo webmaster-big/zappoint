@@ -8,6 +8,27 @@ import type { KioskContext, KioskSessionHandle } from '../../types/photo.types';
 
 type Screen = 'locked' | 'welcome' | 'camera' | 'preview' | 'qr' | 'disabled';
 
+/**
+ * Say what actually went wrong. A bare "could not start" gave staff nothing to act on,
+ * and the three causes need three different responses.
+ */
+const failureText = (e: unknown, fallback: string): string => {
+  const err = e as { response?: { status?: number; data?: { message?: string } }; message?: string };
+  const status = err?.response?.status;
+
+  if (status === 429) {
+    return 'The kiosk is catching its breath. Please wait about a minute and try again.';
+  }
+  if (status === undefined) {
+    return 'The kiosk cannot reach the internet right now. Please check the connection or ask a team member.';
+  }
+  if (status >= 500) {
+    return 'Something went wrong on our side. Please ask a team member for help.';
+  }
+
+  return err?.response?.data?.message || fallback;
+};
+
 const PhotoKiosk = () => {
   const { locationId: locationParam } = useParams<{ locationId: string }>();
   const locationId = Number(locationParam);
@@ -148,8 +169,7 @@ const PhotoKiosk = () => {
       setPasscode('');
       setScreen('welcome');
     } catch (e) {
-      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setLockError(message || 'That passcode is not valid for this location.');
+      setLockError(failureText(e, 'That passcode is not valid for this location.'));
     } finally {
       setUnlocking(false);
     }
@@ -164,8 +184,7 @@ const PhotoKiosk = () => {
       setScreen('camera');
       await startCamera();
     } catch (e) {
-      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setNotice(message || 'The kiosk could not start. Please ask a team member for help.');
+      setNotice(failureText(e, 'The kiosk could not start. Please ask a team member for help.'));
     } finally {
       setBusy(false);
     }
@@ -239,8 +258,7 @@ const PhotoKiosk = () => {
         if (handleRef.current?.session_id !== current.session_id) {
           return;
         }
-        const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        setNotice(message || 'Something went wrong with that photo. Please try again.');
+        setNotice(failureText(e, 'Something went wrong with that photo. Please try again.'));
       } finally {
         capturingRef.current = false;
         setBusy(false);
@@ -273,8 +291,7 @@ const PhotoKiosk = () => {
       setQrUrl(result.qr_target_url);
       setScreen('qr');
     } catch (e) {
-      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setNotice(message || 'Your photo could not be saved. Please ask a team member for help.');
+      setNotice(failureText(e, 'Your photo could not be saved. Please ask a team member for help.'));
     } finally {
       setBusy(false);
     }

@@ -53,6 +53,7 @@ const PhotoCapture = () => {
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState<PhotoWaiverMatch[]>([]);
   const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
+  const [slideshowOptIn, setSlideshowOptIn] = useState(false);
 
   const camera = usePhotoCamera({ facingMode: 'environment' });
   const { start: startCamera, stop: stopCamera, capture: capturePhoto } = camera;
@@ -199,6 +200,7 @@ const PhotoCapture = () => {
         method,
         schedule: method === 'waiver_message' ? schedule : undefined,
         waiver_ids: method === 'waiver_message' ? selected.map((w) => w.id) : undefined,
+        slideshow_opt_in: slideshowOptIn,
       });
       setSession(result.data);
       setDeliveryNote(result.message ?? null);
@@ -209,7 +211,7 @@ const PhotoCapture = () => {
     } finally {
       setBusy(false);
     }
-  }, [method, schedule, selected, session, stopCamera]);
+  }, [method, schedule, selected, session, slideshowOptIn, stopCamera]);
 
   const resetAll = useCallback(() => {
     stopCamera();
@@ -223,6 +225,7 @@ const PhotoCapture = () => {
     setSearched(false);
     setSelected([]);
     setDeliveryNote(null);
+    setSlideshowOptIn(false);
   }, [stopCamera]);
 
   const discard = useCallback(async () => {
@@ -670,6 +673,25 @@ const PhotoCapture = () => {
                 </div>
               </div>
             )}
+
+            <label className="flex items-start gap-3 bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={slideshowOptIn}
+                onChange={(e) => setSlideshowOptIn(e.target.checked)}
+                className={`mt-1 h-5 w-5 accent-${themeColor}-700`}
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium text-gray-900">
+                  Also show these photos on the venue slideshow
+                </span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  They appear on the public screen within a few seconds. Please ask the customer first, and leave this
+                  unticked if they would rather not be shown. You can add or remove any photo later from the photo
+                  library.
+                </span>
+              </span>
+            </label>
 
             <div className="flex flex-wrap gap-3">
               <StandardButton variant="secondary" onClick={() => setStep('capture')} icon={ArrowLeft}>
