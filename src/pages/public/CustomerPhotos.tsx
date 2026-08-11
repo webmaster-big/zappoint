@@ -9,7 +9,8 @@ type FieldErrors = Partial<Record<'name' | 'email' | 'phone', string>>;
 const CustomerPhotos = () => {
   const { accessToken } = useParams<{ accessToken: string }>();
   const [page, setPage] = useState<CustomerPhotoPage | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'expired' | 'unknown'>('loading');
+  const [state, setState] = useState<'loading' | 'ready' | 'expired' | 'removed' | 'unknown'>('loading');
+  const [gonePhotoMessage, setGonePhotoMessage] = useState<string | null>(null);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -34,8 +35,15 @@ const CustomerPhotos = () => {
         setState('ready');
       } catch (e) {
         if (cancelled) return;
-        const status = (e as { response?: { status?: number } })?.response?.status;
-        setState(status === 410 ? 'expired' : 'unknown');
+        const response = (e as { response?: { status?: number; data?: { state?: string; message?: string } } })?.response;
+
+        if (response?.status === 410 && response.data?.state === 'photos_removed') {
+          setGonePhotoMessage(response.data.message ?? null);
+          setState('removed');
+          return;
+        }
+
+        setState(response?.status === 410 ? 'expired' : 'unknown');
       }
     })();
 
@@ -120,6 +128,21 @@ const CustomerPhotos = () => {
     );
   }
 
+  if (state === 'removed') {
+    return (
+      <div className="min-h-dvh bg-zinc-950 text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center">
+          <ImageOff className="w-12 h-12 mx-auto text-zinc-500 mb-4" />
+          <h1 className="text-2xl font-bold mb-2">These photos are no longer available</h1>
+          <p className="text-zinc-400">
+            {gonePhotoMessage ??
+              'If you think this is a mistake, please contact the venue and they can help.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (state === 'unknown' || !page) {
     return (
       <div className="min-h-dvh bg-zinc-950 text-white flex items-center justify-center px-6">
@@ -140,9 +163,9 @@ const CustomerPhotos = () => {
   return (
     <div className="min-h-dvh bg-zinc-950 text-white">
       <header className="px-6 py-6 max-w-3xl mx-auto">
-        <p className="text-2xl font-black tracking-tight text-yellow-400">ZAP ZONE</p>
+        <img src="/Zap-Zone.png" alt="Zap Zone" className="h-10 w-auto object-contain" />
         {page.location_name && (
-          <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">{page.location_name}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-400">{page.location_name}</p>
         )}
       </header>
 

@@ -159,7 +159,7 @@ const PhotoReports = () => {
             <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">Audit log</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Every capture, delivery, download, backend send, hide and passcode change.
+                Every capture, delivery, download, staff resend, hide and passcode change.
               </p>
             </div>
 

@@ -144,6 +144,12 @@ const photoService = {
     payload: { waiver_ids: number[]; schedule?: string },
   ): Promise<PhotoSessionRecord> => (await api.post(`/photo-library/${photoId}/send`, payload)).data.data,
 
+  deletePhoto: async (photoId: number): Promise<string> =>
+    (await api.delete(`/photo-library/${photoId}`)).data.message,
+
+  deletePhotos: async (photoIds: number[]): Promise<string> =>
+    (await api.post('/photo-library/delete', { photo_ids: photoIds })).data.message,
+
   // ---- slideshow queue ----
   getSlideshowQueues: async (locationId: number): Promise<SlideshowQueueResponse> =>
     (await api.get('/slideshow-queues', { params: { location_id: locationId } })).data.data,

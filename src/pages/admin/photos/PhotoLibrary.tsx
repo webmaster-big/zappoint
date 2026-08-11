@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   CalendarDays,
   Download,
   Images,
@@ -7,11 +8,13 @@ import {
   RefreshCcw,
   Search,
   Send,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
+import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PhotoLibraryResponse, PhotoRecord, PhotoWaiverMatch } from '../../../types/photo.types';
@@ -43,6 +46,9 @@ const PhotoLibrary = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [preview, setPreview] = useState<PhotoRecord | null>(null);
 
+  const [confirmDelete, setConfirmDelete] = useState<{ photos: PhotoRecord[]; bulk: boolean } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const [sendFor, setSendFor] = useState<PhotoRecord | null>(null);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<PhotoWaiverMatch[]>([]);
@@ -72,6 +78,12 @@ const PhotoLibrary = () => {
   }, [load]);
 
   const allPhotos = useMemo(() => (library?.days ?? []).flatMap((day) => day.photos), [library]);
+
+  // Deleting a photo is irreversible, so this matches the server rule: managers and admins.
+  const canDelete = useMemo(() => {
+    const role = getStoredUser()?.role ?? '';
+    return role === 'company_admin' || role === 'admin' || role === 'location_manager';
+  }, []);
 
   const toggle = useCallback((photoId: number) => {
     setSelectedIds((prev) => (prev.includes(photoId) ? prev.filter((id) => id !== photoId) : [...prev, photoId]));
@@ -103,6 +115,26 @@ const PhotoLibrary = () => {
       setToast({ message: errorMessage(e, 'The bulk download failed.'), type: 'error' });
     }
   }, [selectedIds]);
+
+  const runDelete = useCallback(async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      const ids = confirmDelete.photos.map((p) => p.id);
+      const message = confirmDelete.bulk
+        ? await photoService.deletePhotos(ids)
+        : await photoService.deletePhoto(ids[0]);
+      setToast({ message, type: 'success' });
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+      setPreview((current) => (current && ids.includes(current.id) ? null : current));
+      setConfirmDelete(null);
+      await load();
+    } catch (e) {
+      setToast({ message: errorMessage(e, 'That photo could not be deleted.'), type: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirmDelete, load]);
 
   const runSearch = useCallback(async () => {
     if (query.trim().length < 2) return;
@@ -188,6 +220,21 @@ const PhotoLibrary = () => {
             <StandardButton size="sm" icon={Download} onClick={() => void downloadSelected()}>
               Download selected
             </StandardButton>
+            {canDelete && (
+              <StandardButton
+                size="sm"
+                variant="danger"
+                icon={Trash2}
+                onClick={() =>
+                  setConfirmDelete({
+                    photos: allPhotos.filter((p) => selectedIds.includes(p.id)),
+                    bulk: true,
+                  })
+                }
+              >
+                Delete selected
+              </StandardButton>
+            )}
             <button type="button" onClick={() => setSelectedIds([])} className="text-sm text-gray-500 underline">
               Clear
             </button>
@@ -323,6 +370,17 @@ const PhotoLibrary = () => {
                           <Send className="w-3.5 h-3.5" />
                           Send
                         </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete({ photos: [photo], bulk: false })}
+                            title="Delete this photo"
+                            aria-label={`Delete photo ${photo.id}`}
+                            className="inline-flex items-center justify-center text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -361,11 +419,83 @@ const PhotoLibrary = () => {
         </div>
       )}
 
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <span className="mt-0.5 inline-flex items-center justify-center h-9 w-9 rounded-full bg-red-100">
+                  <AlertTriangle className="w-5 h-5 text-red-700" />
+                </span>
+                <div>
+                  <h2 className="font-semibold text-gray-900">
+                    Delete {confirmDelete.photos.length} photo{confirmDelete.photos.length === 1 ? '' : 's'}?
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">This cannot be undone.</p>
+                </div>
+              </div>
+
+              <ul className="text-sm text-gray-700 space-y-1.5 mb-5">
+                <li>The image file is deleted from storage for good.</li>
+                <li>
+                  Any customer link already sent will stop showing{' '}
+                  {confirmDelete.photos.length === 1 ? 'it' : 'them'}, and downloads will no longer work.
+                </li>
+                <li>
+                  {confirmDelete.photos.some((p) => p.slideshow_eligible)
+                    ? 'It also comes off the venue slideshow straight away.'
+                    : 'Nothing here is currently on the venue slideshow.'}
+                </li>
+                <li>The delivery record and activity log are kept, so the history stays intact.</li>
+              </ul>
+
+              {confirmDelete.photos.length > 1 && (
+                <div className="mb-5 flex flex-wrap gap-2">
+                  {confirmDelete.photos.slice(0, 8).map((photo) => (
+                    <img
+                      key={photo.id}
+                      src={photo.thumbnail_url ?? ''}
+                      alt=""
+                      className="h-12 w-12 rounded object-cover bg-gray-100"
+                    />
+                  ))}
+                  {confirmDelete.photos.length > 8 && (
+                    <span className="self-center text-xs text-gray-500">
+                      +{confirmDelete.photos.length - 8} more
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <StandardButton
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => setConfirmDelete(null)}
+                  disabled={deleting}
+                >
+                  Keep {confirmDelete.photos.length === 1 ? 'it' : 'them'}
+                </StandardButton>
+                <StandardButton
+                  variant="danger"
+                  fullWidth
+                  icon={Trash2}
+                  loading={deleting}
+                  onClick={() => void runDelete()}
+                >
+                  Delete {confirmDelete.photos.length === 1 ? 'photo' : 'photos'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sendFor && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Send this photo from the backend</h2>
+              <h2 className="font-semibold text-gray-900">Send this photo again</h2>
               <button type="button" onClick={() => setSendFor(null)} aria-label="Close">
                 <X className="w-5 h-5 text-gray-500" />
               </button>

@@ -509,7 +509,7 @@ const PhotoSettings = () => {
                     onChange={(e) => setForm((prev) => ({ ...prev, retention_days: Number(e.target.value) }))}
                     className={fieldCls}
                   />
-                  <p className="mt-1 text-xs text-gray-500">Photos leave backend access after this many days.</p>
+                  <p className="mt-1 text-xs text-gray-500">Photos are removed from the photo library after this many days.</p>
                 </div>
 
                 <div>

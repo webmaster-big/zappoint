@@ -318,8 +318,10 @@ const PhotoKiosk = () => {
       <div className="min-h-dvh flex flex-col">
         <header className="flex items-center justify-between px-6 sm:px-10 pt-6">
           <div>
-            <p className="text-2xl sm:text-3xl font-black tracking-tight text-yellow-400">ZAP ZONE</p>
-            {context && <p className="text-xs sm:text-sm uppercase tracking-[0.2em] text-zinc-400">{venueLine}</p>}
+            <img src="/Zap-Zone.png" alt="Zap Zone" className="h-10 sm:h-12 w-auto object-contain" />
+            {context && (
+              <p className="mt-1 text-xs sm:text-sm uppercase tracking-[0.2em] text-zinc-400">{venueLine}</p>
+            )}
           </div>
           {context && screen !== 'locked' && (
             <p className="text-xs sm:text-sm text-zinc-400">{context.capture_date_label}</p>

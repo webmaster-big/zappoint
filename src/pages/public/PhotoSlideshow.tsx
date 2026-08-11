@@ -197,7 +197,11 @@ const PhotoSlideshow = () => {
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-5xl sm:text-7xl font-black tracking-tight text-yellow-400 mb-4">ZAP ZONE</p>
+            <img
+              src="/Zap-Zone.png"
+              alt="Zap Zone"
+              className="mx-auto w-64 sm:w-80 object-contain mb-6"
+            />
             <p className="text-xl sm:text-2xl text-zinc-300">{feed?.location_name}</p>
             <p className="mt-6 text-zinc-500">Take a photo at the kiosk and it appears here.</p>
           </div>
@@ -205,7 +209,7 @@ const PhotoSlideshow = () => {
       )}
 
       <div className="absolute top-5 left-6 flex items-center gap-3">
-        <span className="text-xl font-black tracking-tight text-yellow-400 drop-shadow">ZAP ZONE</span>
+        <img src="/Zap-Zone.png" alt="Zap Zone" className="h-9 sm:h-11 w-auto object-contain drop-shadow" />
         {paused && (
           <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-3 py-1 text-xs">
             <PauseCircle className="w-3.5 h-3.5" />
