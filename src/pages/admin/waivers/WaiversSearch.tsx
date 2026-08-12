@@ -483,6 +483,29 @@ const WaiversSearch = () => {
     }
   };
 
+  // Counted from what is on screen. The page loads one status at a time, so the line names
+  // that status rather than printing a completed/pending split that would always read zero
+  // for whichever status was not requested.
+  const visibleCounts = useMemo(() => {
+    const rows = table.filteredRows;
+    const statuses = new Set<string>();
+    let checkedIn = 0;
+    let minors = 0;
+    rows.forEach((w) => {
+      statuses.add(w.status);
+      if (w.checked_in_at) checkedIn += 1;
+      minors += w.minors?.length ?? 0;
+    });
+    const onlyStatus = statuses.size === 1 ? [...statuses][0] : null;
+    return {
+      total: rows.length,
+      onlyStatus,
+      checkedIn,
+      minors,
+      hidden: waivers.length - rows.length,
+    };
+  }, [table.filteredRows, waivers.length]);
+
   const clearScope = () => {
     setScopeDate(todayStr());
     setScopeStatus('');
@@ -554,6 +577,28 @@ const WaiversSearch = () => {
             Auto-refresh ({refreshSeconds}s)
           </label>
           <StandardButton variant="ghost" size="sm" onClick={clearScope}>Reset</StandardButton>
+          <p
+            className="sm:ml-auto min-w-0 truncate text-sm text-gray-600"
+            aria-live="polite"
+            title={
+              visibleCounts.hidden > 0
+                ? `${visibleCounts.hidden} more ${visibleCounts.hidden === 1 ? 'waiver is' : 'waivers are'} loaded but hidden by the search and filters`
+                : undefined
+            }
+          >
+            {loading ? (
+              'Counting…'
+            ) : (
+              <>
+                <span className="font-semibold text-gray-900">{visibleCounts.total}</span>
+                {visibleCounts.onlyStatus ? ` ${visibleCounts.onlyStatus}` : ''} waiver
+                {visibleCounts.total === 1 ? '' : 's'}
+                {' · '}{visibleCounts.checkedIn} checked in
+                {' · '}{visibleCounts.minors} minor{visibleCounts.minors === 1 ? '' : 's'}
+                {visibleCounts.hidden > 0 && <span className="text-gray-500">{` · ${visibleCounts.hidden} hidden`}</span>}
+              </>
+            )}
+          </p>
         </div>
       </div>
 

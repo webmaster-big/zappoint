@@ -48,6 +48,8 @@ import {
   AttractionScheduleCard,
   EventScheduleCard,
 } from '../../components/admin/calendar/ScheduledActivity';
+import { buildCalendarCategories, useCategoryFilter } from '../../components/admin/calendar/useCategoryFilter';
+import CalendarCategoryTabs from '../../components/admin/calendar/CategoryFilter';
 import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
@@ -493,6 +495,46 @@ const LocationManagerDashboard: React.FC = () => {
   const getAttractionsForDay = (date: Date) => attractionsForDate(scheduledAttractions, date);
   const getEventsForDay = (date: Date) => eventsForDate(scheduledEvents, date);
 
+  const bookingsThisWeek = weeklyBookings.filter(booking => {
+    const bookingDate = parseLocalDate(booking.booking_date);
+    return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
+  });
+
+  const calendarCategories = useMemo(
+    () =>
+      buildCalendarCategories({
+        bookings: calendarView === 'day' ? dailyBookings : calendarView === 'week' ? bookingsThisWeek : monthlyBookings,
+        attractions: scheduledAttractions,
+        events: scheduledEvents,
+      }),
+    [calendarView, dailyBookings, bookingsThisWeek, monthlyBookings, scheduledAttractions, scheduledEvents]
+  );
+
+  const calendarFilter = useCategoryFilter(calendarCategories);
+
+  const shownDailyBookings = dailyBookings.filter(calendarFilter.showsBooking);
+  const shownWeekBookings = bookingsThisWeek.filter(calendarFilter.showsBooking);
+
+  const selectedDayCategories = useMemo(
+    () =>
+      buildCalendarCategories(
+        selectedDayBookings
+          ? {
+              bookings: selectedDayBookings.bookings,
+              attractions: attractionsForDate(scheduledAttractions, selectedDayBookings.date),
+              events: eventsForDate(scheduledEvents, selectedDayBookings.date),
+            }
+          : { bookings: [], attractions: [], events: [] }
+      ),
+    [selectedDayBookings, scheduledAttractions, scheduledEvents]
+  );
+
+  const selectedDayFilter = useCategoryFilter(selectedDayCategories, calendarFilter.selected, selectedDayBookings?.date.toDateString() ?? null);
+
+  const shownSelectedDayBookings = selectedDayBookings
+    ? selectedDayBookings.bookings.filter(selectedDayFilter.showsBooking)
+    : [];
+
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
     const nameB = b.name;
@@ -537,10 +579,10 @@ const LocationManagerDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
-  const unassignedBookings = dailyBookings.filter(b => !b.room_id);
+  const unassignedBookings = shownDailyBookings.filter(b => !b.room_id);
 
   const visibleTimeSlots = dailyTimeSlots.filter(slot => {
-    return dailyBookings.some(booking => {
+    return shownDailyBookings.some(booking => {
       const [bookingHour, bookingMin] = (booking.booking_time || '00:00').split(':').map(Number);
       const startInMinutes = bookingHour * 60 + bookingMin;
       const slotInMinutes = slot.hour * 60 + slot.minute;
@@ -556,7 +598,7 @@ const LocationManagerDashboard: React.FC = () => {
   });
 
   const getBookingForSlot = (spaceId: number, slot: { hour: number; minute: number }) => {
-    return dailyBookings.find(booking => {
+    return shownDailyBookings.find(booking => {
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -568,7 +610,7 @@ const LocationManagerDashboard: React.FC = () => {
   };
 
   const isSlotOccupied = (spaceId: number, slot: { hour: number; minute: number }) => {
-    return dailyBookings.some(booking => {
+    return shownDailyBookings.some(booking => {
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -674,11 +716,6 @@ const LocationManagerDashboard: React.FC = () => {
       explanation: 'Average collected per package booking: booking revenue divided by the number of non-cancelled bookings in the period.',
     },
   ];
-
-  const bookingsThisWeek = weeklyBookings.filter(booking => {
-    const bookingDate = parseLocalDate(booking.booking_date);
-    return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
-  });
 
   const quickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
@@ -976,7 +1013,9 @@ const LocationManagerDashboard: React.FC = () => {
             </StandardButton>
           </div>
         </div>
-        
+
+        <CalendarCategoryTabs filter={calendarFilter} className="mb-6" />
+
         {calendarView === 'day' && (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             {sortedRooms.length === 0 ? (
@@ -986,7 +1025,7 @@ const LocationManagerDashboard: React.FC = () => {
               </div>
             ) : visibleTimeSlots.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
+                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}{calendarFilter.isAll ? '' : ' in the selected categories'}.</p>
               </div>
             ) : (
               <table className="w-full border-collapse">
@@ -1147,8 +1186,8 @@ const LocationManagerDashboard: React.FC = () => {
         )}
 
         {calendarView === 'day' && (() => {
-          const dayAttractions = getAttractionsForDay(currentDay);
-          const dayEvents = getEventsForDay(currentDay);
+          const dayAttractions = getAttractionsForDay(currentDay).filter(calendarFilter.showsAttraction);
+          const dayEvents = calendarFilter.showsEvents() ? getEventsForDay(currentDay) : [];
           if (dayAttractions.length === 0 && dayEvents.length === 0) return null;
           return (
             <div className="mt-4 space-y-4">
@@ -1195,7 +1234,7 @@ const LocationManagerDashboard: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {(() => {
                 const bookingTimes = new Set<string>();
-                bookingsThisWeek.forEach(booking => {
+                shownWeekBookings.forEach(booking => {
                   const [hour, minute] = booking.booking_time.split(':');
                   bookingTimes.add(`${hour}:${minute}`);
                 });
@@ -1210,7 +1249,7 @@ const LocationManagerDashboard: React.FC = () => {
                   return (
                     <tr>
                       <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
-                        No bookings for this week
+                        No bookings for this week{calendarFilter.isAll ? '' : ' in the selected categories'}
                       </td>
                     </tr>
                   );
@@ -1231,7 +1270,7 @@ const LocationManagerDashboard: React.FC = () => {
                       </td>
                       {weekDates.map((date, dateIndex) => {
                         const dateStr = date.toDateString();
-                        const bookingsForCell = bookingsThisWeek.filter(
+                        const bookingsForCell = shownWeekBookings.filter(
                           booking => {
                             const bookingDate = parseLocalDate(booking.booking_date);
                             const [bookingHour, bookingMinute] = booking.booking_time.split(':');
@@ -1315,8 +1354,8 @@ const LocationManagerDashboard: React.FC = () => {
         )}
 
         {calendarView === 'week' && (() => {
-          const weekAttractions = weekDates.flatMap(d => getAttractionsForDay(d));
-          const weekEvents = weekDates.flatMap(d => getEventsForDay(d));
+          const weekAttractions = weekDates.flatMap(d => getAttractionsForDay(d)).filter(calendarFilter.showsAttraction);
+          const weekEvents = calendarFilter.showsEvents() ? weekDates.flatMap(d => getEventsForDay(d)) : [];
           if (weekAttractions.length === 0 && weekEvents.length === 0) return null;
           return (
             <div className="mt-4 space-y-4">
@@ -1363,10 +1402,11 @@ const LocationManagerDashboard: React.FC = () => {
                 }
                 
                 const dayBookings = getBookingsForDay(day);
-                const dayAttractions = getAttractionsForDay(day);
-                const dayEvents = getEventsForDay(day);
+                const shownBookings = dayBookings.filter(calendarFilter.showsBooking);
+                const shownAttractions = getAttractionsForDay(day).filter(calendarFilter.showsAttraction);
+                const shownEvents = calendarFilter.showsEvents() ? getEventsForDay(day) : [];
                 const isToday = day.toDateString() === new Date().toDateString();
-                const summary = getDaySummary(dayBookings.length, dayAttractions, dayEvents);
+                const summary = getDaySummary(shownBookings.length, shownAttractions, shownEvents);
                 const hasActivity = summary.total > 0;
 
                 return (
@@ -1836,6 +1876,7 @@ const LocationManagerDashboard: React.FC = () => {
                       return parts.join(' • ') || 'No scheduled activity';
                     })()}
                   </p>
+                  <CalendarCategoryTabs filter={selectedDayFilter} size="sm" className="mt-3" />
                 </div>
                 <StandardButton
                   onClick={() => setSelectedDayBookings(null)}
@@ -1845,9 +1886,9 @@ const LocationManagerDashboard: React.FC = () => {
                 />
               </div>
 
-              {selectedDayBookings.bookings.length > 0 && (
+              {shownSelectedDayBookings.length > 0 && (
               <div className="space-y-3">
-                {selectedDayBookings.bookings
+                {shownSelectedDayBookings
                   .sort((a, b) => a.booking_time.localeCompare(b.booking_time))
                   .map((booking, index) => {
                     const [hourStr, minuteStr] = booking.booking_time.split(':');
@@ -1910,8 +1951,8 @@ const LocationManagerDashboard: React.FC = () => {
               )}
 
               {(() => {
-                const dayAttractions = getAttractionsForDay(selectedDayBookings.date);
-                const dayEvents = getEventsForDay(selectedDayBookings.date);
+                const dayAttractions = getAttractionsForDay(selectedDayBookings.date).filter(selectedDayFilter.showsAttraction);
+                const dayEvents = selectedDayFilter.showsEvents() ? getEventsForDay(selectedDayBookings.date) : [];
                 return (
                   <>
                     {dayAttractions.length > 0 && (

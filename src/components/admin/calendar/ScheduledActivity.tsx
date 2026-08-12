@@ -182,6 +182,8 @@ export const DateActivityBreakdown: React.FC<{ summary: DaySummary; className?: 
     });
   }
 
+  if (rows.length === 0) return null;
+
   return (
     <div className={`space-y-1 ${className ?? ''}`}>
       {rows.map(row => (

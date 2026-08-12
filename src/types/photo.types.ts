@@ -128,6 +128,8 @@ export interface PhotoChannelDiagnostics {
   email_transport: string;
   sms_note: string | null;
   email_note: string | null;
+  photo_link_base: string;
+  photo_link_note: string | null;
 }
 
 export interface PhotoWaiverMatch {

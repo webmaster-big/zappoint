@@ -8,6 +8,7 @@ import type {
   KioskSessionHandle,
   LocationPhotoSettingRecord,
   PhotoCaptureContext,
+  PhotoChannel,
   PhotoDeliveryRecord,
   PhotoLibraryResponse,
   PhotoMessageTemplateRecord,
@@ -210,6 +211,28 @@ const photoService = {
 
   rotatePasscode: async (locationId: number, mode: 'kiosk' | 'slideshow'): Promise<LocationPhotoSettingRecord> =>
     (await api.post('/photo-settings/passcode', { location_id: locationId, mode })).data.data,
+
+  sendTestMessage: async (
+    locationId: number,
+    channel: PhotoChannel,
+    destination: string,
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await api.post('/photo-settings/test-message', {
+        location_id: locationId,
+        channel,
+        destination,
+      });
+      return { success: true, message: res.data.message as string };
+    } catch (error) {
+      const response = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response;
+      const firstFieldError = Object.values(response?.data?.errors ?? {})[0]?.[0];
+      return {
+        success: false,
+        message: firstFieldError || response?.data?.message || 'The test message could not be sent.',
+      };
+    }
+  },
 
   getTemplates: async (): Promise<PhotoTemplatesResponse> => (await api.get('/photo-templates')).data.data,
 

@@ -63,6 +63,8 @@ import {
   AttractionScheduleCard,
   EventScheduleCard,
 } from '../../components/admin/calendar/ScheduledActivity';
+import { buildCalendarCategories, useCategoryFilter } from '../../components/admin/calendar/useCategoryFilter';
+import CalendarCategoryTabs from '../../components/admin/calendar/CategoryFilter';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -301,6 +303,40 @@ const CompanyDashboard: React.FC = () => {
   const getAttractionsForDay = (date: Date) => attractionsForDate(scheduledAttractions, date);
   const getEventsForDay = (date: Date) => eventsForDate(scheduledEvents, date);
 
+  const calendarViewBookings = useMemo(() => {
+    if (calendarView === 'day') return dailyBookings;
+    if (calendarView === 'week') return weeklyBookings;
+    return monthlyBookings;
+  }, [calendarView, dailyBookings, weeklyBookings, monthlyBookings]);
+
+  const calendarCategories = useMemo(
+    () => buildCalendarCategories({
+      bookings: calendarViewBookings,
+      attractions: scheduledAttractions,
+      events: scheduledEvents,
+    }),
+    [calendarViewBookings, scheduledAttractions, scheduledEvents]
+  );
+
+  const categoryFilter = useCategoryFilter(calendarCategories);
+
+  const modalDayCategories = useMemo(
+    () => buildCalendarCategories(
+      selectedDayBookings
+        ? {
+            bookings: selectedDayBookings.bookings,
+            attractions: attractionsForDate(scheduledAttractions, selectedDayBookings.date),
+            events: eventsForDate(scheduledEvents, selectedDayBookings.date),
+          }
+        : { bookings: [], attractions: [], events: [] }
+    ),
+    [selectedDayBookings, scheduledAttractions, scheduledEvents]
+  );
+
+  const modalCategoryFilter = useCategoryFilter(modalDayCategories, categoryFilter.selected, selectedDayBookings?.date.toDateString() ?? null);
+
+  const shownModalBookings = (selectedDayBookings ? selectedDayBookings.bookings : []).filter(modalCategoryFilter.showsBooking);
+
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
     const nameB = b.name;
@@ -341,10 +377,12 @@ const CompanyDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
-  const unassignedBookings = dailyBookings.filter(b => !b.room_id);
+  const shownDailyBookings = dailyBookings.filter(categoryFilter.showsBooking);
+
+  const unassignedBookings = shownDailyBookings.filter(b => !b.room_id);
 
   const visibleTimeSlots = dailyTimeSlots.filter(slotObj => {
-    return dailyBookings.some(booking => {
+    return shownDailyBookings.some(booking => {
       const bookingTime = booking.booking_time?.substring(0, 5);
       if (!bookingTime) return false;
       const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
@@ -361,7 +399,7 @@ const CompanyDashboard: React.FC = () => {
   });
 
   const getBookingForSlot = (spaceId: number, slot: string) => {
-    return dailyBookings.find(booking => {
+    return shownDailyBookings.find(booking => {
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -374,7 +412,7 @@ const CompanyDashboard: React.FC = () => {
 
   const isSlotOccupied = (spaceId: number, slot: string) => {
     const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
-    return dailyBookings.some(booking => {
+    return shownDailyBookings.some(booking => {
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -755,7 +793,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-indigo-100 text-indigo-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.waiverBreakdown ?? [],
-      explanation: 'Waivers created in the selected period (by creation date), scoped to the selected location. "Signed" are completed waivers; pending are not yet signed. Open the card for the split by status, by source, adults vs minors covered, and the adult age brackets.',
+      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers so this agrees with the Waiver Records page. "Signed" are completed waivers; pending are not yet signed. Open the card for the split by status, by source, adults vs minors covered, and the adult age brackets.',
     },
   ];
 
@@ -784,6 +822,8 @@ const CompanyDashboard: React.FC = () => {
     return false;
   });
 
+  const shownCalendarBookings = filteredCalendarBookings.filter(categoryFilter.showsBooking);
+
   const convertTo12HourFormat = (time24: string): string => {
     const [hourStr, minuteStr] = time24.split(':');
     const hour = parseInt(hourStr);
@@ -798,7 +838,7 @@ const CompanyDashboard: React.FC = () => {
   const getBookingTimeSlots = () => {
     const timeSlotsSet = new Set<string>();
     
-    filteredCalendarBookings.forEach(booking => {
+    shownCalendarBookings.forEach(booking => {
       const time12Hour = convertTo12HourFormat(booking.booking_time);
       timeSlotsSet.add(time12Hour);
     });
@@ -835,7 +875,7 @@ const CompanyDashboard: React.FC = () => {
       });
     });
     
-    filteredCalendarBookings.forEach(booking => {
+    shownCalendarBookings.forEach(booking => {
       const bookingDate = parseLocalDate(booking.booking_date);
       const dateStr = bookingDate.toDateString();
       const time = convertTo12HourFormat(booking.booking_time);
@@ -1467,7 +1507,9 @@ const CompanyDashboard: React.FC = () => {
             )}
           </div>
         </div>
-        
+
+        <CalendarCategoryTabs filter={categoryFilter} className="mb-4 md:mb-6" />
+
         {showFilterPanel && calendarView === 'week' && (
           <div className="mb-4 md:mb-6 p-3 md:p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex justify-between items-center mb-3">
@@ -1699,7 +1741,7 @@ const CompanyDashboard: React.FC = () => {
               ) : (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
-                    No bookings for this week
+                    No bookings for this week{categoryFilter.isAll ? '' : ' in the selected categories'}
                   </td>
                 </tr>
               )}
@@ -1709,8 +1751,8 @@ const CompanyDashboard: React.FC = () => {
         )}
 
         {calendarView === 'week' && (() => {
-          const weekAttractions = weekDates.flatMap(d => getAttractionsForDay(d));
-          const weekEvents = weekDates.flatMap(d => getEventsForDay(d));
+          const weekAttractions = weekDates.flatMap(d => getAttractionsForDay(d)).filter(categoryFilter.showsAttraction);
+          const weekEvents = categoryFilter.showsEvents() ? weekDates.flatMap(d => getEventsForDay(d)) : [];
           if (weekAttractions.length === 0 && weekEvents.length === 0) return null;
           return (
             <div className="mt-4 space-y-4">
@@ -1744,7 +1786,7 @@ const CompanyDashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-800">
                 {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </h3>
-              <p className="text-sm text-gray-500">{dailyBookings.length} bookings across {sortedRooms.length} spaces</p>
+              <p className="text-sm text-gray-500">{shownDailyBookings.length} bookings across {sortedRooms.length} spaces</p>
             </div>
             
             {sortedRooms.length === 0 ? (
@@ -1754,7 +1796,7 @@ const CompanyDashboard: React.FC = () => {
               </div>
             ) : visibleTimeSlots.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
+                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}{categoryFilter.isAll ? '' : ' in the selected categories'}.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1930,8 +1972,8 @@ const CompanyDashboard: React.FC = () => {
         )}
 
         {calendarView === 'day' && (() => {
-          const dayAttractions = getAttractionsForDay(currentDay);
-          const dayEvents = getEventsForDay(currentDay);
+          const dayAttractions = getAttractionsForDay(currentDay).filter(categoryFilter.showsAttraction);
+          const dayEvents = categoryFilter.showsEvents() ? getEventsForDay(currentDay) : [];
           if (dayAttractions.length === 0 && dayEvents.length === 0) return null;
           return (
             <div className="mt-4 space-y-4">
@@ -1980,8 +2022,11 @@ const CompanyDashboard: React.FC = () => {
                 const dayBookings = getBookingsForDay(day);
                 const dayAttractions = getAttractionsForDay(day);
                 const dayEvents = getEventsForDay(day);
+                const shownBookings = dayBookings.filter(categoryFilter.showsBooking);
+                const shownAttractions = dayAttractions.filter(categoryFilter.showsAttraction);
+                const shownEvents = categoryFilter.showsEvents() ? dayEvents : [];
                 const isToday = day.toDateString() === new Date().toDateString();
-                const summary = getDaySummary(dayBookings.length, dayAttractions, dayEvents);
+                const summary = getDaySummary(shownBookings.length, shownAttractions, shownEvents);
                 const hasActivity = summary.total > 0;
 
                 return (
@@ -2303,9 +2348,11 @@ const CompanyDashboard: React.FC = () => {
                 />
               </div>
 
-              {selectedDayBookings.bookings.length > 0 && (
+              <CalendarCategoryTabs filter={modalCategoryFilter} size="sm" className="mb-5" />
+
+              {shownModalBookings.length > 0 && (
               <div className="space-y-3">
-                {selectedDayBookings.bookings
+                {shownModalBookings
                   .sort((a, b) => a.booking_time.localeCompare(b.booking_time))
                   .map((booking, index) => {
                     const [hourStr, minuteStr] = booking.booking_time.split(':');
@@ -2374,8 +2421,8 @@ const CompanyDashboard: React.FC = () => {
               )}
 
               {(() => {
-                const dayAttractions = getAttractionsForDay(selectedDayBookings.date);
-                const dayEvents = getEventsForDay(selectedDayBookings.date);
+                const dayAttractions = getAttractionsForDay(selectedDayBookings.date).filter(modalCategoryFilter.showsAttraction);
+                const dayEvents = modalCategoryFilter.showsEvents() ? getEventsForDay(selectedDayBookings.date) : [];
                 return (
                   <>
                     {dayAttractions.length > 0 && (

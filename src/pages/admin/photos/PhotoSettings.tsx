@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Copy,
+  Link as LinkIcon,
   Lock,
   Mail,
   MapPin,
@@ -8,6 +9,7 @@ import {
   RefreshCcw,
   RotateCcw,
   Save,
+  Send,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -15,7 +17,7 @@ import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import type { PhotoMessageTemplateRecord, PhotoSettingsResponse } from '../../../types/photo.types';
+import type { PhotoChannel, PhotoMessageTemplateRecord, PhotoSettingsResponse } from '../../../types/photo.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -37,6 +39,75 @@ const KIND_LABELS: Record<string, string> = {
   immediate: 'Immediate waiver delivery',
   next_day: '9:00 AM next-day delivery',
   kiosk: 'Kiosk delivery',
+};
+
+const ChannelTest = ({
+  channel,
+  locationId,
+  label,
+  placeholder,
+  inputType,
+}: {
+  channel: PhotoChannel;
+  locationId: number | null;
+  label: string;
+  placeholder: string;
+  inputType: 'email' | 'tel';
+}) => {
+  const [destination, setDestination] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const send = async () => {
+    if (sending || !locationId || destination.trim() === '') return;
+    setSending(true);
+    setResult(null);
+    try {
+      setResult(await photoService.sendTestMessage(locationId, channel, destination.trim()));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const inputId = `photo-channel-test-${channel}`;
+
+  return (
+    <div className="mt-3 border-t border-white/60 pt-3">
+      <label htmlFor={inputId} className="block text-xs font-medium text-gray-700">
+        {label}
+      </label>
+      <div className="mt-1 flex gap-2">
+        <input
+          id={inputId}
+          type={inputType}
+          value={destination}
+          placeholder={placeholder}
+          onChange={(e) => setDestination(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              send();
+            }
+          }}
+          className="flex-1 min-w-0 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+        />
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending || destination.trim() === '' || !locationId}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40"
+        >
+          <Send className="w-3.5 h-3.5" />
+          {sending ? 'Sending…' : 'Send'}
+        </button>
+      </div>
+      {result && (
+        <p className={`mt-2 text-sm ${result.success ? 'text-green-800' : 'text-red-700'}`} aria-live="polite">
+          {result.message}
+        </p>
+      )}
+    </div>
+  );
 };
 
 const PhotoSettings = () => {
@@ -249,6 +320,13 @@ const PhotoSettings = () => {
                     Transport: <code className="text-xs bg-white/70 rounded px-1.5 py-0.5">{data.channels.email_transport}</code>
                   </p>
                   {data.channels.email_note && <p className="mt-2 text-sm text-amber-900">{data.channels.email_note}</p>}
+                  <ChannelTest
+                    channel="email"
+                    locationId={effectiveLocationId}
+                    label="Send a test email to"
+                    placeholder="you@example.com"
+                    inputType="email"
+                  />
                 </div>
 
                 <div
@@ -269,7 +347,32 @@ const PhotoSettings = () => {
                   </p>
                   <p className="mt-2 text-sm text-gray-700">Provider: Twilio</p>
                   {data.channels.sms_note && <p className="mt-2 text-sm text-amber-900">{data.channels.sms_note}</p>}
+                  <ChannelTest
+                    channel="sms"
+                    locationId={effectiveLocationId}
+                    label="Send a test text to"
+                    placeholder="(810) 555-0134"
+                    inputType="tel"
+                  />
                 </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="flex items-center gap-2 font-medium text-gray-900">
+                  <LinkIcon className="w-4 h-4" />
+                  Photo link address
+                </p>
+                <p className="mt-2 text-sm text-gray-700">
+                  Every message links here:{' '}
+                  <code className="text-xs bg-white rounded px-1.5 py-0.5">{data.channels.photo_link_base || 'not set'}</code>
+                </p>
+                {data.channels.photo_link_note ? (
+                  <p className="mt-2 text-sm text-amber-900">{data.channels.photo_link_note}</p>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-600">
+                    This is the address visitors reach, so the links you send will open for them.
+                  </p>
+                )}
               </div>
             </section>
 

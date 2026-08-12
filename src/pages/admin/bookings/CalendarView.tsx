@@ -32,6 +32,8 @@ import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import attractionPurchaseService, { type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import { AttractionScheduleCard, EventScheduleCard } from '../../../components/admin/calendar/ScheduledActivity';
+import { buildCalendarCategories, useCategoryFilter } from '../../../components/admin/calendar/useCategoryFilter';
+import { CalendarCategoryTabs } from '../../../components/admin/calendar/CategoryFilter';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import type { Booking } from '../../../services/bookingService';
 import type { EventPurchase } from '../../../types/event.types';
@@ -520,10 +522,58 @@ const CalendarView: React.FC = () => {
       .sort((a, b) => timeToMinutes(a.purchase_time) - timeToMinutes(b.purchase_time));
   };
 
+  const pageCategories = useMemo(() => {
+    if (filters.view === 'day') {
+      return buildCalendarCategories({
+        bookings: getBookingsForDate(currentDate),
+        attractions: getAttractionsForDate(currentDate),
+        events: getEventsForDate(currentDate),
+      });
+    }
+
+    if (filters.view === 'week') {
+      const weekDays = getWeekDays();
+      return buildCalendarCategories({
+        bookings: weekDays.flatMap(day => getBookingsForDate(day)),
+        attractions: weekDays.flatMap(day => getAttractionsForDate(day)),
+        events: weekDays.flatMap(day => getEventsForDate(day)),
+      });
+    }
+
+    return buildCalendarCategories({
+      bookings: filteredBookings,
+      attractions: filteredAttractionPurchases,
+      events: filteredEventPurchases,
+    });
+  }, [filters.view, currentDate, filteredBookings, filteredAttractionPurchases, filteredEventPurchases]);
+
+  const pageFilter = useCategoryFilter(pageCategories);
+
+  const modalCategories = useMemo(() => {
+    if (!selectedDate) return buildCalendarCategories({ bookings: [], attractions: [], events: [] });
+    const modalDate = parseLocalDate(selectedDate);
+    return buildCalendarCategories({
+      bookings: getBookingsForDate(modalDate),
+      attractions: getAttractionsForDate(modalDate),
+      events: getEventsForDate(modalDate),
+    });
+  }, [selectedDate, filteredBookings, filteredAttractionPurchases, filteredEventPurchases]);
+
+  const modalFilter = useCategoryFilter(modalCategories, pageFilter.selected, selectedDate);
+
+  const getShownBookingsForDate = (date: Date): Booking[] =>
+    getBookingsForDate(date).filter(pageFilter.showsBooking);
+
+  const getShownAttractionsForDate = (date: Date): AttractionPurchase[] =>
+    getAttractionsForDate(date).filter(pageFilter.showsAttraction);
+
+  const getShownEventsForDate = (date: Date): EventPurchase[] =>
+    pageFilter.showsEvents() ? getEventsForDate(date) : [];
+
   const getDateSummary = (date: Date) => {
-    const dayBookings = getBookingsForDate(date);
-    const dayAttractions = getAttractionsForDate(date);
-    const dayEvents = getEventsForDate(date);
+    const dayBookings = getShownBookingsForDate(date);
+    const dayAttractions = getShownAttractionsForDate(date);
+    const dayEvents = getShownEventsForDate(date);
     const attractionTickets = dayAttractions.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
     return {
       bookings: dayBookings.length,
@@ -668,9 +718,9 @@ const CalendarView: React.FC = () => {
   };
 
   const renderDayView = () => {
-    const dayBookings = getBookingsForDate(currentDate);
-    const dayAttractions = getAttractionsForDate(currentDate);
-    const dayEvents = getEventsForDate(currentDate);
+    const dayBookings = getShownBookingsForDate(currentDate);
+    const dayAttractions = getShownAttractionsForDate(currentDate);
+    const dayEvents = getShownEventsForDate(currentDate);
     const hasAny = dayBookings.length > 0 || dayAttractions.length > 0 || dayEvents.length > 0;
     return (
       <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 h-full overflow-y-auto">
@@ -679,7 +729,7 @@ const CalendarView: React.FC = () => {
         </h3>
         {!hasAny ? (
           <div className="text-center text-gray-500 py-8">
-            No scheduled activity for this day
+            {pageFilter.isAll ? 'No scheduled activity for this day' : 'No scheduled activity in the selected categories'}
           </div>
         ) : (
           <div className="space-y-6">
@@ -779,10 +829,10 @@ const CalendarView: React.FC = () => {
                   <span className="md:hidden">{day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
                   <span className="hidden md:inline">{day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 </div>
-                {summary.total === 0 ? (
-                  <div className="text-xs text-gray-400 mt-1 md:mt-2">No activity</div>
-                ) : (
-                  renderDateBreakdown(day)
+                {renderDateBreakdown(day) ?? (
+                  <div className="text-xs text-gray-400 mt-1 md:mt-2">
+                    {summary.total === 0 || pageFilter.isAll ? 'No activity' : 'Nothing in the selected categories'}
+                  </div>
                 )}
               </div>
             );
@@ -862,7 +912,7 @@ const CalendarView: React.FC = () => {
     
     const start = new Date(filters.dateRange.start);
     const end = new Date(filters.dateRange.end);
-    const rangeBookings = [...filteredBookings].sort((a, b) => {
+    const rangeBookings = filteredBookings.filter(pageFilter.showsBooking).sort((a, b) => {
       const dateA = a.booking_date.split('T')[0];
       const dateB = b.booking_date.split('T')[0];
       if (dateA !== dateB) return dateA < dateB ? -1 : 1;
@@ -877,7 +927,7 @@ const CalendarView: React.FC = () => {
         
         {rangeBookings.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
-            No bookings in this date range
+            {pageFilter.isAll ? 'No bookings in this date range' : 'No bookings in the selected categories for this date range'}
           </div>
         ) : (
           <div className="space-y-4">
@@ -1249,6 +1299,11 @@ const CalendarView: React.FC = () => {
               </StandardButton>
             </div>
           </div>
+
+          <CalendarCategoryTabs
+            filter={pageFilter}
+            className="mt-3 pt-3 border-t border-gray-100 justify-center sm:justify-start"
+          />
         </div>
 
         {showFilters && (
@@ -1394,6 +1449,9 @@ const CalendarView: React.FC = () => {
                   const dayEvents = getEventsForDate(modalDate);
                   const attractionTickets = dayAttractions.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
                   const hasAny = dayBookings.length > 0 || dayAttractions.length > 0 || dayEvents.length > 0;
+                  const shownBookings = dayBookings.filter(modalFilter.showsBooking);
+                  const shownAttractions = dayAttractions.filter(modalFilter.showsAttraction);
+                  const shownEvents = modalFilter.showsEvents() ? dayEvents : [];
 
                   if (!hasAny) {
                     return (
@@ -1421,15 +1479,23 @@ const CalendarView: React.FC = () => {
                         </span>
                       </div>
 
+                      <CalendarCategoryTabs filter={modalFilter} size="sm" className="mb-6" />
+
                       <div className="space-y-6">
-                        {dayBookings.length > 0 && (
+                        {shownBookings.length === 0 && shownAttractions.length === 0 && shownEvents.length === 0 && (
+                          <div className="text-center text-gray-500 py-8">
+                            No scheduled activity in the selected categories
+                          </div>
+                        )}
+
+                        {shownBookings.length > 0 && (
                           <div>
                             <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
                               <PackageIcon className="h-4 w-4 text-blue-600" />
-                              Package Bookings ({dayBookings.length})
+                              Package Bookings ({shownBookings.length})
                             </div>
                             <div className="space-y-4">
-                              {dayBookings.map(booking => (
+                              {shownBookings.map(booking => (
                                 <div
                                   key={booking.id}
                                   className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
@@ -1519,26 +1585,26 @@ const CalendarView: React.FC = () => {
                           </div>
                         )}
 
-                        {dayAttractions.length > 0 && (
+                        {shownAttractions.length > 0 && (
                           <div>
                             <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
                               <Ticket className="h-4 w-4 text-purple-600" />
-                              Attraction Purchases ({dayAttractions.length})
+                              Attraction Purchases ({shownAttractions.length})
                             </div>
                             <div className="space-y-4">
-                              {dayAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
+                              {shownAttractions.map(p => <AttractionScheduleCard key={`attraction-${p.id}`} purchase={p} />)}
                             </div>
                           </div>
                         )}
 
-                        {dayEvents.length > 0 && (
+                        {shownEvents.length > 0 && (
                           <div>
                             <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
                               <Sparkles className="h-4 w-4 text-amber-600" />
-                              Event Registrations ({dayEvents.length})
+                              Event Registrations ({shownEvents.length})
                             </div>
                             <div className="space-y-4">
-                              {dayEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
+                              {shownEvents.map(p => <EventScheduleCard key={`event-${p.id}`} purchase={p} />)}
                             </div>
                           </div>
                         )}
