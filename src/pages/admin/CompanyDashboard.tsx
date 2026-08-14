@@ -793,7 +793,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-indigo-100 text-indigo-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.waiverBreakdown ?? [],
-      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers so this agrees with the Waiver Records page. "Signed" are completed waivers; pending are not yet signed. Open the card for the split by status, by source, adults vs minors covered, and the adult age brackets.',
+      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers. "Signed" are completed waivers and matches the Waiver Records page for the same day; the total also counts pending ones, which Records only shows if you set its status to All. Open the card for the split by status, by source, adults vs minors covered, and the adult age brackets.',
     },
   ];
 

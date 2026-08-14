@@ -250,7 +250,8 @@ export interface EntityWaiverSummary {
 export interface WaiverSearchFilters {
   date?: string;
   all?: boolean | number;
-  status?: WaiverStatus;
+  /** 'all' applies no status filter, so the page can match the dashboard's headline total. */
+  status?: WaiverStatus | 'all';
   adult_name?: string;
   minor_name?: string;
   email?: string;

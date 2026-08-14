@@ -109,7 +109,7 @@ const WaiversSearch = () => {
       const base: WaiverSearchFilters = { per_page: 200 };
       if (allDates) base.all = 1;
       else if (scopeDate) base.date = scopeDate;
-      if (scopeStatus) base.status = scopeStatus as WaiverStatus;
+      if (scopeStatus) base.status = scopeStatus as WaiverStatus | 'all';
 
       const collected: Waiver[] = [];
       let currentPage = 1;
@@ -230,13 +230,16 @@ const WaiversSearch = () => {
     },
     {
       key: 'date',
-      label: 'Date',
+      label: 'Visit date',
       group: 'Dates',
       sortable: true,
       sortValue: (w) => w.selected_date || '',
       exportValue: (w) => w.selected_date || '',
-      defaultVisible: false,
-      render: (w) => <span className="text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDateLong(w.selected_date)}</span>,
+      render: (w) => (
+        <span className="text-sm text-gray-600" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {w.selected_date ? formatDateLong(w.selected_date) : <span className="text-gray-400 italic">not recorded</span>}
+        </span>
+      ),
     },
     {
       key: 'template',
@@ -296,7 +299,7 @@ const WaiversSearch = () => {
     },
     {
       key: 'submitted',
-      label: 'Submitted',
+      label: 'Signed',
       group: 'Dates',
       sortable: true,
       sortValue: (w) => (w.submitted_at ? new Date(w.submitted_at).getTime() : 0),
@@ -373,7 +376,7 @@ const WaiversSearch = () => {
     {
       type: 'daterange',
       key: 'submitted',
-      label: 'Submitted Date',
+      label: 'Signed date',
       getDate: (w) => w.submitted_at,
     },
   ], [templateOptions, locationOptions]);
@@ -383,7 +386,7 @@ const WaiversSearch = () => {
     columns,
     getRowId: (w) => String(w.id),
     storageKey: 'waivers_search_v3',
-    columnsVersion: 'phone-default-2026-07',
+    columnsVersion: 'visit-date-visible-2026-08',
     filterDefs,
     searchFields: (w) => [
       w.id,
@@ -546,8 +549,12 @@ const WaiversSearch = () => {
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
         <div className="flex flex-wrap items-center gap-3" data-tour="waivers-date-controls">
+          <label htmlFor="waiver-visit-date" className="text-sm font-medium text-gray-700">
+            Visit date
+          </label>
           <div className="relative">
             <input
+              id="waiver-visit-date"
               type="date"
               value={scopeDate}
               disabled={allDates}
@@ -567,6 +574,7 @@ const WaiversSearch = () => {
               title="Waiver status scope"
             >
               <option value="">Completed (default)</option>
+              <option value="all">All statuses</option>
               <option value="pending">Pending</option>
               <option value="expired">Expired</option>
               <option value="replaced">Replaced</option>
