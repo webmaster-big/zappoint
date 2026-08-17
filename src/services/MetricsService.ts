@@ -179,10 +179,10 @@ class MetricsService {
     if (params?.location_id !== undefined && params.location_id !== null && params.location_id !== 'all') {
       queryParams.append('location_id', params.location_id.toString());
     }
-    // Only send timezone for the "today" timeframe so backend calculates midnight correctly
-    if (params?.timeframe === 'today') {
-      queryParams.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
-    }
+    // The browser's timezone is deliberately not sent. "Today" has to mean the venue's
+    // today, not the viewer's: an admin in Manila asking for today was getting a day that
+    // had not started in Michigan yet, so the card read zero while Waiver Records — which
+    // resolves the day on the server — showed a full day of business.
 
     const url = `${API_BASE_URL}/metrics/dashboard/${user.id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
