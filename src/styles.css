@@ -770,6 +770,21 @@ html.dark a:not([class*="bg-"]):hover {
   animation: fade-in 0.5s ease-out;
 }
 
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-hover:hover {
+    transform: none;
+  }
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;

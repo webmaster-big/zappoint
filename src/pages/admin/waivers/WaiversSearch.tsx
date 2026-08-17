@@ -33,7 +33,7 @@ import attractionPurchaseService from '../../../services/AttractionPurchaseServi
 import type { AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
-import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus } from '../../../types/waiver.types';
+import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus, WaiverTimeframe } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
@@ -67,6 +67,37 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+/** 'day' keeps the single-day lookup staff use most; the rest mirror the dashboard exactly. */
+type WaiverScope = WaiverTimeframe | 'day';
+
+const SCOPE_OPTIONS: Array<{ value: WaiverScope; label: string }> = [
+  { value: 'day', label: 'Single day' },
+  { value: 'today', label: 'Today' },
+  { value: 'last_24h', label: 'Last 24 Hours' },
+  { value: 'last_7d', label: 'Last 7 Days' },
+  { value: 'last_30d', label: 'Last 30 Days' },
+  { value: 'all_time', label: 'All Time' },
+  { value: 'custom', label: 'Custom Range' },
+];
+
+/**
+ * Start on whatever period the dashboard is showing, read from the key the dashboard
+ * writes, so the two screens line up without anyone setting them twice.
+ */
+const dashboardTimeframe = (): WaiverScope => {
+  try {
+    const user = getStoredUser();
+    const key = user?.id ? `dashboard_timeframe_${user.id}` : 'dashboard_timeframe';
+    const saved = localStorage.getItem(key);
+    if (saved && SCOPE_OPTIONS.some((option) => option.value === saved)) {
+      return saved as WaiverScope;
+    }
+  } catch {
+    /* fall through to the single-day default */
+  }
+  return 'day';
+};
+
 const adultName = (w: Waiver) => [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ');
 const minorNames = (w: Waiver) => (w.minors || []).map((m) => [m.first_name, m.last_name].filter(Boolean).join(' ')).join(', ');
 const linkedLabel = (w: Waiver) => {
@@ -92,6 +123,9 @@ const WaiversSearch = () => {
   const [scopeDate, setScopeDate] = useState<string>(todayStr());
   const [scopeStatus, setScopeStatus] = useState<string>('');
   const [allDates, setAllDates] = useState(false);
+  const [scopeTimeframe, setScopeTimeframe] = useState<WaiverScope>(dashboardTimeframe);
+  const [customFrom, setCustomFrom] = useState<string>(todayStr());
+  const [customTo, setCustomTo] = useState<string>(todayStr());
 
   const [autoRefresh, setAutoRefresh] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -107,8 +141,19 @@ const WaiversSearch = () => {
     try {
       setLoading(true);
       const base: WaiverSearchFilters = { per_page: 200 };
-      if (allDates) base.all = 1;
-      else if (scopeDate) base.date = scopeDate;
+
+      if (allDates || scopeTimeframe === 'all_time') {
+        base.all = 1;
+      } else if (scopeTimeframe === 'day') {
+        if (scopeDate) base.date = scopeDate;
+      } else if (scopeTimeframe === 'custom') {
+        base.timeframe = 'custom';
+        if (customFrom) base.start_date = customFrom;
+        if (customTo) base.end_date = customTo;
+      } else {
+        base.timeframe = scopeTimeframe;
+      }
+
       if (scopeStatus) base.status = scopeStatus as WaiverStatus | 'all';
 
       const collected: Waiver[] = [];
@@ -128,7 +173,7 @@ const WaiversSearch = () => {
     } finally {
       setLoading(false);
     }
-  }, [scopeDate, scopeStatus, allDates]);
+  }, [scopeDate, scopeStatus, allDates, scopeTimeframe, customFrom, customTo]);
 
   useEffect(() => {
     load();
@@ -435,7 +480,7 @@ const WaiversSearch = () => {
       return;
     }
     exportTableCsv({
-      filename: `waivers-${allDates ? 'all' : scopeDate}-${new Date().toISOString().split('T')[0]}.csv`,
+      filename: `waivers-${scopeLabel}-${new Date().toISOString().split('T')[0]}.csv`,
       columns,
       rows: table.filteredRows,
       extraColumns: [
@@ -509,10 +554,21 @@ const WaiversSearch = () => {
     };
   }, [table.filteredRows, waivers.length]);
 
+  const scopeLabel = allDates || scopeTimeframe === 'all_time'
+    ? 'all'
+    : scopeTimeframe === 'day'
+      ? scopeDate
+      : scopeTimeframe === 'custom'
+        ? `${customFrom}_to_${customTo}`
+        : scopeTimeframe;
+
   const clearScope = () => {
     setScopeDate(todayStr());
     setScopeStatus('');
     setAllDates(false);
+    setScopeTimeframe('day');
+    setCustomFrom(todayStr());
+    setCustomTo(todayStr());
     table.setSearchInput('');
     table.clearFilters();
     table.setPage(1);
@@ -549,23 +605,56 @@ const WaiversSearch = () => {
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
         <div className="flex flex-wrap items-center gap-3" data-tour="waivers-date-controls">
-          <label htmlFor="waiver-visit-date" className="text-sm font-medium text-gray-700">
-            Visit date
+          <label htmlFor="waiver-timeframe" className="text-sm font-medium text-gray-700">
+            Visit period
           </label>
-          <div className="relative">
-            <input
-              id="waiver-visit-date"
-              type="date"
-              value={scopeDate}
-              disabled={allDates}
-              onChange={(e) => { setScopeDate(e.target.value); table.setPage(1); }}
-              className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 disabled:bg-gray-50 disabled:text-gray-400`}
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={allDates} onChange={(e) => { setAllDates(e.target.checked); table.setPage(1); }} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
-            All dates
-          </label>
+          <select
+            id="waiver-timeframe"
+            value={scopeTimeframe}
+            onChange={(e) => { setScopeTimeframe(e.target.value as WaiverScope); setAllDates(false); table.setPage(1); }}
+            className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
+            title="Matches the period options on the company dashboard, so both counts can be compared"
+          >
+            {SCOPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+
+          {scopeTimeframe === 'day' && (
+            <div className="relative">
+              <input
+                id="waiver-visit-date"
+                type="date"
+                value={scopeDate}
+                disabled={allDates}
+                onChange={(e) => { setScopeDate(e.target.value); table.setPage(1); }}
+                className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 disabled:bg-gray-50 disabled:text-gray-400`}
+                aria-label="Visit date"
+              />
+            </div>
+          )}
+
+          {scopeTimeframe === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customFrom}
+                max={customTo || undefined}
+                onChange={(e) => { setCustomFrom(e.target.value); table.setPage(1); }}
+                className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
+                aria-label="Period start"
+              />
+              <span className="text-sm text-gray-400">to</span>
+              <input
+                type="date"
+                value={customTo}
+                min={customFrom || undefined}
+                onChange={(e) => { setCustomTo(e.target.value); table.setPage(1); }}
+                className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
+                aria-label="Period end"
+              />
+            </div>
+          )}
           <div>
             <select
               value={scopeStatus}

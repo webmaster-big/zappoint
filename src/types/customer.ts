@@ -65,6 +65,7 @@ export interface Attraction {
   image: string;
   category: 'adventure' | 'technology' | 'sports' | 'games' | string;
   availableLocations: string[];
+  availableLocationIds?: number[];
   duration?: string;
   pricingType?: string;
   purchaseLinks?: AttractionPurchaseLink[];
@@ -91,6 +92,7 @@ export interface Package {
   image: string;
   category: 'celebration' | 'corporate' | 'family' | 'adventure' | 'romance' | 'premium' | string;
   availableLocations: string[];
+  availableLocationIds?: number[];
   bookingLinks?: PackageBookingLink[];
   availability_schedules?: PackageAvailabilitySchedule[];
   package_type?: string;

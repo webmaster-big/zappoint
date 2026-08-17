@@ -247,9 +247,16 @@ export interface EntityWaiverSummary {
   checked_in?: number;
 }
 
+/** Mirrors the company admin dashboard's period options so both screens can be compared. */
+export type WaiverTimeframe = 'today' | 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';
+
 export interface WaiverSearchFilters {
   date?: string;
   all?: boolean | number;
+  /** Resolved server-side by the same helper the dashboard uses. */
+  timeframe?: WaiverTimeframe;
+  start_date?: string;
+  end_date?: string;
   /** 'all' applies no status filter, so the page can match the dashboard's headline total. */
   status?: WaiverStatus | 'all';
   adult_name?: string;

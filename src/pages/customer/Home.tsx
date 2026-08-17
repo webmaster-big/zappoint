@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
-  MapPin, 
-  Calendar, 
-  Users, 
-  Clock, 
+import { Link, useParams } from 'react-router-dom';
+import {
+  MapPin,
+  Calendar,
+  Users,
+  Clock,
   Zap,
   Ticket,
   Package,
@@ -12,7 +13,8 @@ import {
   X,
   CheckCircle,
   DollarSign,
-  Sparkles
+  Sparkles,
+  Phone
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 import { type GroupedAttraction, type GroupedPackage, type GroupedEvent } from '../../services/CustomerService';
@@ -20,8 +22,18 @@ import { customerDataCacheService } from '../../services/CustomerDataCacheServic
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
+import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
+import { findLocationBySlug } from '../../services/StorefrontLocationService';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import SiteFooter from '../../components/customer/SiteFooter';
+import NotFound from '../NotFound';
 // import MembershipCarousel from '../../components/customer/MembershipCarousel';
 
+
+interface LocationRef {
+  id?: number;
+  name: string;
+}
 
 interface DisplayEventLocation {
   location_id: number;
@@ -54,6 +66,14 @@ interface DisplayEvent {
 }
 
 const EntertainmentLandingPage = () => {
+  const { locationSlug } = useParams<{ locationSlug?: string }>();
+  const { locations: storefrontLocations, loaded: storefrontLoaded } = useStorefrontLocations();
+  const activeLocation = useMemo(
+    () => findLocationBySlug(storefrontLocations, locationSlug),
+    [storefrontLocations, locationSlug],
+  );
+  const isSingleLocationPage = Boolean(locationSlug);
+
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'packages' | 'attractions'>('all');
@@ -93,6 +113,7 @@ const EntertainmentLandingPage = () => {
         image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
         category: attr.category,
         availableLocations: attr.locations.map(loc => loc.location_name),
+        availableLocationIds: attr.locations.map(loc => loc.location_id),
         duration: !attr.duration || attr.duration === 0 || String(attr.duration) === '0' ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
         pricingType: attr.pricing_type,
         purchaseLinks: attr.purchase_links,
@@ -123,6 +144,7 @@ const EntertainmentLandingPage = () => {
         image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
         category: pkg.category,
         availableLocations: pkg.locations.map(loc => loc.location_name),
+        availableLocationIds: pkg.locations.map(loc => loc.location_id),
         bookingLinks: pkg.booking_links,
         availability_schedules: pkg.availability_schedules,
         package_type: pkg.package_type || 'regular',
@@ -209,37 +231,43 @@ const EntertainmentLandingPage = () => {
     });
     return () => unsubscribe();
   }, [processData]);
+  const matchesLocationScope = useCallback(
+    (locationIds: number[] | undefined, locationNames: string[]) => {
+      if (activeLocation) {
+        return (locationIds ?? []).includes(activeLocation.id);
+      }
+      return selectedLocation === 'All Locations' || locationNames.includes(selectedLocation);
+    },
+    [activeLocation, selectedLocation],
+  );
+
   const filteredAttractions = attractions.filter(attraction => {
-    const matchesLocation = selectedLocation === 'All Locations' || 
-      attraction.availableLocations.includes(selectedLocation);
+    const matchesLocation = matchesLocationScope(attraction.availableLocationIds, attraction.availableLocations);
     const matchesSearch = attraction.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (attraction.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     return matchesLocation && matchesSearch;
   });
 
   const filteredPackages = packages.filter(pkg => {
-    const matchesLocation = selectedLocation === 'All Locations' || 
-      pkg.availableLocations.includes(selectedLocation);
+    const matchesLocation = matchesLocationScope(pkg.availableLocationIds, pkg.availableLocations);
     const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (pkg.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     return matchesLocation && matchesSearch;
   });
 
   const filteredSpecialPackages = packages.filter(pkg => {
-    const matchesLocation = selectedLocation === 'All Locations' || 
-      pkg.availableLocations.includes(selectedLocation);
+    const matchesLocation = matchesLocationScope(pkg.availableLocationIds, pkg.availableLocations);
     const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (pkg.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     const isSpecial = pkg.package_type && pkg.package_type !== 'regular';
-    
+
     return matchesLocation && matchesSearch && isSpecial;
   });
 
   const filteredEvents = events.filter(evt => {
-    const matchesLocation = selectedLocation === 'All Locations' ||
-      evt.availableLocations.includes(selectedLocation);
+    const matchesLocation = matchesLocationScope(evt.locations.map(loc => loc.location_id), evt.availableLocations);
     const matchesSearch = evt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (evt.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesLocation && matchesSearch;
@@ -251,7 +279,10 @@ const EntertainmentLandingPage = () => {
     const candidates = packages.filter(pkg => {
       if (pkg.id === selectedPackage.id) return false;
       if (pkg.price <= selectedPackage.price) return false;
-      const sharedLocs = pkg.availableLocations.filter(loc => 
+      if (activeLocation) {
+        return (pkg.availableLocationIds ?? []).includes(activeLocation.id);
+      }
+      const sharedLocs = pkg.availableLocations.filter(loc =>
         selectedPackage.availableLocations.includes(loc)
       );
       return sharedLocs.length > 0;
@@ -278,7 +309,7 @@ const EntertainmentLandingPage = () => {
     highlights.push(`Only $${priceDiff.toFixed(0)} more`);
     
     return { package: upgrade, highlights, priceDiff };
-  }, [selectedPackage, packages]);
+  }, [selectedPackage, packages, activeLocation]);
 
   const handleAttractionClick = (attraction: Attraction) => {
     setSelectedAttraction(attraction);
@@ -301,7 +332,47 @@ const EntertainmentLandingPage = () => {
     setShowPackageModal(true);
   };
 
+  const slugForLocation = (locationId: number | undefined, locationName: string): string => {
+    const match = locationId === undefined
+      ? undefined
+      : storefrontLocations.find(loc => loc.id === locationId);
+    return match?.slug ?? generateLocationSlug(locationName);
+  };
+
+  const attractionUrlFor = (attraction: Attraction, target: LocationRef): string | null => {
+    const link = attraction.purchaseLinks?.find(l =>
+      target.id === undefined ? l.location === target.name : l.location_id === target.id);
+    if (!link) return null;
+    const itemSlug = generateSlug(attraction.name, link.attraction_id);
+    return `${window.location.origin}/purchase/attraction/${slugForLocation(link.location_id, link.location)}/${itemSlug}`;
+  };
+
+  const packageUrlFor = (pkg: PackageType, target: LocationRef): string | null => {
+    const link = pkg.bookingLinks?.find(l =>
+      target.id === undefined ? l.location === target.name : l.location_id === target.id);
+    if (!link) return null;
+    const itemSlug = generateSlug(pkg.name, link.package_id);
+    return `${window.location.origin}/book/package/${slugForLocation(link.location_id, link.location)}/${itemSlug}`;
+  };
+
+  const eventUrlFor = (evt: DisplayEvent, target: LocationRef): string | null => {
+    const locData = evt.locations.find(loc =>
+      target.id === undefined ? loc.location_name === target.name : loc.location_id === target.id);
+    if (!locData) return null;
+    const locationSlug = storefrontLocations.find(loc => loc.id === locData.location_id)?.slug
+      ?? (locData.location_slug || generateLocationSlug(locData.location_name)).toLowerCase();
+    const eventSlug = generateSlug(evt.name, locData.event_id);
+    return `${window.location.origin}/purchase/event/${locationSlug}/${eventSlug}`;
+  };
+
   const handleBuyTickets = (attraction: Attraction) => {
+    if (activeLocation) {
+      const url = attractionUrlFor(attraction, activeLocation);
+      if (!url) return;
+      setShowAttractionModal(false);
+      window.open(url, '_blank');
+      return;
+    }
     setSelectedAttraction(attraction);
     setActiveBookingType('attraction');
     setShowAttractionModal(false);
@@ -309,6 +380,13 @@ const EntertainmentLandingPage = () => {
   };
 
   const handleBookPackage = (pkg: PackageType) => {
+    if (activeLocation) {
+      const url = packageUrlFor(pkg, activeLocation);
+      if (!url) return;
+      setShowPackageModal(false);
+      window.open(url, '_blank');
+      return;
+    }
     setSelectedPackage(pkg);
     setActiveBookingType('package');
     setShowPackageModal(false);
@@ -321,6 +399,13 @@ const EntertainmentLandingPage = () => {
   };
 
   const handleBuyEventTickets = (evt: DisplayEvent) => {
+    if (activeLocation) {
+      const url = eventUrlFor(evt, activeLocation);
+      if (!url) return;
+      setShowEventModal(false);
+      window.open(url, '_blank');
+      return;
+    }
     setShowEventModal(false);
     setSelectedEvent(evt);
     setActiveBookingType('event');
@@ -328,35 +413,17 @@ const EntertainmentLandingPage = () => {
   };
 
   const handleLocationSelect = (location: string) => {
-    if (activeBookingType === 'event') {
-      if (!selectedEvent) return;
-      const locData = selectedEvent.locations.find(loc => loc.location_name === location);
-      if (!locData) return;
-      const locationSlug = (locData.location_slug || generateLocationSlug(location)).toLowerCase();
-      const eventSlug = generateSlug(selectedEvent.name, locData.event_id);
-      window.open(`${window.location.origin}/purchase/event/${locationSlug}/${eventSlug}`, '_blank');
-      return;
-    }
+    const target: LocationRef = { name: location };
 
-    if (activeBookingType === 'attraction') {
-      if (!selectedAttraction) return;
-      const link = selectedAttraction.purchaseLinks?.find(l => l.location === location);
-      if (!link) return;
-      const locationSlug = generateLocationSlug(location);
-      const itemSlug = generateSlug(selectedAttraction.name, link.attraction_id);
-      window.open(`${window.location.origin}/purchase/attraction/${locationSlug}/${itemSlug}`, '_blank');
-      return;
-    }
+    const url = activeBookingType === 'event'
+      ? (selectedEvent ? eventUrlFor(selectedEvent, target) : null)
+      : activeBookingType === 'attraction'
+      ? (selectedAttraction ? attractionUrlFor(selectedAttraction, target) : null)
+      : activeBookingType === 'package'
+      ? (selectedPackage ? packageUrlFor(selectedPackage, target) : null)
+      : null;
 
-    if (activeBookingType === 'package') {
-      if (!selectedPackage) return;
-      const link = selectedPackage.bookingLinks?.find(l => l.location === location);
-      if (!link) return;
-      const locationSlug = generateLocationSlug(location);
-      const itemSlug = generateSlug(selectedPackage.name, link.package_id);
-      window.open(`${window.location.origin}/book/package/${locationSlug}/${itemSlug}`, '_blank');
-      return;
-    }
+    if (url) window.open(url, '_blank');
   };
 
   const formatTime = (time: string) => {
@@ -373,6 +440,40 @@ const EntertainmentLandingPage = () => {
       .match(/(EST|EDT|ET)/)?.[1] ?? 'ET';
     return abbr;
   })();
+
+  if (isSingleLocationPage && !activeLocation) {
+    if (!storefrontLoaded) {
+      return (
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <LoadingSpinner size="medium" />
+        </div>
+      );
+    }
+
+    if (storefrontLocations.length === 0) {
+      return (
+        <div className="min-h-[60vh] flex flex-col items-center justify-center px-6 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">We could not load our locations</h1>
+          <p className="text-gray-600 mb-6 max-w-md">
+            Something went wrong on our end, so we cannot tell which venue this page belongs to. Please try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-2.5 bg-blue-800 text-white font-semibold rounded-xl hover:bg-blue-900 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+
+    return <NotFound />;
+  }
+
+  const locationAddress = activeLocation
+    ? [activeLocation.address, activeLocation.city, activeLocation.state].filter(Boolean).join(', ')
+    : '';
 
   return (
     <>
@@ -416,14 +517,6 @@ const EntertainmentLandingPage = () => {
         }
         .animate-slide-up-delay {
           animation: slide-up 0.4s ease-out 0.1s both;
-        }
-        
-        .card-hover {
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .card-hover:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
         }
         
         .modal-scroll {
@@ -554,16 +647,26 @@ const EntertainmentLandingPage = () => {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="mb-8 md:mb-10 animate-slide-up">
             <div className="inline-flex items-center space-x-2 bg-white/15 backdrop-blur-md px-4 py-2 md:px-5 md:py-2.5 rounded-full mb-5 md:mb-7 border border-white/20">
-              <Zap className="w-4 h-4 md:w-5 md:h-5 text-yellow-300" />
-              <span className="text-xs md:text-sm font-semibold tracking-wide">Premium Entertainment Experience</span>
+              {activeLocation ? (
+                <>
+                  <MapPin className="w-4 h-4 md:w-5 md:h-5 text-yellow-300" />
+                  <span className="text-xs md:text-sm font-semibold tracking-wide">{locationAddress || activeLocation.name}</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 md:w-5 md:h-5 text-yellow-300" />
+                  <span className="text-xs md:text-sm font-semibold tracking-wide">Premium Entertainment Experience</span>
+                </>
+              )}
             </div>
-            
+
             <p className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-extrabold mb-5 md:mb-7 text-white leading-tight drop-shadow-3xl">
-              Unleash the Fun at ZapZone!
+              {activeLocation ? `Unleash the Fun at ${activeLocation.name}!` : 'Unleash the Fun at ZapZone!'}
             </p>
             <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-8 md:mb-12 text-blue-100/90 max-w-3xl mx-auto leading-relaxed px-2">
-              Discover thrilling attractions and amazing packages across all our locations. 
-              From laser tag adventures to unforgettable celebrations — your next adventure awaits!
+              {activeLocation
+                ? `Everything you can book at ${activeLocation.name} — attractions, packages and events, all in one place.`
+                : 'Discover thrilling attractions and amazing packages across all our locations. From laser tag adventures to unforgettable celebrations — your next adventure awaits!'}
             </p>
           </div>
           
@@ -589,20 +692,41 @@ const EntertainmentLandingPage = () => {
           </div>
 
           <div className="flex items-center justify-center gap-6 md:gap-10 mt-10 md:mt-14 animate-slide-up-delay">
-            <div className="text-center">
-              <div className="text-2xl md:text-3xl font-bold text-white">10+</div>
-              <div className="text-xs md:text-sm text-blue-200/80">Locations</div>
-            </div>
-            <div className="w-px h-8 bg-white/20"></div>
-            <div className="text-center">
-              <div className="text-2xl md:text-3xl font-bold text-white">{packages.length}+</div>
-              <div className="text-xs md:text-sm text-blue-200/80">Packages</div>
-            </div>
-            <div className="w-px h-8 bg-white/20"></div>
-            <div className="text-center">
-              <div className="text-2xl md:text-3xl font-bold text-white">{attractions.length}+</div>
-              <div className="text-xs md:text-sm text-blue-200/80">Attractions</div>
-            </div>
+            {activeLocation ? (
+              <>
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white">{filteredPackages.length}</div>
+                  <div className="text-xs md:text-sm text-blue-200/80">Packages</div>
+                </div>
+                <div className="w-px h-8 bg-white/20"></div>
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white">{filteredAttractions.length}</div>
+                  <div className="text-xs md:text-sm text-blue-200/80">Attractions</div>
+                </div>
+                <div className="w-px h-8 bg-white/20"></div>
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white">{filteredEvents.length}</div>
+                  <div className="text-xs md:text-sm text-blue-200/80">Events</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white">10+</div>
+                  <div className="text-xs md:text-sm text-blue-200/80">Locations</div>
+                </div>
+                <div className="w-px h-8 bg-white/20"></div>
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white">{packages.length}+</div>
+                  <div className="text-xs md:text-sm text-blue-200/80">Packages</div>
+                </div>
+                <div className="w-px h-8 bg-white/20"></div>
+                <div className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-white">{attractions.length}+</div>
+                  <div className="text-xs md:text-sm text-blue-200/80">Attractions</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
         
@@ -612,27 +736,55 @@ const EntertainmentLandingPage = () => {
       <section className="bg-white/95 backdrop-blur-sm py-4 md:py-5 border-b border-gray-100 sticky top-16 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-gray-400">
-                <MapPin size={14} />
-                <span className="text-xs font-semibold uppercase tracking-wider">Location:</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {locations.map(location => (
-                  <button
-                    key={location}
-                    onClick={() => setSelectedLocation(location)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                      selectedLocation === location
-                        ? 'bg-gray-900 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+            {activeLocation ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 min-w-0">
+                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900 min-w-0">
+                  <MapPin size={14} className="text-blue-800 flex-shrink-0" />
+                  <span className="truncate">{activeLocation.name}</span>
+                </span>
+                {locationAddress && (
+                  <span className="text-xs text-gray-500 truncate">{locationAddress}</span>
+                )}
+                {activeLocation.phone && (
+                  <a
+                    href={`tel:${activeLocation.phone}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-blue-800 transition-colors"
                   >
-                    {location === 'All Locations' ? 'All' : location}
-                  </button>
-                ))}
+                    <Phone size={12} />
+                    {activeLocation.phone}
+                  </a>
+                )}
+                <Link
+                  to="/"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors"
+                >
+                  All locations
+                  <ChevronRight size={12} />
+                </Link>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <MapPin size={14} />
+                  <span className="text-xs font-semibold uppercase tracking-wider">Location:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {locations.map(location => (
+                    <button
+                      key={location}
+                      onClick={() => setSelectedLocation(location)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                        selectedLocation === location
+                          ? 'bg-gray-900 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {location === 'All Locations' ? 'All' : location}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-3">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
@@ -1320,17 +1472,19 @@ const EntertainmentLandingPage = () => {
                 )}
               </div>
 
-              <div className="mb-5">
-                <h3 className="text-sm font-bold text-gray-900 mb-2">Locations</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedAttraction.availableLocations.map((location) => (
-                    <div key={location} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg">
-                      <MapPin size={11} className="text-blue-600" />
-                      <span className="font-medium">{location}</span>
-                    </div>
-                  ))}
+              {!activeLocation && (
+                <div className="mb-5">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2">Locations</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedAttraction.availableLocations.map((location) => (
+                      <div key={location} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg">
+                        <MapPin size={11} className="text-blue-600" />
+                        <span className="font-medium">{location}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-2.5">
                 <button
@@ -1553,17 +1707,19 @@ const EntertainmentLandingPage = () => {
                 )}
               </div>
 
-              <div className="mb-5">
-                <h3 className="text-sm font-bold text-gray-900 mb-2">Locations</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedPackage.availableLocations.map((location) => (
-                    <div key={location} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg">
-                      <MapPin size={11} className="text-blue-600" />
-                      <span className="font-medium">{location}</span>
-                    </div>
-                  ))}
+              {!activeLocation && (
+                <div className="mb-5">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2">Locations</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedPackage.availableLocations.map((location) => (
+                      <div key={location} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg">
+                        <MapPin size={11} className="text-blue-600" />
+                        <span className="font-medium">{location}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {upgradeSuggestion && (
                 <div className="mb-5 bg-gray-50 rounded-xl p-4">
@@ -1724,9 +1880,12 @@ const EntertainmentLandingPage = () => {
               )}
 
               <div className="mb-5">
-                <h3 className="text-sm font-bold text-gray-900 mb-2">Locations</h3>
+                <h3 className="text-sm font-bold text-gray-900 mb-2">{activeLocation ? 'Location' : 'Locations'}</h3>
                 <div className="space-y-2">
-                  {selectedEvent.locations.map((loc) => (
+                  {(activeLocation
+                    ? selectedEvent.locations.filter((loc) => loc.location_id === activeLocation.id)
+                    : selectedEvent.locations
+                  ).map((loc) => (
                     <div key={loc.location_id} className="flex items-start gap-2.5 px-3 py-2.5 bg-gray-50 rounded-xl">
                       <MapPin size={14} className="text-blue-600 mt-0.5 flex-shrink-0" />
                       <div>
@@ -1837,74 +1996,7 @@ const EntertainmentLandingPage = () => {
         </div>
       )}
 
-      <footer className="bg-gradient-to-b from-blue-900 to-blue-950 text-white py-14 md:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10 mb-10 md:mb-12">
-            <div className="lg:col-span-1 text-center md:text-left">
-              <a href="https://bestingames.com/ypsilanti/" target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src="\Zap-Zone.png" alt="Zap Zone Logo" className="w-40 md:w-48 mb-4 md:mb-5 hover:opacity-80 transition"/>
-              </a>
-              <p className="text-sm md:text-base text-blue-200 leading-relaxed mb-4">
-                The Longest Laser Tag Marathon and The Largest Laser Tag Winner Stays on Tournament
-              </p>
-              <div className="flex space-x-4 mb-6 justify-center md:justify-start">
-                <a href="https://www.facebook.com/ZapZoneOffices" target="_blank" rel="noopener noreferrer" 
-                   className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center hover:bg-blue-700 transition">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </a>
-                <a href="https://www.instagram.com/zap__zone/" target="_blank" rel="noopener noreferrer" 
-                   className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center hover:bg-blue-700 transition">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                  </svg>
-                </a>
-              </div>
-            </div>
-            
-            <div className="md:col-span-2 lg:ps-20 text-center md:text-left">
-              <p className="font-bold mb-4 md:mb-5 text-white text-base md:text-lg uppercase tracking-wider">Locations</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm md:text-base text-blue-200">
-                <a href="https://bowlerolanesbc.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Battle Creek</a>
-                <a href="https://brighton.zap-zone.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Brighton</a>
-                <a href="https://canton.zap-zone.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Canton</a>
-                <a href="https://farmington.zap-zone.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Farmington</a>
-                <a href="https://zapzonexl.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Lansing</a>
-                <a href="https://bestingames.com/sterlingheights/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Sterling Heights</a>
-                <a href="https://taylor.zap-zone.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Taylor</a>
-                <a href="https://bestingames.com/warren/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Warren</a>
-                <a href="https://waterford.zap-zone.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Waterford</a>
-                <a href="https://bestingames.com/ypsilanti/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Ypsilanti</a>
-              </div>
-            </div>
-            
-            <div className="text-center md:text-left">
-              <p className="font-bold mb-4 md:mb-5 text-white text-base md:text-lg uppercase tracking-wider">Support</p>
-              <div className="space-y-2.5 text-sm md:text-base text-blue-200 mb-6">
-                <a href="https://zap-zone.com/contact-us/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Contact Us</a>
-                <a href="https://zap-zone.com/eventcoordinator/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Event Coordinator</a>
-                <a href="https://zap-zone.com/corporate/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Corporate</a>
-                <a href="https://zap-zone.com/#" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Careers</a>
-                <a href="https://zap-zone.com/#" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Donations</a>
-                <a href="https://zap-zone.com/gift-cards/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Gift Cards</a>
-                <a href="https://zap-zone.com/#" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Invitations</a>
-              </div>
-            </div>
-          </div>
-          
-          <div className="border-t border-blue-800 pt-8">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <p className="text-blue-200 text-sm text-center md:text-left">
-                &copy; {new Date().getFullYear()} Zone Entertainment LLC. All Rights Reserved.
-              </p>
-              <div className="flex flex-wrap justify-center md:justify-end text-sm text-blue-200">
-                <a href="https://zap-zone.com/terms-conditions/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">Terms & Conditions</a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   );
 };

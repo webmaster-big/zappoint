@@ -26,6 +26,7 @@ import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import AnalyticsService from '../../../services/AnalyticsService';
 import type { CompanyAnalyticsResponse } from '../../../services/AnalyticsService';
 import { getStoredUser } from '../../../utils/storage';
+import { formatHourLabel } from '../../../utils/timeFormat';
 import {
   LineChart,
   Line,
@@ -593,7 +594,7 @@ const CompanyAnalytics: React.FC = () => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={peak_hours}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="hour" stroke="#6b7280" />
+              <XAxis dataKey="hour" stroke="#6b7280" tickFormatter={formatHourLabel} />
               <YAxis stroke="#6b7280" />
               <Tooltip
                 content={({ active, payload }) => {
@@ -601,7 +602,7 @@ const CompanyAnalytics: React.FC = () => {
                   const data = payload[0].payload;
                   return (
                     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
-                      <p className="font-semibold text-gray-900 mb-2">{data.hour}</p>
+                      <p className="font-semibold text-gray-900 mb-2">{formatHourLabel(data.hour)}</p>
                       <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
                       {data.event_purchases > 0 && <p className="text-gray-600">Event Purchases: <span className="font-medium text-gray-900">{data.event_purchases}</span></p>}
                     </div>

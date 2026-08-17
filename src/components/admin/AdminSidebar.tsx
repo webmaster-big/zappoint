@@ -51,12 +51,15 @@ import {
   Images,
   MonitorPlay,
   Layers,
+  ExternalLink,
   Send as SendIcon
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLocationScope, LOCATION_SCOPE_ENABLED } from '../../contexts/LocationContext';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
+import { findLocationById } from '../../services/StorefrontLocationService';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
 import { API_BASE_URL, getImageUrl } from '../../utils/storage';
 import { notificationStreamService, type NotificationObject } from '../../services/NotificationStreamService';
@@ -416,12 +419,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const { theme, toggleTheme } = useTheme();
   const { themeColor, fullColor } = useThemeColor();
   const location = useLocation();
-  const { selectedLocationId, setSelectedLocationId, locations: scopeLocations, isCompanyAdmin: canScopeLocation } = useLocationScope();
+  const { selectedLocationId, setSelectedLocationId, locations: scopeLocations, isCompanyAdmin: canScopeLocation, effectiveLocationId } = useLocationScope();
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const locationMenuRef = useRef<HTMLDivElement>(null);
   const selectedLocationName = selectedLocationId === null
     ? 'All Locations'
     : (scopeLocations.find((l) => l.id === selectedLocationId)?.name || `Location #${selectedLocationId}`);
+
+  const { locations: storefrontLocations } = useStorefrontLocations();
+  const storefrontLocation = findLocationById(storefrontLocations, effectiveLocationId);
+  const storefrontUrl = storefrontLocation ? `${window.location.origin}/${storefrontLocation.slug}` : null;
+  const storefrontTitle = storefrontLocation ? `Open the ${storefrontLocation.name} store page` : '';
 
   useEffect(() => {
     if (!locationMenuOpen) return;
@@ -1262,20 +1270,35 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
           {LOCATION_SCOPE_ENABLED && canScopeLocation && !isMinimized && (
             <div className="px-3 pt-3 relative" ref={locationMenuRef}>
-              <button
-                type="button"
-                onClick={() => setLocationMenuOpen((o) => !o)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-colors text-left ${locationMenuOpen ? 'bg-gray-50 border-gray-100' : ''}`}
-              >
-                <span className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${themeColor}-50 text-${fullColor} flex-shrink-0`}>
-                  <MapPin className="w-4 h-4" />
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Location</span>
-                  <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1">{selectedLocationName}</span>
-                </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setLocationMenuOpen((o) => !o)}
+                  className={`flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-colors text-left ${locationMenuOpen ? 'bg-gray-50 border-gray-100' : ''}`}
+                >
+                  <span className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${themeColor}-50 text-${fullColor} flex-shrink-0`}>
+                    <MapPin className="w-4 h-4" />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Location</span>
+                    <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1">{selectedLocationName}</span>
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {storefrontUrl && (
+                  <a
+                    href={storefrontUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={storefrontTitle}
+                    aria-label={storefrontTitle}
+                    className={`flex items-center justify-center w-9 h-9 flex-shrink-0 rounded-xl border border-gray-200 text-gray-500 hover:text-${fullColor} hover:border-${themeColor}-300 hover:bg-${themeColor}-50 transition-colors`}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
 
               {locationMenuOpen && (
                 <div className="absolute left-3 right-3 z-50 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 max-h-72 overflow-y-auto">
@@ -1305,9 +1328,30 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             </div>
           )}
 
+          {!canScopeLocation && !isMinimized && storefrontUrl && (
+            <div className="px-3 pt-3">
+              <a
+                href={storefrontUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={storefrontTitle}
+                className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-colors text-left"
+              >
+                <span className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${themeColor}-50 text-${fullColor} flex-shrink-0`}>
+                  <MapPin className="w-4 h-4" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Store page</span>
+                  <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1">{storefrontLocation?.name}</span>
+                </span>
+                <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0 group-hover:text-gray-600 transition-colors" />
+              </a>
+            </div>
+          )}
+
           <div className="p-4" ref={searchRef}>
             {isMinimized ? (
-              <div className="flex items-center justify-center">
+              <div className="flex items-center justify-center gap-1">
                 <Link
                   to="/notifications"
                   className={`relative p-2 rounded-md hover:bg-${themeColor}-50 transition-colors flex-shrink-0`}
@@ -1330,6 +1374,18 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                     </span>
                   )}
                 </Link>
+                {storefrontUrl && (
+                  <a
+                    href={storefrontUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={storefrontTitle}
+                    aria-label={storefrontTitle}
+                    className={`p-2 rounded-md hover:bg-${themeColor}-50 transition-colors flex-shrink-0`}
+                  >
+                    <ExternalLink size={18} className="text-gray-700" />
+                  </a>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2">

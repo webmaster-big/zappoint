@@ -33,6 +33,18 @@ export function formatLocalDateTime(
   return date.toLocaleDateString('en-US', defaultOptions);
 }
 
+export function formatHourLabel(time: string | number): string {
+  if (time === '' || time === null || time === undefined) return '';
+
+  const hour = typeof time === 'number' ? time : parseInt(String(time).split(':')[0], 10);
+  if (!Number.isFinite(hour)) return String(time);
+
+  const period = hour >= 12 && hour < 24 ? 'PM' : 'AM';
+  const normalized = hour % 12 === 0 ? 12 : hour % 12;
+
+  return `${normalized}${period}`;
+}
+
 export function convertTo12Hour(time24: string): string {
   if (!time24) return '';
   

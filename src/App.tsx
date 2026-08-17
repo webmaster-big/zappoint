@@ -46,6 +46,7 @@ import Notifications from "./pages/admin/Notifications";
 import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
 import ManageAccounts from "./pages/admin/users/ManageAccounts";
 import EntertainmentLandingPage from "./pages/customer/Home";
+import LocationChooser from "./pages/customer/Locations";
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
 import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics";
@@ -179,7 +180,8 @@ function App() {
         <Route path="/photos/:accessToken" element={<><PageViewBeacon pageType="customer_photos" /><CustomerPhotos /></>} />
         
         <Route element={<CustomerLayout />}>
-          <Route path="/" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
+          <Route path="/" element={<><PageViewBeacon pageType="home" /><LocationChooser /></>} />
+          <Route path="/browse" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_reservations" /><CustomerReservations /></></CustomerProtectedRoute>} />
           <Route path="/customer/attractions" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_attractions" /><MyAttractions /></></CustomerProtectedRoute>} />
           <Route path="/customer/events" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_events" /><MyEvents /></></CustomerProtectedRoute>} />
@@ -188,6 +190,7 @@ function App() {
           <Route path="/customer/membership" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_membership" /><MyMembership /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership/purchase" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_purchase" /><PurchaseMembership /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership/update-payment" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_update_payment" /><UpdatePaymentMethod /></></CustomerProtectedRoute>} />
+          <Route path="/:locationSlug" element={<><PageViewBeacon pageType="location_home" /><EntertainmentLandingPage /></>} />
         </Route>
         
         <Route element={<ProtectedRoute><LocationProvider><MainLayout /></LocationProvider></ProtectedRoute>}>
