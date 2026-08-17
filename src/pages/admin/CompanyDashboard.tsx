@@ -787,8 +787,10 @@ const CompanyDashboard: React.FC = () => {
     {
       key: 'waivers',
       title: 'Waivers',
-      value: metrics.totalWaivers ?? 0,
-      description: `${metrics.completedWaivers ?? 0} signed · ${metrics.pendingWaivers ?? 0} pending`,
+      value: metrics.waiverMetricsAvailable === false ? '—' : (metrics.totalWaivers ?? 0),
+      description: metrics.waiverMetricsAvailable === false
+        ? 'Could not be counted — see the server log'
+        : `${metrics.completedWaivers ?? 0} signed · ${metrics.pendingWaivers ?? 0} pending`,
       icon: FileSignature,
       accent: 'bg-indigo-100 text-indigo-700',
       timeframe: timeframeDescription,

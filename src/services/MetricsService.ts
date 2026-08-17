@@ -29,6 +29,8 @@ export interface DashboardMetrics {
   checkedInWaivers?: number;
   adultWaivers?: number;
   minorWaivers?: number;
+  /** False when the server failed to count waivers, so the card must not print a zero. */
+  waiverMetricsAvailable?: boolean;
 }
 
 export interface BreakdownItem {
