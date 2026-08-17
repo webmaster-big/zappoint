@@ -250,9 +250,21 @@ export interface EntityWaiverSummary {
 /** Mirrors the company admin dashboard's period options so both screens can be compared. */
 export type WaiverTimeframe = 'today' | 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';
 
+/** Ignores the list's status filter on purpose — these are the dashboard card's own figures. */
+export interface WaiverPeriodSummary {
+  total: number;
+  completed: number;
+  pending: number;
+  checked_in: number;
+  minors_covered: number;
+  people_covered: number;
+}
+
 export interface WaiverSearchFilters {
   date?: string;
   all?: boolean | number;
+  /** Company admins pass the sidebar's selected location so Records matches the dashboard. */
+  location_id?: number;
   /** Resolved server-side by the same helper the dashboard uses. */
   timeframe?: WaiverTimeframe;
   start_date?: string;

@@ -13,6 +13,8 @@ export interface StorefrontLocation {
   phone?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** False when the slug was derived here because the server had none to give. */
+  hasStoredSlug?: boolean;
 }
 
 const CACHE_KEY = 'zapzone_storefront_locations';
@@ -50,6 +52,7 @@ const toStorefrontLocation = (value: unknown): StorefrontLocation | null => {
     id,
     name,
     slug,
+    hasStoredSlug: stored !== null,
     address: asText(row.address),
     city: asText(row.city),
     state: asText(row.state),
@@ -60,13 +63,39 @@ const toStorefrontLocation = (value: unknown): StorefrontLocation | null => {
   };
 };
 
+/**
+ * Two locations in the same city derive the same slug, and the second card would then link
+ * to the first one's page. The server numbers its duplicates, so do the same here for the
+ * rows that arrive without a stored slug.
+ */
+const dedupeDerivedSlugs = (rows: StorefrontLocation[]): StorefrontLocation[] => {
+  const taken = new Set(rows.filter((row) => row.hasStoredSlug).map((row) => row.slug.toLowerCase()));
+
+  return rows.map((row) => {
+    if (row.hasStoredSlug) return row;
+
+    let slug = row.slug;
+    let suffix = 2;
+    while (taken.has(slug.toLowerCase())) {
+      slug = `${row.slug}-${suffix}`;
+      suffix += 1;
+    }
+    taken.add(slug.toLowerCase());
+
+    return slug === row.slug ? row : { ...row, slug };
+  });
+};
+
 const readRows = (payload: unknown): StorefrontLocation[] => {
   const data = (payload as { data?: unknown })?.data;
   if (!Array.isArray(data)) return [];
-  return data
+
+  const rows = data
     .map(toStorefrontLocation)
     .filter((row): row is StorefrontLocation => row !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  return dedupeDerivedSlugs(rows);
 };
 
 export const readCachedStorefrontLocations = (): StorefrontLocation[] => {

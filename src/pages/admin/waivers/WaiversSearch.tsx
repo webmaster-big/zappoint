@@ -24,6 +24,7 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import waiverService from '../../../services/waiverService';
@@ -33,7 +34,7 @@ import attractionPurchaseService from '../../../services/AttractionPurchaseServi
 import type { AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
-import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus, WaiverTimeframe } from '../../../types/waiver.types';
+import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus, WaiverTimeframe, WaiverPeriodSummary } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
@@ -110,6 +111,7 @@ const linkedLabel = (w: Waiver) => {
 const WaiversSearch = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
+  const { effectiveLocationId } = useLocationScope();
   const currentUser = getStoredUser();
   const isAdmin = currentUser?.role === 'company_admin';
   const isManager = currentUser?.role === 'location_manager';
@@ -122,8 +124,9 @@ const WaiversSearch = () => {
 
   const [scopeDate, setScopeDate] = useState<string>(todayStr());
   const [scopeStatus, setScopeStatus] = useState<string>('');
-  const [allDates, setAllDates] = useState(false);
   const [scopeTimeframe, setScopeTimeframe] = useState<WaiverScope>(dashboardTimeframe);
+  const [periodSummary, setPeriodSummary] = useState<WaiverPeriodSummary | null>(null);
+  const summaryRequest = useRef(0);
   const [customFrom, setCustomFrom] = useState<string>(todayStr());
   const [customTo, setCustomTo] = useState<string>(todayStr());
 
@@ -142,7 +145,7 @@ const WaiversSearch = () => {
       setLoading(true);
       const base: WaiverSearchFilters = { per_page: 200 };
 
-      if (allDates || scopeTimeframe === 'all_time') {
+      if (scopeTimeframe === 'all_time') {
         base.all = 1;
       } else if (scopeTimeframe === 'day') {
         if (scopeDate) base.date = scopeDate;
@@ -155,6 +158,21 @@ const WaiversSearch = () => {
       }
 
       if (scopeStatus) base.status = scopeStatus as WaiverStatus | 'all';
+      if (effectiveLocationId) base.location_id = effectiveLocationId;
+
+      // Dashboard-shaped figures for the same period, fetched separately because they must
+      // ignore the status filter above — that filter is exactly why the two screens looked
+      // like they disagreed. Sequence-guarded: on a reconciliation screen, a slow reply
+      // landing after a newer one would show figures for a period nobody is looking at.
+      const request = ++summaryRequest.current;
+      waiverService
+        .periodSummary(base)
+        .then((res) => {
+          if (request === summaryRequest.current) setPeriodSummary(res.success ? res.data : null);
+        })
+        .catch(() => {
+          if (request === summaryRequest.current) setPeriodSummary(null);
+        });
 
       const collected: Waiver[] = [];
       let currentPage = 1;
@@ -173,7 +191,7 @@ const WaiversSearch = () => {
     } finally {
       setLoading(false);
     }
-  }, [scopeDate, scopeStatus, allDates, scopeTimeframe, customFrom, customTo]);
+  }, [scopeDate, scopeStatus, scopeTimeframe, customFrom, customTo, effectiveLocationId]);
 
   useEffect(() => {
     load();
@@ -554,7 +572,7 @@ const WaiversSearch = () => {
     };
   }, [table.filteredRows, waivers.length]);
 
-  const scopeLabel = allDates || scopeTimeframe === 'all_time'
+  const scopeLabel = scopeTimeframe === 'all_time'
     ? 'all'
     : scopeTimeframe === 'day'
       ? scopeDate
@@ -565,7 +583,6 @@ const WaiversSearch = () => {
   const clearScope = () => {
     setScopeDate(todayStr());
     setScopeStatus('');
-    setAllDates(false);
     setScopeTimeframe('day');
     setCustomFrom(todayStr());
     setCustomTo(todayStr());
@@ -611,7 +628,7 @@ const WaiversSearch = () => {
           <select
             id="waiver-timeframe"
             value={scopeTimeframe}
-            onChange={(e) => { setScopeTimeframe(e.target.value as WaiverScope); setAllDates(false); table.setPage(1); }}
+            onChange={(e) => { setScopeTimeframe(e.target.value as WaiverScope); table.setPage(1); }}
             className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
             title="Matches the period options on the company dashboard, so both counts can be compared"
           >
@@ -626,7 +643,6 @@ const WaiversSearch = () => {
                 id="waiver-visit-date"
                 type="date"
                 value={scopeDate}
-                disabled={allDates}
                 onChange={(e) => { setScopeDate(e.target.value); table.setPage(1); }}
                 className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 disabled:bg-gray-50 disabled:text-gray-400`}
                 aria-label="Visit date"
@@ -697,6 +713,23 @@ const WaiversSearch = () => {
             )}
           </p>
         </div>
+
+        {periodSummary && (
+          <p className="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-600" aria-live="polite">
+            <span className="font-medium text-gray-700">This period, all statuses:</span>{' '}
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.total}</span> total
+            {' · '}
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.completed}</span> signed
+            {' · '}
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.pending}</span> pending
+            {' · '}
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.checked_in}</span> checked in
+            <span className="block text-xs text-gray-400 mt-1">
+              Counted the same way the company dashboard counts, for the same period and location —
+              so <span className="font-medium">total</span> should equal the dashboard's waiver card.
+            </span>
+          </p>
+        )}
       </div>
 
       <div data-tour="waivers-filter-btns">

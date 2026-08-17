@@ -25,10 +25,17 @@ api.interceptors.request.use(
 export interface Location {
   id: number;
   name: string;
+  /** Drives the public storefront URL, /<slug>. Derived from the city unless set by hand. */
+  slug?: string;
   address?: string;
   city?: string;
   state?: string;
   zip_code?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  /** How exact the stored pin is: address, street, or city. */
+  geocode_precision?: string | null;
+  geocoded_at?: string | null;
   phone?: string;
   email?: string;
   capacity?: number;
@@ -49,10 +56,14 @@ export interface LocationFilters {
 
 export interface CreateLocationData {
   name: string;
+  /** Send null to have the server rebuild it from the city. */
+  slug?: string | null;
   address?: string;
   city?: string;
   state?: string;
   zip_code?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   phone?: string;
   email?: string;
   capacity?: number;

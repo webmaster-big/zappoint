@@ -16,6 +16,9 @@ interface EditLocationModalProps {
 // Allows digits, spaces, dashes, plus, parens, dots — 7–20 chars total
 const PHONE_RE = /^[\d\s\-\+\(\)\.]{7,20}$/;
 
+// Matches the server's slug rule, so a bad URL is caught before the round trip
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = false }: EditLocationModalProps) => {
   const { themeColor } = useThemeColor();
   const [form, setForm] = useState<UpdateLocationData>({});
@@ -28,10 +31,13 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
     if (!isOpen || !location) return;
     setForm({
       name: location.name,
+      slug: location.slug ?? '',
       address: location.address ?? '',
       city: location.city ?? '',
       state: location.state ?? '',
       zip_code: location.zip_code ?? '',
+      latitude: location.latitude === null || location.latitude === undefined ? null : Number(location.latitude),
+      longitude: location.longitude === null || location.longitude === undefined ? null : Number(location.longitude),
       phone: location.phone ?? '',
       email: location.email ?? '',
     });
@@ -43,6 +49,24 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
   const update = <K extends keyof UpdateLocationData>(key: K, value: UpdateLocationData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const pinNote = (() => {
+    if (form.latitude === null || form.longitude === null || form.latitude === undefined || form.longitude === undefined) {
+      return 'No map pin yet, so this location is left off the storefront map.';
+    }
+    switch (location?.geocode_precision) {
+      case 'address':
+        return 'Pin matched to the exact building.';
+      case 'street':
+        return 'Pin is on the right road, but the building itself is not mapped. Adjust it here if you want it exact.';
+      case 'city':
+        return 'Pin is only accurate to the city centre. Adjust it here if you want it exact.';
+      case 'manual':
+        return 'Pin was set by hand, and automatic geocoding will leave it alone.';
+      default:
+        return 'Editing these values marks the pin as set by hand, so geocoding will leave it alone.';
+    }
+  })();
+
   const validate = (): boolean => {
     const errs: Record<string, string[]> = {};
     if (!form.name?.trim()) {
@@ -50,6 +74,16 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
     }
     if (form.phone?.trim() && !PHONE_RE.test(form.phone.trim())) {
       errs.phone = ['Invalid phone format. Example: (555) 123-4567'];
+    }
+    const slug = form.slug?.trim();
+    if (slug && !SLUG_RE.test(slug)) {
+      errs.slug = ['Use lower case letters, numbers and single dashes, for example brighton or sterling-heights.'];
+    }
+    const oneCoordinateOnly =
+      (form.latitude === null || form.latitude === undefined) !==
+      (form.longitude === null || form.longitude === undefined);
+    if (oneCoordinateOnly) {
+      errs.latitude = ['Set both latitude and longitude, or leave both blank.'];
     }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -69,10 +103,13 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
     try {
       const payload: UpdateLocationData = {
         name: form.name?.trim(),
+        slug: form.slug?.trim() ? form.slug.trim() : null,
         address: form.address?.trim() ?? '',
         city: form.city?.trim() ?? '',
         state: form.state?.trim() ?? '',
         zip_code: form.zip_code?.trim() ?? '',
+        latitude: form.latitude ?? null,
+        longitude: form.longitude ?? null,
         phone: form.phone?.trim() ?? '',
         email: form.email?.trim() ?? '',
       };
@@ -244,6 +281,73 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
             {fieldErrors.email && (
               <p className="text-xs text-red-600 mt-1">{fieldErrors.email[0]}</p>
             )}
+          </div>
+
+          {/* Storefront URL + map pin */}
+          <div className="pt-3 border-t border-gray-100 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Storefront URL</label>
+              <div className="flex items-center">
+                <span className="px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg whitespace-nowrap">
+                  /
+                </span>
+                <input
+                  type="text"
+                  value={form.slug ?? ''}
+                  onChange={(e) => update('slug', e.target.value)}
+                  disabled={submitting}
+                  placeholder={location?.city ? location.city.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'brighton'}
+                  className={`flex-1 min-w-0 px-3 py-2 border ${fieldErrors.slug ? 'border-red-400' : 'border-gray-300'} rounded-r-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100`}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Lower case letters, numbers and dashes. Leave blank to rebuild it from the city.
+              </p>
+              {fieldErrors.slug && (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.slug[0]}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+                <input
+                  type="number"
+                  step="0.0000001"
+                  min={-90}
+                  max={90}
+                  value={form.latitude ?? ''}
+                  onChange={(e) => update('latitude', e.target.value === '' ? null : Number(e.target.value))}
+                  disabled={submitting}
+                  placeholder="42.5695675"
+                  className={`w-full px-3 py-2 border ${fieldErrors.latitude ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100`}
+                />
+                {fieldErrors.latitude && (
+                  <p className="text-xs text-red-600 mt-1">{fieldErrors.latitude[0]}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+                <input
+                  type="number"
+                  step="0.0000001"
+                  min={-180}
+                  max={180}
+                  value={form.longitude ?? ''}
+                  onChange={(e) => update('longitude', e.target.value === '' ? null : Number(e.target.value))}
+                  disabled={submitting}
+                  placeholder="-83.8147104"
+                  className={`w-full px-3 py-2 border ${fieldErrors.longitude ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100`}
+                />
+                {fieldErrors.longitude && (
+                  <p className="text-xs text-red-600 mt-1">{fieldErrors.longitude[0]}</p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              {pinNote}
+            </p>
           </div>
 
           {/* Actions */}

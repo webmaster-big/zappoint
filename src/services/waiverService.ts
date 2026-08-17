@@ -12,6 +12,7 @@ import type {
   AvailableActivities,
   WaiverSettings,
   WaiverSearchFilters,
+  WaiverPeriodSummary,
   ActivityType,
   WaiverMinor,
   ConnectedWaiver,
@@ -88,6 +89,10 @@ const waiverService = {
   // ---- staff: search / view records ----
   list: async (filters: WaiverSearchFilters = {}): Promise<Paginated<Waiver>> =>
     (await api.get('/waivers', { params: filters })).data,
+
+  /** Counted the way the dashboard card counts, so the two screens can be reconciled. */
+  periodSummary: async (filters: WaiverSearchFilters = {}): Promise<ApiResponse<WaiverPeriodSummary>> =>
+    (await api.get('/waivers/period-summary', { params: filters })).data,
 
   get: async (id: number): Promise<ApiResponse<{ waiver: Waiver; rendered_body: string }>> =>
     (await api.get(`/waivers/${id}`)).data,
