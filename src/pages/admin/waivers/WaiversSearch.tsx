@@ -68,11 +68,10 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** 'day' keeps the single-day lookup staff use most; the rest mirror the dashboard exactly. */
-type WaiverScope = WaiverTimeframe | 'day';
+/** Exactly the company dashboard's options, so the two screens can be compared one to one. */
+type WaiverScope = WaiverTimeframe;
 
 const SCOPE_OPTIONS: Array<{ value: WaiverScope; label: string }> = [
-  { value: 'day', label: 'Single day' },
   { value: 'today', label: 'Today' },
   { value: 'last_24h', label: 'Last 24 Hours' },
   { value: 'last_7d', label: 'Last 7 Days' },
@@ -94,9 +93,9 @@ const dashboardTimeframe = (): WaiverScope => {
       return saved as WaiverScope;
     }
   } catch {
-    /* fall through to the single-day default */
+    /* fall through */
   }
-  return 'day';
+  return 'today';
 };
 
 const adultName = (w: Waiver) => [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ');
@@ -122,7 +121,6 @@ const WaiversSearch = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [settings, setSettings] = useState<WaiverSettings | null>(null);
 
-  const [scopeDate, setScopeDate] = useState<string>(todayStr());
   const [scopeStatus, setScopeStatus] = useState<string>('');
   const [scopeTimeframe, setScopeTimeframe] = useState<WaiverScope>(dashboardTimeframe);
   const [periodSummary, setPeriodSummary] = useState<WaiverPeriodSummary | null>(null);
@@ -147,8 +145,6 @@ const WaiversSearch = () => {
 
       if (scopeTimeframe === 'all_time') {
         base.all = 1;
-      } else if (scopeTimeframe === 'day') {
-        if (scopeDate) base.date = scopeDate;
       } else if (scopeTimeframe === 'custom') {
         base.timeframe = 'custom';
         if (customFrom) base.start_date = customFrom;
@@ -191,7 +187,7 @@ const WaiversSearch = () => {
     } finally {
       setLoading(false);
     }
-  }, [scopeDate, scopeStatus, scopeTimeframe, customFrom, customTo, effectiveLocationId]);
+  }, [scopeStatus, scopeTimeframe, customFrom, customTo, effectiveLocationId]);
 
   useEffect(() => {
     load();
@@ -574,16 +570,13 @@ const WaiversSearch = () => {
 
   const scopeLabel = scopeTimeframe === 'all_time'
     ? 'all'
-    : scopeTimeframe === 'day'
-      ? scopeDate
-      : scopeTimeframe === 'custom'
-        ? `${customFrom}_to_${customTo}`
-        : scopeTimeframe;
+    : scopeTimeframe === 'custom'
+      ? `${customFrom}_to_${customTo}`
+      : scopeTimeframe;
 
   const clearScope = () => {
-    setScopeDate(todayStr());
     setScopeStatus('');
-    setScopeTimeframe('day');
+    setScopeTimeframe('today');
     setCustomFrom(todayStr());
     setCustomTo(todayStr());
     table.setSearchInput('');
@@ -636,19 +629,6 @@ const WaiversSearch = () => {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-
-          {scopeTimeframe === 'day' && (
-            <div className="relative">
-              <input
-                id="waiver-visit-date"
-                type="date"
-                value={scopeDate}
-                onChange={(e) => { setScopeDate(e.target.value); table.setPage(1); }}
-                className={`border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 disabled:bg-gray-50 disabled:text-gray-400`}
-                aria-label="Visit date"
-              />
-            </div>
-          )}
 
           {scopeTimeframe === 'custom' && (
             <div className="flex items-center gap-2">

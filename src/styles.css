@@ -989,3 +989,144 @@ html.dark a:not([class*="bg-"]):hover {
 .animate-bounce-slow {
   animation: bounce 1.5s infinite cubic-bezier(0.28, 0.84, 0.42, 1);
 }
+/* ---- Storefront location map (Leaflet) ----------------------------------
+   The basemap is recoloured rather than replaced. Stripping its colour and
+   blending in luminosity mode paints the streets in shades of the brand blue
+   underneath, which turns a busy default basemap into a quiet monochrome one
+   without needing a styled-tile provider. A radial mask feathers the edges so
+   the map merges into the hero instead of sitting on it as a card.
+-------------------------------------------------------------------------- */
+.zz-map {
+  /* No background of its own and no isolation: the tile pane blends straight through to the
+     hero's gradient, so the map is tinted by whatever is behind it and cannot read as a
+     differently-shaded rectangle sitting on top. */
+  background: transparent;
+
+  /* Feather all four sides. A radial mask only softens the corners — on a wide box the left
+     and right edges stay hard, which is the border that was still showing. */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 26%, #000 78%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 24%, #000 80%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent 0, #000 26%, #000 78%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 24%, #000 80%, transparent 100%);
+  mask-composite: intersect;
+}
+
+.zz-map .leaflet-container {
+  background: transparent;
+  font-family: inherit;
+}
+
+.zz-map .leaflet-tile-pane {
+  /* Recoloured with filters, not a blend mode. Leaflet transforms its map pane, and a
+     transform creates a stacking context that isolates mix-blend-mode — so blending against
+     the hero is impossible from in here and both earlier attempts left a pale rectangle.
+     Filters are not isolated, so this drives the tiles to the same deep blue as the hero:
+     drop the colour, darken, then tint. Roads stay a shade lighter than the land, which is
+     what keeps the map readable. */
+  filter:
+    grayscale(1)
+    brightness(0.46)
+    contrast(1.45)
+    sepia(1)
+    hue-rotate(186deg)
+    saturate(5.5)
+    brightness(0.95);
+}
+
+/* Controls and credits, quietened to match */
+.zz-map .leaflet-control-zoom {
+  border: none;
+  box-shadow: none;
+}
+
+.zz-map .leaflet-control-zoom a {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(6px);
+  width: 30px;
+  height: 30px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.zz-map .leaflet-control-zoom a:first-child { border-radius: 10px 10px 0 0; }
+.zz-map .leaflet-control-zoom a:last-child { border-radius: 0 0 10px 10px; }
+.zz-map .leaflet-control-zoom a:hover { background: rgba(255, 255, 255, 0.26); }
+
+/* Attribution must stay visible for the tile licence; it just does not need to shout. */
+.zz-map .leaflet-control-attribution {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 9px;
+}
+
+.zz-map .leaflet-control-attribution a { color: rgba(255, 255, 255, 0.7); }
+
+/* ---- Pins ---- */
+.zz-pin {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  transform: translate(-7px, -7px);
+}
+
+.zz-pin__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #fde047;
+  box-shadow: 0 0 0 4px rgba(253, 224, 71, 0.22), 0 1px 6px rgba(8, 15, 40, 0.5);
+  flex-shrink: 0;
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.zz-pin__label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: #fff;
+  /* A chip, so our label reads as ours and not as a duplicate of the basemap's own
+     city name printed underneath it. */
+  background: rgba(9, 17, 45, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 2px 7px;
+  border-radius: 7px;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 1px 6px rgba(8, 15, 40, 0.35);
+}
+
+.leaflet-marker-icon:hover .zz-pin__dot,
+.zz-pin--active .zz-pin__dot {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 7px rgba(253, 224, 71, 0.28), 0 2px 10px rgba(8, 15, 40, 0.55);
+}
+
+/* ---- Popup ---- */
+.zz-map .leaflet-popup-content-wrapper {
+  background: rgba(10, 20, 55, 0.9);
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px -8px rgba(8, 15, 40, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.zz-map .leaflet-popup-tip { background: rgba(10, 20, 55, 0.9); }
+.zz-map .leaflet-popup-content { margin: 10px 14px; }
+.zz-map .leaflet-popup-close-button { color: rgba(255, 255, 255, 0.6) !important; }
+
+.zz-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.zz-popup strong { font-size: 14px; font-weight: 700; color: #fff; }
+.zz-popup span { color: rgba(255, 255, 255, 0.7); }
+.zz-popup em { color: #fde047; font-style: normal; font-weight: 600; }

@@ -7,6 +7,7 @@ import { customerDataCacheService } from '../../services/CustomerDataCacheServic
 import type { GroupedAttraction, GroupedPackage, GroupedEvent } from '../../services/CustomerService';
 import SiteFooter from '../../components/customer/SiteFooter';
 import LocationsMap from '../../components/customer/LocationsMap';
+import { splitLocationName } from '../../utils/locationName';
 
 interface LocationTally {
   packages: number;
@@ -93,17 +94,6 @@ const LocationChooser = () => {
   const addressLine = (location: StorefrontLocation) =>
     [location.address, location.city, location.state].filter(Boolean).join(', ');
 
-  const nameParts = (location: StorefrontLocation) => {
-    const [first, ...rest] = location.name.split('|').map((part) => part.trim()).filter(Boolean);
-    if (rest.length > 0) {
-      return { primary: first, secondary: rest.join(' · ') };
-    }
-    const primary = first || location.name;
-    return {
-      primary,
-      secondary: location.city && location.city !== primary ? location.city : null,
-    };
-  };
 
   const showSkeletons = !loaded && locations.length === 0;
   const loadFailed = loaded && failed && locations.length === 0;
@@ -112,12 +102,17 @@ const LocationChooser = () => {
   return (
     <>
       <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white overflow-hidden">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 text-white opacity-[0.16]">
-          <LocationsMap locations={locations} className="w-full h-full" />
+        <div className="hidden lg:flex flex-col absolute top-4 bottom-8 right-0 w-[52%] xl:w-[50%]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-200/80 mb-2">
+            Click a pin to open that location
+          </p>
+          <LocationsMap locations={visible} className="flex-1 min-h-0" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <div className="max-w-2xl animate-fade-in-up">
+        {/* The centred wrapper is wider than the text inside it and overlaps the map, so it must
+            not intercept clicks. Its interactive children opt back in below. */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 pointer-events-none">
+          <div className="max-w-2xl animate-fade-in-up pointer-events-auto">
             <div className="inline-flex items-center space-x-2 bg-white/15 backdrop-blur-md px-4 py-2 md:px-5 md:py-2.5 rounded-full mb-5 md:mb-7 border border-white/20">
               <Zap className="w-4 h-4 md:w-5 md:h-5 text-yellow-300" />
               <span className="text-xs md:text-sm font-semibold tracking-wide">
@@ -134,7 +129,7 @@ const LocationChooser = () => {
             </p>
           </div>
 
-          <div className="max-w-xl mt-8 md:mt-10 animate-slide-up-delay">
+          <div className="max-w-xl mt-8 md:mt-10 animate-slide-up-delay pointer-events-auto">
             <div className="relative group">
               <div className="absolute -inset-1.5 bg-gradient-to-r from-white/25 via-blue-300/25 to-blue-300/25 rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition duration-500"></div>
               <div className="relative">
@@ -227,7 +222,7 @@ const LocationChooser = () => {
                   .filter((entry) => entry.value > 0)
                   .map((entry) => ({ ...entry, label: entry.value === 1 ? entry.noun : `${entry.noun}s` }));
 
-                const { primary, secondary } = nameParts(location);
+                const { primary, secondary } = splitLocationName(location.name, location.city);
 
                 return (
                   <article
