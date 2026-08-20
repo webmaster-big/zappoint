@@ -172,7 +172,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine },
+          { label: 'Bulk Orders', href: '/orders', icon: ShoppingCart }
         ]},
         { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
           { label: 'Manage Events', href: '/events', icon: List },
@@ -242,7 +243,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine },
+          { label: 'Bulk Orders', href: '/orders', icon: ShoppingCart }
         ]},
         { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
           { label: 'Manage Events', href: '/events', icon: List },
@@ -327,7 +329,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine },
+          { label: 'Bulk Orders', href: '/orders', icon: ShoppingCart }
         ]},
         { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
           { label: 'Manage Events', href: '/events', icon: List },

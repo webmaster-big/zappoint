@@ -31,9 +31,13 @@ export interface Package {
   package_type: string; // 'regular', 'holiday', 'special', 'seasonal', etc.
   features?: string | string[]; // Support both string and array for backward compatibility
   price: number;
+  pricing_type?: 'base' | 'per_person';
   price_per_additional?: number;
   max_participants: number;
   min_participants?: number;
+  max_tickets_per_slot?: number | null;
+  participant_label?: string | null;
+  display_label?: string | null;
   duration: number;
   duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;
@@ -114,9 +118,13 @@ export interface CreatePackageData {
   package_type?: string; // 'regular', 'holiday', 'special', 'seasonal', etc.
   features?: string | string[]; // Support both string and array for backward compatibility
   price: number;
+  pricing_type?: 'base' | 'per_person';
   price_per_additional?: number;
   max_participants: number;
   min_participants?: number;
+  max_tickets_per_slot?: number | null;
+  participant_label?: string | null;
+  display_label?: string | null;
   duration: number;
   duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;

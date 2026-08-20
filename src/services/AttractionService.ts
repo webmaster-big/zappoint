@@ -30,6 +30,7 @@ export interface Attraction {
   price: number;
   pricing_type: string;
   max_capacity: number;
+  max_tickets_per_slot?: number | null;
   category: string;
   unit?: string;
   duration?: number;
@@ -74,6 +75,7 @@ export interface CreateAttractionData {
   price: number;
   pricing_type: string;
   max_capacity: number;
+  max_tickets_per_slot?: number | null;
   category: string;
   unit?: string;
   duration?: number;
@@ -113,6 +115,12 @@ export interface PaginatedResponse<T> {
 }
 
 class AttractionService {
+  async getSlotAvailability(attractionId: number, date: string): Promise<{ max_tickets_per_slot: number | null; booked_by_slot: Record<string, number>; remaining_by_slot: Record<string, number> | null }> {
+    const response = await api.get(`/attractions/${attractionId}/slot-availability/${date}`);
+    return response.data?.data ?? { max_tickets_per_slot: null, booked_by_slot: {}, remaining_by_slot: null };
+  }
+
+
   async getAttractions(filters?: AttractionFilters): Promise<PaginatedResponse<Attraction>> {
     const response = await api.get('/attractions', { params: filters, headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${getStoredUser()?.token}`} });
     return response.data;

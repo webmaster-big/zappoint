@@ -15,19 +15,21 @@ import {
   DollarSign,
   Info
 } from 'lucide-react';
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import { resolveBullets } from '../../../utils/bullets';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo, PurchaseAttractionAddOn } from '../../../types/PurchaseAttraction.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
-import { generatePurchaseQRCode } from '../../../utils/qrcode';
+import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
+import { useCartSafe } from '../../../contexts/CartContext';
+import ticketOrderService, { type CartQuote as OrderQuote, type TicketOrder as PlacedOrder } from '../../../services/TicketOrderService';
 import { trackPageView } from '../../../utils/analytics';
 import { setNextTrackingId } from '../../../utils/analyticsHeaders';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -136,11 +138,19 @@ const countries: { code: string; name: string }[] = [
 
 const PurchaseAttraction = () => {
   const { slug } = useParams<{ location: string; slug: string }>();
-  const attractionId = slug ? extractIdFromSlug(slug) : null;
+  const cart = useCartSafe();
+  const orderMode = !slug && (cart?.items.length ?? 0) > 0;
+  const anchorItem = orderMode ? (cart?.items.find(i => i.type === 'attraction') ?? null) : null;
+  const attractionId = slug ? extractIdFromSlug(slug) : (anchorItem?.id ?? null);
   const navigate = useNavigate();
 
   // True when a customer (not an admin) is visiting this page.
   const isCustomerMode = useMemo(() => !getStoredUser(), []);
+
+  const [orderQuote, setOrderQuote] = useState<OrderQuote | null>(null);
+  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [orderQrImage, setOrderQrImage] = useState<string | null>(null);
+  const [orderPrefilled, setOrderPrefilled] = useState(false);
 
   const [attraction, setAttraction] = useState<PurchaseAttractionAttraction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,6 +210,7 @@ const PurchaseAttraction = () => {
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   const [partialDayOffs, setPartialDayOffs] = useState<Record<string, Array<{ time_start?: string | null; time_end?: string | null }>>>({});
   const [scheduleError, setScheduleError] = useState<string>('');
@@ -318,6 +329,80 @@ const PurchaseAttraction = () => {
       setScheduledTime('');
     }
   }, [scheduledDate, attraction, partialDayOffs]);
+
+  useEffect(() => {
+    if (!scheduledDate || !attraction?.id) {
+      setSlotRemaining(null);
+      return;
+    }
+    let cancelled = false;
+    attractionService.getSlotAvailability(Number(attraction.id), scheduledDate)
+      .then(res => {
+        if (cancelled) return;
+        if (res.max_tickets_per_slot == null) { setSlotRemaining(null); return; }
+        const map: Record<string, number> = {};
+        Object.entries(res.remaining_by_slot ?? {}).forEach(([slot, left]) => { map[slot] = left as number; });
+        setSlotRemaining({ __cap: res.max_tickets_per_slot, ...map });
+      })
+      .catch(() => { if (!cancelled) setSlotRemaining(null); });
+    return () => { cancelled = true; };
+  }, [scheduledDate, attraction?.id]);
+
+  const orderItemsPayload = useMemo(() => {
+    if (!orderMode || !attraction || !cart) return null;
+    if (!anchorItem) return null;
+    const rest = cart.items.filter(i => i.key !== anchorItem.key);
+    return [
+      {
+        key: anchorItem.key,
+        type: 'attraction' as const,
+        id: Number(attraction.id),
+        name: attraction.name,
+        locationId: attraction.locationId || cart.items[0].locationId,
+        unitPrice: Number(attraction.price),
+        quantity,
+        scheduledDate: scheduledDate || null,
+        scheduledTime: scheduledTime || null,
+        addOns: Object.entries(selectedAddOns)
+          .filter(([, qty]) => qty > 0)
+          .map(([idStr, qty]) => {
+            const addOn = attraction.addOns?.find(a => a.id === Number(idStr));
+            return { id: Number(idStr), name: addOn?.name ?? '', price: Number(addOn?.price ?? 0), quantity: qty };
+          }),
+      },
+      ...rest,
+    ];
+  }, [orderMode, attraction, cart, anchorItem, quantity, scheduledDate, scheduledTime, selectedAddOns]);
+
+  useEffect(() => {
+    if (!orderMode || !orderItemsPayload || !scheduledDate || !scheduledTime) {
+      setOrderQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      ticketOrderService
+        .quote(orderItemsPayload)
+        .then(q => { if (!cancelled) setOrderQuote(q); })
+        .catch(() => {});
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [orderMode, orderItemsPayload, scheduledDate, scheduledTime]);
+
+  useEffect(() => {
+    if (!slug && (cart?.items.length ?? 0) === 0 && !purchaseComplete) {
+      navigate('/cart', { replace: true });
+    }
+  }, [slug, cart?.items.length, purchaseComplete, navigate]);
+
+  useEffect(() => {
+    if (!orderMode || orderPrefilled || !attraction) return;
+    if (!anchorItem) return;
+    setQuantity(anchorItem.quantity);
+    if (anchorItem.scheduledDate) setScheduledDate(anchorItem.scheduledDate);
+    if (anchorItem.scheduledTime) setScheduledTime(anchorItem.scheduledTime);
+    setOrderPrefilled(true);
+  }, [orderMode, orderPrefilled, attraction, anchorItem]);
 
   useEffect(() => {
     const fetchDayOffs = async () => {
@@ -691,7 +776,7 @@ const PurchaseAttraction = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        const pricingDate = scheduledDate || new Date().toISOString().split('T')[0];
+        const pricingDate = new Date().toISOString().split('T')[0];
         const basePrice = calculateTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
@@ -871,6 +956,80 @@ const PurchaseAttraction = () => {
         membership_id: membershipBenefits.membershipId ?? undefined,
         membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
       };
+
+      if (orderMode && orderItemsPayload && cart) {
+        let order: PlacedOrder | null = null;
+
+        try {
+          setNextTrackingId();
+          order = await ticketOrderService.checkout(orderItemsPayload, {
+            customer_id: selectedCustomerId ?? undefined,
+            guest_name: `${customerInfo.firstName} ${customerInfo.lastName}`,
+            guest_email: customerInfo.email,
+            guest_phone: customerInfo.phone || undefined,
+            guest_address: customerInfo.address || undefined,
+            guest_city: customerInfo.city || undefined,
+            guest_state: customerInfo.state || undefined,
+            guest_zip: customerInfo.zip || undefined,
+            guest_country: customerInfo.country || undefined,
+            sms_consent: smsConsent,
+            payment_method: 'authorize.net',
+            notes: `Bulk order — ${orderItemsPayload.length} items`,
+          });
+        } catch (createErr) {
+          console.error('❌ Order creation failed:', createErr);
+          throw new Error(
+            createErr instanceof Error && createErr.message
+              ? createErr.message
+              : "We couldn't process your order right now. No charges were made.",
+          );
+        }
+
+        const orderPaymentData = {
+          location_id: order.location_id,
+          amount: order.total_amount,
+          order_id: order.reference_number.slice(0, 20),
+          description: `ZapZone order ${order.reference_number}`,
+          customer_id: selectedCustomerId ?? undefined,
+          signature_image: signatureImage || undefined,
+          terms_accepted: termsAccepted,
+          payable_id: order.id,
+          payable_type: PAYMENT_TYPE.TICKET_ORDER,
+          send_email: false,
+        };
+
+        try {
+          const orderQr = await generateOrderQRCode(order.id);
+          setOrderQrImage(orderQr);
+          void ticketOrderService.storeQrCode(order.id, orderQr);
+        } catch { void 0; }
+
+        let orderPayment;
+        try {
+          orderPayment = await processCardPayment(
+            cardData,
+            orderPaymentData,
+            authorizeApiLoginId,
+            authorizeClientKey,
+            customerData
+          );
+        } catch (paymentErr) {
+          await ticketOrderService.rollback(order.id);
+          throw paymentErr;
+        }
+
+        if (!orderPayment.success) {
+          await ticketOrderService.rollback(order.id);
+          throw new Error(orderPayment.message || 'Your payment could not be processed. No charges were made to your card.');
+        }
+
+        setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: order.total_amount, remaining_balance: 0, status: 'confirmed' })));
+        cart.clear();
+        setToast({ message: 'Order confirmed! Receipt sent to your email.', type: 'success' });
+        setPurchaseComplete(true);
+        setCurrentStep(4);
+        return;
+      }
 
       let response;
       try {
@@ -1080,6 +1239,63 @@ const PurchaseAttraction = () => {
                 </div>
               )}
             </div>
+            {orderMode && cart && currentStep >= 2 && currentStep < 4 && (
+              <div className="bg-white shadow-md rounded-2xl p-4 md:p-5 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm md:text-base font-bold text-gray-900">Your order — {cart.items.length} items · {cart.items.reduce((n, i) => n + i.quantity, 0)} tickets</h2>
+                  <button type="button" onClick={() => navigate('/cart')} className="text-xs font-semibold text-blue-800 hover:text-blue-900">
+                    Edit cart
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(orderItemsPayload ?? []).map((line, i) => {
+                    const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                    return (
+                      <div key={line.key ?? i} className="py-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate font-semibold text-gray-900">
+                            {line.quantity}× {line.name}
+                            {line.scheduledDate ? ` · ${line.scheduledDate}` : ''}
+                            {line.scheduledTime ? ` ${convertTo12Hour(line.scheduledTime)}` : ''}
+                          </span>
+                          <span className="tabular-nums font-semibold text-gray-900 flex-shrink-0">
+                            {priced ? `$${priced.total_amount.toFixed(2)}` : '—'}
+                          </span>
+                        </div>
+                        {priced && (
+                          <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                            <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
+                            {priced.applied_discounts.map((d, di) => (
+                              <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                            ))}
+                            {(priced.add_ons ?? []).map((ao, ai) => (
+                              <p key={`a${ai}`}>+ {ao.quantity}× {ao.name} · ${(ao.line_total ?? ao.price_at_purchase * ao.quantity).toFixed(2)}</p>
+                            ))}
+                            {priced.fee_total > 0 && <p>+ ${priced.fee_total.toFixed(2)} fees</p>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="pt-2 mt-1 border-t border-gray-200 space-y-1 text-sm">
+                  <div className="flex items-center justify-between"><span className="text-gray-500">Subtotal</span><span className="tabular-nums text-gray-900">{orderQuote ? `$${orderQuote.subtotal.toFixed(2)}` : '—'}</span></div>
+                  {orderQuote && orderQuote.discount_amount > 0 && (
+                    <div className="flex items-center justify-between"><span className="text-emerald-700">Discounts</span><span className="tabular-nums text-emerald-700">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                  )}
+                  {orderQuote && orderQuote.fee_total > 0 && (
+                    <div className="flex items-center justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
+                  )}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="font-bold text-gray-900">Order total</span>
+                    <span className="font-extrabold text-gray-900 tabular-nums">
+                      {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
               {currentStep === 1 && (
                 <MobilePurchaseIntro
@@ -1113,8 +1329,8 @@ const PurchaseAttraction = () => {
                     ))}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span className="hidden sm:inline truncate max-w-[45%]">Quantity {attraction.name}</span>
-                    <span className="sm:hidden">Qty</span>
+                    <span className="hidden sm:inline truncate max-w-[45%]">{orderMode ? 'Review order' : `Quantity ${attraction.name}`}</span>
+                    <span className="sm:hidden">{orderMode ? 'Review' : 'Qty'}</span>
                     <span className="hidden sm:inline">Your Info</span>
                     <span className="sm:hidden">Info</span>
                     <span>Payment</span>
@@ -1127,10 +1343,20 @@ const PurchaseAttraction = () => {
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
-                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity of <span className="text-xl md:text-2xl font-extrabold text-blue-800">{attraction.name}</span></h2>
-                    <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
+                    {orderMode ? (
+                      <>
+                        <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Review your <span className="text-xl md:text-2xl font-extrabold text-blue-800">order</span></h2>
+                        <p className="text-xs md:text-sm text-gray-600">Check your items and quantities, then continue to your info.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity of <span className="text-xl md:text-2xl font-extrabold text-blue-800">{attraction.name}</span></h2>
+                        <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
+                      </>
+                    )}
                   </div>
 
+                  {!orderMode && (<>
                   <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-center mb-4">
                       <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 text-blue-600" />
@@ -1163,7 +1389,10 @@ const PurchaseAttraction = () => {
                         <div className="text-xs md:text-sm text-gray-600">{quantity === 1 ? 'ticket' : 'tickets'}</div>
                       </div>
                       <button
-                        onClick={() => setQuantity(quantity + 1)}
+                        onClick={() => {
+                          const left = scheduledTime && slotRemaining ? (slotRemaining[scheduledTime] ?? slotRemaining['__cap']) : null;
+                          setQuantity(left != null ? Math.min(Math.max(1, left), quantity + 1) : quantity + 1);
+                        }}
                         className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white shadow-md text-gray-800 flex items-center justify-center text-xl md:text-2xl font-bold hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95"
                       >
                         +
@@ -1185,16 +1414,83 @@ const PurchaseAttraction = () => {
                         scheduledDate={scheduledDate}
                         scheduledTime={scheduledTime}
                         availableTimeSlots={availableTimeSlots}
+                        slotRemaining={slotRemaining}
                         onDateSelect={(dateStr) => { setScheduledDate(dateStr); setScheduleError(''); }}
-                        onTimeSelect={(time) => { setScheduledTime(time); setScheduleError(''); }}
+                        onTimeSelect={(time) => {
+                          setScheduledTime(time);
+                          setScheduleError('');
+                          const left = slotRemaining ? (slotRemaining[time] ?? slotRemaining['__cap']) : null;
+                          if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
+                        }}
                         themeColor="blue"
                       />
                     )}
                   </div>
+                  </>)}
+
+                  {orderMode && cart && (
+                    <div className="space-y-3">
+                      {(orderItemsPayload ?? []).map((line, i) => {
+                        const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                        const isAnchorLine = anchorItem != null && line.key === anchorItem.key;
+                        const cartItem = cart.items.find(ci => ci.key === line.key);
+                        const qty = isAnchorLine ? quantity : (cartItem?.quantity ?? line.quantity);
+                        const setQty = (q: number) => {
+                          const next = Math.max(1, q);
+                          if (isAnchorLine) setQuantity(next);
+                          if (cartItem) cart.updateQuantity(cartItem.key, next);
+                        };
+                        const removeLine = () => {
+                          if (!cartItem) return;
+                          if (isAnchorLine) {
+                            setSelectedAddOns({});
+                            setOrderPrefilled(false);
+                          }
+                          cart.removeItem(cartItem.key);
+                        };
+                        return (
+                          <div key={line.key ?? i} className="bg-gray-50/80 border border-gray-100 rounded-xl p-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-gray-900">{line.name}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {line.scheduledDate ?? ''}
+                                  {line.scheduledTime ? ` at ${convertTo12Hour(line.scheduledTime)}` : ''}
+                                </p>
+                                {priced?.applied_discounts.map((d, di) => (
+                                  <p key={di} className="text-xs font-semibold text-emerald-700 mt-0.5">
+                                    {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label} off)` : ''}
+                                  </p>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setQty(qty - 1)} disabled={qty <= 1} className="w-9 h-9 rounded-full bg-white shadow text-gray-800 text-lg font-bold hover:bg-gray-50 disabled:opacity-40" aria-label={`Fewer ${line.name} tickets`}>−</button>
+                                <span className="w-8 text-center text-lg font-bold text-blue-800 tabular-nums">{qty}</span>
+                                <button type="button" onClick={() => setQty(qty + 1)} className="w-9 h-9 rounded-full bg-white shadow text-gray-800 text-lg font-bold hover:bg-gray-50" aria-label={`More ${line.name} tickets`}>+</button>
+                              </div>
+                              <div className="text-right min-w-[5rem]">
+                                <p className="font-extrabold text-gray-900 tabular-nums">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</p>
+                                {priced && priced.discount_amount > 0 && (
+                                  <p className="text-[11px] text-gray-400 line-through tabular-nums">${priced.subtotal.toFixed(2)}</p>
+                                )}
+                              </div>
+                              <button type="button" onClick={removeLine} className="text-xs font-semibold text-red-500 hover:text-red-700">Remove</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm px-1">
+                        <button type="button" onClick={() => navigate('/cart')} className="font-semibold text-blue-800 hover:text-blue-900">Edit cart — change dates &amp; times</button>
+                        <span className="font-bold text-gray-900">
+                          Order total: <span className="tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {attraction.addOns && attraction.addOns.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
-                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
+                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">{orderMode ? `Add-ons for ${attraction.name}` : 'Add-ons'}</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {[...attraction.addOns].sort((a, b) => {
                           if (!attraction.addOnsOrder || attraction.addOnsOrder.length === 0) return 0;
@@ -1572,10 +1868,64 @@ const PurchaseAttraction = () => {
 
               {currentStep === 3 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                  {orderMode && cart && (
+                    <div className="border border-blue-100 bg-blue-50/50 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-gray-900">Order summary</h3>
+                        <button type="button" onClick={() => navigate('/cart')} className="text-xs font-semibold text-blue-800 hover:text-blue-900">Edit cart</button>
+                      </div>
+                      <div className="divide-y divide-blue-100">
+                        {(orderItemsPayload ?? []).map((line, i) => {
+                          const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                          return (
+                            <div key={line.key ?? i} className="py-2 text-sm">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="min-w-0 truncate font-semibold text-gray-900">
+                                  {line.quantity}× {line.name}
+                                  {line.scheduledDate ? ` · ${line.scheduledDate}` : ''}
+                                  {line.scheduledTime ? ` ${convertTo12Hour(line.scheduledTime)}` : ''}
+                                </span>
+                                <span className="tabular-nums font-semibold text-gray-900 flex-shrink-0">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</span>
+                              </div>
+                              {priced && (
+                                <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                                  <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
+                                  {priced.applied_discounts.map((d, di) => (
+                                    <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                                  ))}
+                                  {(priced.add_ons ?? []).map((a, ai) => (
+                                    <p key={`a${ai}`}>+ {a.quantity}× {a.name} · ${(a.line_total ?? a.price_at_purchase * a.quantity).toFixed(2)}</p>
+                                  ))}
+                                  {priced.fee_total > 0 && <p>+ ${priced.fee_total.toFixed(2)} fees</p>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="pt-2 mt-1 border-t border-blue-100 space-y-1 text-sm">
+                        <div className="flex items-center justify-between"><span className="text-gray-600">Subtotal</span><span className="tabular-nums text-gray-900">{orderQuote ? `$${orderQuote.subtotal.toFixed(2)}` : '—'}</span></div>
+                        {orderQuote && orderQuote.discount_amount > 0 && (
+                          <div className="flex items-center justify-between"><span className="text-emerald-700">Discounts</span><span className="tabular-nums text-emerald-700">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                        )}
+                        {orderQuote && orderQuote.fee_total > 0 && (
+                          <div className="flex items-center justify-between"><span className="text-gray-600">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
+                        )}
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-bold text-gray-900">Order total ({orderQuote?.ticket_count ?? '…'} tickets)</span>
+                          <span className="font-extrabold text-gray-900 tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h2 className="text-base md:text-lg font-semibold text-gray-900">Payment Information</h2>
-                      <p className="text-xs md:text-sm text-gray-600 mt-0.5 md:mt-1">Secure payment powered by Authorize.Net</p>
+                      {orderMode && !authorizeApiLoginId ? (
+                        <p className="text-xs md:text-sm font-semibold text-amber-700 mt-0.5 md:mt-1">Online payment is temporarily unavailable — please refresh or try again shortly.</p>
+                      ) : (
+                        <p className="text-xs md:text-sm text-gray-600 mt-0.5 md:mt-1">Secure payment powered by Authorize.Net</p>
+                      )}
                     </div>
                     <div className="flex gap-1.5 md:gap-2">
                       <div className="h-5 md:h-6 lg:h-7 px-1.5 md:px-2 bg-gradient-to-br from-blue-800 to-blue-950 rounded flex items-center justify-center" title="Visa">
@@ -1760,8 +2110,8 @@ const PurchaseAttraction = () => {
                             </>
                           ) : (
                             <>
-                              <span className="hidden sm:inline">Pay ${total.toFixed(2)}</span>
-                              <span className="sm:hidden">${total.toFixed(2)}</span>
+                              <span className="hidden sm:inline">Pay ${(orderMode && orderQuote ? orderQuote.total_amount : total).toFixed(2)}</span>
+                              <span className="sm:hidden">${(orderMode && orderQuote ? orderQuote.total_amount : total).toFixed(2)}</span>
                             </>
                           )}
                         </>
@@ -1778,13 +2128,56 @@ const PurchaseAttraction = () => {
                     <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h2>
                     <p className="text-gray-600 mb-2">
-                      Your tickets for <span className="font-semibold text-gray-900">{attraction.name}</span> have been confirmed.
+                      {placedOrder
+                        ? <>Your order of <span className="font-semibold text-gray-900">{placedOrder.item_count} items · {placedOrder.ticket_count} tickets</span> has been confirmed.</>
+                        : <>Your tickets for <span className="font-semibold text-gray-900">{attraction.name}</span> have been confirmed.</>}
                     </p>
+                    {placedOrder && (
+                      <p className="text-sm text-gray-600 mb-2">
+                        Order reference: <span className="font-mono font-bold text-gray-900">{placedOrder.reference_number}</span>
+                      </p>
+                    )}
                     <p className="text-sm text-gray-500">
                       A confirmation email has been sent to <span className="font-medium text-gray-700">{customerInfo.email}</span>
                     </p>
                   </div>
                   
+                  {placedOrder && orderQrImage && (
+                    <div className="flex flex-col items-center mb-4">
+                      <img src={orderQrImage} alt="Order check-in code" className="w-44 h-44 border border-gray-200 rounded-xl" />
+                      <p className="text-xs text-gray-500 mt-2">One code for the whole order — show this at the venue.</p>
+                    </div>
+                  )}
+                  {placedOrder && (
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 mb-4">
+                      {placedOrder.lines.map(line => (
+                        <div key={line.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                          <span className="min-w-0 truncate text-gray-800">
+                            {line.quantity}× {line.name}
+                            {line.scheduled_date ? ` · ${line.scheduled_date}` : ''}
+                            {line.scheduled_time ? ` ${convertTo12Hour(line.scheduled_time)}` : ''}
+                          </span>
+                          <span className="tabular-nums font-semibold text-gray-900">${line.total_amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm">
+                        <span className="font-bold text-gray-900">Order total</span>
+                        <span className="font-extrabold text-gray-900 tabular-nums">${placedOrder.total_amount.toFixed(2)}</span>
+                      </div>
+                      {placedOrder.amount_paid < placedOrder.total_amount ? (
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-amber-50 text-sm">
+                          <span className="font-bold text-amber-800">Due at the venue</span>
+                          <span className="font-extrabold text-amber-800 tabular-nums">${(placedOrder.total_amount - placedOrder.amount_paid).toFixed(2)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-emerald-50 text-sm">
+                          <span className="font-bold text-emerald-800">Paid in full</span>
+                          <span className="font-extrabold text-emerald-800 tabular-nums">${placedOrder.amount_paid.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                     <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1830,12 +2223,27 @@ const PurchaseAttraction = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Payment Method:</span>
-                        <span className="font-medium text-gray-900">Credit/Debit Card</span>
+                        <span className="font-medium text-gray-900">{placedOrder && placedOrder.payment_method !== 'authorize.net' ? 'Pay on arrival' : 'Credit/Debit Card'}</span>
                       </div>
-                      <div className="pt-3 mt-3 flex justify-between">
-                        <span className="text-gray-900 font-semibold">Total Paid:</span>
-                        <span className="text-lg font-bold text-green-600">${total.toFixed(2)}</span>
-                      </div>
+                      {orderMode && placedOrder ? (
+                        <>
+                          <div className="pt-3 mt-3 flex justify-between">
+                            <span className="text-gray-900 font-semibold">Total Paid:</span>
+                            <span className="text-lg font-bold text-green-600">${placedOrder.amount_paid.toFixed(2)}</span>
+                          </div>
+                          {placedOrder.amount_paid < placedOrder.total_amount && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-900 font-semibold">Due at the venue:</span>
+                              <span className="text-lg font-bold text-amber-600">${(placedOrder.total_amount - placedOrder.amount_paid).toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="pt-3 mt-3 flex justify-between">
+                          <span className="text-gray-900 font-semibold">Total Paid:</span>
+                          <span className="text-lg font-bold text-green-600">${total.toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1866,7 +2274,7 @@ const PurchaseAttraction = () => {
                     <StandardButton
                       variant="primary"
                       size="md"
-                      onClick={() => navigate('/my-purchases')}
+                      onClick={() => navigate('/customer/attractions')}
                     >
                       View My Purchases
                     </StandardButton>
@@ -1878,7 +2286,7 @@ const PurchaseAttraction = () => {
 
           <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden lg:sticky lg:top-8">
-              {attraction.images && attraction.images.length > 0 && (
+              {!orderMode && attraction.images && attraction.images.length > 0 && (
                 <div className="relative group">
                   <div className="relative h-64 overflow-hidden bg-gray-100">
                     <img 
@@ -1937,6 +2345,60 @@ const PurchaseAttraction = () => {
               )}
               
               <div className="p-4 md:p-6">
+                {orderMode && cart ? (
+                  <div>
+                    <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">Your order</h2>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {cart.items.length} {cart.items.length === 1 ? 'item' : 'items'} · {orderQuote?.ticket_count ?? cart.ticketCount} tickets
+                      {attraction.location ? ` · ${attraction.location}` : ''}
+                    </p>
+                    <div className="divide-y divide-gray-100">
+                      {(orderItemsPayload ?? []).map((line, i) => {
+                        const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                        return (
+                          <div key={line.key ?? i} className="py-2 text-sm">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="min-w-0 font-semibold text-gray-900">{line.quantity}× {line.name}</span>
+                              <span className="tabular-nums font-semibold text-gray-900 flex-shrink-0">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {line.scheduledDate ?? ''}{line.scheduledTime ? ` at ${convertTo12Hour(line.scheduledTime)}` : ''}
+                            </p>
+                            {priced && (
+                              <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                                <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
+                                {priced.applied_discounts.map((d, di) => (
+                                  <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                                ))}
+                                {(priced.add_ons ?? []).map((ao, ai) => (
+                                  <p key={`a${ai}`}>+ {ao.quantity}× {ao.name} · ${(ao.line_total ?? ao.price_at_purchase * ao.quantity).toFixed(2)}</p>
+                                ))}
+                                {priced.fee_total > 0 && <p>+ ${priced.fee_total.toFixed(2)} fees</p>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="pt-2 mt-1 border-t border-gray-200 space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="tabular-nums text-gray-900">{orderQuote ? `$${orderQuote.subtotal.toFixed(2)}` : '—'}</span></div>
+                      {orderQuote && orderQuote.discount_amount > 0 && (
+                        <div className="flex justify-between"><span className="text-emerald-700">Discounts</span><span className="tabular-nums text-emerald-700">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                      )}
+                      {orderQuote && orderQuote.fee_total > 0 && (
+                        <div className="flex justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
+                      )}
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-white text-sm">Order total</span>
+                        <span className="text-xl md:text-2xl font-extrabold text-white">
+                          {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : '…'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (<>
                 <div className="mb-4">
                   <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">{attraction.name}</h2>
                   {attraction.location && (
@@ -2137,6 +2599,7 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
                 </div>
+                </>)}
                 
                 <div className="mt-5 bg-gray-50 rounded-xl p-3">
                   <div className="flex items-center justify-around text-xs text-gray-500">
@@ -2162,7 +2625,7 @@ const PurchaseAttraction = () => {
 
       <button
         onClick={() => setShowMobileSummary(true)}
-        className="fixed top-4 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
+        className="fixed top-20 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
         aria-label="View Order Summary"
       >
         <Info className="w-4 h-4" />
@@ -2375,9 +2838,17 @@ const PurchaseAttraction = () => {
 
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-white text-sm">Total</span>
+                    <span className="font-bold text-white text-sm">{orderMode ? 'This item' : 'Total'}</span>
                     <span className="text-xl font-extrabold text-white">${total.toFixed(2)}</span>
                   </div>
+                  {orderMode && (
+                    <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-white/20">
+                      <span className="font-bold text-white text-sm">Order total</span>
+                      <span className="text-xl font-extrabold text-white">
+                        {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : '…'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

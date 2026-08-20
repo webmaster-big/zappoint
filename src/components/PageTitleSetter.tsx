@@ -16,6 +16,7 @@ const titles: Record<string, string> = {
   '/customers/analytics': 'Customer Analytics',
   '/attractions': 'Attractions',
   '/attractions/create': 'Create Attraction',
+  '/orders': 'Bulk Orders',
   '/attractions/purchases': 'Attraction Purchases',
   '/attractions/purchases/create': 'Create Purchase',
   '/attendant/dashboard': 'Attendant Dashboard',

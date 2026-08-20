@@ -22,7 +22,8 @@ import {
   Trash2,
   Undo2,
   AlertTriangle,
-  Archive
+  Archive,
+  ShoppingCart
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import {
@@ -85,6 +86,7 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
   const booking = payment.booking;
   const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
   const eventPurchase = payment.eventPurchase || payment.event_purchase;
+  const ticketOrder = payment.ticketOrder || payment.ticket_order;
 
   let customerName = 'Guest';
   let customerEmail = 'N/A';
@@ -101,6 +103,9 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
   } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
     customerName = eventPurchase.guest_name || 'Guest';
     customerEmail = eventPurchase.guest_email || 'N/A';
+  } else if (payableType === PAYMENT_TYPE.TICKET_ORDER && ticketOrder) {
+    customerName = ticketOrder.customer_name || ticketOrder.guest_name || 'Guest';
+    customerEmail = ticketOrder.guest_email || 'N/A';
   }
 
   let payableReference = 'N/A';
@@ -124,6 +129,12 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
   } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE) {
     payableReference = `Event #${payment.payable_id}`;
     payableDescription = 'Event Purchase';
+  } else if (payableType === PAYMENT_TYPE.TICKET_ORDER && ticketOrder) {
+    payableReference = ticketOrder.reference_number || `Order #${payment.payable_id}`;
+    payableDescription = `Bulk Order • ${ticketOrder.item_count ?? '?'} items · ${ticketOrder.ticket_count ?? '?'} tickets`;
+  } else if (payableType === PAYMENT_TYPE.TICKET_ORDER) {
+    payableReference = `Order #${payment.payable_id}`;
+    payableDescription = 'Bulk Order';
   }
 
   return {
@@ -237,7 +248,8 @@ const Payments = () => {
   const payableTypeConfig = {
     booking: { icon: Package, label: 'Package Booking', color: `bg-${themeColor}-100 text-${fullColor}` },
     attraction_purchase: { icon: Ticket, label: 'Attraction Purchase', color: 'bg-purple-100 text-purple-800' },
-    event_purchase: { icon: Calendar, label: 'Event Purchase', color: 'bg-amber-100 text-amber-800' }
+    event_purchase: { icon: Calendar, label: 'Event Purchase', color: 'bg-amber-100 text-amber-800' },
+    ticket_order: { icon: ShoppingCart, label: 'Bulk Order', color: 'bg-blue-100 text-blue-800' }
   };
 
   const metrics: PaymentsMetrics = {
@@ -646,6 +658,8 @@ const Payments = () => {
       navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
     } else if (payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE) {
       navigate(`/events/purchases/${payment.payable_id}?from=payments`);
+    } else if (payment.payable_type === PAYMENT_TYPE.TICKET_ORDER) {
+      navigate(`/orders/${payment.payable_id}`);
     }
   };
 
@@ -1119,7 +1133,7 @@ const Payments = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metricCards.map((metric, index) => {
           const Icon = metric.icon;
           return (

@@ -1492,6 +1492,9 @@ const ManualBooking: React.FC = () => {
                                     }`}
                                   >
                                     {formatTimeTo12Hour(slot.start_time)}
+                                    {slot.remaining_tickets != null && (
+                                      <span className={`block text-[10px] font-semibold ${slot.remaining_tickets <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>{slot.remaining_tickets} left</span>
+                                    )}
                                   </button>
                                 ))}
                               </div>

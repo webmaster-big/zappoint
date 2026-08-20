@@ -42,6 +42,7 @@ const EditAttraction = () => {
     price: '',
     pricingType: 'per_person',
     maxCapacity: '',
+    maxTicketsPerSlot: '',
     duration: '',
     durationUnit: 'minutes',
     images: [],
@@ -123,6 +124,7 @@ const EditAttraction = () => {
           price: attraction.price?.toString() || '',
           pricingType: attraction.pricing_type || 'per_person',
           maxCapacity: attraction.max_capacity?.toString() || '',
+          maxTicketsPerSlot: attraction.max_tickets_per_slot?.toString() || '',
           duration: attraction.duration?.toString() || '',
           durationUnit: attraction.duration_unit || 'minutes',
           images: attraction.image ? (Array.isArray(attraction.image) ? attraction.image : [attraction.image]) : [],
@@ -373,6 +375,7 @@ const EditAttraction = () => {
         price: Number(formData.price),
         pricing_type: formData.pricingType,
         max_capacity: Number(formData.maxCapacity),
+        max_tickets_per_slot: formData.maxTicketsPerSlot ? parseInt(formData.maxTicketsPerSlot) : null,
         category: formData.category,
         duration: formData.duration === '' || formData.duration === '0' || Number(formData.duration) === 0 ? 0 : Number(formData.duration),
         duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
@@ -690,6 +693,19 @@ const EditAttraction = () => {
                       <label className="text-sm text-gray-700">Display capacity to customers</label>
                     </div>
                     <p className="text-xs text-gray-400 mt-1">When unchecked, customers will not see the capacity on the attraction page</p>
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Max Tickets per Time Slot</label>
+                    <input
+                      type="number"
+                      name="maxTicketsPerSlot"
+                      min="1"
+                      value={formData.maxTicketsPerSlot}
+                      onChange={handleInputChange}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                      placeholder="No limit"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Tickets sellable per time slot per day. Customers see the live count.</p>
                   </div>
 
                   <div>

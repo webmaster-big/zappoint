@@ -25,6 +25,8 @@ api.interceptors.request.use(
 export interface AttractionPurchase {
   id: number;
   attraction_id: number;
+  ticket_order_id?: number | null;
+  line_position?: number | null;
   customer_id?: number;
   location_id?: number;
   guest_name?: string;

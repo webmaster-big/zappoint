@@ -38,6 +38,8 @@ interface DisplayPurchase {
   id: string;
   referenceNumber: string;
   eventName: string;
+  ticketOrderId: number | null;
+  linePosition: number | null;
   customerName: string;
   email: string;
   phone: string;
@@ -94,25 +96,30 @@ const EventPurchases = () => {
     voided: { color: 'bg-red-100 text-red-800', icon: XCircle },
   };
 
+  const liveEventPurchases = purchases.filter(p => !['cancelled', 'refunded', 'voided'].includes(p.status));
+  const eventTransactionCount = liveEventPurchases.filter(p => !p.ticketOrderId).length
+    + new Set(liveEventPurchases.filter(p => p.ticketOrderId).map(p => p.ticketOrderId)).size;
+  const eventRevenue = liveEventPurchases.reduce((sum, p) => sum + p.amountPaid, 0);
+
   const metrics = [
     {
       title: 'Total Purchases',
-      value: purchases.length.toString(),
-      change: `${purchases.filter(p => p.status === 'confirmed').length} confirmed`,
+      value: eventTransactionCount.toString(),
+      change: `${purchases.length} ticket lines · ${purchases.filter(p => p.status === 'confirmed').length} confirmed`,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CreditCard,
     },
     {
       title: 'Total Revenue',
-      value: `$${purchases.reduce((sum, p) => sum + p.totalAmount, 0).toFixed(2)}`,
-      change: 'All time revenue',
+      value: `$${eventRevenue.toFixed(2)}`,
+      change: 'Collected, excluding cancelled/refunded',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CheckCircle,
     },
     {
       title: 'Avg. Purchase',
-      value: purchases.length > 0
-        ? `$${(purchases.reduce((sum, p) => sum + p.totalAmount, 0) / purchases.length).toFixed(2)}`
+      value: eventTransactionCount > 0
+        ? `$${(eventRevenue / eventTransactionCount).toFixed(2)}`
         : '$0.00',
       change: 'Per transaction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -132,6 +139,8 @@ const EventPurchases = () => {
       id: purchase.id.toString(),
       referenceNumber: purchase.reference_number,
       eventName: purchase.event?.name || 'Unknown Event',
+      ticketOrderId: purchase.ticket_order_id ?? null,
+      linePosition: purchase.line_position ?? null,
       customerName: purchase.customer
         ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
         : purchase.guest_name || 'Walk-in Customer',
@@ -263,8 +272,21 @@ const EventPurchases = () => {
       group: 'Purchase',
       sortable: true,
       sortValue: p => p.eventName,
-      exportValue: p => p.eventName,
-      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.eventName}</span>,
+      exportValue: p => p.ticketOrderId ? `${p.eventName} (bulk order line ${p.linePosition ?? ''})` : p.eventName,
+      render: p => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          {p.eventName}
+          {p.ticketOrderId ? (
+            <Link
+              to={`/orders/${p.ticketOrderId}`}
+              title={`Item ${p.linePosition ?? ''} of a bulk order — view the order`}
+              className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-800 hover:bg-blue-100"
+            >
+              bulk{p.linePosition ? ` #${p.linePosition}` : ''}
+            </Link>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: 'quantity',
@@ -367,7 +389,15 @@ const EventPurchases = () => {
       sortable: true,
       sortValue: p => p.status,
       exportValue: p => p.status,
-      render: p => (
+      render: p => p.ticketOrderId ? (
+        <Link
+          to={`/orders/${p.ticketOrderId}`}
+          title="Part of a bulk order — status is managed on the order"
+          className={`inline-block text-xs font-medium px-3 py-1 rounded-full ${statusConfig[p.status]?.color || 'bg-gray-100 text-gray-800'} hover:ring-2 hover:ring-blue-300`}
+        >
+          {p.status} ↗
+        </Link>
+      ) : (
         <select
           value={p.status}
           onChange={(e) => handleStatusChange(p.id, e.target.value)}
@@ -505,10 +535,18 @@ const EventPurchases = () => {
 
   const handleBulkDelete = async () => {
     if (table.selectedIds.length === 0) return;
-    if (window.confirm(`Are you sure you want to delete ${table.selectedIds.length} purchase record(s)?`)) {
+
+    const orderLineIds = new Set(purchases.filter(p => p.ticketOrderId).map(p => p.id));
+    const eligible = table.selectedIds.filter(id => !orderLineIds.has(id));
+    const skipped = table.selectedIds.length - eligible.length;
+    if (eligible.length === 0) {
+      setToast({ message: 'The selected tickets belong to bulk orders — manage them on the order page.', type: 'info' });
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete ${eligible.length} purchase record(s)?`)) {
       try {
-        await Promise.all(table.selectedIds.map((id) => eventPurchaseService.deletePurchase(Number(id))));
-        setToast({ message: `${table.selectedIds.length} purchase(s) deleted successfully`, type: 'success' });
+        await Promise.all(eligible.map((id) => eventPurchaseService.deletePurchase(Number(id))));
+        setToast({ message: `${eligible.length} purchase(s) deleted${skipped ? ` — ${skipped} skipped (bulk-order tickets are managed on their order)` : ''}`, type: 'success' });
         table.clearSelection();
         loadPurchases();
       } catch (error) {
@@ -520,9 +558,16 @@ const EventPurchases = () => {
 
   const handleBulkStatusChange = async (newStatus: string) => {
     if (table.selectedIds.length === 0 || !newStatus) return;
+    const orderLineIds = new Set(purchases.filter(p => p.ticketOrderId).map(p => p.id));
+    const eligible = table.selectedIds.filter(id => !orderLineIds.has(id));
+    const skipped = table.selectedIds.length - eligible.length;
+    if (eligible.length === 0) {
+      setToast({ message: 'The selected tickets belong to bulk orders — manage them on the order page.', type: 'info' });
+      return;
+    }
     try {
-      await Promise.all(table.selectedIds.map((id) => eventPurchaseService.updateStatus(Number(id), newStatus)));
-      setToast({ message: `${table.selectedIds.length} purchase(s) updated successfully`, type: 'success' });
+      await Promise.all(eligible.map((id) => eventPurchaseService.updateStatus(Number(id), newStatus)));
+      setToast({ message: `${eligible.length} purchase(s) updated${skipped ? ` — ${skipped} skipped (bulk-order tickets are managed on their order)` : ''}`, type: 'success' });
       table.clearSelection();
       loadPurchases();
     } catch (error) {
@@ -550,6 +595,8 @@ const EventPurchases = () => {
       id: purchase.id.toString(),
       referenceNumber: purchase.reference_number,
       eventName: purchase.event?.name || 'Unknown Event',
+      ticketOrderId: purchase.ticket_order_id ?? null,
+      linePosition: purchase.line_position ?? null,
       customerName: purchase.customer
         ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
         : purchase.guest_name || 'Walk-in Customer',

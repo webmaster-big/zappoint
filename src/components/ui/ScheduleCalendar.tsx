@@ -14,6 +14,7 @@ interface ScheduleCalendarProps {
   scheduledDate: string;
   scheduledTime: string;
   availableTimeSlots: string[];
+  slotRemaining?: Record<string, number> | null;
   onDateSelect: (dateStr: string) => void;
   onTimeSelect: (time: string) => void;
   themeColor?: string;
@@ -37,6 +38,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   scheduledDate,
   scheduledTime,
   availableTimeSlots,
+  slotRemaining,
   onDateSelect,
   onTimeSelect,
   themeColor = 'blue',
@@ -285,6 +287,14 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
                 }`}
             >
               {formatTime12Hour(time)}
+              {(() => {
+                const left = slotRemaining ? (slotRemaining[time] ?? slotRemaining['__cap']) : null;
+                return left != null ? (
+                  <span className={`block text-[10px] font-semibold ${scheduledTime === time ? 'text-white/80' : left <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {left} left
+                  </span>
+                ) : null;
+              })()}
             </button>
           ))}
         </div>

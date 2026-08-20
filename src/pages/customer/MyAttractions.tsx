@@ -21,7 +21,7 @@ import {
 import { attractionPurchaseService } from '../../services/AttractionPurchaseService';
 import type { AttractionPurchase } from '../../services/AttractionPurchaseService';
 import { getImageUrl } from '../../utils/storage';
-import { generatePurchaseQRCode } from '../../utils/qrcode';
+import { generatePurchaseQRCode, generateOrderQRCode } from '../../utils/qrcode';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 
@@ -127,10 +127,14 @@ const MyAttractions = () => {
 
   const handleDownloadQRCode = async (purchase: AttractionPurchase) => {
     try {
-      const qrCodeDataURL = await generatePurchaseQRCode(purchase.id);
+      const qrCodeDataURL = purchase.ticket_order_id
+        ? await generateOrderQRCode(purchase.ticket_order_id)
+        : await generatePurchaseQRCode(purchase.id);
       const link = document.createElement('a');
       link.href = qrCodeDataURL;
-      link.download = `attraction-ticket-${purchase.id}.png`;
+      link.download = purchase.ticket_order_id
+        ? `order-${purchase.ticket_order_id}.png`
+        : `attraction-ticket-${purchase.id}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

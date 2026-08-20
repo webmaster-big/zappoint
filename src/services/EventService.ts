@@ -107,7 +107,7 @@ class EventService {
     return response.data;
   }
 
-  async getAvailableTimeSlots(eventId: number, date: string): Promise<{ date: string; time_slots: string[] }> {
+  async getAvailableTimeSlots(eventId: number, date: string): Promise<{ date: string; time_slots: string[]; remaining_tickets?: Record<string, number> | null }> {
     const response = await api.get(`/events/${eventId}/available-time-slots/${date}`);
     return response.data;
   }

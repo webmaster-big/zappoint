@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Menu,
   X,
@@ -10,6 +10,8 @@ import customerService from '../services/CustomerService';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { membershipCache } from '../services/MembershipCacheService';
 import Toast from '../components/ui/Toast';
+import { useCart } from '../contexts/CartContext';
+import { ShoppingCart } from 'lucide-react';
 
 interface CustomerUser {
   id: number;
@@ -29,12 +31,37 @@ const CustomerLayout = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const { itemCount, ticketCount } = useCart();
 
 
 
   useEffect(() => {
     checkUserLoginStatus();
   }, []);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        '--zz-header-h',
+        `${Math.round(header.getBoundingClientRect().height)}px`,
+      );
+    };
+
+    publish();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', publish);
+      return () => window.removeEventListener('resize', publish);
+    }
+
+    const observer = new ResizeObserver(publish);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [isLoading]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -62,7 +89,6 @@ const CustomerLayout = () => {
     }
   };
 
-  console.log(window.location.pathname);
 
   const handleLogout = async () => {
     if (!customerUser?.token) return;
@@ -99,7 +125,7 @@ const CustomerLayout = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="bg-white/80 backdrop-blur-md border-b border-blue-800 sticky top-0 z-40">
+      <header ref={headerRef} className="bg-white/80 backdrop-blur-md border-b border-blue-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
@@ -111,7 +137,7 @@ const CustomerLayout = () => {
               />
             </div>
             
-            <div className="hidden lg:flex items-center space-x-6">
+            <div className="hidden lg:flex items-center space-x-6 lg:ml-auto">
               <nav className="flex items-center space-x-4">
             
                 {customerUser && (
@@ -224,6 +250,20 @@ const CustomerLayout = () => {
                 </div>
               )}
             </div>
+
+            {itemCount > 0 && (
+              <Link
+                to="/cart"
+                aria-label={`Cart: ${itemCount} ${itemCount === 1 ? 'item' : 'items'}, ${ticketCount} ${ticketCount === 1 ? 'ticket' : 'tickets'}`}
+                className="ml-auto lg:ml-4 mr-2 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border border-blue-800 text-blue-800 hover:bg-blue-50 font-semibold text-sm transition-colors flex-shrink-0"
+              >
+                <ShoppingCart size={16} />
+                <span className="hidden xl:inline">Cart</span>
+                <span className="inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-blue-800 text-white text-[11px] font-bold tabular-nums leading-none">
+                  {itemCount}
+                </span>
+              </Link>
+            )}
 
             <button 
               className="lg:hidden p-2 hover:bg-blue-50 transition-colors border border-blue-800"

@@ -153,6 +153,22 @@ const ViewEventPurchase = () => {
           </div>
         </div>
 
+        {purchase.ticket_order_id != null && (
+          <div className="mb-4 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900 flex items-center justify-between gap-3">
+            <span>
+              <span className="font-bold">Part of bulk order</span>
+              {purchase.line_position != null && <> — line {purchase.line_position}</>}
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate(`/orders/${purchase.ticket_order_id}`)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-800 hover:bg-blue-900 text-white whitespace-nowrap"
+            >
+              View order
+            </button>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchase Information</h2>

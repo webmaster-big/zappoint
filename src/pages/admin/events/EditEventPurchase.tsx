@@ -45,6 +45,7 @@ const EditEventPurchase: React.FC = () => {
         if (user?.role === 'company_admin') return '/admin/payments';
         return '/payments';
       case 'details': return `/events/purchases/${id}`;
+      case 'order': return originalPurchase?.ticket_order_id != null ? `/orders/${originalPurchase.ticket_order_id}` : '/orders';
       default: return '/events/purchases';
     }
   };
@@ -64,6 +65,7 @@ const EditEventPurchase: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [originalPurchase, setOriginalPurchase] = useState<EventPurchase | null>(null);
+  const isOrderLine = originalPurchase?.ticket_order_id != null;
   const [eventFull, setEventFull] = useState<Event | null>(null);
   const [originalPurchaseDate, setOriginalPurchaseDate] = useState('');
   const [originalPurchaseTime, setOriginalPurchaseTime] = useState('');
@@ -351,25 +353,32 @@ const EditEventPurchase: React.FC = () => {
     }
     setSubmitting(true);
     try {
-      const data: UpdateEventPurchaseData = {
-        guest_name: guestName || undefined,
-        guest_email: guestEmail || undefined,
-        guest_phone: guestPhone || undefined,
-        quantity,
-        purchase_date: purchaseDate,
-        purchase_time: purchaseTime,
-        status,
-        payment_status: paymentStatus,
-        payment_method: paymentMethod,
-        amount_paid: amountPaid,
-        total_amount: displayTotal,
-        discount_amount: discountAmount,
-        applied_fees: appliedFees.length > 0 ? appliedFees : null,
-        applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
-        notes: notes || undefined,
-        special_requests: specialRequests || undefined,
-        add_ons: buildAddOns(),
-      };
+      const data: UpdateEventPurchaseData = isOrderLine
+        ? {
+            purchase_date: purchaseDate,
+            purchase_time: purchaseTime,
+            notes: notes || undefined,
+            special_requests: specialRequests || undefined,
+          }
+        : {
+            guest_name: guestName || undefined,
+            guest_email: guestEmail || undefined,
+            guest_phone: guestPhone || undefined,
+            quantity,
+            purchase_date: purchaseDate,
+            purchase_time: purchaseTime,
+            status,
+            payment_status: paymentStatus,
+            payment_method: paymentMethod,
+            amount_paid: amountPaid,
+            total_amount: displayTotal,
+            discount_amount: discountAmount,
+            applied_fees: appliedFees.length > 0 ? appliedFees : null,
+            applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
+            notes: notes || undefined,
+            special_requests: specialRequests || undefined,
+            add_ons: buildAddOns(),
+          };
 
       const response = await eventPurchaseService.updatePurchase(originalPurchase.id, data);
 
@@ -436,6 +445,14 @@ const EditEventPurchase: React.FC = () => {
             </span>
           </div>
 
+          {isOrderLine && (
+            <div className="mb-6 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900">
+              <span className="font-bold">Part of bulk order</span>
+              {originalPurchase?.line_position != null && <> — line {originalPurchase.line_position}</>}.
+              {' '}Only the schedule, notes and special requests can be changed here; tickets, pricing, customer and status are managed on the order.
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-8">
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
@@ -454,18 +471,19 @@ const EditEventPurchase: React.FC = () => {
               <div className="mt-4">
                 <label className="block font-semibold mb-2 text-base text-neutral-800">Quantity</label>
                 <div className="flex items-center gap-2">
-                  <StandardButton type="button" variant="secondary" size="sm" icon={Minus} onClick={() => setQuantity(Math.max(1, quantity - 1))}>
+                  <StandardButton type="button" variant="secondary" size="sm" icon={Minus} disabled={isOrderLine} onClick={() => setQuantity(Math.max(1, quantity - 1))}>
                     {''}
                   </StandardButton>
                   <input
                     type="number"
                     min="1"
                     value={quantity}
+                    disabled={isOrderLine}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                     onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                    className="w-16 text-center font-bold text-base text-gray-900 border border-gray-300 rounded px-1 py-1.5"
+                    className="w-16 text-center font-bold text-base text-gray-900 border border-gray-300 rounded px-1 py-1.5 disabled:bg-gray-100 disabled:text-gray-500"
                   />
-                  <StandardButton type="button" variant="primary" size="sm" icon={Plus} onClick={() => setQuantity(quantity + 1)}>
+                  <StandardButton type="button" variant="primary" size="sm" icon={Plus} disabled={isOrderLine} onClick={() => setQuantity(quantity + 1)}>
                     {''}
                   </StandardButton>
                   <span className="ml-2 text-sm text-gray-500">
@@ -475,7 +493,7 @@ const EditEventPurchase: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <User className={`w-5 h-5 text-${themeColor}-600`} /> Customer Information
               </h3>
@@ -554,7 +572,7 @@ const EditEventPurchase: React.FC = () => {
             </div>
 
             {availableAddOns.length > 0 && (
-              <div>
+              <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                   <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
                 </h3>
@@ -609,7 +627,7 @@ const EditEventPurchase: React.FC = () => {
               </div>
             )}
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Receipt className={`w-5 h-5 text-${themeColor}-600`} /> Fees
               </h3>
@@ -680,7 +698,7 @@ const EditEventPurchase: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Percent className={`w-5 h-5 text-${themeColor}-600`} /> Discounts
               </h3>
@@ -783,7 +801,7 @@ const EditEventPurchase: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <DollarSign className={`w-5 h-5 text-${themeColor}-600`} /> Status & Payment
               </h3>

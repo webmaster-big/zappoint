@@ -38,6 +38,7 @@ const EditEvent = () => {
   const [timeEnd, setTimeEnd] = useState('17:00');
   const [intervalMinutes, setIntervalMinutes] = useState(60);
   const [maxBookingsPerSlot, setMaxBookingsPerSlot] = useState('');
+  const [maxTicketsPerSlot, setMaxTicketsPerSlot] = useState('');
   const [price, setPrice] = useState('0');
   const [features, setFeatures] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
@@ -94,6 +95,7 @@ const EditEvent = () => {
     setTimeEnd(event.time_end ? event.time_end.substring(0, 5) : '17:00');
     setIntervalMinutes(event.interval_minutes || 60);
     setMaxBookingsPerSlot(event.max_bookings_per_slot?.toString() || '');
+    setMaxTicketsPerSlot(event.max_tickets_per_slot?.toString() || '');
     setPrice(event.price || '0');
     setFeatures(event.features || []);
     setIsActive(event.is_active ?? true);
@@ -260,6 +262,7 @@ const EditEvent = () => {
         time_end: timeEnd,
         interval_minutes: intervalMinutes,
         max_bookings_per_slot: maxBookingsPerSlot ? parseInt(maxBookingsPerSlot) : null,
+        max_tickets_per_slot: maxTicketsPerSlot ? parseInt(maxTicketsPerSlot) : null,
         price: parseFloat(price) || 0,
         features: features.filter(f => f.trim()),
         add_on_ids: selectedAddOnIds,
@@ -503,6 +506,18 @@ const EditEvent = () => {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
               <p className="text-xs text-gray-400 mt-1">Leave empty for unlimited</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max Tickets per Slot</label>
+              <input
+                type="number"
+                min={1}
+                value={maxTicketsPerSlot}
+                onChange={e => setMaxTicketsPerSlot(e.target.value)}
+                placeholder="Unlimited"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <p className="text-xs text-gray-400 mt-1">Tickets sellable per slot. Customers see the live count.</p>
             </div>
           </div>
 

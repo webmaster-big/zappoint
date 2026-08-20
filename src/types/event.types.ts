@@ -12,6 +12,7 @@ export interface Event {
   time_end: string;
   interval_minutes: number;
   max_bookings_per_slot: number | null;
+  max_tickets_per_slot?: number | null;
   price: string;
   features: string[] | null;
   add_ons_order: number[] | null;
@@ -39,6 +40,8 @@ export interface EventPurchase {
   id: number;
   reference_number: string;
   event_id: number;
+  ticket_order_id?: number | null;
+  line_position?: number | null;
   customer_id: number | null;
   location_id: number;
   guest_name: string | null;
@@ -95,6 +98,7 @@ export interface CreateEventData {
   time_end: string;
   interval_minutes: number;
   max_bookings_per_slot?: number | null;
+  max_tickets_per_slot?: number | null;
   price?: number;
   features?: string[];
   add_on_ids?: number[];

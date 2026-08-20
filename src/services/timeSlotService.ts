@@ -27,9 +27,10 @@ export interface TimeSlot {
   end_time: string;
   duration: number;
   duration_unit: string;
-  room_id?: number;
-  room_name?: string;
+  room_id?: number | null;
+  room_name?: string | null;
   available_rooms_count?: number;
+  remaining_tickets?: number | null;
 }
 
 export interface BookedSlot {

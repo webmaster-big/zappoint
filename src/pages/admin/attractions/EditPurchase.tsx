@@ -50,6 +50,7 @@ const EditPurchase: React.FC = () => {
       case 'dashboard': return -1 as any;
       case 'payments': return getPaymentsPath();
       case 'details': return `/attractions/purchases/${id}`;
+      case 'order': return originalPurchase?.ticket_order_id != null ? `/orders/${originalPurchase.ticket_order_id}` : '/orders';
       default: return '/attractions/purchases';
     }
   };
@@ -69,6 +70,7 @@ const EditPurchase: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [originalPurchase, setOriginalPurchase] = useState<AttractionPurchase | null>(null);
+  const isOrderLine = originalPurchase?.ticket_order_id != null;
   const [originalScheduledDate, setOriginalScheduledDate] = useState<string>('');
   const [originalScheduledTime, setOriginalScheduledTime] = useState<string>('');
   const [attractions, setAttractions] = useState<Attraction[]>([]);
@@ -370,24 +372,30 @@ const EditPurchase: React.FC = () => {
     }
     setSubmitting(true);
     try {
-      const data: UpdatePurchaseData = {
-        attraction_id: attractionId ?? undefined,
-        guest_name: guestName || undefined,
-        guest_email: guestEmail || undefined,
-        guest_phone: guestPhone || undefined,
-        quantity,
-        scheduled_date: scheduledDate,
-        scheduled_time: scheduledTime,
-        status,
-        payment_method: paymentMethod,
-        amount_paid: amountPaid,
-        notes: notes || undefined,
-        applied_fees: appliedFees.length > 0 ? appliedFees : null,
-        applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
-        discount_amount: discountAmount,
-        total_amount: displayTotal,
-        ...(addOnsChanged && { additional_addons: buildAdditionalAddons() }),
-      };
+      const data: UpdatePurchaseData = isOrderLine
+        ? {
+            scheduled_date: scheduledDate,
+            scheduled_time: scheduledTime,
+            notes: notes || undefined,
+          }
+        : {
+            attraction_id: attractionId ?? undefined,
+            guest_name: guestName || undefined,
+            guest_email: guestEmail || undefined,
+            guest_phone: guestPhone || undefined,
+            quantity,
+            scheduled_date: scheduledDate,
+            scheduled_time: scheduledTime,
+            status,
+            payment_method: paymentMethod,
+            amount_paid: amountPaid,
+            notes: notes || undefined,
+            applied_fees: appliedFees.length > 0 ? appliedFees : null,
+            applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
+            discount_amount: discountAmount,
+            total_amount: displayTotal,
+            ...(addOnsChanged && { additional_addons: buildAdditionalAddons() }),
+          };
 
       const response = await attractionPurchaseService.updatePurchase(originalPurchase.id, data);
 
@@ -462,8 +470,16 @@ const EditPurchase: React.FC = () => {
             </span>
           </div>
 
+          {originalPurchase?.ticket_order_id != null && (
+            <div className="mb-6 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900">
+              <span className="font-bold">Part of bulk order</span>
+              {originalPurchase.line_position != null && <> — line {originalPurchase.line_position}</>}.
+              {' '}Only the visit schedule and notes can be changed here; tickets, pricing, customer and status are managed on the order.
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-8">
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Ticket className={`w-5 h-5 text-${themeColor}-600`} /> Attraction
               </h3>
@@ -519,7 +535,7 @@ const EditPurchase: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <User className={`w-5 h-5 text-${themeColor}-600`} /> Customer Information
               </h3>
@@ -592,7 +608,7 @@ const EditPurchase: React.FC = () => {
             </div>
 
             {availableAddOns.length > 0 && (
-              <div>
+              <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                   <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
                 </h3>
@@ -647,7 +663,7 @@ const EditPurchase: React.FC = () => {
               </div>
             )}
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Receipt className={`w-5 h-5 text-${themeColor}-600`} /> Fees
               </h3>
@@ -718,7 +734,7 @@ const EditPurchase: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Percent className={`w-5 h-5 text-${themeColor}-600`} /> Discounts
               </h3>
@@ -821,7 +837,7 @@ const EditPurchase: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className={isOrderLine ? "pointer-events-none opacity-50 select-none" : undefined}>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <DollarSign className={`w-5 h-5 text-${themeColor}-600`} /> Status & Payment
               </h3>

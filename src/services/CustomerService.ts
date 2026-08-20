@@ -196,6 +196,10 @@ export interface GroupedPackage {
   min_participants: number;
   max_guests: number;
   price_per_additional?: number;
+  pricing_type?: 'base' | 'per_person';
+  participant_label?: string | null;
+  display_label?: string | null;
+  max_tickets_per_slot?: number | null;
   duration: number;
   duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   image: string | string[];

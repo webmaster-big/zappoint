@@ -47,3 +47,9 @@ export const generatePurchaseQRCode = async (
   const qrData = generatePurchaseQRData(purchaseId);
   return generateQRCode(qrData);
 };
+
+export const generateOrderQRData = (orderId: number | string): string =>
+  JSON.stringify({ type: 'ticket_order', id: orderId });
+
+export const generateOrderQRCode = async (orderId: number | string): Promise<string> =>
+  generateQRCode(generateOrderQRData(orderId));

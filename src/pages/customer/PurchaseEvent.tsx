@@ -22,6 +22,8 @@ import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import { extractIdFromSlug } from '../../utils/slug';
+import { useCartSafe } from '../../contexts/CartContext';
+import ticketOrderService, { type CartQuote as OrderQuote, type TicketOrder as PlacedOrder } from '../../services/TicketOrderService';
 import { trackPageView } from '../../utils/analytics';
 import { setNextTrackingId } from '../../utils/analyticsHeaders';
 import Toast from '../../components/ui/Toast';
@@ -39,6 +41,8 @@ import type { Event, EventAddOn } from '../../types/event.types';
 import { useMembershipBenefits } from '../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../types/Membership.types';
 import { resolveBullets } from '../../utils/bullets';
+import { generateOrderQRCode } from '../../utils/qrcode';
+import { convertTo12Hour } from '../../utils/timeFormat';
 import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
 
 const countries: { code: string; name: string }[] = [
@@ -119,7 +123,12 @@ const getPaymentErrorMessage = (error: any): string => {
 
 const PurchaseEvent = () => {
   const { eventId: rawEventId, slug } = useParams<{ eventId?: string; slug?: string }>();
-  const eventId = rawEventId ?? (slug ? String(extractIdFromSlug(slug)) : undefined);
+  const cart = useCartSafe();
+  const orderMode = !slug && !rawEventId && (cart?.items.length ?? 0) > 0;
+  const anchorItem = orderMode ? (cart?.items.find(i => i.type === 'event') ?? null) : null;
+  const eventId = rawEventId
+    ?? (slug ? String(extractIdFromSlug(slug)) : undefined)
+    ?? (anchorItem ? String(anchorItem.id) : undefined);
   const navigate = useNavigate();
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -132,6 +141,7 @@ const PurchaseEvent = () => {
   const [fullyBlockedDates, setFullyBlockedDates] = useState<Set<string>>(new Set());
   const [selectedDate, setSelectedDate] = useState('');
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
 
@@ -187,6 +197,10 @@ const PurchaseEvent = () => {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
+  const [orderQuote, setOrderQuote] = useState<OrderQuote | null>(null);
+  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [orderQrImage, setOrderQrImage] = useState<string | null>(null);
+  const [orderPrefilled, setOrderPrefilled] = useState(false);
 
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
@@ -419,9 +433,11 @@ const PurchaseEvent = () => {
     try {
       const res = await eventService.getAvailableTimeSlots(parseInt(eventId!), date);
       setTimeSlots(res.time_slots || []);
-      setSelectedTime('');
+      setSlotRemaining(res.remaining_tickets ?? null);
+      setSelectedTime(prev => (res.time_slots || []).includes(prev) ? prev : '');
     } catch {
       setTimeSlots([]);
+      setSlotRemaining(null);
     } finally {
       setLoadingSlots(false);
     }
@@ -587,6 +603,57 @@ const PurchaseEvent = () => {
     }
   };
 
+  useEffect(() => {
+    if (!slug && !rawEventId && (cart?.items.length ?? 0) === 0 && !purchaseComplete) {
+      navigate('/cart', { replace: true });
+    }
+  }, [slug, rawEventId, cart?.items.length, purchaseComplete, navigate]);
+
+  useEffect(() => {
+    if (!orderMode || orderPrefilled || !event || !anchorItem) return;
+    setQuantity(anchorItem.quantity);
+    if (anchorItem.scheduledDate) setSelectedDate(anchorItem.scheduledDate);
+    if (anchorItem.scheduledTime) setSelectedTime(anchorItem.scheduledTime);
+    setOrderPrefilled(true);
+  }, [orderMode, orderPrefilled, event, anchorItem]);
+
+  const orderItemsPayload = useMemo(() => {
+    if (!orderMode || !event || !cart || !anchorItem) return null;
+    const rest = cart.items.filter(i => i.key !== anchorItem.key);
+    return [
+      {
+        key: anchorItem.key,
+        type: 'event' as const,
+        id: Number(event.id),
+        name: event.name,
+        locationId: event.location_id,
+        unitPrice: Number(event.price),
+        quantity,
+        scheduledDate: selectedDate || null,
+        scheduledTime: selectedTime || null,
+        addOns: Object.entries(selectedAddOns)
+          .filter(([, qty]) => qty > 0)
+          .map(([idStr, qty]) => ({ id: Number(idStr), name: '', price: 0, quantity: qty })),
+      },
+      ...rest,
+    ];
+  }, [orderMode, event, cart, anchorItem, quantity, selectedDate, selectedTime, selectedAddOns]);
+
+  useEffect(() => {
+    if (!orderMode || !orderItemsPayload || !selectedDate || !selectedTime) {
+      setOrderQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      ticketOrderService
+        .quote(orderItemsPayload)
+        .then(q => { if (!cancelled) setOrderQuote(q); })
+        .catch(() => {});
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [orderMode, orderItemsPayload, selectedDate, selectedTime]);
+
   const handlePurchase = async (e?: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setError('');
@@ -693,6 +760,76 @@ const PurchaseEvent = () => {
         zip: billingZip,
         country: billingCountry,
       };
+
+      if (orderMode && orderItemsPayload && cart) {
+        let order: PlacedOrder | null = null;
+
+        try {
+          setNextTrackingId();
+          order = await ticketOrderService.checkout(orderItemsPayload, {
+            customer_id: selectedCustomerId || customerData?.id || undefined,
+            guest_name: guestName,
+            guest_email: guestEmail,
+            guest_phone: guestPhone || undefined,
+            guest_address: billingAddress || undefined,
+            guest_city: billingCity || undefined,
+            guest_state: billingState || undefined,
+            guest_zip: billingZip || undefined,
+            guest_country: billingCountry || undefined,
+            sms_consent: smsConsent,
+            payment_method: 'authorize.net',
+            notes: specialRequests || `Bulk order — ${orderItemsPayload.length} items`,
+          });
+        } catch (createErr) {
+          throw new Error(
+            createErr instanceof Error && createErr.message
+              ? createErr.message
+              : "We couldn't process your order right now. No charges were made.",
+          );
+        }
+
+        try {
+          const orderQr = await generateOrderQRCode(order.id);
+          setOrderQrImage(orderQr);
+          void ticketOrderService.storeQrCode(order.id, orderQr);
+        } catch { void 0; }
+
+        let orderPayment;
+        try {
+          orderPayment = await processCardPayment(
+            cardData,
+            {
+              location_id: event!.location_id,
+              amount: order.total_amount,
+              order_id: order.reference_number.slice(0, 20),
+              description: `ZapZone order ${order.reference_number}`,
+              customer_id: selectedCustomerId || customerData?.id || undefined,
+              signature_image: signatureImage || undefined,
+              terms_accepted: termsAccepted,
+              payable_id: order.id,
+              payable_type: PAYMENT_TYPE.TICKET_ORDER,
+              send_email: false,
+            },
+            authorizeApiLoginId,
+            authorizeClientKey,
+            customerBillingData
+          );
+        } catch (paymentErr) {
+          await ticketOrderService.rollback(order.id);
+          throw paymentErr;
+        }
+
+        if (!orderPayment.success) {
+          await ticketOrderService.rollback(order.id);
+          throw new Error(orderPayment.message || 'Your payment could not be processed. No charges were made to your card.');
+        }
+
+        setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: order.total_amount, remaining_balance: 0, status: 'confirmed' })));
+        cart.clear();
+        setPurchaseComplete(true);
+        setCurrentStep(4);
+        return;
+      }
 
       let response;
       try {
@@ -873,6 +1010,63 @@ const PurchaseEvent = () => {
                 </div>
               )}
             </div>
+            {orderMode && cart && currentStep >= 2 && currentStep < 4 && (
+              <div className="bg-white shadow-md rounded-2xl p-4 md:p-5 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm md:text-base font-bold text-gray-900">Your order — {cart.items.length} items · {cart.items.reduce((n, i) => n + i.quantity, 0)} tickets</h2>
+                  <button type="button" onClick={() => navigate('/cart')} className="text-xs font-semibold text-blue-800 hover:text-blue-900">
+                    Edit cart
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(orderItemsPayload ?? []).map((line, i) => {
+                    const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                    return (
+                      <div key={line.key ?? i} className="py-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate font-semibold text-gray-900">
+                            {line.quantity}× {line.name}
+                            {line.scheduledDate ? ` · ${line.scheduledDate}` : ''}
+                            {line.scheduledTime ? ` ${convertTo12Hour(line.scheduledTime)}` : ''}
+                          </span>
+                          <span className="tabular-nums font-semibold text-gray-900 flex-shrink-0">
+                            {priced ? `$${priced.total_amount.toFixed(2)}` : '—'}
+                          </span>
+                        </div>
+                        {priced && (
+                          <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                            <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
+                            {priced.applied_discounts.map((d, di) => (
+                              <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                            ))}
+                            {(priced.add_ons ?? []).map((ao, ai) => (
+                              <p key={`a${ai}`}>+ {ao.quantity}× {ao.name} · ${(ao.line_total ?? ao.price_at_purchase * ao.quantity).toFixed(2)}</p>
+                            ))}
+                            {priced.fee_total > 0 && <p>+ ${priced.fee_total.toFixed(2)} fees</p>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="pt-2 mt-1 border-t border-gray-200 space-y-1 text-sm">
+                  <div className="flex items-center justify-between"><span className="text-gray-500">Subtotal</span><span className="tabular-nums text-gray-900">{orderQuote ? `$${orderQuote.subtotal.toFixed(2)}` : '—'}</span></div>
+                  {orderQuote && orderQuote.discount_amount > 0 && (
+                    <div className="flex items-center justify-between"><span className="text-emerald-700">Discounts</span><span className="tabular-nums text-emerald-700">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                  )}
+                  {orderQuote && orderQuote.fee_total > 0 && (
+                    <div className="flex items-center justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
+                  )}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="font-bold text-gray-900">Order total</span>
+                    <span className="font-extrabold text-gray-900 tabular-nums">
+                      {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white shadow-md rounded-2xl overflow-hidden">
               {currentStep === 1 && (
                 <MobilePurchaseIntro
@@ -907,7 +1101,7 @@ const PurchaseEvent = () => {
                     ))}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span className="hidden sm:inline truncate max-w-[45%]">Tickets {event.name}</span><span className="sm:hidden">Qty</span>
+                    <span className="hidden sm:inline truncate max-w-[45%]">{orderMode ? 'Review order' : `Tickets ${event.name}`}</span><span className="sm:hidden">{orderMode ? 'Review' : 'Qty'}</span>
                     <span className="hidden sm:inline">Your Info</span><span className="sm:hidden">Info</span>
                     <span>Payment</span>
                     <span className="hidden sm:inline">Confirmation</span><span className="sm:hidden">Done</span>
@@ -918,10 +1112,24 @@ const PurchaseEvent = () => {
               {currentStep === 1 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                   <div>
-                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Tickets of <span className="text-xl md:text-2xl font-extrabold text-blue-800">{event.name}</span></h2>
-                    <p className="text-xs md:text-sm text-gray-600">Choose your date, time, and quantity</p>
+                    {orderMode ? (
+                      <>
+                        <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Review your <span className="text-xl md:text-2xl font-extrabold text-blue-800">order</span></h2>
+                        <p className="text-xs md:text-sm text-gray-600">Check your items and quantities, then continue to your info.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Tickets of <span className="text-xl md:text-2xl font-extrabold text-blue-800">{event.name}</span></h2>
+                        <p className="text-xs md:text-sm text-gray-600">Choose your date, time, and quantity</p>
+                      </>
+                    )}
                   </div>
 
+                  {orderMode && (
+                    <p className="text-sm font-semibold text-gray-800">
+                      Pick the date &amp; time for {event.name} — the rest of your order is listed above.
+                    </p>
+                  )}
                   {event.date_type === 'date_range' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -964,7 +1172,11 @@ const PurchaseEvent = () => {
                             <button
                               key={slot}
                               type="button"
-                              onClick={() => setSelectedTime(slot)}
+                              onClick={() => {
+                                setSelectedTime(slot);
+                                const left = slotRemaining?.[slot];
+                                if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
+                              }}
                               className={`px-3 py-2.5 text-sm rounded-lg border transition ${
                                 selectedTime === slot
                                   ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
@@ -972,6 +1184,11 @@ const PurchaseEvent = () => {
                               }`}
                             >
                               {formatTime(slot)}
+                              {slotRemaining?.[slot] != null && (
+                                <span className={`block text-[10px] font-semibold ${selectedTime === slot ? 'text-blue-100' : slotRemaining[slot] <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  {slotRemaining[slot]} left
+                                </span>
+                              )}
                             </button>
                           ))}
                         </div>
@@ -979,6 +1196,7 @@ const PurchaseEvent = () => {
                     </div>
                   )}
 
+                  {!orderMode && (<>
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-center mb-4">
                       <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 text-blue-600" />
@@ -1003,15 +1221,76 @@ const PurchaseEvent = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setQuantity(quantity + 1)}
+                        onClick={() => setQuantity(Math.min(selectedTime && slotRemaining?.[selectedTime] != null ? Math.max(1, slotRemaining[selectedTime]) : Number.MAX_SAFE_INTEGER, quantity + 1))}
                         className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white shadow-md text-gray-800 flex items-center justify-center text-xl md:text-2xl font-bold hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95"
                       >+</button>
                     </div>
                   </div>
+                  </>)}
+
+                  {orderMode && cart && (
+                    <div className="space-y-3">
+                      {(orderItemsPayload ?? []).map((line, i) => {
+                        const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                        const isAnchorLine = anchorItem != null && line.key === anchorItem.key;
+                        const cartItem = cart.items.find(ci => ci.key === line.key);
+                        const qty = isAnchorLine ? quantity : (cartItem?.quantity ?? line.quantity);
+                        const setQty = (q: number) => {
+                          const next = Math.max(1, q);
+                          if (isAnchorLine) setQuantity(next);
+                          if (cartItem) cart.updateQuantity(cartItem.key, next);
+                        };
+                        const removeLine = () => {
+                          if (!cartItem) return;
+                          if (isAnchorLine) {
+                            setSelectedAddOns({});
+                            setOrderPrefilled(false);
+                          }
+                          cart.removeItem(cartItem.key);
+                        };
+                        return (
+                          <div key={line.key ?? i} className="bg-gray-50/80 border border-gray-100 rounded-xl p-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-gray-900">{line.name}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {line.scheduledDate ?? ''}
+                                  {line.scheduledTime ? ` at ${convertTo12Hour(line.scheduledTime)}` : ''}
+                                </p>
+                                {priced?.applied_discounts.map((d, di) => (
+                                  <p key={di} className="text-xs font-semibold text-emerald-700 mt-0.5">
+                                    {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label} off)` : ''}
+                                  </p>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setQty(qty - 1)} disabled={qty <= 1} className="w-9 h-9 rounded-full bg-white shadow text-gray-800 text-lg font-bold hover:bg-gray-50 disabled:opacity-40" aria-label={`Fewer ${line.name} tickets`}>−</button>
+                                <span className="w-8 text-center text-lg font-bold text-blue-800 tabular-nums">{qty}</span>
+                                <button type="button" onClick={() => setQty(qty + 1)} className="w-9 h-9 rounded-full bg-white shadow text-gray-800 text-lg font-bold hover:bg-gray-50" aria-label={`More ${line.name} tickets`}>+</button>
+                              </div>
+                              <div className="text-right min-w-[5rem]">
+                                <p className="font-extrabold text-gray-900 tabular-nums">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</p>
+                                {priced && priced.discount_amount > 0 && (
+                                  <p className="text-[11px] text-gray-400 line-through tabular-nums">${priced.subtotal.toFixed(2)}</p>
+                                )}
+                              </div>
+                              <button type="button" onClick={removeLine} className="text-xs font-semibold text-red-500 hover:text-red-700">Remove</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm px-1">
+                        <button type="button" onClick={() => navigate('/cart')} className="font-semibold text-blue-800 hover:text-blue-900">Edit cart — change dates &amp; times</button>
+                        <span className="font-bold text-gray-900">
+                          Order total: <span className="tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {orderedAddOns.length > 0 && (
                     <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
-                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
+                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">{orderMode ? `Add-ons for ${event.name}` : 'Add-ons'}</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {orderedAddOns.map(addon => {
                           const maxQty = addon.max_quantity ?? 99;
@@ -1289,10 +1568,64 @@ const PurchaseEvent = () => {
 
               {currentStep === 3 && (
                 <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                  {orderMode && cart && (
+                    <div className="border border-blue-100 bg-blue-50/50 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-gray-900">Order summary</h3>
+                        <button type="button" onClick={() => navigate('/cart')} className="text-xs font-semibold text-blue-800 hover:text-blue-900">Edit cart</button>
+                      </div>
+                      <div className="divide-y divide-blue-100">
+                        {(orderItemsPayload ?? []).map((line, i) => {
+                          const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                          return (
+                            <div key={line.key ?? i} className="py-2 text-sm">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="min-w-0 truncate font-semibold text-gray-900">
+                                  {line.quantity}× {line.name}
+                                  {line.scheduledDate ? ` · ${line.scheduledDate}` : ''}
+                                  {line.scheduledTime ? ` ${convertTo12Hour(line.scheduledTime)}` : ''}
+                                </span>
+                                <span className="tabular-nums font-semibold text-gray-900 flex-shrink-0">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</span>
+                              </div>
+                              {priced && (
+                                <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                                  <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
+                                  {priced.applied_discounts.map((d, di) => (
+                                    <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                                  ))}
+                                  {(priced.add_ons ?? []).map((a, ai) => (
+                                    <p key={`a${ai}`}>+ {a.quantity}× {a.name} · ${(a.line_total ?? a.price_at_purchase * a.quantity).toFixed(2)}</p>
+                                  ))}
+                                  {priced.fee_total > 0 && <p>+ ${priced.fee_total.toFixed(2)} fees</p>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="pt-2 mt-1 border-t border-blue-100 space-y-1 text-sm">
+                        <div className="flex items-center justify-between"><span className="text-gray-600">Subtotal</span><span className="tabular-nums text-gray-900">{orderQuote ? `$${orderQuote.subtotal.toFixed(2)}` : '—'}</span></div>
+                        {orderQuote && orderQuote.discount_amount > 0 && (
+                          <div className="flex items-center justify-between"><span className="text-emerald-700">Discounts</span><span className="tabular-nums text-emerald-700">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                        )}
+                        {orderQuote && orderQuote.fee_total > 0 && (
+                          <div className="flex items-center justify-between"><span className="text-gray-600">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
+                        )}
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-bold text-gray-900">Order total ({orderQuote?.ticket_count ?? '…'} tickets)</span>
+                          <span className="font-extrabold text-gray-900 tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h2 className="text-base md:text-lg font-semibold text-gray-900">Payment Information</h2>
-                      <p className="text-xs md:text-sm text-gray-600 mt-0.5">Secure payment powered by Authorize.Net</p>
+                      {orderMode && !authorizeApiLoginId ? (
+                        <p className="text-xs md:text-sm font-semibold text-amber-700 mt-0.5">Online payment is temporarily unavailable — please refresh or try again shortly.</p>
+                      ) : (
+                        <p className="text-xs md:text-sm text-gray-600 mt-0.5">Secure payment powered by Authorize.Net</p>
+                      )}
                     </div>
                     <div className="flex gap-1.5 md:gap-2">
                       <div className="h-5 md:h-6 lg:h-7 px-1.5 md:px-2 bg-gradient-to-br from-blue-800 to-blue-950 rounded flex items-center justify-center" title="Visa">
@@ -1429,7 +1762,7 @@ const PurchaseEvent = () => {
                           {submitting ? (
                             <><span className="hidden sm:inline">Processing…</span><span className="sm:hidden">Wait…</span></>
                           ) : (
-                            <><span className="hidden sm:inline">Pay ${totalAmount.toFixed(2)}</span><span className="sm:hidden">${totalAmount.toFixed(2)}</span></>
+                            <><span className="hidden sm:inline">Pay ${(orderMode && orderQuote ? orderQuote.total_amount : totalAmount).toFixed(2)}</span><span className="sm:hidden">${(orderMode && orderQuote ? orderQuote.total_amount : totalAmount).toFixed(2)}</span></>
                           )}
                         </>
                       )}
@@ -1443,9 +1776,50 @@ const PurchaseEvent = () => {
                   <div className="text-center mb-6">
                     <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h2>
+                    {placedOrder && (
+                      <p className="text-sm text-gray-600 mb-2">
+                        Order reference: <span className="font-mono font-bold text-gray-900">{placedOrder.reference_number}</span> · {placedOrder.item_count} items · {placedOrder.ticket_count} tickets
+                      </p>
+                    )}
                     <p className="text-gray-600 mb-2">Your tickets for <span className="font-semibold text-gray-900">{event.name}</span> have been confirmed.</p>
                     <p className="text-sm text-gray-500">A confirmation email has been sent to <span className="font-medium text-gray-700">{guestEmail}</span></p>
                   </div>
+
+                  {placedOrder && orderQrImage && (
+                    <div className="flex flex-col items-center mb-4">
+                      <img src={orderQrImage} alt="Order check-in code" className="w-44 h-44 border border-gray-200 rounded-xl" />
+                      <p className="text-xs text-gray-500 mt-2">One code for the whole order — show this at the venue.</p>
+                    </div>
+                  )}
+                  {placedOrder && (
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 mb-4">
+                      {placedOrder.lines.map(line => (
+                        <div key={line.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                          <span className="min-w-0 truncate text-gray-800">
+                            {line.quantity}× {line.name}
+                            {line.scheduled_date ? ` · ${formatDate(String(line.scheduled_date).split('T')[0])}` : ''}
+                            {line.scheduled_time ? ` ${convertTo12Hour(line.scheduled_time)}` : ''}
+                          </span>
+                          <span className="tabular-nums font-semibold text-gray-900">${line.total_amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm">
+                        <span className="font-bold text-gray-900">Order total</span>
+                        <span className="font-extrabold text-gray-900 tabular-nums">${placedOrder.total_amount.toFixed(2)}</span>
+                      </div>
+                      {placedOrder.amount_paid < placedOrder.total_amount ? (
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-amber-50 text-sm">
+                          <span className="font-bold text-amber-800">Due at the venue</span>
+                          <span className="font-extrabold text-amber-800 tabular-nums">${(placedOrder.total_amount - placedOrder.amount_paid).toFixed(2)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-emerald-50 text-sm">
+                          <span className="font-bold text-emerald-800">Paid in full</span>
+                          <span className="font-extrabold text-emerald-800 tabular-nums">${placedOrder.amount_paid.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                     <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
@@ -1470,8 +1844,17 @@ const PurchaseEvent = () => {
                       <div className="flex justify-between"><span className="text-gray-600">Date:</span><span className="font-medium text-gray-900">{formatDate(selectedDate)}</span></div>
                       <div className="flex justify-between"><span className="text-gray-600">Time:</span><span className="font-medium text-gray-900">{formatTime(selectedTime)}</span></div>
                       <div className="flex justify-between"><span className="text-gray-600">Tickets:</span><span className="font-medium text-gray-900">{quantity}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Payment Method:</span><span className="font-medium text-gray-900">Credit/Debit Card</span></div>
-                      <div className="pt-3 mt-3 flex justify-between"><span className="text-gray-900 font-semibold">Total Paid:</span><span className="text-lg font-bold text-emerald-600">${totalAmount.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Payment Method:</span><span className="font-medium text-gray-900">{placedOrder && placedOrder.payment_method !== 'authorize.net' ? 'Pay on arrival' : 'Credit/Debit Card'}</span></div>
+                      {orderMode && placedOrder ? (
+                        <>
+                          <div className="pt-3 mt-3 flex justify-between"><span className="text-gray-900 font-semibold">Total Paid:</span><span className="text-lg font-bold text-emerald-600">${placedOrder.amount_paid.toFixed(2)}</span></div>
+                          {placedOrder.amount_paid < placedOrder.total_amount && (
+                            <div className="flex justify-between"><span className="text-gray-900 font-semibold">Due at the venue:</span><span className="text-lg font-bold text-amber-600">${(placedOrder.total_amount - placedOrder.amount_paid).toFixed(2)}</span></div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="pt-3 mt-3 flex justify-between"><span className="text-gray-900 font-semibold">Total Paid:</span><span className="text-lg font-bold text-emerald-600">${totalAmount.toFixed(2)}</span></div>
+                      )}
                     </div>
                   </div>
 
@@ -1490,7 +1873,7 @@ const PurchaseEvent = () => {
 
                   <div className="flex flex-col sm:flex-row justify-center gap-3">
                     <StandardButton variant="secondary" size="md" onClick={() => navigate('/')}>Back to Home</StandardButton>
-                    <StandardButton variant="primary" size="md" onClick={() => navigate('/my-purchases')}>View My Purchases</StandardButton>
+                    <StandardButton variant="primary" size="md" onClick={() => navigate('/customer/attractions')}>View My Purchases</StandardButton>
                   </div>
                 </div>
               )}
@@ -1499,12 +1882,66 @@ const PurchaseEvent = () => {
 
           <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden lg:sticky lg:top-8">
-              {event.image && (
+              {!orderMode && event.image && (
                 <div className="h-48 overflow-hidden bg-gray-100">
                   <img src={getImageUrl(event.image)} alt={event.name} className="w-full h-full object-cover" />
                 </div>
               )}
               <div className="p-4 md:p-6">
+                {orderMode && cart ? (
+                  <div>
+                    <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">Your order</h2>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {cart.items.length} {cart.items.length === 1 ? 'item' : 'items'} · {orderQuote?.ticket_count ?? cart.ticketCount} tickets
+                      {event.location ? ` · ${event.location.name}` : ''}
+                    </p>
+                    <div className="divide-y divide-gray-100">
+                      {(orderItemsPayload ?? []).map((line, i) => {
+                        const priced = orderQuote?.lines.find(l => l.position === i + 1);
+                        return (
+                          <div key={line.key ?? i} className="py-2 text-sm">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="min-w-0 font-semibold text-gray-900">{line.quantity}× {line.name}</span>
+                              <span className="tabular-nums font-semibold text-gray-900 flex-shrink-0">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {line.scheduledDate ?? ''}{line.scheduledTime ? ` at ${convertTo12Hour(line.scheduledTime)}` : ''}
+                            </p>
+                            {priced && (
+                              <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
+                                <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
+                                {priced.applied_discounts.map((d, di) => (
+                                  <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                                ))}
+                                {(priced.add_ons ?? []).map((ao, ai) => (
+                                  <p key={`a${ai}`}>+ {ao.quantity}× {ao.name} · ${(ao.line_total ?? ao.price_at_purchase * ao.quantity).toFixed(2)}</p>
+                                ))}
+                                {priced.fee_total > 0 && <p>+ ${priced.fee_total.toFixed(2)} fees</p>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="pt-2 mt-1 border-t border-gray-200 space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="tabular-nums text-gray-900">{orderQuote ? `$${orderQuote.subtotal.toFixed(2)}` : '—'}</span></div>
+                      {orderQuote && orderQuote.discount_amount > 0 && (
+                        <div className="flex justify-between"><span className="text-emerald-700">Discounts</span><span className="tabular-nums text-emerald-700">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                      )}
+                      {orderQuote && orderQuote.fee_total > 0 && (
+                        <div className="flex justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
+                      )}
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-white text-sm">Order total</span>
+                        <span className="text-xl md:text-2xl font-extrabold text-white">
+                          {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : '…'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (<>
                 <div className="mb-4">
                   <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">{event.name}</h2>
                   <div className="flex flex-wrap gap-2 mb-3">
@@ -1667,6 +2104,7 @@ const PurchaseEvent = () => {
                     </div>
                   </div>
                 </div>
+                </>)}
 
                 <div className="mt-5 bg-gray-50 rounded-xl p-3">
                   <div className="flex items-center justify-around text-xs text-gray-500">
@@ -1683,7 +2121,7 @@ const PurchaseEvent = () => {
 
       <button
         onClick={() => setShowMobileSummary(true)}
-        className="fixed top-4 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
+        className="fixed top-20 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
         aria-label="View Order Summary"
       >
         <Info className="w-4 h-4" />

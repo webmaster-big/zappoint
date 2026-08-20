@@ -9,6 +9,7 @@ interface Props {
   id: number;
   title?: string;
   compact?: boolean;
+  emptyMessage?: string;
   checkInActions?: boolean;
 }
 
@@ -43,7 +44,7 @@ const formatDate = (val?: string | null) => {
 
 const waiverName = (w: ConnectedWaiver) => w.adult_name || w.adult_email || w.adult_phone || 'Awaiting signature';
 
-const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, checkInActions = true }: Props) => {
+const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, checkInActions = true, emptyMessage }: Props) => {
   const { themeColor, fullColor } = useThemeColor();
   const [waivers, setWaivers] = useState<ConnectedWaiver[]>([]);
   const [summary, setSummary] = useState<EntityWaiverSummary>({ total: 0, completed: 0, pending: 0, checked_in: 0 });
@@ -58,13 +59,25 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
   const launchKiosk = async () => {
     if (!canKiosk) return;
     setLaunching(true);
+    setActionError(null);
+    const kioskWindow = window.open('', '_blank');
     try {
       const res = await waiverService.createKioskSession(type as 'booking' | 'attraction_purchase' | 'event_purchase', id);
       if (res.success && res.data.kiosk_url) {
-        window.open(res.data.kiosk_url, '_blank', 'noopener');
+        if (kioskWindow) {
+          kioskWindow.location.href = res.data.kiosk_url;
+        } else {
+          const retry = window.open(res.data.kiosk_url, '_blank', 'noopener');
+          if (!retry) setActionError('The browser blocked the kiosk tab — allow pop-ups for this site and try again.');
+        }
+      } else {
+        kioskWindow?.close();
+        setActionError('The kiosk could not be started for this ticket.');
       }
-    } catch {
-      /* ignore */
+    } catch (err: unknown) {
+      kioskWindow?.close();
+      const e = err as { response?: { data?: { message?: string } } };
+      setActionError(e.response?.data?.message || 'The kiosk could not be started for this ticket.');
     } finally {
       setLaunching(false);
     }
@@ -147,7 +160,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
             </button>
           )}
         </div>
-        <p className="text-xs text-gray-400">No waiver connected to this {type.replace('_', ' ')}.</p>
+        <p className="text-xs text-gray-400">{emptyMessage ?? `No waiver connected to this ${type.replace('_', ' ')}.`}</p>
       </div>
     );
   }

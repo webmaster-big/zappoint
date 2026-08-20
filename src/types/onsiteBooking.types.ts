@@ -55,6 +55,8 @@ export interface OnsiteBookingPackage {
   price: number;
   pricePerAdditional?: number;
   minParticipants?: number;
+  pricingType?: 'base' | 'per_person';
+  participantLabel?: string | null;
   maxParticipants: number;
   category: string;
   features: string;

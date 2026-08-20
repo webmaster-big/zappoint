@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
+import ticketOrderService, { type TicketOrder } from '../../../services/TicketOrderService';
 import Toast from '../../../components/ui/Toast';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
@@ -41,6 +42,8 @@ const AttractionCheckIn = () => {
   const [processing, setProcessing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [verifiedPurchase, setVerifiedPurchase] = useState<AttractionPurchase | null>(null);
+  const [verifiedOrder, setVerifiedOrder] = useState<TicketOrder | null>(null);
+  const [orderBusy, setOrderBusy] = useState<number | 'all' | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +141,13 @@ const AttractionCheckIn = () => {
       
       try {
         const qrData = JSON.parse(decodedText);
+
+        if (qrData.type === 'ticket_order' && qrData.id) {
+          await handleOrderScan(Number(qrData.id));
+          setProcessing(false);
+          return;
+        }
+
         purchaseId = qrData.purchaseId || qrData.purchase_id || qrData.id;
       } catch {
         const idMatch = decodedText.match(/\d+/);
@@ -241,6 +251,37 @@ const AttractionCheckIn = () => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleOrderScan = async (orderId: number) => {
+    try {
+      const order = await ticketOrderService.get(orderId);
+      setVerifiedOrder(order);
+      setToast({ message: `Order ${order.reference_number} — ${order.ticket_count} tickets`, type: 'success' });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : 'Order not found', type: 'error' });
+      await startScanning();
+    }
+  };
+
+  const handleOrderCheckIn = async (lineIds?: number[]) => {
+    if (!verifiedOrder) return;
+    setOrderBusy(lineIds ? lineIds[0] : 'all');
+    try {
+      const res = await ticketOrderService.checkIn(verifiedOrder.id, lineIds);
+      const skipped = res.skipped.length ? ` — skipped: ${res.skipped.map(x => x.reason).join(', ')}` : '';
+      setToast({ message: `Checked in ${res.checked_in}${skipped}`, type: res.checked_in > 0 ? 'success' : 'error' });
+      setVerifiedOrder(await ticketOrderService.get(verifiedOrder.id));
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : 'Check-in failed', type: 'error' });
+    } finally {
+      setOrderBusy(null);
+    }
+  };
+
+  const handleCloseOrder = () => {
+    setVerifiedOrder(null);
+    startScanning();
   };
 
   const handleConfirmCheckIn = async () => {
@@ -831,6 +872,176 @@ const AttractionCheckIn = () => {
           </ul>
         </div>
       </div>
+
+      {verifiedOrder && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-800">Verify Order Details</h2>
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                onClick={handleCloseOrder}
+                icon={X}
+              >
+                {''}
+              </StandardButton>
+            </div>
+
+            <div className="p-6">
+              {verifiedOrder.remaining_balance > 0 && !['cancelled', 'refunded'].includes(verifiedOrder.status) && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-yellow-800">Payment Incomplete</p>
+                    <p className="text-sm text-yellow-600">${verifiedOrder.remaining_balance.toFixed(2)} outstanding on this order. Collect the balance before check-in.</p>
+                  </div>
+                </div>
+              )}
+
+              {verifiedOrder.status === 'cancelled' && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-red-800">Order Cancelled</p>
+                    <p className="text-sm text-red-600">This order has been cancelled and cannot be used.</p>
+                  </div>
+                </div>
+              )}
+
+              {verifiedOrder.lines.length > 0 && verifiedOrder.lines.every(l => l.checked_in_at) && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-red-800">Already Checked In</p>
+                    <p className="text-sm text-red-600">Every ticket on this order has already been checked in.</p>
+                  </div>
+                </div>
+              )}
+
+              {verifiedOrder.status === 'confirmed' && verifiedOrder.remaining_balance <= 0 && verifiedOrder.lines.some(l => !l.checked_in_at) && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-blue-800">Valid Order - Ready for Check-In</p>
+                    <p className="text-sm text-blue-600">This order is paid in full and ready to be checked in.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4 p-4 bg-gray-50 rounded-lg mb-6">
+                <h3 className="font-semibold text-gray-800 mb-4">Order Information</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                      <Ticket className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Order Reference</p>
+                      <p className="font-medium text-gray-800">{verifiedOrder.reference_number}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                      <User className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Customer</p>
+                      <p className="font-medium text-gray-800">{verifiedOrder.customer_name}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                      <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Items</p>
+                      <p className="font-medium text-gray-800">{verifiedOrder.item_count} {verifiedOrder.item_count === 1 ? 'item' : 'items'} · {verifiedOrder.ticket_count} tickets</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                      <DollarSign className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Total / Paid</p>
+                      <p className="font-medium text-gray-800">${verifiedOrder.total_amount.toFixed(2)} / ${verifiedOrder.amount_paid.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-4 bg-gray-50 rounded-lg mb-6">
+                <h3 className="font-semibold text-gray-800 mb-4">Tickets on this Order</h3>
+
+                <div className="space-y-3">
+                  {verifiedOrder.lines.map(line => (
+                    <div key={line.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                          <Ticket className={`h-5 w-5 text-${fullColor}`} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-800">{line.quantity}× {line.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {line.scheduled_date ?? ''}
+                            {line.scheduled_time ? ` at ${convertTo12Hour(line.scheduled_time)}` : ''}
+                          </p>
+                        </div>
+                        {line.checked_in_at ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="w-4 h-4" /> Checked In
+                          </span>
+                        ) : line.amount_paid < line.total_amount ? (
+                          <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">Unpaid</span>
+                        ) : (
+                          <StandardButton
+                            variant="primary"
+                            size="sm"
+                            onClick={() => void handleOrderCheckIn([line.id])}
+                            disabled={orderBusy !== null}
+                          >
+                            {orderBusy === line.id ? 'Checking In...' : 'Check In'}
+                          </StandardButton>
+                        )}
+                      </div>
+                      {line.type === 'attraction' && (
+                        <div className="mt-3">
+                          <WaiverConnectionPanel type="attraction_purchase" id={line.id} title="Waivers" compact emptyMessage="Covered by this order's waiver — one signature per visit day (see the ticket holding it)." />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <StandardButton
+                  variant="secondary"
+                  size="lg"
+                  onClick={handleCloseOrder}
+                  fullWidth
+                >
+                  Close
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="lg"
+                  onClick={() => void handleOrderCheckIn()}
+                  disabled={orderBusy !== null || verifiedOrder.lines.every(l => l.checked_in_at) || verifiedOrder.remaining_balance > 0}
+                  fullWidth
+                >
+                  {verifiedOrder.lines.every(l => l.checked_in_at) ? 'All Checked In' : orderBusy === 'all' ? 'Checking In...' : 'Confirm Check-In (All)'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">

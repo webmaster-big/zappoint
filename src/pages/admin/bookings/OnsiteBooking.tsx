@@ -341,6 +341,8 @@ const OnsiteBooking: React.FC = () => {
             name: pkg.name,
             description: pkg.description,
             price: Number(pkg.price),
+            pricingType: (pkg.pricing_type === 'per_person' ? 'per_person' : 'base') as 'base' | 'per_person',
+            participantLabel: pkg.participant_label ?? null,
             minParticipants: pkg.min_participants,
             maxParticipants: pkg.max_participants,
             category: pkg.category,
@@ -427,6 +429,8 @@ const OnsiteBooking: React.FC = () => {
               name: pkg.name,
               description: pkg.description,
               price: Number(pkg.price),
+              pricingType: (pkg.pricing_type === 'per_person' ? 'per_person' : 'base') as 'base' | 'per_person',
+              participantLabel: pkg.participant_label ?? null,
               minParticipants: pkg.min_participants,
               maxParticipants: pkg.max_participants,
               category: pkg.category,
@@ -1055,8 +1059,10 @@ const OnsiteBooking: React.FC = () => {
       const basePrice = selectedPackage.price;
       const minParticipants = selectedPackage.minParticipants || 1;
       const pricePerAdditional = selectedPackage.pricePerAdditional || 0;
-      
-      if (bookingData.participants <= minParticipants) {
+
+      if (selectedPackage.pricingType === 'per_person') {
+        total += basePrice * bookingData.participants;
+      } else if (bookingData.participants <= minParticipants) {
         total += basePrice;
       } else {
         const additional = bookingData.participants - minParticipants;
@@ -2097,6 +2103,9 @@ const OnsiteBooking: React.FC = () => {
                         className={`accent-${fullColor} w-4 h-4`}
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
+                      {slot.remaining_tickets != null && (
+                        <span className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${slot.remaining_tickets <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{slot.remaining_tickets} left</span>
+                      )}
                     </div>
                     <span className="text-xs text-gray-500 ml-6">to {formatTimeTo12Hour(slot.end_time)}</span>
                   </label>

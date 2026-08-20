@@ -74,7 +74,11 @@ export interface BookPackagePackage {
   features: string;
   price: string;
   price_per_additional: string;
+  pricing_type?: 'base' | 'per_person';
   min_participants?: number;
+  max_tickets_per_slot?: number | null;
+  participant_label?: string | null;
+  display_label?: string | null;
   max_participants: number;
   duration: number;
   duration_unit: "hours" | "minutes" | "hours and minutes";

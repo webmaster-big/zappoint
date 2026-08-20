@@ -309,9 +309,11 @@ const BookPackage: React.FC = () => {
         const pkgPrice = Number(pkg.price ?? 0);
         const minPart = Number(pkg.min_participants || 1);
         const perAdditional = Number(pkg.price_per_additional || 0);
-        const pkgBasePrice = participants <= minPart
-          ? pkgPrice
-          : pkgPrice + (participants - minPart) * perAdditional;
+        const pkgBasePrice = pkg.pricing_type === 'per_person'
+          ? pkgPrice * participants
+          : (participants <= minPart
+            ? pkgPrice
+            : pkgPrice + (participants - minPart) * perAdditional);
         const addOns = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
           const id = Number(idStr);
           const found = pkg.add_ons?.find((a) => a.id === id);
@@ -898,6 +900,11 @@ const BookPackage: React.FC = () => {
   const calculateBasePrice = () => {
     if (!pkg) return 0;
     const basePrice = Number(pkg.price);
+
+    if (pkg.pricing_type === 'per_person') {
+      return basePrice * participants;
+    }
+
     const minParticipants = Number(pkg.min_participants || 1);
     const pricePerAdditional = Number(pkg.price_per_additional || 0);
     
@@ -908,6 +915,21 @@ const BookPackage: React.FC = () => {
       return basePrice + (additional * pricePerAdditional);
     }
   };
+
+  const selectedSlotRemaining = (() => {
+    const slot = filteredTimeSlots.find(sl => sl.start_time === selectedTime);
+    return slot?.remaining_tickets ?? null;
+  })();
+
+  useEffect(() => {
+    if (selectedSlotRemaining != null) {
+      setParticipants(prev => Math.min(prev, Math.max(1, selectedSlotRemaining)));
+    }
+  }, [selectedSlotRemaining]);
+  const participantCeiling = Math.max(1, Math.min(
+    Number(pkg?.max_participants || 99),
+    selectedSlotRemaining ?? Number.MAX_SAFE_INTEGER,
+  ));
 
   const basePrice = calculateBasePrice();
   const addOnsTotal = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
@@ -1517,7 +1539,7 @@ const BookPackage: React.FC = () => {
               )}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Base Price:</span>
+                  <span className="text-gray-600">{pkg?.pricing_type === 'per_person' ? `${participants} × $${Number(pkg?.price ?? 0).toFixed(2)} per ${(pkg?.participant_label || 'player').toLowerCase()}:` : 'Base Price:'}</span>
                   <span className="font-medium text-gray-900">${basePrice.toFixed(2)}</span>
                 </div>
                 {addOnsTotal > 0 && (
@@ -1878,13 +1900,21 @@ const BookPackage: React.FC = () => {
                                     if (slot.room_id) {
                                       setSelectedRoomId(slot.room_id);
                                     }
+                                    if (slot.remaining_tickets != null) {
+                                      setParticipants(prev => Math.min(prev, Math.max(1, slot.remaining_tickets as number)));
+                                    }
                                   }}
                                   className="accent-blue-800"
                                 />
-                                <div className="flex flex-col">
+                                <div className="flex flex-col flex-1">
                                   <span className="text-sm text-gray-800">{formatTimeTo12Hour(slot.start_time)}</span>
                                   <span className="text-xs text-gray-500">{formatTimeTo12Hour(slot.end_time)}</span>
                                 </div>
+                                {slot.remaining_tickets != null && (
+                                  <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${slot.remaining_tickets <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                    {slot.remaining_tickets} left
+                                  </span>
+                                )}
                               </label>
                             ))
                           ) : (
@@ -1905,7 +1935,7 @@ const BookPackage: React.FC = () => {
           
                 
                 <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
-                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Participants</label>
+                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">{(pkg.participant_label || 'Participant') + 's'}</label>
                   <div className="flex items-center flex-wrap gap-2">
                     <StandardButton
                       variant="secondary"
@@ -1917,22 +1947,29 @@ const BookPackage: React.FC = () => {
                     <input 
                       type="number" 
                       min={1} 
-                      max={Number(pkg.max_participants)} 
+                      max={participantCeiling} 
                       value={participants} 
-                      onChange={e => setParticipants(Math.max(1, Math.min(Number(pkg.max_participants), Number(e.target.value))))}
+                      onChange={e => setParticipants(Math.max(1, Math.min(participantCeiling, Number(e.target.value))))}
                       onWheel={(e) => e.currentTarget.blur()}
                       className="w-12 md:w-16 text-center rounded-lg border border-gray-300 px-1 md:px-2 py-1.5 md:py-2 text-sm md:text-base font-medium text-gray-800" 
                     />
                     <StandardButton
                       variant="secondary"
                       size="md"
-                      onClick={() => setParticipants(Math.min(Number(pkg.max_participants), participants + 1))}
+                      onClick={() => setParticipants(Math.min(participantCeiling, participants + 1))}
                     >
                       +
                     </StandardButton>
                     <span className="text-xs text-gray-500 w-full sm:w-auto mt-1 sm:mt-0">
-                      {pkg.min_participants} included, +${pkg.price_per_additional} per additional (Max: {pkg.max_participants})
+                      {pkg.pricing_type === 'per_person'
+                        ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()} (${pkg.min_participants || 1}–${pkg.max_participants})`
+                        : `${pkg.min_participants} included, +$${pkg.price_per_additional} per additional (Max: ${pkg.max_participants})`}
                     </span>
+                    {selectedSlotRemaining != null && (
+                      <span className={`text-xs font-semibold w-full sm:w-auto ${selectedSlotRemaining <= 3 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {selectedSlotRemaining} {(pkg.participant_label || 'ticket').toLowerCase()}{selectedSlotRemaining === 1 ? '' : 's'} left for this time
+                      </span>
+                    )}
                   </div>
                 </div>
                 
@@ -2744,12 +2781,14 @@ const BookPackage: React.FC = () => {
             <div className="space-y-3 text-sm">
               <div className="bg-blue-50/70 rounded-xl p-3">
                 <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold text-gray-800">Base Package</span>
-                  <span className="font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
+                  <span className="font-semibold text-gray-800">{pkg.pricing_type === 'per_person' ? `${participants} × ${(pkg.participant_label || 'Player')}${participants !== 1 ? 's' : ''}` : 'Base Package'}</span>
+                  <span className="font-bold text-gray-900">${(pkg.pricing_type === 'per_person' ? Number(pkg.price) * participants : Number(pkg.price)).toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-gray-600">{pkg.name}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
+                  {pkg.pricing_type === 'per_person'
+                    ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()}`
+                    : `Includes up to ${pkg.min_participants || 1} participant${(pkg.min_participants || 1) > 1 ? 's' : ''}`}
                 </p>
                 <p className="text-xs text-gray-400">
                   Duration: {formatDuration()}
@@ -2775,10 +2814,12 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
-                <span>Room Assignment</span>
-                <span className="text-gray-500">Auto-assigned at booking</span>
-              </div>
+              {(pkg.rooms?.length ?? 0) > 0 && (
+                <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
+                  <span>Room Assignment</span>
+                  <span className="text-gray-500">Auto-assigned at booking</span>
+                </div>
+              )}
               
               {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
                 <div>
@@ -3024,12 +3065,14 @@ const BookPackage: React.FC = () => {
               <div className="space-y-3 text-sm">
                 <div className="bg-blue-50/70 rounded-xl p-3">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-semibold text-gray-800">Base Package</span>
-                    <span className="font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
+                    <span className="font-semibold text-gray-800">{pkg.pricing_type === 'per_person' ? `${participants} × ${(pkg.participant_label || 'Player')}${participants !== 1 ? 's' : ''}` : 'Base Package'}</span>
+                    <span className="font-bold text-gray-900">${(pkg.pricing_type === 'per_person' ? Number(pkg.price) * participants : Number(pkg.price)).toFixed(2)}</span>
                   </div>
                   <p className="text-xs text-gray-600">{pkg.name}</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
+                    {pkg.pricing_type === 'per_person'
+                      ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()}`
+                      : `Includes up to ${pkg.min_participants || 1} participant${(pkg.min_participants || 1) > 1 ? 's' : ''}`}
                   </p>
                   <p className="text-xs text-gray-400">
                     Duration: {formatDuration()}
@@ -3055,10 +3098,12 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
-                  <span>Room Assignment</span>
-                  <span className="text-gray-500">Auto-assigned at booking</span>
-                </div>
+                {(pkg.rooms?.length ?? 0) > 0 && (
+                  <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
+                    <span>Room Assignment</span>
+                    <span className="text-gray-500">Auto-assigned at booking</span>
+                  </div>
+                )}
 
                 {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
                   <div>

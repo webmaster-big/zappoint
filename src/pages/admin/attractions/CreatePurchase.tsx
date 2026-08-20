@@ -7,6 +7,7 @@ import {
   Minus,
   Search,
   X,
+  Pencil,
   Tag,
   Calendar,
   Banknote,
@@ -35,7 +36,13 @@ import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay'
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
+import { convertTo12Hour } from '../../../utils/timeFormat';
+import ticketOrderService, { type CartItem, type CartQuote } from '../../../services/TicketOrderService';
+import { generateOrderQRCode } from '../../../utils/qrcode';
+import { eventService } from '../../../services/EventService';
+import type { Event as ZapEvent } from '../../../types/event.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 import { generateTimeSlots } from '../../../utils/timeSlots';
@@ -65,7 +72,6 @@ const CreatePurchase = () => {
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   
-  const [useAuthorizeNet, setUseAuthorizeNet] = useState(true); // Toggle for Authorize.Net vs manual card
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -84,12 +90,24 @@ const CreatePurchase = () => {
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
+  const [orderLines, setOrderLines] = useState<CartItem[]>([]);
+  const [orderQuote, setOrderQuote] = useState<CartQuote | null>(null);
+  const [eventsCatalog, setEventsCatalog] = useState<ZapEvent[]>([]);
+  const [eventsCatalogLocation, setEventsCatalogLocation] = useState<number | null>(null);
+  const [eventDate, setEventDate] = useState('');
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<CreatePurchaseAddOn | null>(null);
   
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [bulkMode, setBulkMode] = useState(searchParams.get('bulk') === '1');
+  const [itemTab, setItemTab] = useState<'attractions' | 'events'>('attractions');
+  const [selectedEvent, setSelectedEvent] = useState<ZapEvent | null>(null);
+  const [eventQty, setEventQty] = useState(1);
   const { effectiveLocationId } = useLocationScope();
   const selectedLocation = effectiveLocationId;
 
@@ -263,10 +281,19 @@ const CreatePurchase = () => {
       return;
     }
 
+    const gatewayLocationId = orderLines[0]?.locationId
+      ?? selectedAttraction?.locationId
+      ?? (selectedEvent ? Number(selectedEvent.location_id) : null)
+      ?? selectedLocation
+      ?? null;
+
+    if (!gatewayLocationId) {
+      return;
+    }
+
     const initializeAuthorizeNet = async () => {
       try {
-        const locationId = selectedAttraction?.locationId || 1;
-        const response = await getAuthorizeNetPublicKey(locationId);
+        const response = await getAuthorizeNetPublicKey(gatewayLocationId);
         if (response && response.api_login_id) {
           setAuthorizeApiLoginId(response.api_login_id);
           setAuthorizeClientKey(response.client_key || response.api_login_id);
@@ -284,7 +311,7 @@ const CreatePurchase = () => {
       }
     };
     initializeAuthorizeNet();
-  }, [selectedAttraction, paymentMethod, useAuthorizeNet]);
+  }, [selectedAttraction, selectedEvent, orderLines, selectedLocation, paymentMethod]);
 
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -483,8 +510,190 @@ const CreatePurchase = () => {
     }
   }, [scheduledDate, selectedAttraction]);
 
+  useEffect(() => {
+    if (!scheduledDate || !selectedAttraction?.id) {
+      setSlotRemaining(null);
+      return;
+    }
+    let cancelled = false;
+    attractionService.getSlotAvailability(Number(selectedAttraction.id), scheduledDate)
+      .then(res => {
+        if (cancelled) return;
+        if (res.max_tickets_per_slot == null) { setSlotRemaining(null); return; }
+        const map: Record<string, number> = {};
+        Object.entries(res.remaining_by_slot ?? {}).forEach(([slot, left]) => { map[slot] = left as number; });
+        setSlotRemaining({ __cap: res.max_tickets_per_slot, ...map });
+      })
+      .catch(() => { if (!cancelled) setSlotRemaining(null); });
+    return () => { cancelled = true; };
+  }, [scheduledDate, selectedAttraction?.id]);
+
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
+
+  const orderLocationId = orderLines[0]?.locationId ?? selectedAttraction?.locationId ?? selectedEvent?.location_id ?? selectedLocation ?? null;
+
+  const buildCurrentLine = (): CartItem | null => {
+    if (itemTab === 'events') {
+      if (!selectedEvent) return null;
+      const evDate = eventDate || String(selectedEvent.start_date ?? '').split('T')[0];
+      return {
+        key: `event-${selectedEvent.id}-${evDate}-${orderLines.length}`,
+        type: 'event',
+        id: Number(selectedEvent.id),
+        name: selectedEvent.name,
+        locationId: Number(selectedEvent.location_id),
+        unitPrice: Number(selectedEvent.price ?? 0),
+        quantity: eventQty,
+        scheduledDate: evDate,
+        scheduledTime: null,
+      };
+    }
+
+    if (!selectedAttraction || !scheduledDate || !scheduledTime) return null;
+    return {
+      key: `attraction-${selectedAttraction.id}-${scheduledDate}-${scheduledTime}-${orderLines.length}`,
+      type: 'attraction',
+      id: Number(selectedAttraction.id),
+      name: selectedAttraction.name,
+      locationId: Number(selectedAttraction.locationId || selectedLocation || 0),
+      unitPrice: Number(selectedAttraction.price),
+      quantity,
+      scheduledDate,
+      scheduledTime,
+      addOns: Object.entries(selectedAddOns)
+        .filter(([, qty]) => qty > 0)
+        .map(([idStr, qty]) => {
+          const addOn = selectedAttraction.addOns?.find(x => x.id === Number(idStr));
+          return { id: Number(idStr), name: addOn?.name ?? '', price: Number(addOn?.price ?? 0), quantity: qty };
+        }),
+    };
+  };
+
+  const addCurrentToOrder = () => {
+    const line = buildCurrentLine();
+    if (!line) {
+      setToast({
+        message: itemTab === 'events'
+          ? 'Pick an event first.'
+          : 'Pick an attraction with a visit date and time first.',
+        type: 'error',
+      });
+      return;
+    }
+    setOrderLines(prev => [...prev, line]);
+    if (itemTab === 'events') {
+      setSelectedEvent(null);
+      setEventQty(1);
+      setEventDate('');
+    } else {
+      setSelectedAttraction(null);
+      setQuantity(1);
+      setScheduledDate('');
+      setScheduledTime('');
+      setSelectedAddOns({});
+    }
+    setToast({ message: `${line.quantity}× ${line.name} added — configure the next item or complete the order.`, type: 'success' });
+  };
+
+  const removeOrderLine = (key: string) => setOrderLines(prev => prev.filter(l => l.key !== key));
+
+  const editOrderLine = (key: string) => {
+    const line = orderLines.find(l => l.key === key);
+    if (!line) return;
+
+    if (line.type === 'event') {
+      const ev = eventsCatalog.find(x => Number(x.id) === line.id);
+      if (!ev) {
+        setToast({ message: `${line.name} is no longer in the catalog here — remove the line instead if it should not be sold.`, type: 'error' });
+        return;
+      }
+      setOrderLines(prev => prev.filter(l => l.key !== key));
+      setItemTab('events');
+      setSelectedEvent(ev);
+      setEventQty(line.quantity);
+      setEventDate(line.scheduledDate ?? '');
+    } else {
+      const attr = attractions.find(x => Number(x.id) === line.id);
+      if (!attr) {
+        setToast({ message: `${line.name} is no longer in the catalog here — remove the line instead if it should not be sold.`, type: 'error' });
+        return;
+      }
+      setOrderLines(prev => prev.filter(l => l.key !== key));
+      setItemTab('attractions');
+      setSelectedAttraction(attr);
+      setQuantity(line.quantity);
+      setScheduledDate(line.scheduledDate ?? '');
+      setScheduledTime(line.scheduledTime ?? '');
+      setSelectedAddOns((line.addOns ?? []).reduce<{ [id: number]: number }>((acc, ao) => {
+        acc[ao.id] = ao.quantity;
+        return acc;
+      }, {}));
+    }
+
+    setToast({ message: `Editing ${line.name} — adjust it below, then press "Add item to order" to put it back.`, type: 'info' });
+  };
+
+  useEffect(() => {
+    const current = buildCurrentLine();
+    const items = current ? [...orderLines, current] : orderLines;
+
+    if (!(bulkMode || orderLines.length > 0) || items.length === 0) {
+      setOrderQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      ticketOrderService.quote(items)
+        .then(q => { if (!cancelled) setOrderQuote(q); })
+        .catch(() => undefined);
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [orderLines, selectedAttraction, quantity, scheduledDate, scheduledTime, selectedAddOns, bulkMode, itemTab, selectedEvent, eventQty, eventDate]);
+
+  useEffect(() => {
+    if (!orderLocationId || !(bulkMode || orderLines.length > 0 || itemTab === 'events')) return;
+    if (eventsCatalogLocation === Number(orderLocationId)) return;
+    eventService.getEventsByLocation(Number(orderLocationId))
+      .then(res => {
+        const raw = res as unknown;
+        const inner = (raw as { data?: ZapEvent[] | { events?: ZapEvent[]; data?: ZapEvent[] } })?.data;
+        const list = Array.isArray(raw)
+          ? (raw as ZapEvent[])
+          : Array.isArray(inner)
+            ? inner
+            : ((inner as { events?: ZapEvent[]; data?: ZapEvent[] })?.events ?? (inner as { data?: ZapEvent[] })?.data ?? []);
+        setEventsCatalog(list.filter(ev => ev.is_active !== false));
+        setEventsCatalogLocation(Number(orderLocationId));
+      })
+      .catch(() => undefined);
+  }, [orderLocationId, orderLines.length, eventsCatalogLocation, bulkMode, itemTab]);
+
+  const currentReady = buildCurrentLine() !== null;
+  const readyNudgeRef = useRef(false);
+
+  useEffect(() => {
+    if (bulkMode && currentReady && !readyNudgeRef.current) {
+      const line = buildCurrentLine();
+      if (line) setToast({ message: `${line.name} is ready — press "Add item to order" to put it on the order.`, type: 'info' });
+    }
+    readyNudgeRef.current = currentReady;
+  }, [currentReady, bulkMode]);
+
+  const customerReady = Boolean(selectedCustomerId || customerInfo.name.trim());
+  const receiptEmailOk = bulkMode || !sendEmail || Boolean(customerInfo.email.trim());
+  const cardDetailsReady = paymentMethod !== 'authorize.net'
+    || Boolean(cardNumber && cardMonth && cardYear && cardCVV && validateCardNumber(cardNumber));
+  const itemsReady = bulkMode
+    ? (orderLines.length > 0 || currentReady)
+    : Boolean(selectedAttraction && scheduledDate && scheduledTime);
+
+  const submitBlockers: string[] = [];
+  if (!itemsReady) submitBlockers.push(bulkMode ? 'Add at least one item to the order.' : 'Pick an attraction and set its visit date & time.');
+  if (!customerReady) submitBlockers.push('Enter the customer name.');
+  if (!receiptEmailOk) submitBlockers.push('Add an email for the receipt, or untick "Send email receipt".');
+  if (!cardDetailsReady) submitBlockers.push('Complete the card details.');
+  const canSubmit = submitBlockers.length === 0;
 
   const handleCompletePurchase = async (e?: React.MouseEvent) => {
     if (e) {
@@ -492,7 +701,7 @@ const CreatePurchase = () => {
       e.stopPropagation();
     }
 
-    if (!selectedAttraction) return;
+    if (!selectedAttraction && !selectedEvent && orderLines.length === 0) return;
     if (isSubmittingRef.current) return;
 
     const now = Date.now();
@@ -504,7 +713,7 @@ const CreatePurchase = () => {
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
 
-    if (!scheduledDate || !scheduledTime) {
+    if (selectedAttraction && (!scheduledDate || !scheduledTime) && orderLines.length === 0) {
       setToast({ message: 'Please select a visit date and time before purchasing.', type: 'error' });
       isSubmittingRef.current = false;
       return;
@@ -537,6 +746,91 @@ const CreatePurchase = () => {
       setSubmitting(true);
       setIsProcessingPayment(true);
       setPaymentError('');
+
+      if (bulkMode || orderLines.length > 0) {
+        const currentLine = buildCurrentLine();
+        const items = currentLine ? [...orderLines, currentLine] : [...orderLines];
+
+        if (items.length === 0) {
+          setToast({ message: 'Add at least one configured item to the order first.', type: 'error' });
+          isSubmittingRef.current = false;
+          setSubmitting(false);
+          setIsProcessingPayment(false);
+          return;
+        }
+
+
+        const order = await ticketOrderService.checkout(items, {
+          customer_id: selectedCustomerId || undefined,
+          guest_name: customerInfo.name || 'Walk-in Customer',
+          guest_email: customerInfo.email || undefined,
+          guest_phone: customerInfo.phone || undefined,
+          payment_method: paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
+          notes: notes || `Staff order — ${items.length} items`,
+        });
+
+        try {
+          const orderQr = await generateOrderQRCode(order.id);
+          await ticketOrderService.storeQrCode(order.id, orderQr);
+        } catch { void 0; }
+
+        if (paymentMethod === 'authorize.net') {
+          try {
+            await processCardPayment(
+              { cardNumber: cardNumber.replace(/\s/g, ''), month: cardMonth, year: cardYear, cardCode: cardCVV },
+              {
+                location_id: order.location_id,
+                payable_id: order.id,
+                payable_type: PAYMENT_TYPE.TICKET_ORDER,
+                amount: order.total_amount,
+                order_id: order.reference_number.slice(0, 20),
+                send_email: false,
+              },
+              authorizeApiLoginId,
+              authorizeClientKey,
+              {
+                first_name: customerInfo.name?.split(' ')[0] || '',
+                last_name: customerInfo.name?.split(' ').slice(1).join(' ') || '',
+                email: customerInfo.email || '',
+                phone: customerInfo.phone || '',
+              },
+            );
+          } catch (chargeErr) {
+            await ticketOrderService.rollback(order.id).catch(() => undefined);
+            throw chargeErr instanceof Error ? chargeErr : new Error('Card payment failed — the order was rolled back.');
+          }
+        } else if (paymentMethod === 'in-store') {
+          const collect = amountPaid > 0 ? Math.min(amountPaid, order.total_amount) : order.total_amount;
+          try {
+            await createPayment({
+              payable_id: order.id,
+              payable_type: PAYMENT_TYPE.TICKET_ORDER,
+              amount: collect,
+              method: 'in-store',
+              status: 'completed',
+              location_id: order.location_id,
+              notes: `Collected at creation for order ${order.reference_number}`,
+            });
+          } catch {
+            void attractionPurchaseCacheService.clearCache();
+            void metricsCacheService.clearAllCaches();
+            setToast({ message: `Order ${order.reference_number} was created, but recording the payment failed. Record it from the order page.`, type: 'error' });
+            navigate(`/orders/${order.id}`);
+            return;
+          }
+        }
+
+        void attractionPurchaseCacheService.clearCache();
+        void metricsCacheService.clearAllCaches();
+        setToast({ message: `Order ${order.reference_number} created.`, type: 'success' });
+        navigate(`/orders/${order.id}`);
+        return;
+      }
+
+      if (!selectedAttraction) {
+        isSubmittingRef.current = false;
+        return;
+      }
 
       const totalAmount = finalTotal;
       let transactionId: string | undefined;
@@ -733,7 +1027,6 @@ const CreatePurchase = () => {
       setCardYear('');
       setCardCVV('');
       setPaymentError('');
-      setUseAuthorizeNet(true);
       setSendEmail(true);
       setScheduledDate('');
       setScheduledTime('');
@@ -766,6 +1059,37 @@ const CreatePurchase = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Create New Purchase</h1>
               <p className="text-gray-600">Process on-site ticket purchases for customers</p>
+              <div className="mt-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (bulkMode && orderLines.length > 0 && !window.confirm('Switch to single purchase? The items in this order will be discarded.')) return;
+                    setBulkMode(false);
+                    setOrderLines([]);
+                    setSelectedEvent(null);
+                    setItemTab('attractions');
+                  }}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${!bulkMode ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Single purchase
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkMode(true)}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${bulkMode ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Bulk order
+                </button>
+              </div>
+          {(bulkMode || orderLines.length > 0) && (
+            <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+              <ShoppingCart className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-blue-800">Bulk order mode</p>
+                <p className="text-sm text-blue-600">Configure an item below, press "Add item to order" in the Order panel, repeat for every ticket, then press "Create order" — one order, one payment, one QR code.</p>
+              </div>
+            </div>
+          )}
             </div>
           </div>
         </div>
@@ -773,9 +1097,84 @@ const CreatePurchase = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Attraction</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-800">{itemTab === 'events' ? 'Select Event' : 'Select Attraction'}</h2>
+                {bulkMode && (
+                  <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setItemTab('attractions')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${itemTab === 'attractions' ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      Attractions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setItemTab('events')}
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${itemTab === 'events' ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      Events
+                    </button>
+                  </div>
+                )}
+              </div>
 
-              {selectedAttraction ? (
+              {itemTab === 'events' ? (
+                selectedEvent ? (
+                  <div className={`border rounded-lg p-4 border-${themeColor}-500 bg-${themeColor}-50`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-800">{selectedEvent.name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">Event</p>
+                        <span className={`text-lg font-bold text-${themeColor}-600`}>${Number(selectedEvent.price ?? 0).toFixed(2)}<span className="text-xs font-normal text-gray-500 ml-1">/ticket</span></span>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Event date</label>
+                            <input
+                              type="date"
+                              value={eventDate || String(selectedEvent.start_date ?? '').split('T')[0]}
+                              min={String(selectedEvent.start_date ?? '').split('T')[0]}
+                              max={String(selectedEvent.end_date ?? selectedEvent.start_date ?? '').split('T')[0]}
+                              onChange={(e) => setEventDate(e.target.value)}
+                              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Tickets</label>
+                            <div className="flex items-center gap-2">
+                              <StandardButton variant="ghost" size="sm" onClick={() => setEventQty(Math.max(1, eventQty - 1))} icon={Minus}>{''}</StandardButton>
+                              <span className="w-8 text-center font-semibold">{eventQty}</span>
+                              <StandardButton variant="ghost" size="sm" onClick={() => setEventQty(eventQty + 1)} icon={Plus}>{''}</StandardButton>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-600 p-0.5">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                    {eventsCatalog.length === 0 && (
+                      <p className="col-span-full text-sm text-gray-400 text-center py-8">
+                        {orderLocationId ? 'No active events at this location.' : 'Select a location (or an attraction) first to load its events.'}
+                      </p>
+                    )}
+                    {eventsCatalog.map(ev => (
+                      <div
+                        key={ev.id}
+                        className={`border rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-${themeColor}-300`}
+                        onClick={() => { setSelectedEvent(ev); setEventQty(1); setEventDate(String(ev.start_date ?? '').split('T')[0]); }}
+                      >
+                        <h3 className="font-semibold text-gray-800">{ev.name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{String(ev.start_date ?? '').split('T')[0]}{ev.end_date ? ` – ${String(ev.end_date).split('T')[0]}` : ''}</p>
+                        <span className={`text-lg font-bold text-${themeColor}-600`}>${Number(ev.price ?? 0).toFixed(2)}<span className="text-xs font-normal text-gray-500 ml-1">/ticket</span></span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : selectedAttraction ? (
                 <div className={`border rounded-lg p-4 border-${themeColor}-500 bg-${themeColor}-50`}>
                   <div className="flex items-start justify-between">
                     <div className="flex gap-4 flex-1">
@@ -862,82 +1261,7 @@ const CreatePurchase = () => {
               )}
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email {selectedCustomerId && <span className="text-green-600 text-xs">(Customer Found)</span>}
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={customerInfo.email}
-                    onChange={handleCustomerInfoChange}
-                    onFocus={() => foundCustomers.length > 0 && setShowCustomerDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                    className={`w-full border ${selectedCustomerId ? 'border-green-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                    placeholder="customer@example.com"
-                  />
-                  {searchingCustomer && (
-                    <div className="absolute right-3 top-9 text-gray-400">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-                    </div>
-                  )}
-                  
-                  {showCustomerDropdown && foundCustomers.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {foundCustomers.map((customer) => (
-                        <div
-                          key={customer.id}
-                          onClick={() => handleSelectCustomer(customer)}
-                          className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            selectedCustomerId === customer.id ? 'bg-green-50' : ''
-                          }`}
-                        >
-                          <div className="font-medium text-gray-900">
-                            {customer.first_name} {customer.last_name}
-                          </div>
-                          <div className="text-sm text-gray-600">{customer.email}</div>
-                          {customer.phone && (
-                            <div className="text-xs text-gray-500">{customer.phone}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer Name 
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={customerInfo.name}
-                    onChange={handleCustomerInfoChange}
-                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                    placeholder="Walk-in Customer"
-                  />
-                </div>
-              
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={customerInfo.phone}
-                    onChange={handleCustomerInfoChange}
-                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {selectedAttraction && (
+            {itemTab === 'attractions' && selectedAttraction && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Tag className="h-5 w-5 text-gray-500" />
@@ -960,7 +1284,10 @@ const CreatePurchase = () => {
                       <StandardButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => setQuantity(quantity + 1)}
+                        onClick={() => {
+                          const left = scheduledTime && slotRemaining ? (slotRemaining[scheduledTime] ?? slotRemaining['__cap']) : null;
+                          setQuantity(left != null ? Math.min(Math.max(1, left), quantity + 1) : quantity + 1);
+                        }}
                         icon={Plus}
                       >
                         {''}
@@ -971,18 +1298,20 @@ const CreatePurchase = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Discount ($)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={calculateSubtotal()}
-                      value={discount}
-                      onChange={(e) => setDiscount(Number(e.target.value))}
-                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                    />
-                  </div>
+                  {!bulkMode && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Discount ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={calculateSubtotal()}
+                        value={discount}
+                        onChange={(e) => setDiscount(Number(e.target.value))}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1096,8 +1425,13 @@ const CreatePurchase = () => {
                       scheduledDate={scheduledDate}
                       scheduledTime={scheduledTime}
                       availableTimeSlots={availableTimeSlots}
+                      slotRemaining={slotRemaining}
                       onDateSelect={(dateStr) => setScheduledDate(dateStr)}
-                      onTimeSelect={(time) => setScheduledTime(time)}
+                      onTimeSelect={(time) => {
+                        setScheduledTime(time);
+                        const left = slotRemaining ? (slotRemaining[time] ?? slotRemaining['__cap']) : null;
+                        if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
+                      }}
                       themeColor={themeColor}
                     />
                   </div>
@@ -1105,7 +1439,82 @@ const CreatePurchase = () => {
               </div>
             )}
 
-            {selectedAttraction && (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email {selectedCustomerId && <span className="text-green-600 text-xs">(Customer Found)</span>}
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={customerInfo.email}
+                    onChange={handleCustomerInfoChange}
+                    onFocus={() => foundCustomers.length > 0 && setShowCustomerDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                    className={`w-full border ${selectedCustomerId ? 'border-green-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    placeholder="customer@example.com"
+                  />
+                  {searchingCustomer && (
+                    <div className="absolute right-3 top-9 text-gray-400">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                    </div>
+                  )}
+                  
+                  {showCustomerDropdown && foundCustomers.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {foundCustomers.map((customer) => (
+                        <div
+                          key={customer.id}
+                          onClick={() => handleSelectCustomer(customer)}
+                          className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            selectedCustomerId === customer.id ? 'bg-green-50' : ''
+                          }`}
+                        >
+                          <div className="font-medium text-gray-900">
+                            {customer.first_name} {customer.last_name}
+                          </div>
+                          <div className="text-sm text-gray-600">{customer.email}</div>
+                          {customer.phone && (
+                            <div className="text-xs text-gray-500">{customer.phone}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Name 
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={customerInfo.name}
+                    onChange={handleCustomerInfoChange}
+                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    placeholder="Walk-in Customer"
+                  />
+                </div>
+              
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={customerInfo.phone}
+                    onChange={handleCustomerInfoChange}
+                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {((bulkMode && (orderLines.length > 0 || buildCurrentLine() !== null)) || (!bulkMode && itemTab === 'attractions' && selectedAttraction)) && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Banknote className="h-5 w-5 text-gray-500" />
@@ -1127,7 +1536,7 @@ const CreatePurchase = () => {
                     size="md"
                     onClick={() => {
                       setPaymentMethod('in-store');
-                      setAmountPaid(calculateTotal());
+                      setAmountPaid(finalTotal);
                     }}
                     icon={DollarSign}
                   >
@@ -1235,7 +1644,7 @@ const CreatePurchase = () => {
                           type="text"
                           value={cardCVV}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/\\D/g, '');
+                            const value = e.target.value.replace(/\D/g, '');
                             if (value.length <= 4) {
                               setCardCVV(value);
                             }
@@ -1268,9 +1677,106 @@ const CreatePurchase = () => {
 
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
-              
-              {selectedAttraction ? (
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{(bulkMode || orderLines.length > 0) ? 'Order' : 'Order Summary'}</h2>
+
+              {(bulkMode || orderLines.length > 0) ? (
+                <>
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg mb-4">
+                    {orderLines.length === 0 && !buildCurrentLine() && (
+                      <p className="p-4 text-sm text-gray-400 text-center">No items yet — pick an attraction on the left to start the order.</p>
+                    )}
+                    {orderLines.map((l, i) => {
+                      const priced = orderQuote?.lines.find(x => x.position === i + 1);
+                      return (
+                        <div key={l.key} className="p-3 flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{l.quantity}× {l.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {l.scheduledDate ?? ''}{l.scheduledTime ? ` · ${convertTo12Hour(l.scheduledTime)}` : ''}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900 tabular-nums">{priced ? `$${priced.total_amount.toFixed(2)}` : '—'}</span>
+                          <button type="button" onClick={() => editOrderLine(l.key)} className={`p-1 text-${themeColor}-600 hover:bg-${themeColor}-50 rounded`} aria-label={`Edit ${l.name}`}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => removeOrderLine(l.key)} className="p-1 text-red-500 hover:bg-red-50 rounded" aria-label={`Remove ${l.name}`}>
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {buildCurrentLine() && (
+                      <div className="p-3 flex items-center gap-2 bg-blue-50/60">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{buildCurrentLine()!.quantity}× {buildCurrentLine()!.name}</p>
+                          <p className="text-xs text-blue-700">configuring below — included when you create the order</p>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                          {orderQuote?.lines.find(x => x.position === orderLines.length + 1)
+                            ? `$${orderQuote.lines.find(x => x.position === orderLines.length + 1)!.total_amount.toFixed(2)}`
+                            : '—'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {orderQuote && (
+                    <div className="space-y-1.5 text-sm mb-4">
+                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="tabular-nums">${orderQuote.subtotal.toFixed(2)}</span></div>
+                      {orderQuote.discount_amount > 0 && (
+                        <div className="flex justify-between text-green-600"><span>Discounts</span><span className="tabular-nums">−${orderQuote.discount_amount.toFixed(2)}</span></div>
+                      )}
+                      {orderQuote.fee_total > 0 && (
+                        <div className="flex justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums">${orderQuote.fee_total.toFixed(2)}</span></div>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-gray-100 text-base font-bold text-gray-900">
+                        <span>Total ({orderQuote.ticket_count} tickets)</span><span className="tabular-nums">${orderQuote.total_amount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={addCurrentToOrder}
+                    disabled={submitting || (itemTab === 'events' ? !selectedEvent : !selectedAttraction)}
+                    className={`w-full mb-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${currentReady ? 'border-blue-600 text-blue-800 bg-blue-50 ring-2 ring-blue-200' : 'border-blue-400 text-blue-700 hover:bg-blue-50 hover:border-blue-500'}`}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add item to order
+                  </button>
+                  {itemTab === 'attractions' && selectedAttraction && (!scheduledDate || !scheduledTime) && (
+                    <p className="text-[11px] text-gray-500 mb-2">Needs a visit date &amp; time — set them in Purchase Details.</p>
+                  )}
+
+                  <p className="flex items-center gap-2 mb-3 text-xs text-gray-500">
+                    <Mail className="h-3.5 w-3.5 text-gray-400" />
+                    The receipt emails automatically when the customer has an email on file.
+                  </p>
+
+                  <StandardButton
+                    variant="primary"
+                    size="lg"
+                    onClick={handleCompletePurchase}
+                    disabled={submitting || !canSubmit}
+                    loading={submitting}
+                    icon={ShoppingCart}
+                    fullWidth
+                  >
+                    {submitting
+                      ? 'Processing...'
+                      : `Create order${orderQuote ? ` · $${orderQuote.total_amount.toFixed(2)}` : ''}`}
+                  </StandardButton>
+                  {!canSubmit && !submitting && (
+                    <p className="text-[11px] text-amber-700 mt-2 text-center">{submitBlockers[0]}</p>
+                  )}
+
+                  {orderLines.length > 0 && (
+                    <button type="button" onClick={() => setOrderLines([])} className="w-full mt-2 text-xs text-gray-400 hover:text-red-500">
+                      Clear order
+                    </button>
+                  )}
+                </>
+              ) : selectedAttraction ? (
                 <>
                   <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
@@ -1363,22 +1869,26 @@ const CreatePurchase = () => {
                     </label>
                   </div>
 
+
                   <StandardButton
                     variant="primary"
                     size="lg"
                     onClick={handleCompletePurchase}
-                    disabled={submitting}
+                    disabled={submitting || !canSubmit}
                     loading={submitting}
                     icon={ShoppingCart}
                     fullWidth
                   >
                     {submitting ? 'Processing...' : 'Complete Purchase'}
                   </StandardButton>
+                  {!canSubmit && !submitting && (
+                    <p className="text-[11px] text-amber-700 mt-2 text-center">{submitBlockers[0]}</p>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Select an attraction to begin</p>
+                  <p>{itemTab === 'events' ? 'Select an event to begin' : 'Select an attraction to begin'}</p>
                 </div>
               )}
             </div>

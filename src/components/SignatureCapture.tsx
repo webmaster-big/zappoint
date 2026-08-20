@@ -62,7 +62,12 @@ const SignatureCapture: React.FC<SignatureCaptureProps> = ({
     if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
       const snapshot = sigCanvasRef.current.toDataURL("image/png");
       setStrokeHistory((prev) => [...prev, snapshot]);
-      const base64 = sigCanvasRef.current.getTrimmedCanvas().toDataURL("image/png");
+      let base64 = snapshot;
+      try {
+        base64 = sigCanvasRef.current.getTrimmedCanvas().toDataURL("image/png");
+      } catch {
+        base64 = sigCanvasRef.current.getCanvas().toDataURL("image/png");
+      }
       onSignatureChange(base64);
     }
   };

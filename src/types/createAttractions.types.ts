@@ -12,6 +12,7 @@ export interface CreateAttractionsFormData {
   price: string;
   pricingType: string;
   maxCapacity: string;
+  maxTicketsPerSlot: string;
   duration: string;
   durationUnit: string;
   images: string[];

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   MapPin,
   Calendar,
@@ -14,7 +15,8 @@ import {
   CheckCircle,
   DollarSign,
   Sparkles,
-  Phone
+  Phone,
+  ShoppingCart
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 import { type GroupedAttraction, type GroupedPackage, type GroupedEvent } from '../../services/CustomerService';
@@ -23,6 +25,7 @@ import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
+import { useCart } from '../../contexts/CartContext';
 import { findLocationBySlug } from '../../services/StorefrontLocationService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SiteFooter from '../../components/customer/SiteFooter';
@@ -65,6 +68,25 @@ interface DisplayEvent {
   purchaseLinks: Array<{ location: string; url: string; event_id: number; location_id: number }>;
 }
 
+type StorefrontFilter =
+  | { kind: 'all' }
+  | { kind: 'packages' }
+  | { kind: 'attractions' }
+  | { kind: 'events' }
+  | { kind: 'category'; key: string };
+
+interface FilterChip {
+  key: string;
+  label: string;
+  value: StorefrontFilter;
+  icon?: ReactNode;
+  isCategory?: boolean;
+}
+
+const CART_ENABLED = true;
+
+const categoryKeyOf = (value?: string | null) => (value ?? '').trim().toLowerCase();
+
 const EntertainmentLandingPage = () => {
   const { locationSlug } = useParams<{ locationSlug?: string }>();
   const { locations: storefrontLocations, loaded: storefrontLoaded } = useStorefrontLocations();
@@ -76,7 +98,12 @@ const EntertainmentLandingPage = () => {
 
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'packages' | 'attractions'>('all');
+  const [activeFilter, setActiveFilter] = useState<StorefrontFilter>(
+    locationSlug ? { kind: 'packages' } : { kind: 'all' },
+  );
+  const [cartNotice, setCartNotice] = useState<{ key: string; message: string } | null>(null);
+  const { addItem: addToCart } = useCart();
+  const [filterTouched, setFilterTouched] = useState(false);
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
@@ -129,9 +156,12 @@ const EntertainmentLandingPage = () => {
     const transformedPackages: PackageType[] = packagesData.map((pkg: GroupedPackage) => {
       const minGuests = pkg.min_participants || 1;
       const maxGuests = pkg.max_guests || minGuests;
-      const participantsText = maxGuests > minGuests
-        ? `Starts at ${minGuests} guests (up to ${maxGuests})`
-        : `${minGuests} guests`;
+      const unit = (pkg.participant_label || 'guest').toLowerCase();
+      const participantsText = pkg.pricing_type === 'per_person'
+        ? (maxGuests > minGuests ? `${minGuests}–${maxGuests} ${unit}s` : `${minGuests} ${unit}s`)
+        : (maxGuests > minGuests
+          ? `Starts at ${minGuests} ${unit}s (up to ${maxGuests})`
+          : `${minGuests} ${unit}s`);
       return {
         id: pkg.booking_links[0]?.package_id || 0,
         name: pkg.name,
@@ -151,6 +181,9 @@ const EntertainmentLandingPage = () => {
         min_participants: pkg.min_participants,
         max_guests: pkg.max_guests,
         price_per_additional: pkg.price_per_additional,
+        pricing_type: pkg.pricing_type || 'base',
+        participant_label: pkg.participant_label,
+        display_label: pkg.display_label,
         special_pricing: pkg.special_pricing,
       };
     });
@@ -223,6 +256,12 @@ const EntertainmentLandingPage = () => {
   }, [processData]);
 
   useEffect(() => {
+    setActiveFilter(locationSlug ? { kind: 'packages' } : { kind: 'all' });
+    setFilterTouched(false);
+    setSearchQuery('');
+  }, [locationSlug]);
+
+  useEffect(() => {
     const unsubscribe = customerDataCacheService.onCacheUpdate((event: CustomEvent) => {
       if (event.detail?.source === 'api' && event.detail?.data) {
         const { attractions: a, packages: p, events: e } = event.detail.data;
@@ -241,37 +280,174 @@ const EntertainmentLandingPage = () => {
     [activeLocation, selectedLocation],
   );
 
-  const filteredAttractions = attractions.filter(attraction => {
-    const matchesLocation = matchesLocationScope(attraction.availableLocationIds, attraction.availableLocations);
-    const matchesSearch = attraction.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (attraction.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+  const matchesSearch = useCallback(
+    (name: string, description?: string | null) => {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return true;
+      return name.toLowerCase().includes(query) || (description || '').toLowerCase().includes(query);
+    },
+    [searchQuery],
+  );
 
-    return matchesLocation && matchesSearch;
-  });
+  const locationAttractions = attractions.filter(attraction =>
+    matchesLocationScope(attraction.availableLocationIds, attraction.availableLocations),
+  );
+  const locationPackages = packages.filter(pkg =>
+    matchesLocationScope(pkg.availableLocationIds, pkg.availableLocations),
+  );
 
-  const filteredPackages = packages.filter(pkg => {
-    const matchesLocation = matchesLocationScope(pkg.availableLocationIds, pkg.availableLocations);
-    const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (pkg.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredAttractions = locationAttractions.filter(attraction =>
+    matchesSearch(attraction.name, attraction.description),
+  );
+  const filteredPackages = locationPackages.filter(pkg => matchesSearch(pkg.name, pkg.description));
+  const filteredSpecialPackages = filteredPackages.filter(
+    pkg => pkg.package_type && pkg.package_type !== 'regular',
+  );
+  const filteredEvents = events.filter(
+    evt =>
+      matchesLocationScope(evt.locations.map(loc => loc.location_id), evt.availableLocations) &&
+      matchesSearch(evt.name, evt.description),
+  );
 
-    return matchesLocation && matchesSearch;
-  });
+  const categoryChips = (() => {
+    const byKey = new Map<string, string>();
+    [...locationPackages, ...locationAttractions].forEach(item => {
+      const key = categoryKeyOf(item.category);
+      if (!key || byKey.has(key)) return;
+      byKey.set(key, (item.category ?? '').trim());
+    });
+    return Array.from(byKey, ([key, label]) => ({ key, label })).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  })();
 
-  const filteredSpecialPackages = packages.filter(pkg => {
-    const matchesLocation = matchesLocationScope(pkg.availableLocationIds, pkg.availableLocations);
-    const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (pkg.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const isSpecial = pkg.package_type && pkg.package_type !== 'regular';
+  const pageValidFilter: StorefrontFilter = (() => {
+    if (isSingleLocationPage) {
+      return activeFilter.kind === 'all' ? { kind: 'packages' } : activeFilter;
+    }
+    return activeFilter.kind === 'events' || activeFilter.kind === 'category'
+      ? { kind: 'all' }
+      : activeFilter;
+  })();
 
-    return matchesLocation && matchesSearch && isSpecial;
-  });
+  const reconciledFilter: StorefrontFilter =
+    pageValidFilter.kind === 'category' && !categoryChips.some(chip => chip.key === pageValidFilter.key)
+      ? { kind: 'packages' }
+      : pageValidFilter;
 
-  const filteredEvents = events.filter(evt => {
-    const matchesLocation = matchesLocationScope(evt.locations.map(loc => loc.location_id), evt.availableLocations);
-    const matchesSearch = evt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (evt.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesLocation && matchesSearch;
-  });
+  const effectiveFilter: StorefrontFilter = (() => {
+    if (filterTouched || dataLoading || reconciledFilter.kind !== 'packages') return reconciledFilter;
+    if (filteredPackages.length > 0) return reconciledFilter;
+    if (filteredAttractions.length > 0) return { kind: 'attractions' };
+    if (filteredEvents.length > 0) return { kind: 'events' };
+    return reconciledFilter;
+  })();
+
+  const activeCategoryKey = effectiveFilter.kind === 'category' ? effectiveFilter.key : null;
+  const inActiveCategory = <T extends { category?: string | null }>(items: T[]) =>
+    activeCategoryKey === null
+      ? items
+      : items.filter(item => categoryKeyOf(item.category) === activeCategoryKey);
+
+  const shownPackages = inActiveCategory(filteredPackages);
+  const packageSections = (() => {
+    const groups = new Map<string, typeof shownPackages>();
+    shownPackages.forEach(p => {
+      const k = (p.display_label || '').trim();
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(p);
+    });
+    if (groups.size === 0) groups.set('', []);
+    return [...groups.entries()]
+      .map(([label, items]) => ({ label, items }))
+      .sort((x, y) => (x.label === '' ? -1 : y.label === '' ? 1 : x.label.localeCompare(y.label)));
+  })();
+  const shownAttractions = inActiveCategory(filteredAttractions);
+  const shownSpecialPackages = inActiveCategory(filteredSpecialPackages);
+
+  const showSpecialsSection =
+    shownSpecialPackages.length > 0 &&
+    (effectiveFilter.kind === 'all' || effectiveFilter.kind === 'packages');
+  const showPackagesSection =
+    effectiveFilter.kind === 'all' ||
+    effectiveFilter.kind === 'packages' ||
+    (effectiveFilter.kind === 'category' && shownPackages.length > 0);
+  const showAttractionsSection =
+    effectiveFilter.kind === 'all' ||
+    effectiveFilter.kind === 'attractions' ||
+    (effectiveFilter.kind === 'category' && shownAttractions.length > 0);
+  const showEventsSection =
+    !isSingleLocationPage || effectiveFilter.kind === 'all' || effectiveFilter.kind === 'events';
+
+  const activeChipKey =
+    effectiveFilter.kind === 'category' ? `cat:${effectiveFilter.key}` : effectiveFilter.kind;
+
+  const filterChips: FilterChip[] = [
+    { key: 'packages', label: 'Packages', value: { kind: 'packages' }, icon: <Package size={12} /> },
+    { key: 'attractions', label: 'Attractions', value: { kind: 'attractions' }, icon: <Ticket size={12} /> },
+    { key: 'events', label: 'Events', value: { kind: 'events' }, icon: <Calendar size={12} /> },
+    ...categoryChips.map(chip => ({
+      key: `cat:${chip.key}`,
+      label: chip.label,
+      value: { kind: 'category', key: chip.key } as StorefrontFilter,
+      isCategory: true,
+    })),
+  ];
+
+  const flashCartNotice = (key: string, message: string) => {
+    setCartNotice({ key, message });
+    window.setTimeout(() => {
+      setCartNotice(current => (current?.key === key ? null : current));
+    }, 3200);
+  };
+
+  const handleAddAttractionToCart = (attraction: Attraction) => {
+    const key = `attraction-${attraction.id}`;
+    if (!activeLocation) {
+      flashCartNotice(key, 'Choose a location first.');
+      return;
+    }
+    const link = attraction.purchaseLinks?.find(l => l.location_id === activeLocation.id);
+    if (!link) {
+      flashCartNotice(key, 'Not available at this location.');
+      return;
+    }
+    const special = attraction.special_pricing;
+    const price = special?.has_special_pricing ? Number(special.discounted_price) : Number(attraction.price);
+    const result = addToCart({
+      type: 'attraction',
+      id: link.attraction_id,
+      name: attraction.name,
+      image: attraction.image ?? null,
+      locationId: activeLocation.id,
+      locationName: activeLocation.name,
+      unitPrice: Number.isFinite(price) ? price : 0,
+      quantity: 1,
+    });
+    flashCartNotice(key, result.ok ? 'Added to your cart.' : result.message ?? 'Could not add that.');
+  };
+
+  const handleAddEventToCart = (evt: DisplayEvent) => {
+    const key = `event-${evt.name}-${evt.start_date}`;
+    if (!activeLocation) {
+      flashCartNotice(key, 'Choose a location first.');
+      return;
+    }
+    const match = evt.locations.find(loc => loc.location_id === activeLocation.id);
+    const price = Number(parseFloat(evt.price));
+    const result = addToCart({
+      type: 'event',
+      id: match?.event_id ?? evt.id,
+      name: evt.name,
+      image: evt.image ?? null,
+      locationId: activeLocation.id,
+      locationName: activeLocation.name,
+      unitPrice: Number.isFinite(price) ? price : 0,
+      quantity: 1,
+      scheduledDate: evt.start_date,
+    });
+    flashCartNotice(key, result.ok ? 'Added to your cart.' : result.message ?? 'Could not add that.');
+  };
 
   const upgradeSuggestion = useMemo(() => {
     if (!selectedPackage) return null;
@@ -616,6 +792,13 @@ const EntertainmentLandingPage = () => {
           padding: 5px 12px;
           box-shadow: 0 1px 6px rgba(0,0,0,0.25);
         }
+        .zz-chip-row {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .zz-chip-row::-webkit-scrollbar {
+          display: none;
+        }
         .discount-pill-more {
           display: inline-flex;
           align-items: center;
@@ -629,6 +812,7 @@ const EntertainmentLandingPage = () => {
           border-radius: 999px;
         }
       `}</style>
+      {!isSingleLocationPage && (
       <section className="relative text-white py-16 md:py-28 lg:py-40 overflow-hidden pt-24 md:pt-28" style={{marginTop: '-4rem'}}>
         <div className="hidden md:block absolute inset-0 z-0">
           <div style={{ position: 'relative', paddingTop: '56.25%' }}>
@@ -732,37 +916,77 @@ const EntertainmentLandingPage = () => {
         
         <div className="absolute bottom-0 left-0 w-full h-40 bg-gradient-to-t from-gray-50 to-transparent"></div>
       </section>
+      )}
 
-      <section className="bg-white/95 backdrop-blur-sm py-4 md:py-5 border-b border-gray-100 sticky top-16 z-30 shadow-sm">
+      <section
+        className="bg-white/95 backdrop-blur-sm py-4 md:py-5 border-b border-gray-100 sticky z-30 shadow-sm"
+        style={{ top: isSingleLocationPage ? 'var(--zz-header-h, 80px)' : '4rem' }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {activeLocation ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 min-w-0">
-                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900 min-w-0">
-                  <MapPin size={14} className="text-blue-800 flex-shrink-0" />
-                  <span className="truncate">{activeLocation.name}</span>
-                </span>
-                {locationAddress && (
-                  <span className="text-xs text-gray-500 truncate">{locationAddress}</span>
-                )}
-                {activeLocation.phone && (
-                  <a
-                    href={`tel:${activeLocation.phone}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-blue-800 transition-colors"
-                  >
-                    <Phone size={12} />
-                    {activeLocation.phone}
-                  </a>
-                )}
-                <Link
-                  to="/"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors"
-                >
-                  All locations
-                  <ChevronRight size={12} />
-                </Link>
+          {isSingleLocationPage ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 min-w-0">
+                  <h1 className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900 min-w-0">
+                    <MapPin size={14} className="text-blue-800 flex-shrink-0" />
+                    <span className="truncate">{activeLocation?.name}</span>
+                  </h1>
+                  {locationAddress && (
+                    <span className="text-xs text-gray-500 truncate">{locationAddress}</span>
+                  )}
+                  {activeLocation?.phone && (
+                    <a
+                      href={`tel:${activeLocation.phone}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-blue-800 transition-colors"
+                    >
+                      <Phone size={12} />
+                      {activeLocation.phone}
+                    </a>
+                  )}
+                </div>
+                <div className="relative w-full sm:w-64 lg:w-72 flex-shrink-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search this location..."
+                    aria-label="Search attractions, packages and events at this location"
+                    className="w-full pl-9 pr-3 py-2 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-800/20 focus:border-blue-800 focus:bg-white placeholder-gray-400"
+                  />
+                </div>
               </div>
-            ) : (
+
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="hidden sm:inline text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">
+                  Show:
+                </span>
+                <div className="flex items-center gap-1.5 overflow-x-auto zz-chip-row -mx-1 px-1 py-0.5">
+                  {filterChips.map(chip => {
+                    const isActive = chip.key === activeChipKey;
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => {
+                          setFilterTouched(true);
+                          setActiveFilter(chip.value);
+                        }}
+                        aria-pressed={isActive}
+                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${
+                          isActive ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {chip.icon}
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-gray-400">
                   <MapPin size={14} />
@@ -784,39 +1008,39 @@ const EntertainmentLandingPage = () => {
                   ))}
                 </div>
               </div>
-            )}
 
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
-              <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                <button
-                  onClick={() => setActiveFilter('all')}
-                  className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 ${activeFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setActiveFilter('packages')}
-                  className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter === 'packages' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <Package size={12} />
-                  Packages
-                </button>
-                <button
-                  onClick={() => setActiveFilter('attractions')}
-                  className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter === 'attractions' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <Ticket size={12} />
-                  Attractions
-                </button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
+                <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                  <button
+                    onClick={() => setActiveFilter({ kind: 'all' })}
+                    className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 ${activeFilter.kind === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setActiveFilter({ kind: 'packages' })}
+                    className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter.kind === 'packages' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    <Package size={12} />
+                    Packages
+                  </button>
+                  <button
+                    onClick={() => setActiveFilter({ kind: 'attractions' })}
+                    className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter.kind === 'attractions' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    <Ticket size={12} />
+                    Attractions
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
-        {filteredSpecialPackages.length > 0 && (activeFilter === 'all' || activeFilter === 'packages') && (
+        {showSpecialsSection && (
           <section className="mb-12 md:mb-20">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 md:mb-10 gap-2">
               <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="special-packages">
@@ -830,8 +1054,8 @@ const EntertainmentLandingPage = () => {
               </p>
             </div>
 
-            <div className={`grid gap-5 ${filteredSpecialPackages.length === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : filteredSpecialPackages.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-              {filteredSpecialPackages.map(pkg => {
+            <div className={`grid gap-5 ${shownSpecialPackages.length === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : shownSpecialPackages.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+              {shownSpecialPackages.map(pkg => {
                 const typeConfig: Record<string, { label: string; bgColor: string; textColor: string }> = {
                   holiday: { label: 'HOLIDAY', bgColor: 'bg-red-600', textColor: 'text-white' },
                   special: { label: 'SPECIAL', bgColor: 'bg-amber-500', textColor: 'text-white' },
@@ -937,45 +1161,44 @@ const EntertainmentLandingPage = () => {
           </section>
         )}
 
-        {(activeFilter === 'all' || activeFilter === 'packages') && (
-          <section className="mb-12 md:mb-20">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2" id="packages">
+        {showPackagesSection && packageSections.map((sec, secIndex) => (
+          <section className="mb-12 md:mb-20" key={sec.label || 'packages'}>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2" id={secIndex === 0 ? 'packages' : undefined}>
               <div>
                 <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3">
                   <div className="p-2 bg-blue-50 rounded-xl">
                     <Package className="w-5 h-5 md:w-6 md:h-6 text-blue-800" />
                   </div>
-                  Experience Packages
+                  {sec.label || 'Experience Packages'}
                 </h2>
                 <p className="text-gray-400 text-xs md:text-sm mt-1 ml-12">
-                  Choose your perfect entertainment experience
+                  {sec.label ? `Book your ${sec.label.toLowerCase()} experience` : 'Choose your perfect entertainment experience'}
                 </p>
               </div>
               {!dataLoading && (
                 <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
-                  {filteredPackages.length} packages available
+                  {sec.items.length} {sec.label ? `available` : `package${sec.items.length !== 1 ? 's' : ''} available`}
                 </p>
               )}
             </div>
-
             {dataLoading ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
                 <p className="text-gray-400 text-xs mt-3">Loading packages...</p>
               </div>
-            ) : filteredPackages.length === 0 ? (
+            ) : sec.items.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-sm md:text-lg">No packages found matching your criteria.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
-                {filteredPackages.map(pkg => (
+                {sec.items.map(pkg => (
                   <div 
                     key={pkg.id} 
                     onClick={() => handlePackageClick(pkg)}
-                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group"
+                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
                   >
-                    <div className="aspect-video bg-gray-50 relative overflow-hidden">
+                    <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
                       {pkg.image ? (
                         <img 
                           src={getImageUrl(pkg.image)} 
@@ -1002,12 +1225,12 @@ const EntertainmentLandingPage = () => {
                       )}
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
-                          {pkg.category || 'Package'}
+                          {pkg.display_label || pkg.category || 'Package'}
                         </span>
                       </div>
                     </div>
                     
-                    <div className="p-5 md:p-6">
+                    <div className="p-5 md:p-6 flex flex-col flex-1">
                       <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
                         {pkg.name}
                       </h3>
@@ -1035,32 +1258,46 @@ const EntertainmentLandingPage = () => {
                         </div>
                       </div>
                       
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          {pkg.special_pricing?.has_special_pricing ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
-                              <span className="text-emerald-500 font-bold">→</span>
-                              <span className="text-2xl font-extrabold text-emerald-600">
-                                ${pkg.special_pricing.discounted_price}
-                              </span>
-                              <span className="text-gray-400 text-xs">/ package</span>
-                            </div>
-                          ) : (
-                            <>
-                              <span className="text-2xl font-extrabold text-gray-900">
-                                ${pkg.price}
-                              </span>
-                              <span className="text-gray-400 text-xs ml-1">/ package</span>
-                            </>
-                          )}
+                      <div className="mt-auto">
+                        <div className="flex items-end justify-between gap-3 mb-3">
+                          <div>
+                            {pkg.special_pricing?.has_special_pricing ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
+                                <span className="text-emerald-500 font-bold">→</span>
+                                <span className="text-2xl font-extrabold text-emerald-600">
+                                  ${pkg.special_pricing.discounted_price}
+                                </span>
+                                <span className="text-gray-400 text-xs">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-2xl font-extrabold text-gray-900">
+                                  ${pkg.price}
+                                </span>
+                                <span className="text-gray-400 text-xs ml-1">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePackageClick(pkg);
+                            }}
+                            className="inline-flex items-center gap-0.5 pb-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors whitespace-nowrap flex-shrink-0"
+                          >
+                            Learn more
+                            <ChevronRight size={13} />
+                          </button>
                         </div>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleBookPackage(pkg);
                           }}
-                          className="bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg"
+                          className="w-full bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
                         >
                           <Calendar size={15} />
                           Book Now
@@ -1072,9 +1309,9 @@ const EntertainmentLandingPage = () => {
               </div>
             )}
           </section>
-        )}
+        ))}
 
-        {(activeFilter === 'all' || activeFilter === 'attractions') && (
+        {showAttractionsSection && (
           <section className="mb-12 md:mb-20">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
               <div>
@@ -1090,7 +1327,7 @@ const EntertainmentLandingPage = () => {
               </div>
               {!dataLoading && (
                 <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
-                  {filteredAttractions.length} attractions available
+                  {shownAttractions.length} attraction{shownAttractions.length !== 1 ? 's' : ''} available
                 </p>
               )}
             </div>
@@ -1100,20 +1337,20 @@ const EntertainmentLandingPage = () => {
                 <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
                 <p className="text-gray-400 text-xs mt-3">Loading attractions...</p>
               </div>
-            ) : filteredAttractions.length === 0 ? (
+            ) : shownAttractions.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-sm md:text-lg">No attractions found matching your criteria.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
-                {filteredAttractions.map(attraction => {
+                {shownAttractions.map(attraction => {
                   return (
                   <div 
                     key={attraction.id} 
                     onClick={() => handleAttractionClick(attraction)}
-                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group"
+                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
                   >
-                    <div className="aspect-video bg-gray-50 relative overflow-hidden">
+                    <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
                       {attraction.image ? (
                         <img 
                           src={getImageUrl(attraction.image)} 
@@ -1145,7 +1382,7 @@ const EntertainmentLandingPage = () => {
                       </div>
                     </div>
                     
-                    <div className="p-5 md:p-6">
+                    <div className="p-5 md:p-6 flex flex-col flex-1">
                       <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
                         {attraction.name}
                       </h3>
@@ -1153,36 +1390,68 @@ const EntertainmentLandingPage = () => {
                         {attraction.description}
                       </p>
 
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          {attraction.special_pricing?.has_special_pricing ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-400 line-through font-semibold">${attraction.special_pricing.original_price}</span>
-                              <span className="text-emerald-500 font-bold">→</span>
-                              <span className="text-2xl font-extrabold text-emerald-600">
-                                ${attraction.special_pricing.discounted_price}
-                              </span>
-                              <span className="text-gray-400 text-xs">/ person</span>
-                            </div>
-                          ) : (
-                            <>
-                              <span className="text-2xl font-extrabold text-gray-900">
-                                ${attraction.price}
-                              </span>
-                              <span className="text-gray-400 text-xs ml-1">/ person</span>
-                            </>
+                      <div className="mt-auto">
+                        <div className="flex items-end justify-between gap-3 mb-3">
+                          <div>
+                            {attraction.special_pricing?.has_special_pricing ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-400 line-through font-semibold">${attraction.special_pricing.original_price}</span>
+                                <span className="text-emerald-500 font-bold">→</span>
+                                <span className="text-2xl font-extrabold text-emerald-600">
+                                  ${attraction.special_pricing.discounted_price}
+                                </span>
+                                <span className="text-gray-400 text-xs">/ person</span>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-2xl font-extrabold text-gray-900">
+                                  ${attraction.price}
+                                </span>
+                                <span className="text-gray-400 text-xs ml-1">/ person</span>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAttractionClick(attraction);
+                            }}
+                            className="inline-flex items-center gap-0.5 pb-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors whitespace-nowrap flex-shrink-0"
+                          >
+                            Learn more
+                            <ChevronRight size={13} />
+                          </button>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBuyTickets(attraction);
+                            }}
+                            className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+                          >
+                            <Ticket size={15} />
+                            Buy now
+                          </button>
+                          {CART_ENABLED && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddAttractionToCart(attraction);
+                              }}
+                              className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
+                            >
+                              <ShoppingCart size={15} />
+                              Add to cart
+                            </button>
                           )}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBuyTickets(attraction);
-                          }}
-                          className="px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
-                        >
-                          <Ticket size={15} />
-                          Buy Tickets
-                        </button>
+                        {cartNotice?.key === `attraction-${attraction.id}` && (
+                          <p className="mt-2 text-xs font-semibold text-blue-800">{cartNotice.message}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1195,6 +1464,7 @@ const EntertainmentLandingPage = () => {
 
         {/* <MembershipCarousel /> */}
 
+        {showEventsSection && (
         <section className="mb-12 md:mb-20">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
             <div>
@@ -1231,9 +1501,9 @@ const EntertainmentLandingPage = () => {
                   <div
                     key={`${evt.name}-${evt.start_date}`}
                     onClick={() => handleEventClick(evt)}
-                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group"
+                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
                   >
-                    <div className="aspect-video bg-gray-50 relative overflow-hidden">
+                    <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
                       {evt.image ? (
                         <img
                           src={getImageUrl(evt.image)}
@@ -1252,7 +1522,7 @@ const EntertainmentLandingPage = () => {
                       </div>
                     </div>
 
-                    <div className="p-5 md:p-6">
+                    <div className="p-5 md:p-6 flex flex-col flex-1">
                       <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
                         {evt.name}
                       </h3>
@@ -1260,23 +1530,55 @@ const EntertainmentLandingPage = () => {
                         <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed whitespace-pre-line">{evt.description}</p>
                       )}
 
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          <span className="text-2xl font-extrabold text-gray-900">
-                            ${parseFloat(evt.price).toFixed(2)}
-                          </span>
-                          <span className="text-gray-400 text-xs ml-1">/ ticket</span>
+                      <div className="mt-auto">
+                        <div className="flex items-end justify-between gap-3 mb-3">
+                          <div>
+                            <span className="text-2xl font-extrabold text-gray-900">
+                              ${parseFloat(evt.price).toFixed(2)}
+                            </span>
+                            <span className="text-gray-400 text-xs ml-1">/ ticket</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEventClick(evt);
+                            }}
+                            className="inline-flex items-center gap-0.5 pb-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors whitespace-nowrap flex-shrink-0"
+                          >
+                            Learn more
+                            <ChevronRight size={13} />
+                          </button>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBuyEventTickets(evt);
-                          }}
-                          className="px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
-                        >
-                          <Ticket size={15} />
-                          Get Tickets
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBuyEventTickets(evt);
+                            }}
+                            className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+                          >
+                            <Ticket size={15} />
+                            Buy now
+                          </button>
+                          {CART_ENABLED && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddEventToCart(evt);
+                              }}
+                              className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
+                            >
+                              <ShoppingCart size={15} />
+                              Add to cart
+                            </button>
+                          )}
+                        </div>
+                        {cartNotice?.key === `event-${evt.name}-${evt.start_date}` && (
+                          <p className="mt-2 text-xs font-semibold text-blue-800">{cartNotice.message}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1285,6 +1587,7 @@ const EntertainmentLandingPage = () => {
             </div>
           )}
         </section>
+        )}
       </main>
 
       {showAttractionModal && selectedAttraction && (

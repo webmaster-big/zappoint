@@ -70,25 +70,29 @@ const ManagePurchases = () => {
     voided: { color: 'bg-red-100 text-red-800', icon: XCircle }
   };
 
+  const transactionCount = purchases.filter(p => !p.ticketOrderId).length
+    + new Set(purchases.filter(p => p.ticketOrderId).map(p => p.ticketOrderId)).size;
+  const totalRevenue = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
+
   const metrics = [
     {
       title: 'Total Purchases',
-      value: purchases.length.toString(),
-      change: `${purchases.filter(p => p.status === 'confirmed').length} confirmed`,
+      value: transactionCount.toString(),
+      change: `${purchases.length} ticket lines · ${purchases.filter(p => p.status === 'confirmed').length} confirmed`,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CreditCard,
     },
     {
       title: 'Total Revenue',
-      value: `$${purchases.reduce((sum, p) => sum + p.amountPaid, 0).toFixed(2)}`,
+      value: `$${totalRevenue.toFixed(2)}`,
       change: 'All time revenue',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CheckCircle,
     },
     {
       title: 'Avg. Purchase',
-      value: purchases.length > 0
-        ? `$${(purchases.reduce((sum, p) => sum + p.amountPaid, 0) / purchases.length).toFixed(2)}`
+      value: transactionCount > 0
+        ? `$${(totalRevenue / transactionCount).toFixed(2)}`
         : '$0.00',
       change: 'Per transaction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -108,6 +112,8 @@ const ManagePurchases = () => {
       id: purchase.id.toString(),
       type: 'attraction',
       attractionName: purchase.attraction?.name || 'Unknown Attraction',
+      ticketOrderId: purchase.ticket_order_id ?? null,
+      linePosition: purchase.line_position ?? null,
       customerName: purchase.customer
         ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
         : purchase.guest_name || 'Walk-in Customer',
@@ -272,8 +278,21 @@ const ManagePurchases = () => {
       group: 'Purchase',
       sortable: true,
       sortValue: p => p.attractionName,
-      exportValue: p => p.attractionName,
-      render: p => <span className="whitespace-nowrap text-sm text-gray-900">{p.attractionName}</span>,
+      exportValue: p => p.ticketOrderId ? `${p.attractionName} (bulk order line ${p.linePosition ?? ''})` : p.attractionName,
+      render: p => (
+        <span className="whitespace-nowrap text-sm text-gray-900">
+          {p.attractionName}
+          {p.ticketOrderId ? (
+            <Link
+              to={`/orders/${p.ticketOrderId}`}
+              title={`Item ${p.linePosition ?? ''} of a bulk order — view the order`}
+              className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-800 hover:bg-blue-100"
+            >
+              bulk{p.linePosition ? ` #${p.linePosition}` : ''}
+            </Link>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: 'category',
@@ -370,7 +389,15 @@ const ManagePurchases = () => {
       sortable: true,
       sortValue: p => p.status,
       exportValue: p => p.status,
-      render: p => (
+      render: p => p.ticketOrderId ? (
+        <Link
+          to={`/orders/${p.ticketOrderId}`}
+          title="Part of a bulk order — status is managed on the order"
+          className={`inline-block text-xs font-medium px-3 py-1 rounded-full ${statusConfig[p.status]?.color || 'bg-gray-100 text-gray-800'} hover:ring-2 hover:ring-blue-300`}
+        >
+          {p.status} ↗
+        </Link>
+      ) : (
         <select
           value={p.status}
           onChange={(e) => handleStatusChange(p.id, e.target.value as AttractionPurchasesPurchase['status'])}
@@ -471,15 +498,23 @@ const ManagePurchases = () => {
   const handleBulkDelete = async () => {
     if (table.selectedIds.length === 0) return;
 
-    if (window.confirm(`Are you sure you want to delete ${table.selectedIds.length} purchase record(s)?`)) {
+    const orderLineIds = new Set(purchases.filter(p => p.ticketOrderId).map(p => p.id));
+    const eligible = table.selectedIds.filter(id => !orderLineIds.has(id));
+    const skipped = table.selectedIds.length - eligible.length;
+    if (eligible.length === 0) {
+      setToast({ message: 'The selected tickets belong to bulk orders — manage them on the order page.', type: 'info' });
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete ${eligible.length} purchase record(s)?`)) {
       try {
         await Promise.all(
-          table.selectedIds.map(id => attractionPurchaseService.deletePurchase(Number(id)))
+          eligible.map(id => attractionPurchaseService.deletePurchase(Number(id)))
         );
         await Promise.all(
-          table.selectedIds.map(id => attractionPurchaseCacheService.removePurchaseFromCache(Number(id)))
+          eligible.map(id => attractionPurchaseCacheService.removePurchaseFromCache(Number(id)))
         );
-        setToast({ message: `${table.selectedIds.length} purchase(s) deleted successfully`, type: 'success' });
+        setToast({ message: `${eligible.length} purchase(s) deleted${skipped ? ` — ${skipped} skipped (bulk-order tickets are managed on their order)` : ''}`, type: 'success' });
         table.clearSelection();
         loadPurchases(true);
       } catch (error) {
@@ -492,15 +527,23 @@ const ManagePurchases = () => {
   const handleBulkStatusChange = async (newStatus: AttractionPurchasesPurchase['status']) => {
     if (table.selectedIds.length === 0) return;
 
+    const orderLineIds = new Set(purchases.filter(p => p.ticketOrderId).map(p => p.id));
+    const eligible = table.selectedIds.filter(id => !orderLineIds.has(id));
+    const skipped = table.selectedIds.length - eligible.length;
+    if (eligible.length === 0) {
+      setToast({ message: 'The selected tickets belong to bulk orders — manage them on the order page.', type: 'info' });
+      return;
+    }
+
     try {
       await Promise.all(
-        table.selectedIds.map(id =>
+        eligible.map(id =>
           attractionPurchaseService.updatePurchase(Number(id), {
             status: newStatus as any,
           })
         )
       );
-      setToast({ message: `${table.selectedIds.length} purchase(s) updated successfully`, type: 'success' });
+      setToast({ message: `${eligible.length} purchase(s) updated${skipped ? ` — ${skipped} skipped (bulk-order tickets are managed on their order)` : ''}`, type: 'success' });
       table.clearSelection();
       loadPurchases(true);
     } catch (error) {
@@ -609,6 +652,8 @@ const ManagePurchases = () => {
       id: purchase.id.toString(),
       type: 'attraction',
       attractionName: purchase.attraction?.name || 'Unknown Attraction',
+      ticketOrderId: purchase.ticket_order_id ?? null,
+      linePosition: purchase.line_position ?? null,
       customerName: purchase.customer
         ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
         : purchase.guest_name || 'Walk-in Customer',
@@ -755,7 +800,7 @@ const ManagePurchases = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
           return (
@@ -816,13 +861,23 @@ const ManagePurchases = () => {
             renderActions={(purchase) => (
               <div className="flex items-center gap-1">
                 {purchase.status === 'pending' && purchase.amountPaid < purchase.totalAmount && (
-                  <button
-                    onClick={() => handleOpenPaymentModal(purchase)}
-                    className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-                    title="Process Payment"
-                  >
-                    <DollarSign className="h-4 w-4" />
-                  </button>
+                  purchase.ticketOrderId ? (
+                    <Link
+                      to={`/orders/${purchase.ticketOrderId}`}
+                      className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                      title="Part of a bulk order — take the payment on the order"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenPaymentModal(purchase)}
+                      className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                      title="Process Payment"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                    </button>
+                  )
                 )}
                 <Link
                   to={`/attractions/purchases/${purchase.id}?from=purchases`}

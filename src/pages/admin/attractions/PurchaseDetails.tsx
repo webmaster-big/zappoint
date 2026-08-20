@@ -26,7 +26,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import { getStoredUser } from '../../../utils/storage';
-import { generatePurchaseQRCode } from '../../../utils/qrcode';
+import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 
 const PurchaseDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -98,7 +98,9 @@ const PurchaseDetails = () => {
       setPurchase(response.data);
       if (response.data?.id) {
         try {
-          const qrCode = await generatePurchaseQRCode(response.data.id);
+          const qrCode = response.data.ticket_order_id != null
+            ? await generateOrderQRCode(Number(response.data.ticket_order_id))
+            : await generatePurchaseQRCode(response.data.id);
           setQrCodeData(qrCode);
         } catch (qrErr) {
           console.error('QR code generation failed:', qrErr);
@@ -193,6 +195,22 @@ const PurchaseDetails = () => {
             </StandardButton>
           </div>
         </div>
+
+        {purchase.ticket_order_id != null && (
+          <div className="mb-4 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-900 flex items-center justify-between gap-3">
+            <span>
+              <span className="font-bold">Part of bulk order</span>
+              {purchase.line_position != null && <> — line {purchase.line_position}</>}
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate(`/orders/${purchase.ticket_order_id}`)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-800 hover:bg-blue-900 text-white whitespace-nowrap"
+            >
+              View order
+            </button>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
@@ -422,7 +440,7 @@ const PurchaseDetails = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowQRModal(false)}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Attraction Ticket QR Code</h3>
+              <h3 className="text-xl font-bold text-gray-900">{purchase.ticket_order_id != null ? 'Order QR Code' : 'Attraction Ticket QR Code'}</h3>
               <button onClick={() => setShowQRModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition">
                 <X className="w-5 h-5 text-gray-400" />
               </button>

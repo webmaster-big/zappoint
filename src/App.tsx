@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Route, Routes, Navigate, useLocation } from "react-router-dom"
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -32,6 +33,8 @@ import CompanyDashboard from "./pages/admin/CompanyDashboard";
 import AttendantDashboard from "./pages/admin/AttendantDashboard";
 import PurchaseAttraction from "./pages/admin/attractions/PurchaseAttraction";
 import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
+import TicketOrders from "./pages/admin/orders/TicketOrders";
+import TicketOrderDetails from "./pages/admin/orders/TicketOrderDetails";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
 import AttractionCheckIn from "./pages/admin/attractions/AttractionCheckIn";
 import Payments from "./pages/admin/payments/Payments";
@@ -46,7 +49,19 @@ import Notifications from "./pages/admin/Notifications";
 import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
 import ManageAccounts from "./pages/admin/users/ManageAccounts";
 import EntertainmentLandingPage from "./pages/customer/Home";
+import { CartProvider } from "./contexts/CartContext";
 import LocationChooser from "./pages/customer/Locations";
+import Cart from "./pages/customer/Cart";
+import { useCart } from "./contexts/CartContext";
+
+const CheckoutGate = () => {
+  const { items } = useCart();
+  const lastKind = useRef<"attraction" | "event">("attraction");
+  if (items.length > 0) {
+    lastKind.current = items[0].type;
+  }
+  return lastKind.current === "event" ? <PurchaseEvent /> : <PurchaseAttraction />;
+};
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
 import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics";
@@ -179,8 +194,10 @@ function App() {
         <Route path="/photos/qr/:qrToken" element={<PhotoQrLanding />} />
         <Route path="/photos/:accessToken" element={<><PageViewBeacon pageType="customer_photos" /><CustomerPhotos /></>} />
         
-        <Route element={<CustomerLayout />}>
+        <Route element={<CartProvider><CustomerLayout /></CartProvider>}>
           <Route path="/" element={<><PageViewBeacon pageType="home" /><LocationChooser /></>} />
+          <Route path="/cart" element={<><PageViewBeacon pageType="cart" /><Cart /></>} />
+          <Route path="/checkout" element={<><PageViewBeacon pageType="checkout" /><CheckoutGate /></>} />
           <Route path="/browse" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_reservations" /><CustomerReservations /></></CustomerProtectedRoute>} />
           <Route path="/customer/attractions" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_attractions" /><MyAttractions /></></CustomerProtectedRoute>} />
@@ -203,6 +220,8 @@ function App() {
           <Route path="/attractions/edit/:id" element={<EditAttraction />} />
           <Route path="/attractions/" element={<ManageAttractions />} />
           <Route path="/attractions/details/:slug" element={<AttractionDetails />} />
+          <Route path="/orders" element={<TicketOrders />} />
+          <Route path="/orders/:id" element={<TicketOrderDetails />} />
           <Route path="/attractions/purchases" element={<ManagePurchases />} />
           <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
           <Route path="/attractions/purchases/:id/edit" element={<EditPurchase />} />

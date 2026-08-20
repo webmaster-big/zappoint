@@ -3,6 +3,8 @@ export interface AttractionPurchasesPurchase {
   id: string;
   type: string;
   attractionName: string;
+  ticketOrderId?: number | null;
+  linePosition?: number | null;
   customerName: string;
   email: string;
   phone: string;

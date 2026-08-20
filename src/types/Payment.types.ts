@@ -3,6 +3,7 @@ export const PAYMENT_TYPE = {
   BOOKING: 'booking',
   ATTRACTION_PURCHASE: 'attraction_purchase',
   EVENT_PURCHASE: 'event_purchase',
+  TICKET_ORDER: 'ticket_order',
 } as const;
 
 export type PaymentPayableType = typeof PAYMENT_TYPE[keyof typeof PAYMENT_TYPE];
@@ -125,6 +126,17 @@ export interface PaymentEventPurchase {
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
 export type PaymentMethod = 'card' | 'cash' | 'authorize.net' | 'in-store';
 
+export interface PaymentTicketOrder {
+  id: number;
+  reference_number?: string;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  customer_name?: string;
+  item_count?: number;
+  ticket_count?: number;
+  status?: string;
+}
+
 export interface Payment {
   id: number;
   payable_id?: number;
@@ -148,6 +160,8 @@ export interface Payment {
   attractionPurchase?: PaymentAttractionPurchase | null;
   attraction_purchase?: PaymentAttractionPurchase | null;
   eventPurchase?: PaymentEventPurchase | null;
+  ticketOrder?: PaymentTicketOrder | null;
+  ticket_order?: PaymentTicketOrder | null;
   event_purchase?: PaymentEventPurchase | null;
   customer?: {
     id: number;
