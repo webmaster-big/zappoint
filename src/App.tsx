@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { Route, Routes, Navigate, useLocation } from "react-router-dom"
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -142,6 +142,16 @@ import PhotoDeliveryLog from "./pages/admin/photos/PhotoDeliveryLog";
 import PhotoSettings from "./pages/admin/photos/PhotoSettings";
 import PhotoReports from "./pages/admin/photos/PhotoReports";
 
+const ScrollToTop = () => {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) window.scrollTo(0, 0);
+  }, [pathname, hash]);
+
+  return null;
+};
+
 const GoogleCalendarRedirect = () => {
   const location = useLocation();
   const user = getStoredUser();
@@ -172,6 +182,7 @@ function App() {
   return (
     <ThemeProvider>
         <PageTitleSetter />
+        <ScrollToTop />
         <Routes>
         <Route path="/admin" element={<PublicRoute restricted><Login /></PublicRoute>} />
         <Route path="/admin/register" element={<PublicRoute restricted><CompanyAdminRegistration /></PublicRoute>} />

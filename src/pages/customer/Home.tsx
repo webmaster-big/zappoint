@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -104,6 +104,18 @@ const EntertainmentLandingPage = () => {
   const [cartNotice, setCartNotice] = useState<{ key: string; message: string } | null>(null);
   const { addItem: addToCart } = useCart();
   const [filterTouched, setFilterTouched] = useState(false);
+  const filterScrollRef = useRef(false);
+
+  useEffect(() => {
+    if (!filterScrollRef.current) {
+      filterScrollRef.current = true;
+      return;
+    }
+    const content = document.querySelector('main');
+    if (content) {
+      window.scrollTo({ top: Math.max(0, content.getBoundingClientRect().top + window.scrollY - 90), behavior: 'smooth' });
+    }
+  }, [activeFilter]);
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
@@ -957,7 +969,7 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="zz-filter-bar flex items-center gap-2 min-w-0">
                 <span className="hidden sm:inline text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">
                   Show:
                 </span>
@@ -1009,7 +1021,7 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="zz-filter-bar flex items-center gap-3">
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
                 <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow-sm">
                   <button
