@@ -179,7 +179,7 @@ const BookPackage: React.FC = () => {
     city: "",
     state: "", // 2-letter state code
     zip: "",
-    country: "", // 2-letter country code
+    country: "US", // 2-letter country code
     guestOfHonorName: "",
     guestOfHonorAge: "",
     guestOfHonorGender: ""
@@ -214,7 +214,7 @@ const BookPackage: React.FC = () => {
     bookingId: number;
     waiverUrl?: string | null;
   } | null>(null);
-  const [countrySearch, setCountrySearch] = useState('');
+  const [countrySearch, setCountrySearch] = useState('United States');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
   
@@ -2486,6 +2486,10 @@ const BookPackage: React.FC = () => {
                     }}
                     disabled={!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country}
                     className="flex items-center"
+                    title={(() => {
+                      const missing = !form.firstName ? 'first name' : !form.lastName ? 'last name' : !form.email ? 'email' : !form.phone ? 'phone number' : !form.address ? 'street address' : !form.city ? 'city' : !form.state ? 'state' : !form.zip ? 'ZIP code' : !form.country ? 'country' : '';
+                      return missing ? `Add your ${missing} to continue` : '';
+                    })()}
                   >
                     Continue to Payment
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -2493,6 +2497,12 @@ const BookPackage: React.FC = () => {
                     </svg>
                   </StandardButton>
                 </div>
+                {(() => {
+                  const missing = !form.firstName ? 'first name' : !form.lastName ? 'last name' : !form.email ? 'email' : !form.phone ? 'phone number' : !form.address ? 'street address' : !form.city ? 'city' : !form.state ? 'state' : !form.zip ? 'ZIP code' : !form.country ? 'country (pick one from the list)' : null;
+                  return missing ? (
+                    <p className="text-xs text-amber-700 mt-2 text-right">Add your {missing} to continue.</p>
+                  ) : null;
+                })()}
               </>
             ) : (
               <>

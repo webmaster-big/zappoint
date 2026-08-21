@@ -99,6 +99,9 @@ const CreatePurchase = () => {
   const [eventsCatalog, setEventsCatalog] = useState<ZapEvent[]>([]);
   const [eventsCatalogLocation, setEventsCatalogLocation] = useState<number | null>(null);
   const [eventDate, setEventDate] = useState('');
+  const [eventTime, setEventTime] = useState('');
+  const [eventSlots, setEventSlots] = useState<string[]>([]);
+  const [eventSlotsLeft, setEventSlotsLeft] = useState<Record<string, number> | null>(null);
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<CreatePurchaseAddOn | null>(null);
   
@@ -537,6 +540,7 @@ const CreatePurchase = () => {
     if (itemTab === 'events') {
       if (!selectedEvent) return null;
       const evDate = eventDate || String(selectedEvent.start_date ?? '').split('T')[0];
+      if ((selectedEvent.max_tickets_per_slot != null || selectedEvent.max_bookings_per_slot != null) && !eventTime) return null;
       return {
         key: `event-${selectedEvent.id}-${evDate}-${orderLines.length}`,
         type: 'event',
@@ -546,7 +550,7 @@ const CreatePurchase = () => {
         unitPrice: Number(selectedEvent.price ?? 0),
         quantity: eventQty,
         scheduledDate: evDate,
-        scheduledTime: null,
+        scheduledTime: eventTime || null,
       };
     }
 
@@ -586,6 +590,7 @@ const CreatePurchase = () => {
       setSelectedEvent(null);
       setEventQty(1);
       setEventDate('');
+      setEventTime('');
     } else {
       setSelectedAttraction(null);
       setQuantity(1);
@@ -613,6 +618,7 @@ const CreatePurchase = () => {
       setSelectedEvent(ev);
       setEventQty(line.quantity);
       setEventDate(line.scheduledDate ?? '');
+      setEventTime(line.scheduledTime ?? '');
     } else {
       const attr = attractions.find(x => Number(x.id) === line.id);
       if (!attr) {
@@ -649,7 +655,7 @@ const CreatePurchase = () => {
         .catch(() => undefined);
     }, 400);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [orderLines, selectedAttraction, quantity, scheduledDate, scheduledTime, selectedAddOns, bulkMode, itemTab, selectedEvent, eventQty, eventDate]);
+  }, [orderLines, selectedAttraction, quantity, scheduledDate, scheduledTime, selectedAddOns, bulkMode, itemTab, selectedEvent, eventQty, eventDate, eventTime]);
 
   useEffect(() => {
     if (!orderLocationId || !(bulkMode || orderLines.length > 0 || itemTab === 'events')) return;
@@ -668,6 +674,26 @@ const CreatePurchase = () => {
       })
       .catch(() => undefined);
   }, [orderLocationId, orderLines.length, eventsCatalogLocation, bulkMode, itemTab]);
+
+  useEffect(() => {
+    const evDate = eventDate || String(selectedEvent?.start_date ?? '').split('T')[0];
+    if (!selectedEvent?.id || !evDate) {
+      setEventSlots([]);
+      setEventSlotsLeft(null);
+      setEventTime('');
+      return;
+    }
+    let cancelled = false;
+    eventService.getAvailableTimeSlots(Number(selectedEvent.id), evDate)
+      .then(res => {
+        if (cancelled) return;
+        setEventSlots(res.time_slots || []);
+        setEventSlotsLeft(res.remaining_tickets ?? null);
+        setEventTime(prev => (res.time_slots || []).includes(prev) ? prev : '');
+      })
+      .catch(() => { if (!cancelled) { setEventSlots([]); setEventSlotsLeft(null); } });
+    return () => { cancelled = true; };
+  }, [selectedEvent?.id, eventDate]);
 
   const currentReady = buildCurrentLine() !== null;
   const readyNudgeRef = useRef(false);
@@ -1139,12 +1165,36 @@ const CreatePurchase = () => {
                               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
                             />
                           </div>
+                          {eventSlots.length > 0 && (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Time</label>
+                              <select
+                                value={eventTime}
+                                onChange={(e) => {
+                                  setEventTime(e.target.value);
+                                  const left = eventSlotsLeft?.[e.target.value];
+                                  if (left != null) setEventQty(prev => Math.min(prev, Math.max(1, left)));
+                                }}
+                                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                              >
+                                <option value="">Pick a time…</option>
+                                {eventSlots.map(slot => (
+                                  <option key={slot} value={slot}>
+                                    {convertTo12Hour(slot)}{eventSlotsLeft?.[slot] != null ? ` — ${eventSlotsLeft[slot]} left` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Tickets</label>
                             <div className="flex items-center gap-2">
                               <StandardButton variant="ghost" size="sm" onClick={() => setEventQty(Math.max(1, eventQty - 1))} icon={Minus}>{''}</StandardButton>
                               <span className="w-8 text-center font-semibold">{eventQty}</span>
-                              <StandardButton variant="ghost" size="sm" onClick={() => setEventQty(eventQty + 1)} icon={Plus}>{''}</StandardButton>
+                              <StandardButton variant="ghost" size="sm" onClick={() => {
+                                const left = eventTime && eventSlotsLeft ? eventSlotsLeft[eventTime] : null;
+                                setEventQty(left != null ? Math.min(Math.max(1, left), eventQty + 1) : eventQty + 1);
+                              }} icon={Plus}>{''}</StandardButton>
                             </div>
                           </div>
                         </div>

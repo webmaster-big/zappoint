@@ -165,7 +165,7 @@ const PurchaseAttraction = () => {
     city: '',
     state: '', // 2-letter state code
     zip: '',
-    country: '' // 2-letter country code
+    country: 'US' // 2-letter country code
   });
   const [currentStep, setCurrentStep] = useState(1);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
@@ -188,7 +188,7 @@ const PurchaseAttraction = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [countrySearch, setCountrySearch] = useState('');
+  const [countrySearch, setCountrySearch] = useState('United States');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -1774,10 +1774,13 @@ const PurchaseAttraction = () => {
                               setCountrySearch(value);
                               setShowCountrySuggestions(true);
                               
-                              const exactMatch = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
-                              if (exactMatch) {
-                                setCustomerInfo(prev => ({ ...prev, country: exactMatch.code }));
-                              }
+                              const trimmed = value.trim().toLowerCase();
+                              const exactMatch = countries.find(c => c.name.toLowerCase() === trimmed)
+                                ?? countries.find(c => c.code.toLowerCase() === trimmed)
+                                ?? (trimmed === 'usa' || trimmed === 'united states of america' ? countries.find(c => c.code === 'US') : undefined);
+                              const prefixHits = trimmed.length >= 3 ? countries.filter(c => c.name.toLowerCase().startsWith(trimmed)) : [];
+                              const resolved = exactMatch ?? (prefixHits.length === 1 ? prefixHits[0] : undefined);
+                              setCustomerInfo(prev => ({ ...prev, country: resolved ? resolved.code : '' }));
                             }}
                             onFocus={() => {
                               if (!countrySearch && customerInfo.country) {
@@ -1863,6 +1866,20 @@ const PurchaseAttraction = () => {
                       Continue to Payment →
                     </StandardButton>
                   </div>
+                  {(() => {
+                    const missing = !customerInfo.firstName ? 'first name'
+                      : !customerInfo.lastName ? 'last name'
+                      : !customerInfo.email ? 'email'
+                      : !customerInfo.address ? 'street address'
+                      : !customerInfo.city ? 'city'
+                      : !customerInfo.state ? 'state'
+                      : !customerInfo.zip ? 'ZIP code'
+                      : !customerInfo.country ? 'country (pick one from the list)'
+                      : null;
+                    return missing ? (
+                      <p className="text-xs text-amber-700 mt-2 text-right">Add your {missing} to continue.</p>
+                    ) : null;
+                  })()}
                 </div>
               )}
 

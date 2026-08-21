@@ -1563,6 +1563,19 @@ const PurchaseEvent = () => {
                       Continue to Payment →
                     </StandardButton>
                   </div>
+                  {(() => {
+                    const missing = !guestName.trim() ? 'name'
+                      : !guestEmail.trim() ? 'email'
+                      : !billingAddress ? 'street address'
+                      : !billingCity ? 'city'
+                      : !billingState ? 'state'
+                      : !billingZip ? 'ZIP code'
+                      : !billingCountry ? 'country (pick one from the list)'
+                      : null;
+                    return missing ? (
+                      <p className="text-xs text-amber-700 mt-2 text-right">Add your {missing} to continue.</p>
+                    ) : null;
+                  })()}
                 </div>
               )}
 
