@@ -486,6 +486,11 @@ const PurchaseAttraction = () => {
             zip: customer.zip || prev.zip,
             country: customer.country || prev.country || 'US'
           }));
+          {
+            const code = customer.country || 'US';
+            const match = countries.find(c => c.code === code);
+            if (match) setCountrySearch(match.name);
+          }
           
           if (customer.id) {
             setSelectedCustomerId(customer.id);
@@ -507,6 +512,10 @@ const PurchaseAttraction = () => {
                   zip: data.zip || prev.zip,
                   country: data.country || prev.country
                 }));
+                if (data.country) {
+                  const match = countries.find(c => c.code === data.country);
+                  if (match) setCountrySearch(match.name);
+                }
               }
             } catch {
             }
@@ -663,12 +672,13 @@ const PurchaseAttraction = () => {
 
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomerId(customer.id);
-    setCustomerInfo({
+    setCustomerInfo(prev => ({
+      ...prev,
       firstName: customer.first_name,
       lastName: customer.last_name,
       email: customer.email,
       phone: customer.phone || '',
-    });
+    }));
     setShowCustomerDropdown(false);
   };
 

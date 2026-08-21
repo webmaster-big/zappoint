@@ -410,7 +410,7 @@ const CreatePurchase = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        const pricingDate = scheduledDate || new Date().toISOString().split('T')[0];
+        const pricingDate = scheduledDate || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
         const basePrice = selectedAttraction.price * quantity;
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
@@ -539,10 +539,12 @@ const CreatePurchase = () => {
   const buildCurrentLine = (): CartItem | null => {
     if (itemTab === 'events') {
       if (!selectedEvent) return null;
-      const evDate = eventDate || String(selectedEvent.start_date ?? '').split('T')[0];
+      const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+      const evStart = String(selectedEvent.start_date ?? '').split('T')[0];
+      const evDate = eventDate || (evStart > today ? evStart : today);
       if ((selectedEvent.max_tickets_per_slot != null || selectedEvent.max_bookings_per_slot != null) && !eventTime) return null;
       return {
-        key: `event-${selectedEvent.id}-${evDate}-${orderLines.length}`,
+        key: `event-${selectedEvent.id}-${evDate}-${eventTime || 'any'}-${orderLines.length}`,
         type: 'event',
         id: Number(selectedEvent.id),
         name: selectedEvent.name,
@@ -579,7 +581,7 @@ const CreatePurchase = () => {
     if (!line) {
       setToast({
         message: itemTab === 'events'
-          ? 'Pick an event first.'
+          ? (selectedEvent ? `Pick a time for ${selectedEvent.name} first.` : 'Pick an event first.')
           : 'Pick an attraction with a visit date and time first.',
         type: 'error',
       });
@@ -669,14 +671,21 @@ const CreatePurchase = () => {
           : Array.isArray(inner)
             ? inner
             : ((inner as { events?: ZapEvent[]; data?: ZapEvent[] })?.events ?? (inner as { data?: ZapEvent[] })?.data ?? []);
-        setEventsCatalog(list.filter(ev => ev.is_active !== false));
+        const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+        setEventsCatalog(list.filter(ev => {
+          if (ev.is_active === false) return false;
+          const last = String(ev.end_date ?? ev.start_date ?? '').split('T')[0];
+          return !last || last >= todayStr;
+        }));
         setEventsCatalogLocation(Number(orderLocationId));
       })
       .catch(() => undefined);
   }, [orderLocationId, orderLines.length, eventsCatalogLocation, bulkMode, itemTab]);
 
   useEffect(() => {
-    const evDate = eventDate || String(selectedEvent?.start_date ?? '').split('T')[0];
+    const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+    const evStart = String(selectedEvent?.start_date ?? '').split('T')[0];
+    const evDate = eventDate || (evStart > today ? evStart : today);
     if (!selectedEvent?.id || !evDate) {
       setEventSlots([]);
       setEventSlotsLeft(null);
@@ -689,7 +698,12 @@ const CreatePurchase = () => {
         if (cancelled) return;
         setEventSlots(res.time_slots || []);
         setEventSlotsLeft(res.remaining_tickets ?? null);
-        setEventTime(prev => (res.time_slots || []).includes(prev) ? prev : '');
+        setEventTime(prev => {
+          const kept = (res.time_slots || []).includes(prev) ? prev : '';
+          const left = kept && res.remaining_tickets ? res.remaining_tickets[kept] : null;
+          if (left != null) setEventQty(q => Math.min(q, Math.max(1, left)));
+          return kept;
+        });
       })
       .catch(() => { if (!cancelled) { setEventSlots([]); setEventSlotsLeft(null); } });
     return () => { cancelled = true; };
@@ -895,7 +909,7 @@ const CreatePurchase = () => {
           status: 'confirmed' as const,
         } : {}),
         location_id: selectedAttraction.locationId || 1,
-        purchase_date: new Date().toISOString().split('T')[0],
+        purchase_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
         scheduled_date: scheduledDate || undefined,
         scheduled_time: scheduledTime || undefined,
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
@@ -1158,8 +1172,8 @@ const CreatePurchase = () => {
                             <label className="block text-xs font-medium text-gray-600 mb-1">Event date</label>
                             <input
                               type="date"
-                              value={eventDate || String(selectedEvent.start_date ?? '').split('T')[0]}
-                              min={String(selectedEvent.start_date ?? '').split('T')[0]}
+                              value={eventDate || (() => { const t = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(); const st = String(selectedEvent.start_date ?? '').split('T')[0]; return st > t ? st : t; })()}
+                              min={(() => { const t = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(); const st = String(selectedEvent.start_date ?? '').split('T')[0]; return st > t ? st : t; })()}
                               max={String(selectedEvent.end_date ?? selectedEvent.start_date ?? '').split('T')[0]}
                               onChange={(e) => setEventDate(e.target.value)}
                               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"

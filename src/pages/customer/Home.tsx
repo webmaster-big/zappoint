@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -104,18 +104,14 @@ const EntertainmentLandingPage = () => {
   const [cartNotice, setCartNotice] = useState<{ key: string; message: string } | null>(null);
   const { addItem: addToCart } = useCart();
   const [filterTouched, setFilterTouched] = useState(false);
-  const filterScrollRef = useRef(false);
-
-  useEffect(() => {
-    if (!filterScrollRef.current) {
-      filterScrollRef.current = true;
-      return;
-    }
-    const content = document.querySelector('main');
-    if (content) {
-      window.scrollTo({ top: Math.max(0, content.getBoundingClientRect().top + window.scrollY - 90), behavior: 'smooth' });
-    }
-  }, [activeFilter]);
+  const scrollToResults = useCallback(() => {
+    requestAnimationFrame(() => {
+      const content = document.querySelector('.zz-results');
+      if (content) {
+        window.scrollTo({ top: Math.max(0, content.getBoundingClientRect().top + window.scrollY - 90), behavior: 'smooth' });
+      }
+    });
+  }, []);
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
@@ -982,7 +978,7 @@ const EntertainmentLandingPage = () => {
                         type="button"
                         onClick={() => {
                           setFilterTouched(true);
-                          setActiveFilter(chip.value);
+                          setActiveFilter(chip.value); scrollToResults();
                         }}
                         aria-pressed={isActive}
                         className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${
@@ -1025,20 +1021,20 @@ const EntertainmentLandingPage = () => {
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
                 <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow-sm">
                   <button
-                    onClick={() => setActiveFilter({ kind: 'all' })}
+                    onClick={() => { setActiveFilter({ kind: 'all' }); scrollToResults(); }}
                     className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 ${activeFilter.kind === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                   >
                     All
                   </button>
                   <button
-                    onClick={() => setActiveFilter({ kind: 'packages' })}
+                    onClick={() => { setActiveFilter({ kind: 'packages' }); scrollToResults(); }}
                     className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter.kind === 'packages' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                   >
                     <Package size={12} />
                     Packages
                   </button>
                   <button
-                    onClick={() => setActiveFilter({ kind: 'attractions' })}
+                    onClick={() => { setActiveFilter({ kind: 'attractions' }); scrollToResults(); }}
                     className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter.kind === 'attractions' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                   >
                     <Ticket size={12} />
@@ -1051,7 +1047,7 @@ const EntertainmentLandingPage = () => {
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
+      <main className="zz-results max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
         {showSpecialsSection && (
           <section className="mb-12 md:mb-20">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 md:mb-10 gap-2">

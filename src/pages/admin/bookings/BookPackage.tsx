@@ -392,6 +392,11 @@ const BookPackage: React.FC = () => {
             zip: customer.zip || prev.zip,
             country: customer.country || prev.country || 'US'
           }));
+          {
+            const code = customer.country || 'US';
+            const match = countries.find(c => c.code === code);
+            if (match) setCountrySearch(match.name);
+          }
           
           if (customer.id) {
             setCustomerId(customer.id);
@@ -413,6 +418,10 @@ const BookPackage: React.FC = () => {
                   zip: data.zip || prev.zip,
                   country: data.country || prev.country
                 }));
+                if (data.country) {
+                  const match = countries.find(c => c.code === data.country);
+                  if (match) setCountrySearch(match.name);
+                }
               }
             } catch {
             }
@@ -810,6 +819,7 @@ const BookPackage: React.FC = () => {
   
   const resetForm = () => {
     setSelectedAddOns({});
+    setCountrySearch('United States');
     setSelectedAttractions({});
     setSelectedRoomId(null);
     setPromoCode("");
@@ -828,7 +838,7 @@ const BookPackage: React.FC = () => {
       city: "",
       state: "",
       zip: "",
-      country: "",
+      country: "US",
       guestOfHonorName: "",
       guestOfHonorAge: "",
       guestOfHonorGender: ""
@@ -2398,11 +2408,14 @@ const BookPackage: React.FC = () => {
                           const value = e.target.value;
                           setCountrySearch(value);
                           setShowCountrySuggestions(true);
-                          
-                          const exactMatch = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
-                          if (exactMatch) {
-                            setForm(f => ({ ...f, country: exactMatch.code }));
-                          }
+
+                          const trimmed = value.trim().toLowerCase();
+                          const exactMatch = countries.find(c => c.name.toLowerCase() === trimmed)
+                            ?? countries.find(c => c.code.toLowerCase() === trimmed)
+                            ?? (trimmed === 'usa' || trimmed === 'united states of america' ? countries.find(c => c.code === 'US') : undefined);
+                          const prefixHits = trimmed.length >= 3 ? countries.filter(c => c.name.toLowerCase().startsWith(trimmed)) : [];
+                          const resolved = exactMatch ?? (prefixHits.length === 1 ? prefixHits[0] : undefined);
+                          setForm(f => ({ ...f, country: resolved ? resolved.code : '' }));
                         }}
                         onFocus={() => {
                           if (!countrySearch && form.country) {
