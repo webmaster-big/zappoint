@@ -69,8 +69,20 @@ class EventService {
   }
 
   async getPublicEvent(eventId: number): Promise<ApiResponse<Event>> {
-    const response = await api.get('/events/grouped-by-name');
-    const groups = response.data?.data || [];
+    // The grouped payload holds every event, so the storefront cache already has it —
+    // fetching the whole catalog again to render one event page is pure waste.
+    let groups: any[] = [];
+    try {
+      const { customerDataCacheService } = await import('./CustomerDataCacheService');
+      groups = await customerDataCacheService.getGroupedEvents();
+    } catch {
+      groups = [];
+    }
+
+    if (!Array.isArray(groups) || groups.length === 0) {
+      const response = await api.get('/events/grouped-by-name');
+      groups = response.data?.data || [];
+    }
     for (const group of groups) {
       const loc = group.locations?.find((l: { event_id: number }) => l.event_id === eventId);
       if (loc) {
@@ -88,6 +100,7 @@ class EventService {
             time_end: group.time_end,
             interval_minutes: group.interval_minutes,
             max_bookings_per_slot: group.max_bookings_per_slot,
+            max_tickets_per_slot: group.max_tickets_per_slot,
             price: group.price,
             features: group.features,
             location_id: loc.location_id,

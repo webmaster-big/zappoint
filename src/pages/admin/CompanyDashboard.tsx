@@ -1287,7 +1287,7 @@ const CompanyDashboard: React.FC = () => {
             ) : topLocations.length > 0 ? (
               <div className="space-y-4">
                 {topLocations.map(([locationId, stats], index) => {
-                  const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number };
+                  const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; waivers?: number; waiversSigned?: number };
                   return (
                   <div key={locationId} className={`flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-${themeColor}-50 border-${fullColor}`}>
                     <div className="flex items-center gap-4">
@@ -1296,7 +1296,7 @@ const CompanyDashboard: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-bold text-gray-900 text-lg">{typedStats.name}</div>
-                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.attractionTickets ?? typedStats.purchases} tickets • {typedStats.eventPurchases ?? 0} events • {typedStats.participants} guests</div>
+                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.attractionTickets ?? typedStats.purchases} tickets • {typedStats.eventPurchases ?? 0} events • {typedStats.participants} guests • {typedStats.waivers ?? 0} waivers</div>
                         <div className="text-[11px] text-gray-400 mt-0.5">
                           Bookings ${Number(typedStats.bookingRevenue ?? 0).toFixed(2)} • Tickets ${Number(typedStats.purchaseRevenue ?? 0).toFixed(2)} • Events ${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(2)}
                         </div>
@@ -1335,7 +1335,7 @@ const CompanyDashboard: React.FC = () => {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedLocations.map(([locationId, stats]) => {
-                    const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number };
+                    const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; waivers?: number; waiversSigned?: number };
                     return (
                     <div key={locationId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
@@ -1354,6 +1354,11 @@ const CompanyDashboard: React.FC = () => {
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Events</div>
                           <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.eventPurchases ?? 0}</div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-500">Waivers</div>
+                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.waivers ?? 0}</div>
+                          <div className="text-[10px] text-gray-400">{typedStats.waiversSigned ?? 0} signed</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 mb-2">

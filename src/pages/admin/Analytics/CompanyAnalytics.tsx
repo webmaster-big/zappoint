@@ -774,6 +774,7 @@ const CompanyAnalytics: React.FC = () => {
                 <th className="text-left py-3 font-medium text-gray-600">Location</th>
                 <th className="text-left py-3 font-medium text-gray-600">Revenue</th>
                 <th className="text-left py-3 font-medium text-gray-600">Packages</th>
+                <th className="text-left py-3 font-medium text-gray-600">Waivers</th>
               </tr>
             </thead>
             <tbody>
@@ -782,6 +783,12 @@ const CompanyAnalytics: React.FC = () => {
                   <td className="py-3 font-medium">{location.location}</td>
                   <td className="py-3">${location.revenue.toLocaleString()}</td>
                   <td className="py-3">{location.bookings}</td>
+                  <td className="py-3">
+                    {location.waivers ?? 0}
+                    {(location.waivers ?? 0) > 0 && (
+                      <span className="text-gray-400 text-xs"> ({location.waivers_signed ?? 0} signed)</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

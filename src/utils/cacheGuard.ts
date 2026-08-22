@@ -15,11 +15,19 @@ const METADATA_KEY_CANDIDATES = [
   '/api/memberships/metadata',
 ] as const;
 
+// Public storefront catalogs hold no per-user data, so they must survive the
+// ownership sweep — anonymous shoppers have no user id at all, and purging their
+// catalog on every boot made the cache pointless.
+const PUBLIC_CACHE_NAMES = ['zapzone-customer-data-v1'] as const;
+
+const isPublicCache = (name: string): boolean =>
+  PUBLIC_CACHE_NAMES.some((publicName) => name === publicName);
+
 const isCacheStorageAvailable = (): boolean =>
   typeof window !== 'undefined' && 'caches' in window;
 
 const looksLikeZapzoneCache = (name: string): boolean =>
-  ZAPZONE_CACHE_PREFIXES.some((prefix) => name.startsWith(prefix));
+  !isPublicCache(name) && ZAPZONE_CACHE_PREFIXES.some((prefix) => name.startsWith(prefix));
 
 const getCurrentUserId = (): number | null => {
   try {

@@ -91,6 +91,8 @@ export interface LocationStats {
     bookingRevenue?: number;
     purchaseRevenue?: number;
     eventPurchaseRevenue?: number;
+    waivers?: number;
+    waiversSigned?: number;
   };
 }
 

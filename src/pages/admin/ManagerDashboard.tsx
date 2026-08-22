@@ -26,6 +26,7 @@ import {
   LogIn,
   Save,
   Loader2,
+  FileSignature,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -116,7 +117,10 @@ const LocationManagerDashboard: React.FC = () => {
     eventPurchaseRevenue: 0,
     totalEventPurchases: 0,
     totalEventTickets: 0,
-  });
+    totalWaivers: 0,
+    completedWaivers: 0,
+    pendingWaivers: 0,
+  } as import('../../services/MetricsService').DashboardMetrics & { totalBookings: number });
 
   const getWeekDates = (date: Date): Date[] => {
     const start = new Date(date);
@@ -714,6 +718,14 @@ const LocationManagerDashboard: React.FC = () => {
       icon: TrendingUp,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       explanation: 'Average collected per package booking: booking revenue divided by the number of non-cancelled bookings in the period.',
+    },
+    {
+      title: 'Waivers',
+      value: (metrics.totalWaivers ?? 0).toString(),
+      change: `${metrics.completedWaivers ?? 0} signed • ${metrics.pendingWaivers ?? 0} pending • ${timeframeDescription}`,
+      icon: FileSignature,
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
+      explanation: 'Waivers covering visit days in this period, counted on the day they cover — the same rule the Waiver Records page uses, so the numbers agree.',
     },
   ];
 

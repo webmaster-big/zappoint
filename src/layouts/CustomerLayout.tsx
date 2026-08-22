@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { customerDataCacheService } from '../services/CustomerDataCacheService';
 import { 
   Menu,
   X,
@@ -38,6 +39,10 @@ const CustomerLayout = () => {
 
   useEffect(() => {
     checkUserLoginStatus();
+  }, []);
+
+  useEffect(() => {
+    void customerDataCacheService.warmup();
   }, []);
 
   useEffect(() => {

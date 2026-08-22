@@ -243,12 +243,12 @@ const EntertainmentLandingPage = () => {
     const loadData = async () => {
       try {
         const cached = await customerDataCacheService.getCachedAll();
-        if (cached && !cancelled) {
+        if (cached && !cancelled && (cached.attractions.length > 0 || cached.packages.length > 0 || cached.events.length > 0)) {
           processData(cached.attractions, cached.packages, cached.events);
           setDataLoading(false);
         }
 
-        const fresh = await customerDataCacheService.fetchAndCache();
+        const fresh = await customerDataCacheService.getWithBackgroundSync();
         if (!cancelled) {
           processData(fresh.attractions, fresh.packages, fresh.events);
           setDataLoading(false);

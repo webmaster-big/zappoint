@@ -7,6 +7,8 @@ const PACKAGES_KEY = '/customer/packages/cached';
 const EVENTS_KEY = '/customer/events/cached';
 const METADATA_KEY = '/customer/metadata';
 
+let warmupCompleted = false;
+
 export const CUSTOMER_CACHE_EVENT = 'customer-data-cache-updated';
 
 interface CacheMetadata {
@@ -22,6 +24,8 @@ interface CustomerDataCache {
 class CustomerDataCacheService {
   private static instance: CustomerDataCacheService;
   private isSyncing = false;
+  private inFlight: Promise<CustomerDataCache> | null = null;
+  private swrInFlight: Promise<CustomerDataCache> | null = null;
 
   private constructor() {}
 
@@ -108,6 +112,12 @@ class CustomerDataCacheService {
 
 
   async fetchAndCache(): Promise<CustomerDataCache> {
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.runFetchAndCache().finally(() => { this.inFlight = null; });
+    return this.inFlight;
+  }
+
+  private async runFetchAndCache(): Promise<CustomerDataCache> {
     const [attractionsResult, packagesResult, eventsResult] = await Promise.allSettled([
       customerService.getGroupedAttractions(),
       customerService.getGroupedPackages(),
@@ -140,6 +150,50 @@ class CustomerDataCacheService {
     return data;
   }
 
+  /**
+   * Paints from cache immediately and only refetches when the catalog is stale,
+   * so navigating the storefront costs nothing until the data actually ages out.
+   * Subscribers repaint through onCacheUpdate when the background sync lands.
+   */
+  async getWithBackgroundSync(maxAgeMinutes = 5): Promise<CustomerDataCache> {
+    // One shared read per burst: the layout warmup and the page mount fire together on a
+    // cold cache, and without this they would each kick off a full catalog fetch.
+    if (this.swrInFlight) return this.swrInFlight;
+    this.swrInFlight = this.runGetWithBackgroundSync(maxAgeMinutes)
+      .finally(() => { this.swrInFlight = null; });
+    return this.swrInFlight;
+  }
+
+  private async runGetWithBackgroundSync(maxAgeMinutes: number): Promise<CustomerDataCache> {
+    const cached = await this.getCachedAll();
+    const hasCached = !!cached && (cached.attractions.length > 0 || cached.packages.length > 0 || cached.events.length > 0);
+
+    if (hasCached) {
+      if (await this.isCacheStale(maxAgeMinutes)) {
+        this.syncInBackground();
+      }
+      return cached as CustomerDataCache;
+    }
+
+    return this.fetchAndCache();
+  }
+
+  async warmup(): Promise<void> {
+    if (warmupCompleted) return;
+    warmupCompleted = true;
+    try {
+      await this.getWithBackgroundSync();
+    } catch {
+      warmupCompleted = false;
+    }
+  }
+
+  /** The grouped-events payload already holds every event, so one page need not refetch the catalog. */
+  async getGroupedEvents(maxAgeMinutes = 5): Promise<GroupedEvent[]> {
+    const data = await this.getWithBackgroundSync(maxAgeMinutes);
+    return data.events ?? [];
+  }
+
   syncInBackground(): void {
     if (this.isSyncing) return;
     this.isSyncing = true;
@@ -156,6 +210,7 @@ class CustomerDataCacheService {
   }
 
   async clearCache(): Promise<void> {
+    warmupCompleted = false;
     if (this.isCacheAvailable()) {
       await caches.delete(CACHE_NAME);
     }

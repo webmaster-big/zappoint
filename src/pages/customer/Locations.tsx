@@ -59,7 +59,7 @@ const LocationChooser = () => {
         if (cached && !cancelled) {
           buildTallies(cached.attractions, cached.packages, cached.events);
         }
-        const fresh = await customerDataCacheService.fetchAndCache();
+        const fresh = await customerDataCacheService.getWithBackgroundSync();
         if (!cancelled) {
           buildTallies(fresh.attractions, fresh.packages, fresh.events);
         }

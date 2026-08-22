@@ -241,6 +241,8 @@ export interface CompanyAnalyticsResponse {
     location_id: number;
     revenue: number;
     bookings: number;
+    waivers?: number;
+    waivers_signed?: number;
   }>;
   package_distribution: Array<{
     name: string;
