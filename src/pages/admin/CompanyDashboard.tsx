@@ -1273,41 +1273,40 @@ const CompanyDashboard: React.FC = () => {
           </h2>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="space-y-5">
+          <div>
+            <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
               <TrendingUp className={`w-4 h-4 text-${fullColor}`} /> Top Performing Locations
             </h3>
             {metricsLoading && topLocations.length === 0 ? (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                  <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
                 ))}
               </div>
             ) : topLocations.length > 0 ? (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {topLocations.map(([locationId, stats], index) => {
                   const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; waivers?: number; waiversSigned?: number };
                   return (
-                  <div key={locationId} className={`flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-${themeColor}-50 border-${fullColor}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg bg-${fullColor}`}>
+                  <div key={locationId} className={`p-3 rounded-lg border bg-${themeColor}-50/60 border-${themeColor}-200`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-white font-bold text-xs bg-${fullColor}`}>
                         {index + 1}
                       </div>
-                      <div>
-                        <div className="font-bold text-gray-900 text-lg">{typedStats.name}</div>
-                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.attractionTickets ?? typedStats.purchases} tickets • {typedStats.eventPurchases ?? 0} events • {typedStats.participants} guests • {typedStats.waivers ?? 0} waivers</div>
-                        <div className="text-[11px] text-gray-400 mt-0.5">
-                          Bookings ${Number(typedStats.bookingRevenue ?? 0).toFixed(2)} • Tickets ${Number(typedStats.purchaseRevenue ?? 0).toFixed(2)} • Events ${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(2)}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-gray-900 text-sm truncate">{typedStats.name}</div>
+                        <div className="text-[11px] text-gray-500 leading-tight">
+                          {typedStats.bookings} bkgs · {typedStats.attractionTickets ?? typedStats.purchases} tix · {typedStats.eventPurchases ?? 0} events · {typedStats.waivers ?? 0} waivers
                         </div>
                       </div>
-                    </div>
-                    <div className="text-right min-w-[120px]">
-                      <div className={`font-bold text-lg text-${fullColor}`}>${typedStats.revenue.toFixed(2)}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs font-semibold text-${fullColor}`}>{typedStats.utilization}%</span>
-                        <div className={`w-24 h-2 rounded-full overflow-hidden bg-${themeColor}-200`}>
-                          <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
+                      <div className="text-right shrink-0">
+                        <div className={`font-bold text-sm text-${fullColor} tabular-nums`}>${typedStats.revenue.toFixed(2)}</div>
+                        <div className="flex items-center gap-1.5 justify-end mt-1">
+                          <div className={`w-14 h-1.5 rounded-full overflow-hidden bg-${themeColor}-200`}>
+                            <div className={`h-1.5 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
+                          </div>
+                          <span className="text-[10px] font-semibold text-gray-500 tabular-nums">{typedStats.utilization}%</span>
                         </div>
                       </div>
                     </div>
@@ -1316,86 +1315,68 @@ const CompanyDashboard: React.FC = () => {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-6 text-sm text-gray-500">
                 <p>No location data available yet</p>
-                <p className="text-sm mt-2">Add bookings or ticket purchases to see performance metrics</p>
+                <p className="text-xs mt-1">Add bookings or ticket purchases to see performance</p>
               </div>
             )}
           </div>
 
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-800 mb-4">All Locations Overview</h3>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-800 text-sm mb-3">All Locations Overview</h3>
             {metricsLoading && displayedLocations.length === 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {[1, 2, 3, 4, 5, 6].map(i => (
                   <div key={i} className="h-32 bg-gray-100 rounded-lg animate-pulse" />
                 ))}
               </div>
             ) : displayedLocations.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {displayedLocations.map(([locationId, stats]) => {
                     const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; waivers?: number; waiversSigned?: number };
                     return (
-                    <div key={locationId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-900 text-sm">{typedStats.name}</span>
-                        <div className={`w-3 h-3 rounded-full bg-${fullColor}`} title={`${typedStats.utilization}% utilization`}></div>
+                    <div key={locationId} className="border border-gray-200 rounded-lg p-3 bg-gray-50/70 hover:shadow-sm transition-shadow">
+                      <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                        <span className="font-semibold text-gray-900 text-sm truncate">{typedStats.name}</span>
+                        <span className={`text-sm font-bold shrink-0 text-${fullColor} tabular-nums`}>${typedStats.revenue.toFixed(2)}</span>
                       </div>
-                      <div className="flex items-center gap-4 mb-2">
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500">Bookings</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.bookings}</div>
+                      <div className="grid grid-cols-4 gap-2 mb-2.5">
+                        <div className="min-w-0">
+                          <div className="text-[10px] leading-tight text-gray-400 truncate">Bkgs</div>
+                          <div className={`text-base font-bold leading-tight text-${fullColor} tabular-nums`}>{typedStats.bookings}</div>
                         </div>
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500">Tickets</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.attractionTickets ?? typedStats.purchases}</div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] leading-tight text-gray-400 truncate">Tix</div>
+                          <div className={`text-base font-bold leading-tight text-${fullColor} tabular-nums`}>{typedStats.attractionTickets ?? typedStats.purchases}</div>
                         </div>
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500">Events</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.eventPurchases ?? 0}</div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] leading-tight text-gray-400 truncate">Events</div>
+                          <div className={`text-base font-bold leading-tight text-${fullColor} tabular-nums`}>{typedStats.eventPurchases ?? 0}</div>
                         </div>
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500">Waivers</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.waivers ?? 0}</div>
-                          <div className="text-[10px] text-gray-400">{typedStats.waiversSigned ?? 0} signed</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 mb-2">
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500">Revenue</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>${typedStats.revenue.toFixed(2)}</div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500">Utilization</div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs font-semibold text-${fullColor}`}>{typedStats.utilization}%</span>
-                            <div className={`w-16 h-2 rounded-full overflow-hidden bg-${themeColor}-200`}>
-                              <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
-                            </div>
-                          </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] leading-tight text-gray-400 truncate">Waivers</div>
+                          <div className={`text-base font-bold leading-tight text-${fullColor} tabular-nums`}>{typedStats.waivers ?? 0}</div>
+                          <div className="text-[9px] leading-tight text-gray-400 truncate">{typedStats.waiversSigned ?? 0} signed</div>
                         </div>
                       </div>
-                      <div className="pt-2 border-t border-gray-200 grid grid-cols-3 gap-2">
-                        <div>
-                          <div className="text-[10px] text-gray-400">Bookings Rev.</div>
-                          <div className="text-xs font-semibold text-gray-700">${Number(typedStats.bookingRevenue ?? 0).toFixed(2)}</div>
+                      <div className="flex items-center gap-2">
+                        <div className={`flex-1 h-1.5 rounded-full overflow-hidden bg-${themeColor}-200`}>
+                          <div className={`h-1.5 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
                         </div>
-                        <div>
-                          <div className="text-[10px] text-gray-400">Tickets Rev.</div>
-                          <div className="text-xs font-semibold text-gray-700">${Number(typedStats.purchaseRevenue ?? 0).toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-gray-400">Events Rev.</div>
-                          <div className="text-xs font-semibold text-gray-700">${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(2)}</div>
-                        </div>
+                        <span className="text-[10px] font-semibold text-gray-500 tabular-nums shrink-0">{typedStats.utilization}% used</span>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t border-gray-200 flex items-center justify-between gap-1 text-[10px] text-gray-500 tabular-nums">
+                        <span className="truncate">Bkgs ${Number(typedStats.bookingRevenue ?? 0).toFixed(0)}</span>
+                        <span className="truncate">Tix ${Number(typedStats.purchaseRevenue ?? 0).toFixed(0)}</span>
+                        <span className="truncate">Events ${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(0)}</span>
                       </div>
                     </div>
                     );
                   })}
                 </div>
                 {sortedLocations.length > 4 && (
-                  <div className="flex justify-center mt-4">
+                  <div className="flex justify-center mt-3">
                     <StandardButton
                       variant="secondary"
                       size="sm"
@@ -1407,9 +1388,9 @@ const CompanyDashboard: React.FC = () => {
                 )}
               </>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-6 text-sm text-gray-500">
                 <p>No locations configured</p>
-                <p className="text-sm mt-2">Add locations to track performance</p>
+                <p className="text-xs mt-1">Add locations to track performance</p>
               </div>
             )}
           </div>
