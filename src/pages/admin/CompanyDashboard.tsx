@@ -1399,14 +1399,14 @@ const CompanyDashboard: React.FC = () => {
 
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+            <h2 className="text-lg md:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Calendar className={`w-5 h-5 md:w-6 md:h-6 text-${fullColor}`} /> Calendar
             </h2>
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center bg-gray-100 rounded-lg p-1 shrink-0">
               <button
                 onClick={() => setCalendarView('day')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
                   calendarView === 'day' 
                     ? `bg-white text-${fullColor} shadow-sm` 
                     : 'text-gray-600 hover:text-gray-900'
@@ -1417,7 +1417,7 @@ const CompanyDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setCalendarView('week')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
                   calendarView === 'week' 
                     ? `bg-white text-${fullColor} shadow-sm` 
                     : 'text-gray-600 hover:text-gray-900'
@@ -1428,7 +1428,7 @@ const CompanyDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setCalendarView('month')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
                   calendarView === 'month' 
                     ? `bg-white text-${fullColor} shadow-sm` 
                     : 'text-gray-600 hover:text-gray-900'
@@ -1439,14 +1439,14 @@ const CompanyDashboard: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mt-4 md:mt-0">
+          <div className="flex flex-wrap items-center gap-2 mt-3 md:mt-0 min-w-0 w-full md:w-auto">
             <StandardButton 
               variant="secondary"
               size="sm"
               icon={ChevronLeft}
               onClick={calendarView === 'day' ? goToPreviousDay : calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
             />
-            <span className="text-sm font-medium text-gray-800 min-w-0 sm:min-w-[200px] text-center">
+            <span className="text-xs sm:text-sm font-medium text-gray-800 min-w-0 sm:min-w-[200px] text-center flex-1 sm:flex-none truncate">
               {calendarView === 'day'
                 ? currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
                 : calendarView === 'week' 

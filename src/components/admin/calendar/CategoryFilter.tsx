@@ -40,7 +40,7 @@ export const CalendarCategoryTabs: React.FC<{
 }> = ({ filter, className, size = 'md', label }) => {
   if (filter.categories.length < 2) return null;
 
-  const pad = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm';
+  const pad = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-2.5 py-1 text-xs sm:px-3.5 sm:py-1.5 sm:text-sm';
   const total = filter.categories.reduce((sum, category) => sum + category.count, 0);
 
   const tab = (category: CalendarCategory) => {
@@ -64,7 +64,7 @@ export const CalendarCategoryTabs: React.FC<{
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-2 ${className ?? ''}`}
+      className={`flex flex-wrap items-center gap-1.5 sm:gap-2 ${className ?? ''}`}
       role="group"
       aria-label={label ?? 'Filter the calendar by category'}
     >
