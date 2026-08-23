@@ -43,6 +43,20 @@ const sortRoomsNumerically = (roomNames: string[]): string[] => {
     });
 };
 
+const durationToMinutes = (unit: string, duration: string, hours: string, minutes: string): number => {
+    if (unit === 'hours and minutes') {
+        return ((parseInt(hours) || 0) * 60) + (parseInt(minutes) || 0);
+    }
+    const value = parseFloat(duration) || 0;
+    return unit === 'hours' ? Math.round(value * 60) : Math.round(value);
+};
+
+const serverMessage = (error: unknown, fallback: string): string => {
+    const res = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response;
+    const firstFieldError = res?.data?.errors ? Object.values(res.data.errors)[0]?.[0] : undefined;
+    return firstFieldError || res?.data?.message || fallback;
+};
+
 const CreatePackage: React.FC = () => {
     const navigate = useNavigate();
     const { themeColor, fullColor } = useThemeColor();
@@ -256,7 +270,27 @@ const CreatePackage: React.FC = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+
+        setForm((prev) => {
+            const next = { ...prev, [name]: value };
+
+            // Slot spacing follows the length of the experience unless it was set by hand,
+            // so a one-hour room lists back-to-back hours instead of overlapping halves.
+            if (['duration', 'durationUnit', 'durationHours', 'durationMinutes'].includes(name)) {
+                const before = durationToMinutes(prev.durationUnit, prev.duration, prev.durationHours, prev.durationMinutes);
+                const after = durationToMinutes(next.durationUnit, next.duration, next.durationHours, next.durationMinutes);
+
+                if (after >= 15 && after !== before) {
+                    next.availability_schedules = prev.availability_schedules.map(schedule =>
+                        (!before || schedule.time_slot_interval === before || schedule.time_slot_interval === 30)
+                            ? { ...schedule, time_slot_interval: after }
+                            : schedule
+                    );
+                }
+            }
+
+            return next;
+        });
     };
 
     const handleFeatureChange = (index: number, value: string) => {
@@ -340,6 +374,11 @@ const CreatePackage: React.FC = () => {
         });
     };
 
+    const defaultSlotInterval = () => {
+        const minutes = durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes);
+        return minutes >= 15 ? minutes : 30;
+    };
+
     const addNewSchedule = () => {
         setForm(prev => ({
             ...prev,
@@ -350,7 +389,7 @@ const CreatePackage: React.FC = () => {
                     day_configuration: null,
                     time_slot_start: '09:00',
                     time_slot_end: '17:00',
-                    time_slot_interval: 30,
+                    time_slot_interval: defaultSlotInterval(),
                     is_active: true,
                 }
             ]
@@ -397,16 +436,21 @@ const CreatePackage: React.FC = () => {
                         
                         const price = Number(priceValue.toFixed(2)); // Ensure 2 decimal places
                         
-                        await addOnService.createAddOn({
-                            location_id: 1, // Default location
+                        const created = await addOnService.createAddOn({
+                            location_id: selectedLocation ?? effectiveLocationId ?? 1,
                             name: value,
                             price,
                             description: '',
                             is_active: true
                         });
-                        const tempId = Date.now();
-                        const updated = [...addOns, { id: tempId, name: value, price }];
-                        setAddOns(updated);
+
+                        const newId = created?.data?.id;
+                        if (!newId) {
+                            showToast("Could not save that add-on. Please try again.", "error");
+                            return;
+                        }
+
+                        setAddOns(prev => [...prev, { id: newId, name: value, price }]);
                         showToast("Add-on added!", "success");
                     }
                     break;
@@ -421,15 +465,20 @@ const CreatePackage: React.FC = () => {
                     break;
                 case 'room':
                     if (!rooms.some(r => r.name === value)) {
-                        await roomService.createRoom({
-                            location_id: 1, // Default location
+                        const created = await roomService.createRoom({
+                            location_id: selectedLocation ?? effectiveLocationId ?? 1,
                             name: value,
                             capacity: 20,
                             is_available: true
                         });
-                        const tempId = Date.now();
-                        const updated = [...rooms, { id: tempId, name: value }];
-                        setRooms(updated);
+
+                        const newId = created?.data?.id;
+                        if (!newId) {
+                            showToast("Could not save that space. Please try again.", "error");
+                            return;
+                        }
+
+                        setRooms(prev => [...prev, { id: newId, name: value }]);
                         showToast("Space added!", "success");
                     }
                     break;
@@ -617,7 +666,7 @@ const CreatePackage: React.FC = () => {
             
         } catch (error) {
             console.error('Error creating package:', error);
-            showToast("Error creating package", "error");
+            showToast(serverMessage(error, "Error creating package"), "error");
         } finally {
             setSubmitting(false);
         }
@@ -1226,6 +1275,27 @@ const CreatePackage: React.FC = () => {
                                                                 step="15"
                                                                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
                                                             />
+                                                            {(() => {
+                                                                const durationMins = durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes);
+                                                                if (!durationMins || !schedule.time_slot_interval) return null;
+                                                                if (schedule.time_slot_interval < durationMins) {
+                                                                    return (
+                                                                        <div className="mt-1.5 flex items-start gap-1.5">
+                                                                            <p className="text-xs text-amber-700">
+                                                                                Start times are {schedule.time_slot_interval} min apart but this lasts {durationMins} min, so slots overlap.
+                                                                            </p>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => updateSchedule(index, { time_slot_interval: durationMins })}
+                                                                                className="text-xs font-semibold text-blue-700 hover:underline whitespace-nowrap"
+                                                                            >
+                                                                                Use {durationMins} min
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return <p className="mt-1.5 text-xs text-gray-500">A new start time every {schedule.time_slot_interval} min.</p>;
+                                                            })()}
                                                         </div>
                                                     </div>
 
@@ -1340,7 +1410,7 @@ const CreatePackage: React.FC = () => {
                     </div>
                 )}
             </div>                            {/* SPACE Section */}
-                            <div>
+                            <div className={form.pricingType === 'per_person' ? 'hidden' : undefined}>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
                                         <Home className="w-5 h-5 text-primary" /> Space
@@ -1543,7 +1613,7 @@ const CreatePackage: React.FC = () => {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setForm(prev => ({ ...prev, pricingType: 'per_person' }))}
+                                        onClick={() => setForm(prev => ({ ...prev, pricingType: 'per_person', rooms: [] }))}
                                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${form.pricingType === 'per_person' ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
                                     >
                                         Per {(form.participantLabel.trim() || 'Player').toLowerCase()}
