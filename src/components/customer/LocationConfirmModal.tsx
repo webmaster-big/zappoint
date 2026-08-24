@@ -5,9 +5,12 @@ import type { StorefrontLocation } from '../../services/StorefrontLocationServic
 
 const ACK_KEY = 'zapzone_location_ack';
 
+// Session-scoped on purpose: a guest who opens the storefront fresh should always be
+// told which venue they landed on, however they got there — QR code, shared link, or a
+// link carrying filters. Within one session we only ask once per venue.
 const readAcks = (): Record<string, number> => {
   try {
-    const raw = localStorage.getItem(ACK_KEY);
+    const raw = sessionStorage.getItem(ACK_KEY);
     return raw ? (JSON.parse(raw) as Record<string, number>) : {};
   } catch {
     return {};
@@ -43,9 +46,7 @@ const LocationConfirmModal = ({
   useEffect(() => {
     if (!location?.slug) return;
     setChosenSlug(location.slug);
-    const seenAt = readAcks()[location.slug];
-    // Ask again on a later visit — a returning guest may be at a different venue.
-    setOpen(!(seenAt && Date.now() - seenAt < 24 * 60 * 60 * 1000));
+    setOpen(!readAcks()[location.slug]);
   }, [location?.slug]);
 
   const ordered = useMemo(
@@ -67,7 +68,7 @@ const LocationConfirmModal = ({
 
   const confirm = () => {
     try {
-      localStorage.setItem(ACK_KEY, JSON.stringify({ ...readAcks(), [chosen.slug]: Date.now() }));
+      sessionStorage.setItem(ACK_KEY, JSON.stringify({ ...readAcks(), [chosen.slug]: Date.now() }));
     } catch {
       /* blocked storage just means we ask again next time */
     }

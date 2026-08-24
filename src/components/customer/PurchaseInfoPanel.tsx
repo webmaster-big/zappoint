@@ -67,7 +67,7 @@ const PurchaseInfoPanel = ({
   if (!hasAnything) return null;
 
   return (
-    <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+    <div className="mt-5 pt-4 pb-5 mb-5 border-t border-b border-gray-200 space-y-4">
       <div className="flex items-center gap-1.5">
         <Info className="h-4 w-4 text-blue-800" />
         <h4 className="text-sm font-bold text-gray-900">What you're purchasing</h4>
@@ -97,10 +97,10 @@ const PurchaseInfoPanel = ({
       )}
 
       {facts.length > 0 && (
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5">
           {facts.map(fact => (
             <div key={fact.label} className="min-w-0">
-              <dt className="text-[10px] uppercase tracking-wide text-gray-400">{fact.label}</dt>
+              <dt className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">{fact.label}</dt>
               <dd className="text-xs font-semibold text-gray-800 break-words">{fact.value}</dd>
             </div>
           ))}

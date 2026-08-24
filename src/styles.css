@@ -618,6 +618,23 @@ html.dark .text-white h6 {
   color: white !important;
 }
 
+/* A heading that carries text-white itself — a drawer or modal header sitting on a
+   coloured bar — was still losing to the html.light heading rule above. */
+html.light h1.text-white,
+html.light h2.text-white,
+html.light h3.text-white,
+html.light h4.text-white,
+html.light h5.text-white,
+html.light h6.text-white,
+html.dark h1.text-white,
+html.dark h2.text-white,
+html.dark h3.text-white,
+html.dark h4.text-white,
+html.dark h5.text-white,
+html.dark h6.text-white {
+  color: white !important;
+}
+
 html.light .text-gray-800,
 html.light .text-gray-900 {
   color: #0f172a !important;
