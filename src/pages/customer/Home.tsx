@@ -26,6 +26,7 @@ import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
 import { useCart } from '../../contexts/CartContext';
+import LocationConfirmModal from '../../components/customer/LocationConfirmModal';
 import { findLocationBySlug } from '../../services/StorefrontLocationService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SiteFooter from '../../components/customer/SiteFooter';
@@ -1040,6 +1041,18 @@ const EntertainmentLandingPage = () => {
           )}
         </div>
       </section>
+
+      {isSingleLocationPage && activeLocation && !dataLoading && (
+        <LocationConfirmModal
+          location={activeLocation}
+          counts={{
+            packages: filteredPackages.length,
+            attractions: filteredAttractions.length,
+            events: filteredEvents.length,
+          }}
+          onSwitch={() => { window.location.href = '/browse'; }}
+        />
+      )}
 
       <main className="zz-results max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
         {showSpecialsSection && (

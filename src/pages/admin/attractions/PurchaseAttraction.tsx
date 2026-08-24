@@ -15,6 +15,7 @@ import {
   DollarSign,
   Info
 } from 'lucide-react';
+import PurchaseInfoPanel from '../../../components/customer/PurchaseInfoPanel';
 import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import { resolveBullets } from '../../../utils/bullets';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
@@ -2703,6 +2704,30 @@ const PurchaseAttraction = () => {
                   {attraction.category}
                 </span>
               </div>
+
+              <PurchaseInfoPanel
+                description={attraction.description}
+                bullets={included.bullets}
+                facts={[
+                  { label: 'Duration', value: attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit) },
+                  ...(attraction.maxCapacity ? [{ label: 'Capacity', value: `Up to ${attraction.maxCapacity}` }] : []),
+                  { label: 'Price', value: `$${Number(attraction.price).toFixed(2)} per person` },
+                  ...(scheduledDate ? [{ label: 'Your visit', value: `${scheduledDate}${scheduledTime ? ` at ${convertTo12Hour(scheduledTime)}` : ''}` }] : []),
+                  ...(orderMode ? [] : [{ label: 'Tickets', value: String(quantity) }]),
+                ]}
+                lines={orderMode && cart ? cart.items.map(item => ({
+                  key: item.key,
+                  name: item.name,
+                  quantity: item.quantity,
+                  when: item.scheduledDate
+                    ? `${item.scheduledDate}${item.scheduledTime ? ` at ${convertTo12Hour(item.scheduledTime)}` : ''}`
+                    : null,
+                  amount: item.unitPrice * item.quantity,
+                  addOns: (item.addOns ?? []).map(a => ({ name: a.name, quantity: a.quantity })),
+                })) : []}
+                total={orderMode ? (orderQuote?.total_amount ?? null) : null}
+              />
+
 
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <div className="flex items-start gap-2">

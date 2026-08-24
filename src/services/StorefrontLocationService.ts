@@ -11,6 +11,7 @@ export interface StorefrontLocation {
   state?: string | null;
   zip_code?: string | null;
   phone?: string | null;
+  email?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   /** False when the slug was derived here because the server had none to give. */

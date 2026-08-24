@@ -41,6 +41,7 @@ import type { Event, EventAddOn } from '../../types/event.types';
 import { useMembershipBenefits } from '../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../types/Membership.types';
 import { resolveBullets } from '../../utils/bullets';
+import PurchaseInfoPanel from '../../components/customer/PurchaseInfoPanel';
 import { generateOrderQRCode } from '../../utils/qrcode';
 import { convertTo12Hour } from '../../utils/timeFormat';
 import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
@@ -2168,6 +2169,30 @@ const PurchaseEvent = () => {
               <div className="pt-4 border-t border-gray-100">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Price per ticket</span><span className="font-medium text-sm">${eventPrice.toFixed(2)}</span></div>
+
+              <PurchaseInfoPanel
+                description={event.description}
+                bullets={included.bullets}
+                facts={[
+                  { label: 'Price', value: `$${eventPrice.toFixed(2)} per ticket` },
+                  ...(selectedDate ? [{ label: 'Date', value: formatDate(selectedDate) }] : []),
+                  ...(selectedTime ? [{ label: 'Time', value: formatTime(selectedTime) }] : []),
+                  ...(orderMode ? [] : [{ label: 'Tickets', value: String(quantity) }]),
+                  ...(event.location?.name ? [{ label: 'Venue', value: event.location.name }] : []),
+                ]}
+                lines={orderMode && cart ? cart.items.map(item => ({
+                  key: item.key,
+                  name: item.name,
+                  quantity: item.quantity,
+                  when: item.scheduledDate
+                    ? `${item.scheduledDate}${item.scheduledTime ? ` at ${convertTo12Hour(item.scheduledTime)}` : ''}`
+                    : null,
+                  amount: item.unitPrice * item.quantity,
+                  addOns: (item.addOns ?? []).map(a => ({ name: a.name, quantity: a.quantity })),
+                })) : []}
+                total={orderMode ? (orderQuote?.total_amount ?? null) : null}
+              />
+
                   <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Quantity</span><span className="font-medium text-sm">{quantity}</span></div>
                   {selectedDate && <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Date</span><span className="font-medium text-xs">{formatDate(selectedDate)}</span></div>}
                   {selectedTime && <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Time</span><span className="font-medium text-xs">{formatTime(selectedTime)}</span></div>}
