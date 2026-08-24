@@ -156,8 +156,8 @@ const CreateEvent = () => {
       setToast({ message: 'End date is required for date range events', type: 'error' });
       return;
     }
-    if (timeStart >= timeEnd && timeEnd !== '00:00') {
-      setToast({ message: 'End time must be after start time', type: 'error' });
+    if (timeStart === timeEnd) {
+      setToast({ message: 'Start and end time cannot be the same', type: 'error' });
       return;
     }
 
@@ -374,6 +374,9 @@ const CreateEvent = () => {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
               />
+              {timeStart && timeEnd && timeEnd <= timeStart && (
+                <p className="text-xs text-blue-700 mt-1">Runs past midnight — ends {timeEnd} the next day.</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Interval (minutes) *</label>

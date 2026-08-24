@@ -70,9 +70,6 @@ interface DisplayEvent {
 
 type StorefrontFilter =
   | { kind: 'all' }
-  | { kind: 'packages' }
-  | { kind: 'attractions' }
-  | { kind: 'events' }
   | { kind: 'category'; key: string };
 
 interface FilterChip {
@@ -85,7 +82,19 @@ interface FilterChip {
 
 const CART_ENABLED = true;
 
-const categoryKeyOf = (value?: string | null) => (value ?? '').trim().toLowerCase();
+const categoryKeyOf = (value?: string | null) =>
+  (value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const EVENTS_CATEGORY_LABEL = 'Events';
+
+// A package shown as "Escape Room" belongs under that name, not under its
+// internal category, so the storefront filters read the way guests think.
+const categoryLabelOfPackage = (pkg: { display_label?: string | null; category?: string | null }) =>
+  (pkg.display_label || pkg.category || '').trim();
 
 const EntertainmentLandingPage = () => {
   const { locationSlug } = useParams<{ locationSlug?: string }>();
@@ -98,12 +107,24 @@ const EntertainmentLandingPage = () => {
 
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<StorefrontFilter>(
-    locationSlug ? { kind: 'packages' } : { kind: 'all' },
-  );
+  const [activeFilter, setActiveFilter] = useState<StorefrontFilter>(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('category');
+    const key = categoryKeyOf(fromUrl);
+    return key ? { kind: 'category', key } : { kind: 'all' };
+  });
   const [cartNotice, setCartNotice] = useState<{ key: string; message: string } | null>(null);
   const { addItem: addToCart } = useCart();
-  const [filterTouched, setFilterTouched] = useState(false);
+  const selectFilter = useCallback((next: StorefrontFilter) => {
+    setActiveFilter(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next.kind === 'category') {
+      params.set('category', next.key);
+    } else {
+      params.delete('category');
+    }
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+  }, []);
   const scrollToResults = useCallback(() => {
     requestAnimationFrame(() => {
       const content = document.querySelector('.zz-results');
@@ -264,8 +285,10 @@ const EntertainmentLandingPage = () => {
   }, [processData]);
 
   useEffect(() => {
-    setActiveFilter(locationSlug ? { kind: 'packages' } : { kind: 'all' });
-    setFilterTouched(false);
+    // A shared link like /brighton?category=escape-room must survive the switch,
+    // so only clear the filter when the URL itself carries none.
+    const fromUrl = categoryKeyOf(new URLSearchParams(window.location.search).get('category'));
+    setActiveFilter(fromUrl ? { kind: 'category', key: fromUrl } : { kind: 'all' });
     setSearchQuery('');
   }, [locationSlug]);
 
@@ -319,45 +342,32 @@ const EntertainmentLandingPage = () => {
 
   const categoryChips = (() => {
     const byKey = new Map<string, string>();
-    [...locationPackages, ...locationAttractions].forEach(item => {
-      const key = categoryKeyOf(item.category);
+    const add = (label: string) => {
+      const key = categoryKeyOf(label);
       if (!key || byKey.has(key)) return;
-      byKey.set(key, (item.category ?? '').trim());
-    });
+      byKey.set(key, label.trim());
+    };
+    locationPackages.forEach(pkg => add(categoryLabelOfPackage(pkg)));
+    locationAttractions.forEach(attraction => add(attraction.category ?? ''));
+    if (filteredEvents.length > 0) add(EVENTS_CATEGORY_LABEL);
     return Array.from(byKey, ([key, label]) => ({ key, label })).sort((a, b) =>
       a.label.localeCompare(b.label),
     );
   })();
 
-  const pageValidFilter: StorefrontFilter = (() => {
-    if (isSingleLocationPage) {
-      return activeFilter.kind === 'all' ? { kind: 'packages' } : activeFilter;
-    }
-    return activeFilter.kind === 'events' || activeFilter.kind === 'category'
+  const reconciledFilter: StorefrontFilter =
+    activeFilter.kind === 'category' && !categoryChips.some(chip => chip.key === activeFilter.key)
       ? { kind: 'all' }
       : activeFilter;
-  })();
 
-  const reconciledFilter: StorefrontFilter =
-    pageValidFilter.kind === 'category' && !categoryChips.some(chip => chip.key === pageValidFilter.key)
-      ? { kind: 'packages' }
-      : pageValidFilter;
-
-  const effectiveFilter: StorefrontFilter = (() => {
-    if (filterTouched || dataLoading || reconciledFilter.kind !== 'packages') return reconciledFilter;
-    if (filteredPackages.length > 0) return reconciledFilter;
-    if (filteredAttractions.length > 0) return { kind: 'attractions' };
-    if (filteredEvents.length > 0) return { kind: 'events' };
-    return reconciledFilter;
-  })();
+  const effectiveFilter: StorefrontFilter = reconciledFilter;
 
   const activeCategoryKey = effectiveFilter.kind === 'category' ? effectiveFilter.key : null;
-  const inActiveCategory = <T extends { category?: string | null }>(items: T[]) =>
-    activeCategoryKey === null
-      ? items
-      : items.filter(item => categoryKeyOf(item.category) === activeCategoryKey);
+  const isEventsCategory = activeCategoryKey === categoryKeyOf(EVENTS_CATEGORY_LABEL);
 
-  const shownPackages = inActiveCategory(filteredPackages);
+  const shownPackages = activeCategoryKey === null
+    ? filteredPackages
+    : filteredPackages.filter(pkg => categoryKeyOf(categoryLabelOfPackage(pkg)) === activeCategoryKey);
   const packageSections = (() => {
     const groups = new Map<string, typeof shownPackages>();
     shownPackages.forEach(p => {
@@ -370,30 +380,23 @@ const EntertainmentLandingPage = () => {
       .map(([label, items]) => ({ label, items }))
       .sort((x, y) => (x.label === '' ? -1 : y.label === '' ? 1 : x.label.localeCompare(y.label)));
   })();
-  const shownAttractions = inActiveCategory(filteredAttractions);
-  const shownSpecialPackages = inActiveCategory(filteredSpecialPackages);
+  const shownAttractions = activeCategoryKey === null
+    ? filteredAttractions
+    : (isEventsCategory ? [] : filteredAttractions.filter(a => categoryKeyOf(a.category) === activeCategoryKey));
+  const shownSpecialPackages = activeCategoryKey === null
+    ? filteredSpecialPackages
+    : filteredSpecialPackages.filter(pkg => categoryKeyOf(categoryLabelOfPackage(pkg)) === activeCategoryKey);
+  const shownEvents = activeCategoryKey === null || isEventsCategory ? filteredEvents : [];
 
-  const showSpecialsSection =
-    shownSpecialPackages.length > 0 &&
-    (effectiveFilter.kind === 'all' || effectiveFilter.kind === 'packages');
-  const showPackagesSection =
-    effectiveFilter.kind === 'all' ||
-    effectiveFilter.kind === 'packages' ||
-    (effectiveFilter.kind === 'category' && shownPackages.length > 0);
-  const showAttractionsSection =
-    effectiveFilter.kind === 'all' ||
-    effectiveFilter.kind === 'attractions' ||
-    (effectiveFilter.kind === 'category' && shownAttractions.length > 0);
-  const showEventsSection =
-    !isSingleLocationPage || effectiveFilter.kind === 'all' || effectiveFilter.kind === 'events';
+  const showSpecialsSection = shownSpecialPackages.length > 0;
+  const showPackagesSection = shownPackages.length > 0;
+  const showAttractionsSection = shownAttractions.length > 0;
+  const showEventsSection = shownEvents.length > 0;
 
-  const activeChipKey =
-    effectiveFilter.kind === 'category' ? `cat:${effectiveFilter.key}` : effectiveFilter.kind;
+  const activeChipKey = effectiveFilter.kind === 'category' ? `cat:${effectiveFilter.key}` : 'all';
 
   const filterChips: FilterChip[] = [
-    { key: 'packages', label: 'Packages', value: { kind: 'packages' }, icon: <Package size={12} /> },
-    { key: 'attractions', label: 'Attractions', value: { kind: 'attractions' }, icon: <Ticket size={12} /> },
-    { key: 'events', label: 'Events', value: { kind: 'events' }, icon: <Calendar size={12} /> },
+    { key: 'all', label: 'All', value: { kind: 'all' } },
     ...categoryChips.map(chip => ({
       key: `cat:${chip.key}`,
       label: chip.label,
@@ -977,8 +980,7 @@ const EntertainmentLandingPage = () => {
                         key={chip.key}
                         type="button"
                         onClick={() => {
-                          setFilterTouched(true);
-                          setActiveFilter(chip.value); scrollToResults();
+                          selectFilter(chip.value); scrollToResults();
                         }}
                         aria-pressed={isActive}
                         className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${
@@ -1019,27 +1021,19 @@ const EntertainmentLandingPage = () => {
 
               <div className="zz-filter-bar flex items-center gap-3">
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
-                <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                  <button
-                    onClick={() => { setActiveFilter({ kind: 'all' }); scrollToResults(); }}
-                    className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 ${activeFilter.kind === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => { setActiveFilter({ kind: 'packages' }); scrollToResults(); }}
-                    className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter.kind === 'packages' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    <Package size={12} />
-                    Packages
-                  </button>
-                  <button
-                    onClick={() => { setActiveFilter({ kind: 'attractions' }); scrollToResults(); }}
-                    className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter.kind === 'attractions' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    <Ticket size={12} />
-                    Attractions
-                  </button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {filterChips.map(chip => (
+                    <button
+                      key={chip.key}
+                      onClick={() => { selectFilter(chip.value); scrollToResults(); }}
+                      aria-pressed={chip.key === activeChipKey}
+                      className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${chip.isCategory ? 'capitalize' : ''} ${
+                        chip.key === activeChipKey ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1287,29 +1281,30 @@ const EntertainmentLandingPage = () => {
                               </>
                             )}
                           </div>
+                        </div>
+                        <div className="flex items-stretch gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handlePackageClick(pkg);
                             }}
-                            className="inline-flex items-center gap-0.5 pb-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors whitespace-nowrap flex-shrink-0"
+                            className="flex-1 border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
                           >
                             Learn more
-                            <ChevronRight size={13} />
                           </button>
-                        </div>
-                        <button
+                          <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleBookPackage(pkg);
                           }}
-                          className="w-full bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
+                          className="flex-1 bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
                         >
                           <Calendar size={15} />
                           Book Now
                         </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1419,19 +1414,18 @@ const EntertainmentLandingPage = () => {
                               </>
                             )}
                           </div>
+                        </div>
+                        <div className="flex items-stretch gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleAttractionClick(attraction);
                             }}
-                            className="inline-flex items-center gap-0.5 pb-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors whitespace-nowrap flex-shrink-0"
+                            className="flex-1 border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
                           >
                             Learn more
-                            <ChevronRight size={13} />
                           </button>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1546,19 +1540,18 @@ const EntertainmentLandingPage = () => {
                             </span>
                             <span className="text-gray-400 text-xs ml-1">/ ticket</span>
                           </div>
+                        </div>
+                        <div className="flex items-stretch gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEventClick(evt);
                             }}
-                            className="inline-flex items-center gap-0.5 pb-1 text-xs font-semibold text-blue-800 hover:text-blue-900 transition-colors whitespace-nowrap flex-shrink-0"
+                            className="flex-1 border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
                           >
                             Learn more
-                            <ChevronRight size={13} />
                           </button>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
