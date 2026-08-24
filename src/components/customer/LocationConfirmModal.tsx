@@ -3,17 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Phone, Navigation, ArrowRight, X, ChevronDown } from 'lucide-react';
 import type { StorefrontLocation } from '../../services/StorefrontLocationService';
 
-const ACK_KEY = 'zapzone_location_ack';
+// Nothing is remembered between loads: which venue you are standing in is not something
+// a browser can know, so every visit asks. The only exception lives in memory — after a
+// deliberate switch we skip re-asking about the venue the guest just chose, and even that
+// is gone the moment the page reloads.
+let justSwitchedTo: string | null = null;
 
-// Session-scoped on purpose: a guest who opens the storefront fresh should always be
-// told which venue they landed on, however they got there — QR code, shared link, or a
-// link carrying filters. Within one session we only ask once per venue.
-const readAcks = (): Record<string, number> => {
+// An earlier build remembered acknowledgements; clear that key so it does not sit in
+// guests' browsers forever now that nothing reads it.
+const dropLegacyAck = () => {
   try {
-    const raw = sessionStorage.getItem(ACK_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    localStorage.removeItem('zapzone_location_ack');
+    sessionStorage.removeItem('zapzone_location_ack');
   } catch {
-    return {};
+    /* nothing to clean if storage is blocked */
   }
 };
 
@@ -45,8 +48,16 @@ const LocationConfirmModal = ({
 
   useEffect(() => {
     if (!location?.slug) return;
+    dropLegacyAck();
     setChosenSlug(location.slug);
-    setOpen(!readAcks()[location.slug]);
+
+    if (justSwitchedTo === location.slug) {
+      justSwitchedTo = null;
+      setOpen(false);
+      return;
+    }
+
+    setOpen(true);
   }, [location?.slug]);
 
   const ordered = useMemo(
@@ -67,13 +78,9 @@ const LocationConfirmModal = ({
   const mapQuery = encodeURIComponent([chosen.name, street, cityZip].filter(Boolean).join(', '));
 
   const confirm = () => {
-    try {
-      sessionStorage.setItem(ACK_KEY, JSON.stringify({ ...readAcks(), [chosen.slug]: Date.now() }));
-    } catch {
-      /* blocked storage just means we ask again next time */
-    }
     setOpen(false);
     if (!isCurrent) {
+      justSwitchedTo = chosen.slug;
       navigate(`/${chosen.slug}`);
       return;
     }
