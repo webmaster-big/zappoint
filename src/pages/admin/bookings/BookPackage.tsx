@@ -40,6 +40,7 @@ import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/d
 import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 import { resolveBullets } from '../../../utils/bullets';
+import PurchaseInfoPanel from '../../../components/customer/PurchaseInfoPanel';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 
 const parseLocalDate = (isoDateString: string): Date => {
@@ -1839,9 +1840,14 @@ const BookPackage: React.FC = () => {
           </div>
           
           {pkg.location?.name && (
-            <div className="flex items-center gap-1.5 mb-4 md:hidden bg-white rounded-2xl px-3 py-2 shadow-md">
-              <MapPin className="h-4 w-4 text-blue-600 flex-shrink-0" />
-              <span className="text-xs font-medium text-gray-700 truncate">{pkg.location.name}</span>
+            <div className="mb-4 md:hidden bg-blue-50 border border-blue-100 rounded-2xl px-3 py-2.5 flex items-center gap-2.5">
+              <span className="shrink-0 p-1.5 bg-blue-800 rounded-lg">
+                <MapPin className="h-3.5 w-3.5 text-white" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-blue-800">Booking at</span>
+                <span className="block text-sm font-bold text-gray-900 truncate">{pkg.location.name}</span>
+              </span>
             </div>
           )}
 
@@ -3084,6 +3090,20 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              <PurchaseInfoPanel
+                description={pkg.description}
+                bullets={included.bullets}
+                facts={[
+                  { label: pkg.pricing_type === 'per_person' ? `Price per ${(pkg.participant_label || 'player').toLowerCase()}` : 'Base price', value: `$${Number(pkg.price).toFixed(2)}` },
+                  { label: pkg.participant_label ? `${pkg.participant_label}s` : 'Participants', value: `${participants}${pkg.max_participants ? ` of ${pkg.max_participants}` : ''}` },
+                  { label: 'Duration', value: formatDuration() },
+                  ...(selectedDate ? [{ label: 'Date', value: selectedDate }] : []),
+                  ...(selectedTime ? [{ label: 'Time', value: formatTimeTo12Hour(selectedTime) }] : []),
+                  ...(pkg.location?.name ? [{ label: 'Venue', value: pkg.location.name }] : []),
+                ]}
+              />
+
 
               <div className="space-y-3 text-sm">
                 <div className="bg-blue-50/70 rounded-xl p-3">

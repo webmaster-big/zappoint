@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -126,6 +126,17 @@ const EntertainmentLandingPage = () => {
     const query = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
   }, []);
+  const chipRailRef = useRef<HTMLDivElement | null>(null);
+  const [chipsOverflowRight, setChipsOverflowRight] = useState(false);
+
+  // Categories run off the edge on a phone, and a row that simply gets clipped looks
+  // like the whole list. A fading edge with an arrow says "there is more, keep sliding".
+  const measureChipRail = useCallback(() => {
+    const rail = chipRailRef.current;
+    if (!rail) return;
+    setChipsOverflowRight(rail.scrollWidth - rail.clientWidth - rail.scrollLeft > 8);
+  }, []);
+
   const scrollToResults = useCallback(() => {
     requestAnimationFrame(() => {
       const content = document.querySelector('.zz-results');
@@ -284,6 +295,12 @@ const EntertainmentLandingPage = () => {
     loadData();
     return () => { cancelled = true; };
   }, [processData]);
+
+  useEffect(() => {
+    measureChipRail();
+    window.addEventListener('resize', measureChipRail);
+    return () => window.removeEventListener('resize', measureChipRail);
+  }, [measureChipRail, dataLoading, packages.length, attractions.length, events.length, activeFilter]);
 
   useEffect(() => {
     // A shared link like /brighton?category=escape-room must survive the switch,
@@ -973,7 +990,12 @@ const EntertainmentLandingPage = () => {
                 <span className="hidden sm:inline text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">
                   Show:
                 </span>
-                <div className="flex items-center gap-1.5 overflow-x-auto zz-chip-row -mx-1 px-1 py-0.5">
+                <div className="relative min-w-0 flex-1">
+                <div
+                  ref={chipRailRef}
+                  onScroll={measureChipRail}
+                  className="flex items-center gap-1.5 overflow-x-auto zz-chip-row -mx-1 px-1 py-0.5"
+                >
                   {filterChips.map(chip => {
                     const isActive = chip.key === activeChipKey;
                     return (
@@ -993,6 +1015,12 @@ const EntertainmentLandingPage = () => {
                       </button>
                     );
                   })}
+                </div>
+                {chipsOverflowRight && (
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pl-6 pr-0.5 bg-gradient-to-l from-white via-white/90 to-transparent">
+                    <ChevronRight size={16} className="text-blue-800 animate-pulse" />
+                  </div>
+                )}
                 </div>
               </div>
             </div>
@@ -1045,12 +1073,12 @@ const EntertainmentLandingPage = () => {
       {isSingleLocationPage && activeLocation && !dataLoading && (
         <LocationConfirmModal
           location={activeLocation}
+          locations={storefrontLocations}
           counts={{
             packages: filteredPackages.length,
             attractions: filteredAttractions.length,
             events: filteredEvents.length,
           }}
-          onSwitch={() => { window.location.href = '/browse'; }}
         />
       )}
 
@@ -1295,14 +1323,14 @@ const EntertainmentLandingPage = () => {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-stretch gap-2">
+                        <div className="flex flex-wrap items-stretch gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handlePackageClick(pkg);
                             }}
-                            className="flex-1 border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+                            className="flex-1 basis-28 whitespace-nowrap border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
                           >
                             Learn more
                           </button>
@@ -1312,7 +1340,7 @@ const EntertainmentLandingPage = () => {
                             e.stopPropagation();
                             handleBookPackage(pkg);
                           }}
-                          className="flex-1 bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
+                          className="flex-1 basis-28 whitespace-nowrap bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
                         >
                           <Calendar size={15} />
                           Book Now
@@ -1428,14 +1456,14 @@ const EntertainmentLandingPage = () => {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-stretch gap-2">
+                        <div className="flex flex-wrap items-stretch gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleAttractionClick(attraction);
                             }}
-                            className="flex-1 border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+                            className="flex-1 basis-28 whitespace-nowrap border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
                           >
                             Learn more
                           </button>
@@ -1445,7 +1473,7 @@ const EntertainmentLandingPage = () => {
                               e.stopPropagation();
                               handleBuyTickets(attraction);
                             }}
-                            className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+                            className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
                           >
                             <Ticket size={15} />
                             Buy now
@@ -1457,7 +1485,7 @@ const EntertainmentLandingPage = () => {
                                 e.stopPropagation();
                                 handleAddAttractionToCart(attraction);
                               }}
-                              className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
+                              className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
                             >
                               <ShoppingCart size={15} />
                               Add to cart
@@ -1554,14 +1582,14 @@ const EntertainmentLandingPage = () => {
                             <span className="text-gray-400 text-xs ml-1">/ ticket</span>
                           </div>
                         </div>
-                        <div className="flex items-stretch gap-2">
+                        <div className="flex flex-wrap items-stretch gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEventClick(evt);
                             }}
-                            className="flex-1 border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+                            className="flex-1 basis-28 whitespace-nowrap border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
                           >
                             Learn more
                           </button>
@@ -1571,7 +1599,7 @@ const EntertainmentLandingPage = () => {
                               e.stopPropagation();
                               handleBuyEventTickets(evt);
                             }}
-                            className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+                            className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
                           >
                             <Ticket size={15} />
                             Buy now
@@ -1583,7 +1611,7 @@ const EntertainmentLandingPage = () => {
                                 e.stopPropagation();
                                 handleAddEventToCart(evt);
                               }}
-                              className="sm:flex-1 px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
+                              className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
                             >
                               <ShoppingCart size={15} />
                               Add to cart
@@ -1713,6 +1741,8 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
+              {Array.isArray(selectedAttraction.availability)
+                && selectedAttraction.availability.some(s => Array.isArray(s.days) && s.days.length > 0) && (
               <div className="mb-5">
                 <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-800" />
@@ -1788,6 +1818,7 @@ const EntertainmentLandingPage = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {!activeLocation && (
                 <div className="mb-5">
@@ -1948,6 +1979,10 @@ const EntertainmentLandingPage = () => {
                 </div>
               )}
 
+              {Array.isArray(selectedPackage.availability_schedules)
+                && selectedPackage.availability_schedules.some(s =>
+                  (Array.isArray(s.day_configuration) && s.day_configuration.length > 0)
+                  || s.availability_type === 'daily') && (
               <div className="mb-5">
                 <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-800" />
@@ -1957,14 +1992,21 @@ const EntertainmentLandingPage = () => {
                   <>
                     <div className="space-y-2 mb-4">
                       {selectedPackage.availability_schedules.map((schedule, index) => (
-                        schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0 ? (
+                        (schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0)
+                          || schedule.availability_type === 'daily' ? (
                           <div key={index} className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
                             <div className="flex flex-wrap gap-1 mb-2">
-                              {schedule.day_configuration.map((day) => (
-                                <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
-                                  {day.substring(0, 3)}
-                                </span>
-                              ))}
+                              {(schedule.day_configuration ?? []).length > 0
+                                ? (schedule.day_configuration ?? []).map((day) => (
+                                    <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
+                                      {day.substring(0, 3)}
+                                    </span>
+                                  ))
+                                : (
+                                  <span className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium rounded-md">
+                                    Every day
+                                  </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-1.5 text-xs text-gray-600">
                               <Clock size={12} className="text-blue-600" />
@@ -2023,6 +2065,7 @@ const EntertainmentLandingPage = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {!activeLocation && (
                 <div className="mb-5">
