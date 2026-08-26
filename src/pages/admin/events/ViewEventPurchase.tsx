@@ -25,6 +25,7 @@ import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import type { EventPurchase } from '../../../types/event.types';
 import { getStoredUser } from '../../../utils/storage';
+import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 
 const ViewEventPurchase = () => {
   const { id } = useParams<{ id: string }>();
@@ -392,6 +393,8 @@ const ViewEventPurchase = () => {
               )}
             </div>
           </div>
+
+          <CustomFieldAnswers source={purchase} className="p-6 border-t border-gray-100" />
 
           {(purchase.notes || purchase.special_requests) && (
             <div className="p-6 bg-gray-50">

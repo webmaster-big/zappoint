@@ -27,6 +27,13 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  firstMissingRequired,
+  pruneCustomFieldAnswers,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../../services/CustomFieldService';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -105,6 +112,10 @@ const ManualBooking: React.FC = () => {
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
+
   const [form, setForm] = useState<{
     customerName: string;
     email: string;
@@ -247,11 +258,28 @@ const ManualBooking: React.FC = () => {
   }, [pkg?.location_id, effectiveLocationId, currentUser?.location_id]);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (form.packageId) {
+      customFieldService
+        .applicable({ itemType: 'package', itemId: parseInt(form.packageId) })
+        .then(list => {
+          if (cancelled) return;
+          setCustomFieldsUnavailable(list === null);
+          const fields = list ?? [];
+          setCustomFields(fields);
+          setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+        });
       loadPackageDetails(parseInt(form.packageId));
     } else {
       setPkg(null);
+      setCustomFields([]);
+      setCustomFieldAnswers({});
     }
+
+    // Without this the flag never flipped, so a slow answer for the previous package
+    // could land after the staff member had already picked a different one.
+    return () => { cancelled = true; };
   }, [form.packageId]);
 
   const loadPackages = async () => {
@@ -906,6 +934,7 @@ const ManualBooking: React.FC = () => {
       }
 
       const bookingData: ExtendedBookingData = {
+        custom_fields: toCustomFieldPayload(customFieldAnswers),
         guest_name: form.customerName,
         guest_email: form.email,
         guest_phone: form.phone,
@@ -2243,12 +2272,29 @@ const ManualBooking: React.FC = () => {
                     </label>
                   </div>
                   
+                  {(customFields.length > 0 || customFieldsUnavailable) && (
+                    <div className="mt-4 p-3 border border-gray-200 rounded-lg">
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Before you continue</p>
+                      <CustomFieldChecks
+                        fields={customFields}
+                        unavailable={customFieldsUnavailable}
+                        answers={customFieldAnswers}
+                        onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                      />
+                      {firstMissingRequired(customFields, customFieldAnswers) && (
+                        <p className="text-xs text-amber-700 mt-2">
+                          Please confirm: {firstMissingRequired(customFields, customFieldAnswers)?.label}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
                     <StandardButton
                       type="submit"
                       variant="primary"
                       icon={Save}
-                      disabled={loading || !form.packageId || !form.bookingDate || !form.bookingTime}
+                      disabled={loading || !form.packageId || !form.bookingDate || !form.bookingTime || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       loading={loading}
                       fullWidth
                       size="md"

@@ -18,7 +18,9 @@ import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { customerService, type Customer } from '../../services/CustomerService';
-import { getImageUrl, ASSET_URL } from '../../utils/storage';
+import { getImageUrl, ASSET_URL, getStoredUser } from '../../utils/storage';
+import ScheduleHelpModal from '../../components/customer/ScheduleHelpModal';
+import useAbandonedCheckout from '../../hooks/useAbandonedCheckout';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import { extractIdFromSlug } from '../../utils/slug';
@@ -42,6 +44,13 @@ import { useMembershipBenefits } from '../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../types/Membership.types';
 import { resolveBullets } from '../../utils/bullets';
 import PurchaseInfoPanel from '../../components/customer/PurchaseInfoPanel';
+import CustomFieldChecks from '../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  pruneCustomFieldAnswers,
+  firstMissingRequired,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../services/CustomFieldService';
 import { generateOrderQRCode } from '../../utils/qrcode';
 import { convertTo12Hour } from '../../utils/timeFormat';
 import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
@@ -117,7 +126,11 @@ const getPaymentErrorMessage = (error: any): string => {
   if (combinedMessage.includes('too many') || combinedMessage.includes('rate limit')) {
     return 'Too many attempts. Please wait a moment and try again.';
   }
-  return error?.message || 'Payment could not be processed. Please check your card details and try again.';
+  // The server's wording first — a rejected purchase (capacity, a required
+  // confirmation) otherwise reads as "Request failed with status code 422".
+  return error?.response?.data?.message
+    || error?.message
+    || 'Payment could not be processed. Please check your card details and try again.';
 };
 
 
@@ -143,6 +156,9 @@ const PurchaseEvent = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [selectedTime, setSelectedTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
 
@@ -581,6 +597,30 @@ const PurchaseEvent = () => {
   const membershipDiscount = membershipBenefits.discount;
   const totalAmount = Math.max(0, totalBeforeMembership - membershipDiscount);
 
+  const checkoutLocationId = (event?.location_id ? Number(event.location_id) : null) ?? cart?.items[0]?.locationId ?? null;
+
+  useAbandonedCheckout({
+    enabled: !getStoredUser(),
+    locationId: checkoutLocationId,
+    name: guestName,
+    phone: guestPhone,
+    email: guestEmail,
+    entityType: 'event',
+    entityId: event?.id ?? null,
+    entityName: event?.name ?? null,
+    preferredDate: selectedDate,
+    preferredTime: selectedTime,
+    reachedDetails: currentStep >= 2,
+    stepLabel: currentStep === 1 ? 'Tickets' : currentStep === 2 ? 'Your details' : 'Payment',
+    estimatedTotal: totalAmount,
+    items: orderMode && cart
+      ? cart.items.map(item => ({ name: item.name, quantity: item.quantity }))
+      : event
+        ? [{ name: event.name, quantity }]
+        : undefined,
+    completed: purchaseComplete,
+  });
+
   // Resolve human-readable item names for membership discount labels.
   const eventItemName = (type: string, id: number | null | undefined): string | undefined => {
     if (type === 'event') return event?.name ?? undefined;
@@ -654,6 +694,34 @@ const PurchaseEvent = () => {
     }, 400);
     return () => { cancelled = true; clearTimeout(t); };
   }, [orderMode, orderItemsPayload, selectedDate, selectedTime]);
+
+  const customFieldItems = useMemo(() => {
+    const items: { type: 'package' | 'attraction' | 'event'; id: number }[] = [];
+    if (event?.id) items.push({ type: 'event', id: Number(event.id) });
+    if (orderMode && cart) cart.items.forEach(item => items.push({ type: item.type, id: Number(item.id) }));
+    return items.filter((item, i, all) => all.findIndex(x => x.type === item.type && x.id === item.id) === i);
+  }, [event?.id, orderMode, cart]);
+
+  const customFieldKey = customFieldItems.map(item => `${item.type}:${item.id}`).sort().join(',');
+
+  useEffect(() => {
+    if (!customFieldItems.length) {
+      setCustomFields([]);
+      return;
+    }
+    let cancelled = false;
+    customFieldService
+      .applicableForItems(customFieldItems)
+      .then(list => {
+        if (cancelled) return;
+        setCustomFieldsUnavailable(list === null);
+        const fields = list ?? [];
+        setCustomFields(fields);
+        setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customFieldKey]);
 
   const handlePurchase = async (e?: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -778,6 +846,7 @@ const PurchaseEvent = () => {
             guest_zip: billingZip || undefined,
             guest_country: billingCountry || undefined,
             sms_consent: smsConsent,
+            custom_fields: toCustomFieldPayload(customFieldAnswers),
             payment_method: 'authorize.net',
             notes: specialRequests || `Bulk order — ${orderItemsPayload.length} items`,
           });
@@ -843,6 +912,7 @@ const PurchaseEvent = () => {
           guest_email: guestEmail,
           guest_phone: guestPhone || undefined,
           sms_consent: smsConsent,
+          custom_fields: toCustomFieldPayload(customFieldAnswers),
           purchase_date: selectedDate,
           purchase_time: selectedTime,
           quantity,
@@ -1194,6 +1264,22 @@ const PurchaseEvent = () => {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {!getStoredUser() && (
+                    <div className="pt-1">
+                      <ScheduleHelpModal
+                        locationId={checkoutLocationId}
+                        entityType="event"
+                        entityId={event.id}
+                        entityName={event.name}
+                        preferredDate={selectedDate}
+                        preferredTime={selectedTime ? formatTime(selectedTime) : ''}
+                        defaultName={guestName}
+                        defaultPhone={guestPhone}
+                        defaultEmail={guestEmail}
+                      />
                     </div>
                   )}
 
@@ -1753,6 +1839,18 @@ const PurchaseEvent = () => {
                     />
                   </div>
 
+                  {(customFields.length > 0 || customFieldsUnavailable) && (
+                    <div className="border border-gray-200 rounded-xl p-4">
+                      <h3 className="text-sm font-bold text-gray-900 mb-2.5">Before you continue</h3>
+                      <CustomFieldChecks
+                        fields={customFields}
+                        unavailable={customFieldsUnavailable}
+                        answers={customFieldAnswers}
+                        onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                      />
+                    </div>
+                  )}
+
                   <div className="flex justify-between gap-2 pt-2">
                     <StandardButton variant="secondary" size="md" onClick={() => setCurrentStep(2)} disabled={submitting}>
                       <span className="sm:hidden">←</span><span className="hidden sm:inline">← Back</span>
@@ -1760,7 +1858,7 @@ const PurchaseEvent = () => {
                     <button
                       type="button"
                       onClick={handlePurchase}
-                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (

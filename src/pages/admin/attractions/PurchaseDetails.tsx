@@ -27,6 +27,7 @@ import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import { getStoredUser } from '../../../utils/storage';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
+import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 
 const PurchaseDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -412,6 +413,8 @@ const PurchaseDetails = () => {
               )}
             </div>
           </div>
+
+          <CustomFieldAnswers source={purchase} className="p-6 border-t border-gray-100" />
 
           {purchase.notes && (
             <div className="p-6 bg-gray-50">

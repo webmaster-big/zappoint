@@ -121,6 +121,7 @@ export interface CreateBookingData {
   guest_state?: string;
   guest_zip?: string;
   guest_country?: string;
+  custom_fields?: { id: number; value: boolean }[];
 }
 
 export interface UpdateBookingData {

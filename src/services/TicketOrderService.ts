@@ -133,6 +133,7 @@ export interface TicketOrder {
   confirmed_at?: string | null;
   created_at?: string | null;
   lines: OrderLine[];
+  custom_field_responses?: { id: number; label: string; value: boolean }[];
 }
 
 export interface CheckoutPayload {
@@ -148,6 +149,7 @@ export interface CheckoutPayload {
   sms_consent?: boolean;
   payment_method?: string;
   notes?: string;
+  custom_fields?: { id: number; value: boolean }[];
 }
 
 const toApiItems = (items: CartItem[]) =>

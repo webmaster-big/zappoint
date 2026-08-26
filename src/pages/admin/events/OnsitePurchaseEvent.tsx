@@ -34,6 +34,13 @@ import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.type
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  pruneCustomFieldAnswers,
+  firstMissingRequired,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../../services/CustomFieldService';
 
 const OnsitePurchaseEvent = () => {
   const navigate = useNavigate();
@@ -57,6 +64,9 @@ const OnsitePurchaseEvent = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [quantity, setQuantity] = useState(1);
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('authorize.net');
   const [notes, setNotes] = useState('');
@@ -104,6 +114,24 @@ const OnsitePurchaseEvent = () => {
       setPaymentError('');
     }
   };
+
+  useEffect(() => {
+    if (!event?.id) {
+      setCustomFields([]);
+      return;
+    }
+    let cancelled = false;
+    customFieldService
+      .applicable({ itemType: 'event', itemId: Number(event.id) })
+      .then(list => {
+        if (cancelled) return;
+        setCustomFieldsUnavailable(list === null);
+        const fields = list ?? [];
+        setCustomFields(fields);
+        setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+      });
+    return () => { cancelled = true; };
+  }, [event?.id]);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -179,6 +207,7 @@ const OnsitePurchaseEvent = () => {
 
   const changeEvent = () => {
     setEvent(null);
+    setCustomFieldAnswers({});
     setSelectedDate('');
     setSelectedTime('');
     setTimeSlots([]);
@@ -449,6 +478,7 @@ const OnsitePurchaseEvent = () => {
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : undefined,
+        custom_fields: toCustomFieldPayload(customFieldAnswers),
       });
 
       const createdPurchase = purchaseRes.data || purchaseRes;
@@ -1217,11 +1247,23 @@ const OnsitePurchaseEvent = () => {
                   </label>
                 </div>
 
+                {(customFields.length > 0 || customFieldsUnavailable) && (
+                  <div className="mb-4 p-3 border border-gray-200 rounded-lg">
+                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Before you continue</p>
+                    <CustomFieldChecks
+                      fields={customFields}
+                      unavailable={customFieldsUnavailable}
+                      answers={customFieldAnswers}
+                      onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                    />
+                  </div>
+                )}
+
                 <StandardButton
                   variant="primary"
                   size="lg"
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || firstMissingRequired(customFields, customFieldAnswers) !== null}
                   loading={submitting}
                   icon={ShoppingCart}
                   fullWidth

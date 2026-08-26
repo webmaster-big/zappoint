@@ -153,6 +153,7 @@ export interface CreateEventPurchaseData {
     quantity: number;
     price_at_purchase: number;
   }>;
+  custom_fields?: { id: number; value: boolean }[];
 }
 
 export type UpdateEventPurchaseData = Partial<CreateEventPurchaseData> & {

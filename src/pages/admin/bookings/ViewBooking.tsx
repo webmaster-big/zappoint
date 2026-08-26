@@ -26,6 +26,7 @@ import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDate
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
+import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -77,6 +78,8 @@ const ViewBooking: React.FC = () => {
       try {
         let bookingData: Booking | null = null;
         
+        let cameFromShowEndpoint = false;
+
         if (id) {
           const cached = await bookingCacheService.getBookingFromCache(Number(id));
           if (cached) {
@@ -94,12 +97,27 @@ const ViewBooking: React.FC = () => {
             const response = await bookingService.getBookingById(Number(id));
             if (response.success && response.data) {
               bookingData = response.data;
+              cameFromShowEndpoint = true;
             }
           }
         }
 
         if (bookingData) {
           setBooking(bookingData);
+
+          // The list and the cache now carry the answers, so only a row cached by an
+          // older build needs the detail endpoint — that request pulls the whole package
+          // row, base64 image column included, so it must stay the exception.
+          const missingAnswers =
+            (bookingData as { custom_field_responses?: unknown }).custom_field_responses === undefined;
+
+          if (!cameFromShowEndpoint && missingAnswers && id) {
+            bookingService
+              .getBookingById(Number(id))
+              .then(fresh => { if (fresh.success && fresh.data) setBooking(fresh.data); })
+              .catch(() => { /* the cached copy stays on screen */ });
+          }
+
           if (bookingData.reference_number) {
             const qrCode = await QRCode.toDataURL(bookingData.reference_number, {
               width: 300,
@@ -637,6 +655,8 @@ const ViewBooking: React.FC = () => {
               </div>
             </div>
           )}
+
+          <CustomFieldAnswers source={booking} className="p-6 border-t border-gray-100" />
 
           {(booking.notes || booking.special_requests) && (
             <div className="p-6">

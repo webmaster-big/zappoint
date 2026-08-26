@@ -41,6 +41,7 @@ import Payments from "./pages/admin/payments/Payments";
 import ViewPayment from "./pages/admin/payments/ViewPayment";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
 import CustomerListing from "./pages/admin/customer/Customers";
+import CustomerConcerns from "./pages/admin/concerns/CustomerConcerns";
 import CompanyAdminRegistration from "./pages/auth/Register";
 import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
 import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
@@ -109,6 +110,7 @@ import WaiverTemplates from "./pages/admin/waivers/WaiverTemplates";
 import WaiverBuilder from "./pages/admin/waivers/WaiverBuilder";
 import WaiverBulkInvites from "./pages/admin/waivers/WaiverBulkInvites";
 import WaiverSettings from "./pages/admin/waivers/WaiverSettings";
+import CustomFields from "./pages/admin/settings/CustomFields";
 import WaiverDeletionLog from "./pages/admin/waivers/WaiverDeletionLog";
 import WaiverReports from "./pages/admin/waivers/WaiverReports";
 import Events from "./pages/admin/events/Events";
@@ -271,6 +273,8 @@ function App() {
           <Route path="/waivers/reports" element={<WaiverReports />} />
           <Route path="/waivers/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><WaiverSettings /></ProtectedRoute>} />
 
+          <Route path="/settings/custom-fields" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><CustomFields /></ProtectedRoute>} />
+
           <Route path="/photos/capture" element={<PhotoCapture />} />
           <Route path="/photos/library" element={<PhotoLibrary />} />
           <Route path="/photos/slideshow-queue" element={<SlideshowQueuePage />} />
@@ -293,6 +297,7 @@ function App() {
           
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
+          <Route path="/customer-concerns" element={<CustomerConcerns />} />
 
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/memberships/plans" element={<MembershipPlans />} />

@@ -41,6 +41,13 @@ import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.type
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  pruneCustomFieldAnswers,
+  firstMissingRequired,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../../services/CustomFieldService';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -112,6 +119,9 @@ const OnsiteBooking: React.FC = () => {
   const selectedLocation = effectiveLocationId;
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
@@ -179,6 +189,7 @@ const OnsiteBooking: React.FC = () => {
   const isBookingValid = () => {
     return (
       selectedPackage &&
+      firstMissingRequired(customFields, customFieldAnswers) === null &&
       bookingData.date &&
       bookingData.time &&
       bookingData.participants > 0 &&
@@ -188,6 +199,27 @@ const OnsiteBooking: React.FC = () => {
       bookingData.customer.phone.trim()
     );
   };
+
+  useEffect(() => {
+    if (!selectedPackage?.id) {
+      setCustomFields([]);
+      return;
+    }
+    let cancelled = false;
+    customFieldService
+      .applicable({
+        itemType: 'package',
+        itemId: Number(selectedPackage.id),
+      })
+      .then(list => {
+        if (cancelled) return;
+        setCustomFieldsUnavailable(list === null);
+        const fields = list ?? [];
+        setCustomFields(fields);
+        setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+      });
+    return () => { cancelled = true; };
+  }, [selectedPackage?.id]);
 
   const formatDuration = (pkg: OnsiteBookingPackage | null) => {
     if (!pkg || !pkg.duration) return "Not specified";
@@ -1128,6 +1160,7 @@ const OnsiteBooking: React.FC = () => {
 
   const resetForm = () => {
     setSelectedPackage(null);
+    setCustomFieldAnswers({});
     setPromoDiscount(0);
     setGiftDiscount(0);
     setCodeError(null);
@@ -1367,6 +1400,7 @@ const OnsiteBooking: React.FC = () => {
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
         discount_amount: specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
+        custom_fields: toCustomFieldPayload(customFieldAnswers),
       };
       
       console.log('📤 Sending on-site booking request:', bookingData_request);
@@ -1563,7 +1597,10 @@ const OnsiteBooking: React.FC = () => {
       resetForm();
     } catch (err) {
       console.error('❌ Error creating booking:', err);
-      setToast({ message: 'Failed to create booking. Please try again.', type: 'error' });
+      // Say why: a rejected booking (capacity, a required confirmation) has a reason and
+      // staff cannot act on "Please try again".
+      const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToast({ message: serverMessage || 'Failed to create booking. Please try again.', type: 'error' });
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);
@@ -3241,6 +3278,18 @@ const OnsiteBooking: React.FC = () => {
         )}
       </div>
       
+      {(customFields.length > 0 || customFieldsUnavailable) && (
+        <div className="mb-4 p-3 border border-gray-200 rounded-lg">
+          <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Before you continue</p>
+          <CustomFieldChecks
+            fields={customFields}
+            unavailable={customFieldsUnavailable}
+            answers={customFieldAnswers}
+            onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+          />
+        </div>
+      )}
+
       <div className="flex gap-3">
         <StandardButton
           type="button"

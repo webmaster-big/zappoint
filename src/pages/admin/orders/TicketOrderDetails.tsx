@@ -25,6 +25,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { convertTo12Hour } from '../../../utils/timeFormat';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import { generateOrderQRCode } from '../../../utils/qrcode';
+import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 
 const money = (v: number) => `$${Number(v ?? 0).toFixed(2)}`;
 
@@ -291,6 +292,8 @@ const TicketOrderDetails = () => {
                 </div>
               </div>
             </div>
+
+            <CustomFieldAnswers source={order} className="mt-5 pt-4 border-t border-gray-100" />
           </div>
 
           <div className="p-6 border-b border-gray-100">

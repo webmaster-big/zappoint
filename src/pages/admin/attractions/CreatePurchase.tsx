@@ -42,6 +42,13 @@ import { convertTo12Hour } from '../../../utils/timeFormat';
 import ticketOrderService, { type CartItem, type CartQuote } from '../../../services/TicketOrderService';
 import { generateOrderQRCode } from '../../../utils/qrcode';
 import { eventService } from '../../../services/EventService';
+import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  pruneCustomFieldAnswers,
+  firstMissingRequired,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../../services/CustomFieldService';
 import type { Event as ZapEvent } from '../../../types/event.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
@@ -109,6 +116,9 @@ const CreatePurchase = () => {
   const [searchParams] = useSearchParams();
   const [bulkMode, setBulkMode] = useState(searchParams.get('bulk') === '1');
   const [itemTab, setItemTab] = useState<'attractions' | 'events'>('attractions');
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ZapEvent | null>(null);
   const [eventQty, setEventQty] = useState(1);
   const { effectiveLocationId } = useLocationScope();
@@ -709,6 +719,33 @@ const CreatePurchase = () => {
     return () => { cancelled = true; };
   }, [selectedEvent?.id, eventDate]);
 
+  const customFieldItems = (() => {
+    const items = orderLines.map(line => ({ type: line.type, id: line.id }));
+    if (itemTab === 'events' && selectedEvent) items.push({ type: 'event' as const, id: Number(selectedEvent.id) });
+    if (itemTab === 'attractions' && selectedAttraction) items.push({ type: 'attraction' as const, id: Number(selectedAttraction.id) });
+    return items.filter((item, index, all) => all.findIndex(x => x.type === item.type && x.id === item.id) === index);
+  })();
+  const customFieldKey = customFieldItems.map(item => `${item.type}:${item.id}`).sort().join(',');
+
+  useEffect(() => {
+    if (!customFieldItems.length) {
+      setCustomFields([]);
+      return;
+    }
+    let cancelled = false;
+    customFieldService
+      .applicableForItems(customFieldItems)
+      .then(list => {
+        if (cancelled) return;
+        setCustomFieldsUnavailable(list === null);
+        const fields = list ?? [];
+        setCustomFields(fields);
+        setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customFieldKey]);
+
   const currentReady = buildCurrentLine() !== null;
   const readyNudgeRef = useRef(false);
 
@@ -733,6 +770,8 @@ const CreatePurchase = () => {
   if (!customerReady) submitBlockers.push('Enter the customer name.');
   if (!receiptEmailOk) submitBlockers.push('Add an email for the receipt, or untick "Send email receipt".');
   if (!cardDetailsReady) submitBlockers.push('Complete the card details.');
+  const missingCustomField = firstMissingRequired(customFields, customFieldAnswers);
+  if (missingCustomField) submitBlockers.push(`Please confirm: ${missingCustomField.label}`);
   const canSubmit = submitBlockers.length === 0;
 
   const handleCompletePurchase = async (e?: React.MouseEvent) => {
@@ -807,6 +846,7 @@ const CreatePurchase = () => {
           guest_phone: customerInfo.phone || undefined,
           payment_method: paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
           notes: notes || `Staff order — ${items.length} items`,
+          custom_fields: toCustomFieldPayload(customFieldAnswers),
         });
 
         try {
@@ -918,6 +958,7 @@ const CreatePurchase = () => {
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
+        custom_fields: toCustomFieldPayload(customFieldAnswers),
       };
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);
@@ -1056,6 +1097,7 @@ const CreatePurchase = () => {
 
       setSelectedAttraction(null);
       setQuantity(1);
+      setCustomFieldAnswers({});
       setCustomerInfo({ name: '', email: '', phone: '' });
       setDiscount(0);
       setNotes('');
@@ -1073,8 +1115,11 @@ const CreatePurchase = () => {
       setSelectedAddOns({});
 
     } catch (error: any) {
-      setPaymentError(error.message || 'Payment processing failed. Please try again.');
-      setToast({ message: error.message || 'Failed to complete purchase. Please try again.', type: 'error' });
+      // The server's wording first — a rejected purchase (capacity, a required
+      // confirmation) otherwise reads as "Request failed with status code 422".
+      const serverMessage = error?.response?.data?.message;
+      setPaymentError(serverMessage || error.message || 'Payment processing failed. Please try again.');
+      setToast({ message: serverMessage || error.message || 'Failed to complete purchase. Please try again.', type: 'error' });
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);
@@ -1817,6 +1862,18 @@ const CreatePurchase = () => {
                     The receipt emails automatically when the customer has an email on file.
                   </p>
 
+                  {(customFields.length > 0 || customFieldsUnavailable) && (
+                    <div className="mb-4 p-3 border border-gray-200 rounded-lg">
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Before you continue</p>
+                      <CustomFieldChecks
+                        fields={customFields}
+                        unavailable={customFieldsUnavailable}
+                        answers={customFieldAnswers}
+                        onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                      />
+                    </div>
+                  )}
+
                   <StandardButton
                     variant="primary"
                     size="lg"
@@ -1933,6 +1990,18 @@ const CreatePurchase = () => {
                     </label>
                   </div>
 
+
+                  {(customFields.length > 0 || customFieldsUnavailable) && (
+                    <div className="mb-4 p-3 border border-gray-200 rounded-lg">
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Before you continue</p>
+                      <CustomFieldChecks
+                        fields={customFields}
+                        unavailable={customFieldsUnavailable}
+                        answers={customFieldAnswers}
+                        onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                      />
+                    </div>
+                  )}
 
                   <StandardButton
                     variant="primary"

@@ -20,6 +20,8 @@ import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber,
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
+import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
+import useAbandonedCheckout from '../../../hooks/useAbandonedCheckout';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { trackPageView } from '../../../utils/analytics';
 import { setNextTrackingId } from '../../../utils/analyticsHeaders';
@@ -41,6 +43,13 @@ import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 import { resolveBullets } from '../../../utils/bullets';
 import PurchaseInfoPanel from '../../../components/customer/PurchaseInfoPanel';
+import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  pruneCustomFieldAnswers,
+  firstMissingRequired,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../../services/CustomFieldService';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 
 const parseLocalDate = (isoDateString: string): Date => {
@@ -133,7 +142,11 @@ const getPaymentErrorMessage = (error: any): string => {
     return 'Too many attempts. Please wait a moment and try again.';
   }
   
-  return error?.message || 'Payment could not be processed. Please check your card details and try again.';
+  // The server's own wording beats axios's "Request failed with status code 422", which
+  // is what a rejected booking (capacity, a required confirmation) would otherwise show.
+  return error?.response?.data?.message
+    || error?.message
+    || 'Payment could not be processed. Please check your card details and try again.';
 };
 
 const BookPackage: React.FC = () => {
@@ -169,6 +182,9 @@ const BookPackage: React.FC = () => {
   const [appliedGiftCard, setAppliedGiftCard] = useState<{ code: string; name: string; discount_amount: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<number>(pkg?.min_participants || 1);
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -238,6 +254,24 @@ const BookPackage: React.FC = () => {
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
   const [smsConsent, setSmsConsent] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!pkg?.id) return;
+    let cancelled = false;
+    customFieldService
+      .applicable({
+        itemType: 'package',
+        itemId: Number(pkg.id),
+      })
+      .then(list => {
+        if (cancelled) return;
+        setCustomFieldsUnavailable(list === null);
+        const fields = list ?? [];
+        setCustomFields(fields);
+        setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+      });
+    return () => { cancelled = true; };
+  }, [pkg?.id, pkg?.location_id]);
 
   useEffect(() => {
     const customerData = localStorage.getItem('zapzone_customer');
@@ -1013,6 +1047,24 @@ const BookPackage: React.FC = () => {
     ? Math.max(0, feeBreakdown.total - specialPricingDiscount - promoDiscount - giftCardDiscount - membershipDiscount)
     : totalAfterSpecialPricing;
 
+  useAbandonedCheckout({
+    enabled: isCustomerMode,
+    locationId: pkg?.location_id ?? null,
+    name: `${form.firstName} ${form.lastName}`.trim(),
+    phone: form.phone,
+    email: form.email,
+    entityType: 'package',
+    entityId: pkg?.id ?? null,
+    entityName: pkg?.name ?? null,
+    preferredDate: selectedDate,
+    preferredTime: selectedTime,
+    reachedDetails: currentStep >= 2,
+    stepLabel: currentStep === 1 ? 'Booking details' : currentStep === 2 ? 'Personal info' : 'Payment',
+    estimatedTotal: finalTotal,
+    items: pkg ? [{ name: pkg.name, quantity: participants }] : undefined,
+    completed: showConfirmation,
+  });
+
   const calculatePartialAmount = () => {
     if (!pkg) return 0;
     
@@ -1225,6 +1277,7 @@ const BookPackage: React.FC = () => {
         guest_zip: form.zip || undefined,
         guest_country: form.country || undefined,
         sms_consent: smsConsent,
+        custom_fields: toCustomFieldPayload(customFieldAnswers),
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
         discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
         applied_discounts: (() => {
@@ -1946,6 +1999,22 @@ const BookPackage: React.FC = () => {
                       pkg.availability_type === 'weekly' ? 'weekly on selected weekdays' : 
                       'monthly on selected days'}.</p>
                   </div>
+
+                  {isCustomerMode && (
+                    <div className="mt-3 pt-3 border-t border-blue-100">
+                      <ScheduleHelpModal
+                        locationId={pkg.location_id ?? null}
+                        entityType="package"
+                        entityId={pkg.id}
+                        entityName={pkg.name}
+                        preferredDate={selectedDate}
+                        preferredTime={selectedTime ? formatTimeTo12Hour(selectedTime) : ''}
+                        defaultName={`${form.firstName} ${form.lastName}`.trim()}
+                        defaultPhone={form.phone}
+                        defaultEmail={form.email}
+                      />
+                    </div>
+                  )}
                 </div>
                 
           
@@ -2722,6 +2791,23 @@ const BookPackage: React.FC = () => {
                   />
                 </div>
                 
+                {(customFields.length > 0 || customFieldsUnavailable) && (
+                  <div className="border border-gray-200 rounded-xl p-4 mt-4">
+                    <h3 className="text-sm font-bold text-gray-900 mb-2.5">Before you continue</h3>
+                    <CustomFieldChecks
+                      fields={customFields}
+                      unavailable={customFieldsUnavailable}
+                      answers={customFieldAnswers}
+                      onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                    />
+                    {firstMissingRequired(customFields, customFieldAnswers) && (
+                      <p className="text-xs text-amber-700 mt-2">
+                        Please confirm: {firstMissingRequired(customFields, customFieldAnswers)?.label}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center pt-6 gap-3">
                   <StandardButton 
                     variant="secondary"
@@ -2740,7 +2826,7 @@ const BookPackage: React.FC = () => {
                     variant="primary"
                     size="md"
                     onClick={(e) => handlePayNow(e)}
-                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                     className="flex items-center justify-center flex-1 sm:flex-initial"
                   >
                     {isProcessingPayment ? (

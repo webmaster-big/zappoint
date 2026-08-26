@@ -16,6 +16,13 @@ import {
   Info
 } from 'lucide-react';
 import PurchaseInfoPanel from '../../../components/customer/PurchaseInfoPanel';
+import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import customFieldService, {
+  pruneCustomFieldAnswers,
+  firstMissingRequired,
+  toCustomFieldPayload,
+  type ApplicableCustomField,
+} from '../../../services/CustomFieldService';
 import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import { resolveBullets } from '../../../utils/bullets';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
@@ -26,6 +33,8 @@ import { customerService, type Customer } from '../../../services/CustomerServic
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
+import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
+import useAbandonedCheckout from '../../../hooks/useAbandonedCheckout';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
@@ -90,7 +99,11 @@ const getPaymentErrorMessage = (error: any): string => {
     return 'Too many attempts. Please wait a moment and try again.';
   }
   
-  return error?.message || 'Payment could not be processed. Please check your card details and try again.';
+  // The server's wording first — a rejected purchase (capacity, a required
+  // confirmation) otherwise reads as "Request failed with status code 422".
+  return error?.response?.data?.message
+    || error?.message
+    || 'Payment could not be processed. Please check your card details and try again.';
 };
 
 const countries: { code: string; name: string }[] = [
@@ -212,6 +225,9 @@ const PurchaseAttraction = () => {
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
+  const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
+  const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
+  const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   const [partialDayOffs, setPartialDayOffs] = useState<Record<string, Array<{ time_start?: string | null; time_end?: string | null }>>>({});
   const [scheduleError, setScheduleError] = useState<string>('');
@@ -330,6 +346,34 @@ const PurchaseAttraction = () => {
       setScheduledTime('');
     }
   }, [scheduledDate, attraction, partialDayOffs]);
+
+  const customFieldItems = useMemo(() => {
+    const items: { type: 'package' | 'attraction' | 'event'; id: number }[] = [];
+    if (attraction?.id) items.push({ type: 'attraction', id: Number(attraction.id) });
+    if (orderMode && cart) cart.items.forEach(item => items.push({ type: item.type, id: Number(item.id) }));
+    return items.filter((item, i, all) => all.findIndex(x => x.type === item.type && x.id === item.id) === i);
+  }, [attraction?.id, orderMode, cart]);
+
+  const customFieldKey = customFieldItems.map(item => `${item.type}:${item.id}`).sort().join(',');
+
+  useEffect(() => {
+    if (!customFieldItems.length) {
+      setCustomFields([]);
+      return;
+    }
+    let cancelled = false;
+    customFieldService
+      .applicableForItems(customFieldItems)
+      .then(list => {
+        if (cancelled) return;
+        setCustomFieldsUnavailable(list === null);
+        const fields = list ?? [];
+        setCustomFields(fields);
+        setCustomFieldAnswers(prev => pruneCustomFieldAnswers(prev, fields));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customFieldKey]);
 
   useEffect(() => {
     if (!scheduledDate || !attraction?.id) {
@@ -745,6 +789,30 @@ const PurchaseAttraction = () => {
   const membershipDiscount = membershipBenefits.discount;
   const total = Math.max(0, totalBeforeMembership - membershipDiscount);
 
+  const checkoutLocationId = attraction?.locationId ?? cart?.items[0]?.locationId ?? null;
+
+  useAbandonedCheckout({
+    enabled: isCustomerMode,
+    locationId: checkoutLocationId,
+    name: `${customerInfo.firstName} ${customerInfo.lastName}`.trim(),
+    phone: customerInfo.phone,
+    email: customerInfo.email,
+    entityType: 'attraction',
+    entityId: attraction ? Number(attraction.id) : null,
+    entityName: attraction?.name ?? null,
+    preferredDate: scheduledDate,
+    preferredTime: scheduledTime,
+    reachedDetails: currentStep >= 2,
+    stepLabel: currentStep === 1 ? (orderMode ? 'Review order' : 'Quantity') : currentStep === 2 ? 'Your details' : 'Payment',
+    estimatedTotal: total,
+    items: orderMode && cart
+      ? cart.items.map(item => ({ name: item.name, quantity: item.quantity }))
+      : attraction
+        ? [{ name: attraction.name, quantity }]
+        : undefined,
+    completed: purchaseComplete,
+  });
+
   // Resolve human-readable item names for membership discount labels.
   const attractionItemName = (type: string, id: number | null | undefined): string | undefined => {
     if (type === 'attraction') return attraction?.name ?? undefined;
@@ -942,6 +1010,7 @@ const PurchaseAttraction = () => {
         guest_email: customerInfo.email,
         guest_phone: customerInfo.phone || undefined,
         sms_consent: smsConsent,
+        custom_fields: toCustomFieldPayload(customFieldAnswers),
         quantity: quantity,
         amount: totalAmount,
         total_amount: totalAmount, // Include fees in total_amount
@@ -984,6 +1053,7 @@ const PurchaseAttraction = () => {
             guest_zip: customerInfo.zip || undefined,
             guest_country: customerInfo.country || undefined,
             sms_consent: smsConsent,
+            custom_fields: toCustomFieldPayload(customFieldAnswers),
             payment_method: 'authorize.net',
             notes: `Bulk order — ${orderItemsPayload.length} items`,
           });
@@ -1436,6 +1506,21 @@ const PurchaseAttraction = () => {
                         themeColor="blue"
                       />
                     )}
+                    {isCustomerMode && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <ScheduleHelpModal
+                          locationId={checkoutLocationId}
+                          entityType="attraction"
+                          entityId={Number(attraction.id)}
+                          entityName={attraction.name}
+                          preferredDate={scheduledDate}
+                          preferredTime={scheduledTime}
+                          defaultName={`${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
+                          defaultPhone={customerInfo.phone}
+                          defaultEmail={customerInfo.email}
+                        />
+                      </div>
+                    )}
                   </div>
                   </>)}
 
@@ -1496,6 +1581,21 @@ const PurchaseAttraction = () => {
                           Order total: <span className="tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
                         </span>
                       </div>
+                      {isCustomerMode && (
+                        <div className="px-1">
+                          <ScheduleHelpModal
+                            locationId={checkoutLocationId}
+                            entityType="attraction"
+                            entityId={Number(attraction.id)}
+                            entityName={cart.items.map(i => i.name).join(', ').slice(0, 180)}
+                            preferredDate={cart.items[0]?.scheduledDate ?? ''}
+                            preferredTime={cart.items[0]?.scheduledTime ?? ''}
+                            defaultName={`${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
+                            defaultPhone={customerInfo.phone}
+                            defaultEmail={customerInfo.email}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2104,6 +2204,18 @@ const PurchaseAttraction = () => {
                     />
                   </div>
 
+                  {(customFields.length > 0 || customFieldsUnavailable) && (
+                    <div className="border border-gray-200 rounded-xl p-4">
+                      <h3 className="text-sm font-bold text-gray-900 mb-2.5">Before you continue</h3>
+                      <CustomFieldChecks
+                        fields={customFields}
+                        unavailable={customFieldsUnavailable}
+                        answers={customFieldAnswers}
+                        onChange={(id, value) => setCustomFieldAnswers(prev => ({ ...prev, [id]: value }))}
+                      />
+                    </div>
+                  )}
+
                   <div className="flex justify-between gap-2 pt-2">
                     <StandardButton
                       variant="secondary"
@@ -2117,7 +2229,7 @@ const PurchaseAttraction = () => {
                     <button
                       type="button"
                       onClick={handlePurchase}
-                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (

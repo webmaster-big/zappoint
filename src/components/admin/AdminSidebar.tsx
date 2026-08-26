@@ -41,6 +41,7 @@ import {
   Mail,
   Send,
   Percent,
+  CheckSquare,
   Coins,
   CalendarCheck,
   Calculator,
@@ -52,7 +53,8 @@ import {
   MonitorPlay,
   Layers,
   ExternalLink,
-  Send as SendIcon
+  Send as SendIcon,
+  PhoneCall
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -95,8 +97,10 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Gift Cards': 'Handle gift card sales and redemptions',
     'Customer Analytics': 'Analytics and insights about your customers',
     'Customers': 'View and manage customer information',
+    'Customer Concerns': 'Guests who asked for schedule help or left checkout unfinished',
     'Profile': 'Update your personal profile information',
     'Settings': 'Configure application settings',
+    'Custom Fields': 'Extra checkboxes shown at checkout',
     'Attendants Management': 'Manage attendant accounts and permissions',
     'Manage Attendants': 'View and edit attendant accounts',
     'Create Attendant': 'Create new attendant account',
@@ -151,7 +155,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     ]},
     { label: 'Customers', icon: Users, items: [
       { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
-      { label: 'Customers', href: '/customers', icon: Dot }
+      { label: 'Customers', href: '/customers', icon: Dot },
+      { label: 'Customer Concerns', href: '/customer-concerns', icon: Dot }
     ]},
     { label: 'Memberships', icon: IdCard, items: [
       { label: 'Memberships', href: '/memberships', icon: Dot },
@@ -214,7 +219,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
-          { label: 'Customers', href: '/customers', icon: Users }
+          { label: 'Customers', href: '/customers', icon: Users },
+          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall }
         ]},
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
@@ -273,6 +279,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
+        { label: 'Custom Fields', icon: CheckSquare, href: '/settings/custom-fields', section: 'Configuration' },
         { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
           { label: 'Waiver Records', href: '/waivers', icon: List },
           { label: 'Templates', href: '/waivers/templates', icon: FileText },
@@ -289,7 +296,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
-          { label: 'Customers', href: '/customers', icon: Users }
+          { label: 'Customers', href: '/customers', icon: Users },
+          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall }
         ]},
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
@@ -359,6 +367,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
           { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
+        { label: 'Custom Fields', icon: CheckSquare, href: '/settings/custom-fields', section: 'Configuration' },
         { label: 'Waivers', icon: FileSignature, section: 'Waivers', items: [
           { label: 'Waiver Records', href: '/waivers', icon: List },
           { label: 'Templates', href: '/waivers/templates', icon: FileText },
@@ -375,7 +384,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
-          { label: 'Customers', href: '/customers', icon: Users }
+          { label: 'Customers', href: '/customers', icon: Users },
+          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall }
         ]},
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },

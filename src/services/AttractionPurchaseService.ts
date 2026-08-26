@@ -143,6 +143,7 @@ export interface CreatePurchaseData {
     value_applied: number;
   }> | null;
   sms_consent?: boolean;
+  custom_fields?: { id: number; value: boolean }[];
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {

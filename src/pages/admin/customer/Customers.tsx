@@ -484,7 +484,7 @@ const CustomerListing: React.FC = () => {
       const updateData: Record<string, string | undefined> = {};
       if (viewEditData.first_name !== undefined) updateData.first_name = viewEditData.first_name || undefined;
       if (viewEditData.last_name !== undefined) updateData.last_name = viewEditData.last_name || undefined;
-      if (viewEditData.email !== undefined) updateData.email = viewEditData.email;
+      if (viewEditData.email !== undefined) updateData.email = viewEditData.email || undefined;
       if (viewEditData.phone !== undefined) updateData.phone = viewEditData.phone || undefined;
       if (viewEditData.date_of_birth !== undefined) updateData.date_of_birth = viewEditData.date_of_birth || undefined;
       if (viewEditData.company_name !== undefined) updateData.company_name = viewEditData.company_name || undefined;
@@ -1963,7 +1963,7 @@ const CustomerListing: React.FC = () => {
                           className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                         />
                       ) : (
-                        <p className="text-sm text-gray-900">{selectedContactForView.email}</p>
+                        <p className="text-sm text-gray-900">{selectedContactForView.email || <span className="text-gray-400">No email on file</span>}</p>
                       )}
                     </div>
                     <div>
