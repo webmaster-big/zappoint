@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import checkoutConcernService, {
   type ConcernEntityType,
 } from '../services/CheckoutConcernService';
-import { getUser } from '../utils/auth';
 
 export interface AbandonedCheckoutState {
   locationId?: number | null;
@@ -45,7 +44,6 @@ export function useAbandonedCheckout(state: AbandonedCheckoutState): { reportNow
     if (!current.locationId) return;
     if (!everReachedDetails.current) return;
     if (!hasEnoughToCallThemBack(current)) return;
-    if (getUser()) return;
 
     reported.current = true;
 

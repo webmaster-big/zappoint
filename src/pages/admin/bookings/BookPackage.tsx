@@ -1048,7 +1048,7 @@ const BookPackage: React.FC = () => {
     : totalAfterSpecialPricing;
 
   useAbandonedCheckout({
-    enabled: isCustomerMode,
+    enabled: true,
     locationId: pkg?.location_id ?? null,
     name: `${form.firstName} ${form.lastName}`.trim(),
     phone: form.phone,
@@ -2000,21 +2000,19 @@ const BookPackage: React.FC = () => {
                       'monthly on selected days'}.</p>
                   </div>
 
-                  {isCustomerMode && (
-                    <div className="mt-3 pt-3 border-t border-blue-100">
-                      <ScheduleHelpModal
-                        locationId={pkg.location_id ?? null}
-                        entityType="package"
-                        entityId={pkg.id}
-                        entityName={pkg.name}
-                        preferredDate={selectedDate}
-                        preferredTime={selectedTime ? formatTimeTo12Hour(selectedTime) : ''}
-                        defaultName={`${form.firstName} ${form.lastName}`.trim()}
-                        defaultPhone={form.phone}
-                        defaultEmail={form.email}
-                      />
-                    </div>
-                  )}
+                  <div className="mt-3 pt-3 border-t border-blue-100">
+                    <ScheduleHelpModal
+                      locationId={pkg.location_id ?? null}
+                      entityType="package"
+                      entityId={pkg.id}
+                      entityName={pkg.name}
+                      preferredDate={selectedDate}
+                      preferredTime={selectedTime ? formatTimeTo12Hour(selectedTime) : ''}
+                      defaultName={`${form.firstName} ${form.lastName}`.trim()}
+                      defaultPhone={form.phone}
+                      defaultEmail={form.email}
+                    />
+                  </div>
                 </div>
                 
           

@@ -792,7 +792,7 @@ const PurchaseAttraction = () => {
   const checkoutLocationId = attraction?.locationId ?? cart?.items[0]?.locationId ?? null;
 
   useAbandonedCheckout({
-    enabled: isCustomerMode,
+    enabled: true,
     locationId: checkoutLocationId,
     name: `${customerInfo.firstName} ${customerInfo.lastName}`.trim(),
     phone: customerInfo.phone,
@@ -1506,21 +1506,19 @@ const PurchaseAttraction = () => {
                         themeColor="blue"
                       />
                     )}
-                    {isCustomerMode && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <ScheduleHelpModal
-                          locationId={checkoutLocationId}
-                          entityType="attraction"
-                          entityId={Number(attraction.id)}
-                          entityName={attraction.name}
-                          preferredDate={scheduledDate}
-                          preferredTime={scheduledTime}
-                          defaultName={`${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
-                          defaultPhone={customerInfo.phone}
-                          defaultEmail={customerInfo.email}
-                        />
-                      </div>
-                    )}
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <ScheduleHelpModal
+                        locationId={checkoutLocationId}
+                        entityType="attraction"
+                        entityId={Number(attraction.id)}
+                        entityName={attraction.name}
+                        preferredDate={scheduledDate}
+                        preferredTime={scheduledTime}
+                        defaultName={`${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
+                        defaultPhone={customerInfo.phone}
+                        defaultEmail={customerInfo.email}
+                      />
+                    </div>
                   </div>
                   </>)}
 
@@ -1581,21 +1579,19 @@ const PurchaseAttraction = () => {
                           Order total: <span className="tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
                         </span>
                       </div>
-                      {isCustomerMode && (
-                        <div className="px-1">
-                          <ScheduleHelpModal
-                            locationId={checkoutLocationId}
-                            entityType="attraction"
-                            entityId={Number(attraction.id)}
-                            entityName={cart.items.map(i => i.name).join(', ').slice(0, 180)}
-                            preferredDate={cart.items[0]?.scheduledDate ?? ''}
-                            preferredTime={cart.items[0]?.scheduledTime ?? ''}
-                            defaultName={`${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
-                            defaultPhone={customerInfo.phone}
-                            defaultEmail={customerInfo.email}
-                          />
-                        </div>
-                      )}
+                      <div className="px-1">
+                        <ScheduleHelpModal
+                          locationId={checkoutLocationId}
+                          entityType="attraction"
+                          entityId={Number(attraction.id)}
+                          entityName={cart.items.map(i => i.name).join(', ').slice(0, 180)}
+                          preferredDate={cart.items[0]?.scheduledDate ?? ''}
+                          preferredTime={cart.items[0]?.scheduledTime ?? ''}
+                          defaultName={`${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
+                          defaultPhone={customerInfo.phone}
+                          defaultEmail={customerInfo.email}
+                        />
+                      </div>
                     </div>
                   )}
 

@@ -18,7 +18,7 @@ import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { customerService, type Customer } from '../../services/CustomerService';
-import { getImageUrl, ASSET_URL, getStoredUser } from '../../utils/storage';
+import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import ScheduleHelpModal from '../../components/customer/ScheduleHelpModal';
 import useAbandonedCheckout from '../../hooks/useAbandonedCheckout';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
@@ -600,7 +600,7 @@ const PurchaseEvent = () => {
   const checkoutLocationId = (event?.location_id ? Number(event.location_id) : null) ?? cart?.items[0]?.locationId ?? null;
 
   useAbandonedCheckout({
-    enabled: !getStoredUser(),
+    enabled: true,
     locationId: checkoutLocationId,
     name: guestName,
     phone: guestPhone,
@@ -1267,21 +1267,19 @@ const PurchaseEvent = () => {
                     </div>
                   )}
 
-                  {!getStoredUser() && (
-                    <div className="pt-1">
-                      <ScheduleHelpModal
-                        locationId={checkoutLocationId}
-                        entityType="event"
-                        entityId={event.id}
-                        entityName={event.name}
-                        preferredDate={selectedDate}
-                        preferredTime={selectedTime ? formatTime(selectedTime) : ''}
-                        defaultName={guestName}
-                        defaultPhone={guestPhone}
-                        defaultEmail={guestEmail}
-                      />
-                    </div>
-                  )}
+                  <div className="pt-1">
+                    <ScheduleHelpModal
+                      locationId={checkoutLocationId}
+                      entityType="event"
+                      entityId={event.id}
+                      entityName={event.name}
+                      preferredDate={selectedDate}
+                      preferredTime={selectedTime ? formatTime(selectedTime) : ''}
+                      defaultName={guestName}
+                      defaultPhone={guestPhone}
+                      defaultEmail={guestEmail}
+                    />
+                  </div>
 
                   {!orderMode && (<>
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 md:p-8 shadow-sm">
