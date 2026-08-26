@@ -320,7 +320,7 @@ const CustomFields = () => {
               <div className="pt-2 border-t border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-800 mb-1">Where it appears</h3>
                 <p className="text-xs text-gray-500 mb-3">
-                  Search, filter by venue, or select a whole list at once.
+                  Tick venues to limit where it appears; the lists below then show only what those venues sell.
                 </p>
                 <TargetingPicker value={targeting} onChange={setTargeting} />
               </div>

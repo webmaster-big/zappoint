@@ -205,7 +205,9 @@ const TargetingPicker = ({ value, onChange }: { value: TargetingValue; onChange:
                     ? `${chosen} of ${total} chosen`
                     : namedAnyItem
                       ? `not shown on any ${group.one}`
-                      : `all ${total} ${group.label}`}
+                      : items.length === total
+                        ? `all ${total} ${group.label}`
+                        : `all ${total} ${group.label} · ${items.length} shown here`}
                 </span>
               </span>
               <div className="flex gap-1.5 shrink-0">
