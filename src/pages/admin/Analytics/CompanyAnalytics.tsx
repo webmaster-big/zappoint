@@ -726,6 +726,31 @@ const CompanyAnalytics: React.FC = () => {
             </ResponsiveContainer>
           </div>
         )}
+        {waivers && (waivers.minor_age_brackets?.length ?? 0) > 0 && (
+          <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">Minor Age Brackets</h3>
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                    Ages of the minors covered by signed waivers, computed from each minor's date of birth as of the waiver date.
+                  </div>
+                </div>
+              </div>
+              <Baby className="w-4 h-4 text-gray-400" />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={waivers.minor_age_brackets}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="bracket" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={`var(--color-${themeColor}-400)`} radius={[4, 4, 0, 0]} name="Minors" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
         {waivers && waivers.by_source.length > 0 && (
           <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-6">
