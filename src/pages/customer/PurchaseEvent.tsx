@@ -1422,6 +1422,7 @@ const PurchaseEvent = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {orderedAddOns.map(addon => {
                           const maxQty = addon.max_quantity ?? 99;
+                          const minQty = Math.max(1, addon.min_quantity ?? 1);
                           const currentQty = selectedAddOns[addon.id] || 0;
                           return (
                             <div key={addon.id} className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-white">
@@ -1433,6 +1434,7 @@ const PurchaseEvent = () => {
                               <div className="flex-1 min-w-0">
                                 <span className="font-medium text-gray-800 text-xs md:text-sm truncate block">{addon.name}</span>
                                 <span className="text-[10px] md:text-xs text-gray-500">+${parseFloat(addon.price).toFixed(2)} each</span>
+                                {minQty > 1 && <span className="text-[10px] md:text-xs text-gray-400 ml-1">Min {minQty}</span>}
                               </div>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 <button
@@ -1442,7 +1444,7 @@ const PurchaseEvent = () => {
                                     const newQty = currentQty - 1;
                                     setSelectedAddOns(prev => {
                                       const copy = { ...prev };
-                                      if (newQty <= 0) delete copy[addon.id]; else copy[addon.id] = newQty;
+                                      if (newQty < minQty) delete copy[addon.id]; else copy[addon.id] = newQty;
                                       return copy;
                                     });
                                   }}
@@ -1452,7 +1454,7 @@ const PurchaseEvent = () => {
                                 <button
                                   type="button"
                                   className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-white border border-gray-300 flex items-center justify-center text-xs shadow-sm disabled:opacity-50"
-                                  onClick={() => setSelectedAddOns(prev => ({ ...prev, [addon.id]: Math.min(maxQty, currentQty + 1) }))}
+                                  onClick={() => setSelectedAddOns(prev => ({ ...prev, [addon.id]: Math.min(maxQty, currentQty === 0 ? minQty : currentQty + 1) }))}
                                   disabled={currentQty >= maxQty}
                                 >+</button>
                               </div>

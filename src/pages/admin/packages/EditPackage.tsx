@@ -655,6 +655,12 @@ const EditPackage: React.FC = () => {
             return;
         }
 
+        const maxTicketsPerSlot = form.maxTicketsPerSlot ? parseInt(form.maxTicketsPerSlot) : undefined;
+        if (minParticipants && maxTicketsPerSlot && maxTicketsPerSlot < minParticipants) {
+            showToast("Max tickets per time slot cannot be lower than the minimum participants, or no time slot could ever be booked", "error");
+            return;
+        }
+
         setSubmitting(true);
         try {
             const attraction_ids = form.attractions
@@ -993,7 +999,7 @@ const EditPackage: React.FC = () => {
                                             onChange={handleChange}
                                             onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                            min="0"
+                                            min="1"
                                             placeholder="Enter max participants"
                                         />
                                     </div>

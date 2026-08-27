@@ -543,6 +543,13 @@ const CreatePackage: React.FC = () => {
                 return;
             }
 
+            const maxTicketsPerSlot = form.maxTicketsPerSlot ? parseInt(form.maxTicketsPerSlot) : undefined;
+            if (minParticipants && maxTicketsPerSlot && maxTicketsPerSlot < minParticipants) {
+                showToast("Max tickets per time slot cannot be lower than the minimum participants, or no time slot could ever be booked", "error");
+                setSubmitting(false);
+                return;
+            }
+
             if (form.pricingType === 'per_person' && (!minParticipants || !maxParticipants)) {
                 showToast(`Per-${(form.participantLabel.trim() || 'player').toLowerCase()} pricing needs both minimum and maximum ${(form.participantLabel.trim() || 'player').toLowerCase()}s`, "error");
                 setSubmitting(false);

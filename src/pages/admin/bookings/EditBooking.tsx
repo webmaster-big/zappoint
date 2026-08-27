@@ -745,7 +745,7 @@ const EditBooking: React.FC = () => {
     
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'participants' || name === 'roomId' ? Number(value) : value
+      [name]: name === 'participants' ? (parseInt(value, 10) || 0) : name === 'roomId' ? Number(value) : value
     }));
   };
 

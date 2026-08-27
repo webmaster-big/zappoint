@@ -805,8 +805,8 @@ const BookPackage: React.FC = () => {
     }
     
     const currentQty = selectedAddOns[id] || 0;
-    if (currentQty === 0 && qty > 0 && minQty > 1) {
-      qty = minQty;
+    if (!isForcedAddOn && qty > 0 && qty < minQty) {
+      qty = qty === currentQty - 1 ? 0 : minQty;
     }
     
     const finalQty = isForcedAddOn ? Math.max(minQty, qty) : Math.max(0, qty);
@@ -819,10 +819,10 @@ const BookPackage: React.FC = () => {
     const maxQty = attraction?.max_quantity ?? 99;
     
     if (qty > maxQty) qty = maxQty;
-    
+
     const currentQty = selectedAttractions[id] || 0;
-    if (currentQty === 0 && qty > 0 && minQty > 1) {
-      qty = minQty;
+    if (qty > 0 && qty < minQty) {
+      qty = qty === currentQty - 1 ? 0 : minQty;
     }
     
     setSelectedAttractions((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
@@ -2080,7 +2080,7 @@ const BookPackage: React.FC = () => {
                       min={participantFloor} 
                       max={participantCeiling} 
                       value={participants} 
-                      onChange={e => setParticipants(Math.max(1, Math.min(participantCeiling, Number(e.target.value))))}
+                      onChange={e => setParticipants(Math.max(1, Math.min(participantCeiling, parseInt(e.target.value, 10) || 1)))}
                       onBlur={() => setParticipants(prev => Math.max(participantFloor, prev))}
                       onWheel={(e) => e.currentTarget.blur()}
                       className="w-12 md:w-16 text-center rounded-lg border border-gray-300 px-1 md:px-2 py-1.5 md:py-2 text-sm md:text-base font-medium text-gray-800" 

@@ -111,6 +111,10 @@ const GiftCard: React.FC = () => {
       showToast('Please enter a valid initial value', 'error');
       return;
     }
+    if (form.type === 'percentage' && Number(form.initial_value) > 100) {
+      showToast('Percentage gift cards cannot exceed 100%', 'error');
+      return;
+    }
     if (!form.balance.trim() || isNaN(Number(form.balance))) {
       showToast('Please enter a valid balance', 'error');
       return;
@@ -185,6 +189,10 @@ const GiftCard: React.FC = () => {
     const cardId = card.id;
     if (!cardId) {
       showToast('Cannot update: gift card has no ID', 'error');
+      return;
+    }
+    if ((editForm.type || card.type) === 'percentage' && editForm.initial_value !== undefined && Number(editForm.initial_value) > 100) {
+      showToast('Percentage gift cards cannot exceed 100%', 'error');
       return;
     }
 
@@ -558,7 +566,8 @@ const GiftCard: React.FC = () => {
                   <input 
                     type="number" 
                     name="initial_value" 
-                    value={form.initial_value} 
+                    value={form.initial_value}
+                    max={form.type === "percentage" ? 100 : undefined}
                     onChange={handleChange} 
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     min="0" 
@@ -662,7 +671,8 @@ const GiftCard: React.FC = () => {
                     <input 
                       type="number" 
                       name="initial_value" 
-                      value={editForm.initial_value || ''} 
+                      value={editForm.initial_value || ''}
+                      max={editForm.type === "percentage" ? 100 : undefined}
                       onChange={handleEditChange} 
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="0" 

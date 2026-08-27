@@ -119,6 +119,10 @@ const Promo: React.FC = () => {
       showToast('Please enter a valid value', 'error');
       return;
     }
+    if (form.type === 'percentage' && Number(form.value) > 100) {
+      showToast('Percentage discount cannot exceed 100%', 'error');
+      return;
+    }
     
     try {
       setLoading(true);
@@ -208,6 +212,10 @@ const Promo: React.FC = () => {
     if (editPromoId === null || !editForm) return;
     const promo = promos.find(p => p.id === editPromoId);
     if (!promo) return;
+    if ((editForm.type || promo.type) === 'percentage' && editForm.value !== undefined && Number(editForm.value) > 100) {
+      showToast('Percentage discount cannot exceed 100%', 'error');
+      return;
+    }
     try {
       setLoading(true);
       const updateData: Record<string, unknown> = {};
@@ -639,6 +647,7 @@ const Promo: React.FC = () => {
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="0" 
                       required 
+                      max={form.type === "percentage" ? 100 : undefined}
                       placeholder={form.type === "fixed" ? "0.00" : "0"}
                     />
                   </div>
@@ -769,6 +778,7 @@ const Promo: React.FC = () => {
                       type="number"
                       name="value"
                       value={editForm.value === undefined ? '' : editForm.value}
+                      max={editForm.type === "percentage" ? 100 : undefined}
                       onChange={handleEditChange}
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="0"
