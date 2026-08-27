@@ -258,6 +258,7 @@ export interface WaiverPeriodSummary {
   checked_in: number;
   minors_covered: number;
   people_covered: number;
+  minor_age_brackets?: Array<{ bracket: string; count: number }>;
 }
 
 export interface WaiverSearchFilters {

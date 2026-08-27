@@ -704,6 +704,13 @@ const WaiversSearch = () => {
             <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.pending}</span> pending
             {' · '}
             <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.checked_in}</span> checked in
+            {' · '}
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.minors_covered}</span> minors
+            {(periodSummary.minor_age_brackets?.length ?? 0) > 0 && (
+              <span className="block text-xs text-gray-500 mt-1" data-tour="minor-age-breakdown">
+                Minors by age (at signing): {periodSummary.minor_age_brackets!.map((b) => `${b.bracket}: ${b.count}`).join(' · ')}
+              </span>
+            )}
             <span className="block text-xs text-gray-400 mt-1">
               Counted the same way the company dashboard counts, for the same period and location —
               so <span className="font-medium">total</span> should equal the dashboard's waiver card.

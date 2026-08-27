@@ -295,6 +295,7 @@ export interface CompanyAnalyticsResponse {
     };
     per_day: Array<{ date: string; label: string; count: number }>;
     age_brackets: Array<{ bracket: string; count: number }>;
+    minor_age_brackets?: Array<{ bracket: string; count: number }>;
     by_source: Array<{ source: string; count: number; color: string }>;
   };
 }
