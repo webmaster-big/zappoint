@@ -359,6 +359,8 @@ const CustomerConcerns = () => {
         })}
       </div>
 
+      <TimeFrameSelect table={table} filterKey="created" label="Received" />
+
       <AdminTableToolbar
         table={table}
         searchPlaceholder="Search by name, phone, email, item or message..."
@@ -366,7 +368,6 @@ const CustomerConcerns = () => {
           loadConcerns();
           loadStats();
         }}
-        actions={<TimeFrameSelect table={table} filterKey="created" />}
       />
 
       <AdminDataTable

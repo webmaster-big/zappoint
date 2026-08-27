@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { CalendarDays } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { AdminTableInstance, DateRangeValue } from './types';
 
@@ -54,7 +55,7 @@ export function TimeFrameSelect<T>({
   const { themeColor } = useThemeColor();
   const current = table.filterValues[filterKey] as DateRangeValue | undefined;
 
-  const value = useMemo(() => {
+  const active = useMemo(() => {
     if (!current || (!current.start && !current.end)) return 'all';
     const match = PRESETS.find(p => {
       const range = rangeFor(p.value);
@@ -64,31 +65,35 @@ export function TimeFrameSelect<T>({
   }, [current]);
 
   return (
-    <select
-      aria-label={label}
-      title={label}
-      value={value}
-      onChange={e => {
-        const preset = e.target.value;
-        if (preset === 'all') {
-          table.setFilterValue(filterKey, { start: '', end: '' });
-          return;
-        }
-        const range = rangeFor(preset);
-        if (range) table.setFilterValue(filterKey, range);
-      }}
-      className={`border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-    >
+    <div className="bg-white p-3 sm:px-6 sm:py-4 rounded-xl shadow-sm border border-gray-100 mb-4 flex flex-wrap items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 mr-1">
+        <CalendarDays size={14} />
+        {label}
+      </span>
       {PRESETS.map(preset => (
-        <option key={preset.value} value={preset.value}>
+        <button
+          key={preset.value}
+          type="button"
+          onClick={() => {
+            const range = preset.value === 'all' ? { start: '', end: '' } : rangeFor(preset.value);
+            if (range) table.setFilterValue(filterKey, range);
+          }}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+            active === preset.value
+              ? `border-${themeColor}-600 text-${themeColor}-700 bg-${themeColor}-50`
+              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+          }`}
+        >
           {preset.label}
-        </option>
+        </button>
       ))}
-      {value === 'custom' && (
-        <option value="custom" disabled>
-          Custom range
-        </option>
+      {active === 'custom' && current && (
+        <span
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border border-${themeColor}-600 text-${themeColor}-700 bg-${themeColor}-50`}
+        >
+          {current.start || '…'} → {current.end || '…'}
+        </span>
       )}
-    </select>
+    </div>
   );
 }

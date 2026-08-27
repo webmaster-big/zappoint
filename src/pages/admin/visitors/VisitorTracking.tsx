@@ -457,6 +457,8 @@ const VisitorTracking = () => {
         })}
       </div>
 
+      <TimeFrameSelect table={table} filterKey="session_date" />
+
       <AdminTableToolbar
         table={table}
         searchPlaceholder="Search by name, phone, email or page..."
@@ -464,7 +466,6 @@ const VisitorTracking = () => {
           loadSessions();
           loadStats();
         }}
-        actions={<TimeFrameSelect table={table} filterKey="session_date" />}
       />
 
       {capped && (
