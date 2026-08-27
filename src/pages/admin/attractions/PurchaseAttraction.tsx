@@ -34,6 +34,12 @@ import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrco
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
+import CallToBookPanel from '../../../components/customer/CallToBookPanel';
+import CallToBookModal from '../../../components/customer/CallToBookModal';
+import { attractionIsCallToBook } from '../../../utils/callToBook';
+import { getGuestIdentity } from '../../../utils/guestIdentity';
+import { useStorefrontLocations } from '../../../hooks/useStorefrontLocations';
+import { findLocationById } from '../../../services/StorefrontLocationService';
 import useAbandonedCheckout from '../../../hooks/useAbandonedCheckout';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -205,6 +211,7 @@ const PurchaseAttraction = () => {
   const [countrySearch, setCountrySearch] = useState('United States');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showCallToBook, setShowCallToBook] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [showSavingsBreakdown, setShowSavingsBreakdown] = useState(false);
@@ -515,6 +522,20 @@ const PurchaseAttraction = () => {
     const fetchCustomerData = async () => {
       try {
         const customerData = localStorage.getItem('zapzone_customer');
+        if (!customerData) {
+          const guest = getGuestIdentity();
+          if (guest) {
+            const [guestFirst, ...guestRest] = guest.name.split(' ');
+            setCustomerInfo(prev => ({
+              ...prev,
+              firstName: prev.firstName || guestFirst || '',
+              lastName: prev.lastName || guestRest.join(' '),
+              phone: prev.phone || guest.phone,
+              email: prev.email || guest.email || '',
+            }));
+          }
+          return;
+        }
         if (customerData) {
           const customer: any = JSON.parse(customerData);
           
@@ -790,6 +811,15 @@ const PurchaseAttraction = () => {
   const total = Math.max(0, totalBeforeMembership - membershipDiscount);
 
   const checkoutLocationId = attraction?.locationId ?? cart?.items[0]?.locationId ?? null;
+  const { locations: storefrontLocations } = useStorefrontLocations();
+  const callToBookVenue = checkoutLocationId ? findLocationById(storefrontLocations, checkoutLocationId) : undefined;
+  const attractionCallToBook = Boolean(attraction) && attractionIsCallToBook(getAttractionAvailability());
+  const attractionVenueName = (() => {
+    const loc = attraction?.location as unknown;
+    if (typeof loc === 'string') return loc;
+    if (loc && typeof loc === 'object' && 'name' in loc) return (loc as { name?: string }).name ?? null;
+    return null;
+  })();
 
   useAbandonedCheckout({
     enabled: true,
@@ -1482,6 +1512,26 @@ const PurchaseAttraction = () => {
                   </div>
 
                   <div>
+                    {attractionCallToBook ? (
+                      <>
+                        <CallToBookPanel
+                          venueName={callToBookVenue?.name ?? attractionVenueName}
+                          venuePhone={callToBookVenue?.phone ?? null}
+                          onRequestCall={() => setShowCallToBook(true)}
+                        />
+                        <CallToBookModal
+                          open={showCallToBook}
+                          onClose={() => setShowCallToBook(false)}
+                          locationId={checkoutLocationId}
+                          venueName={callToBookVenue?.name ?? attractionVenueName}
+                          venuePhone={callToBookVenue?.phone ?? null}
+                          entityType="attraction"
+                          entityId={Number(attraction.id)}
+                          entityName={attraction.name}
+                        />
+                      </>
+                    ) : (
+                    <>
                     <div className="flex items-center gap-1 mb-1">
                       <label className="block font-medium text-gray-800 text-xs md:text-sm uppercase tracking-wide">Schedule Visit</label>
                       <span className="text-red-500 text-xs">*</span>
@@ -1519,9 +1569,30 @@ const PurchaseAttraction = () => {
                         defaultEmail={customerInfo.email}
                       />
                     </div>
+                    </>
+                    )}
                   </div>
                   </>)}
 
+                  {orderMode && attractionCallToBook && attraction && (
+                    <>
+                      <CallToBookPanel
+                        venueName={callToBookVenue?.name ?? attractionVenueName}
+                        venuePhone={callToBookVenue?.phone ?? null}
+                        onRequestCall={() => setShowCallToBook(true)}
+                      />
+                      <CallToBookModal
+                        open={showCallToBook}
+                        onClose={() => setShowCallToBook(false)}
+                        locationId={checkoutLocationId}
+                        venueName={callToBookVenue?.name ?? attractionVenueName}
+                        venuePhone={callToBookVenue?.phone ?? null}
+                        entityType="attraction"
+                        entityId={Number(attraction.id)}
+                        entityName={attraction.name}
+                      />
+                    </>
+                  )}
                   {orderMode && cart && (
                     <div className="space-y-3">
                       {(orderItemsPayload ?? []).map((line, i) => {
@@ -1674,7 +1745,9 @@ const PurchaseAttraction = () => {
                       size="md"
                       onClick={() => {
                         if (!scheduledDate || !scheduledTime) {
-                          setScheduleError('Please select a visit date and time before continuing.');
+                          setScheduleError(attractionCallToBook
+                            ? 'This attraction is booked by phone — call the venue or request a call back above.'
+                            : 'Please select a visit date and time before continuing.');
                           return;
                         }
                         setScheduleError('');

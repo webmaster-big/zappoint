@@ -20,6 +20,12 @@ import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { customerService, type Customer } from '../../services/CustomerService';
 import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import ScheduleHelpModal from '../../components/customer/ScheduleHelpModal';
+import CallToBookPanel from '../../components/customer/CallToBookPanel';
+import CallToBookModal from '../../components/customer/CallToBookModal';
+import { eventIsCallToBook } from '../../utils/callToBook';
+import { getGuestIdentity } from '../../utils/guestIdentity';
+import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
+import { findLocationById } from '../../services/StorefrontLocationService';
 import useAbandonedCheckout from '../../hooks/useAbandonedCheckout';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
@@ -220,6 +226,7 @@ const PurchaseEvent = () => {
   const [orderPrefilled, setOrderPrefilled] = useState(false);
 
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showCallToBook, setShowCallToBook] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [showSavingsBreakdown, setShowSavingsBreakdown] = useState(false);
 
@@ -263,6 +270,14 @@ const PurchaseEvent = () => {
   }, [selectedDate]);
 
   useEffect(() => {
+    if (!customerData) {
+      const guest = getGuestIdentity();
+      if (guest) {
+        setGuestName(prev => prev || guest.name);
+        setGuestPhone(prev => prev || guest.phone);
+        setGuestEmail(prev => prev || guest.email || '');
+      }
+    }
     if (customerData) {
       setGuestName(customerData.name || `${customerData.first_name || ''} ${customerData.last_name || ''}`.trim() || '');
       setGuestEmail(customerData.email || '');
@@ -484,8 +499,8 @@ const PurchaseEvent = () => {
           return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
         };
         const interval = event.interval_minutes || 60;
-        const startM = toMinutes(event.time_start);
-        const endM = toMinutes(event.time_end);
+        const startM = toMinutes(event.time_start ?? '00:00');
+        const endM = toMinutes(event.time_end ?? '00:00');
         const eventSlots: string[] = [];
         for (let cur = startM; cur < endM; cur += interval) {
           if (cur + interval > endM) break;
@@ -598,6 +613,9 @@ const PurchaseEvent = () => {
   const totalAmount = Math.max(0, totalBeforeMembership - membershipDiscount);
 
   const checkoutLocationId = (event?.location_id ? Number(event.location_id) : null) ?? cart?.items[0]?.locationId ?? null;
+  const { locations: storefrontLocations } = useStorefrontLocations();
+  const callToBookVenue = checkoutLocationId ? findLocationById(storefrontLocations, checkoutLocationId) : undefined;
+  const eventCallToBook = Boolean(event) && eventIsCallToBook(event);
 
   useAbandonedCheckout({
     enabled: true,
@@ -1201,6 +1219,26 @@ const PurchaseEvent = () => {
                       Pick the date &amp; time for {event.name} — the rest of your order is listed above.
                     </p>
                   )}
+                  {eventCallToBook ? (
+                    <>
+                      <CallToBookPanel
+                        venueName={callToBookVenue?.name ?? event.location?.name ?? null}
+                        venuePhone={callToBookVenue?.phone ?? null}
+                        onRequestCall={() => setShowCallToBook(true)}
+                      />
+                      <CallToBookModal
+                        open={showCallToBook}
+                        onClose={() => setShowCallToBook(false)}
+                        locationId={checkoutLocationId}
+                        venueName={callToBookVenue?.name ?? event.location?.name ?? null}
+                        venuePhone={callToBookVenue?.phone ?? null}
+                        entityType="event"
+                        entityId={event.id}
+                        entityName={event.name}
+                      />
+                    </>
+                  ) : (
+                  <>
                   {event.date_type === 'date_range' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -1280,6 +1318,8 @@ const PurchaseEvent = () => {
                       defaultEmail={guestEmail}
                     />
                   </div>
+                  </>
+                  )}
 
                   {!orderMode && (<>
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 md:p-8 shadow-sm">
@@ -1426,7 +1466,9 @@ const PurchaseEvent = () => {
                       size="md"
                       onClick={() => {
                         if (!selectedDate || !selectedTime) {
-                          setError('Please select a date and time slot before continuing.');
+                          setError(eventCallToBook
+                            ? 'This event is booked by phone — call the venue or request a call back above.'
+                            : 'Please select a date and time slot before continuing.');
                           return;
                         }
                         setError('');
@@ -2071,7 +2113,7 @@ const PurchaseEvent = () => {
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   <div className="flex items-start gap-2">
                     <div className="p-2 bg-blue-50 rounded-xl"><Clock className="h-4 w-4 text-blue-600" /></div>
-                    <div><p className="text-xs text-gray-400">Time</p><p className="text-sm font-medium text-gray-900">{formatTime(event.time_start)} – {formatTime(event.time_end)}</p></div>
+                    <div><p className="text-xs text-gray-400">Time</p><p className="text-sm font-medium text-gray-900">{event.time_start && event.time_end ? `${formatTime(event.time_start)} – ${formatTime(event.time_end)}` : 'Call to book'}</p></div>
                   </div>
                   <div className="flex items-start gap-2">
                     <div className="p-2 bg-blue-50 rounded-xl"><DollarSign className="h-4 w-4 text-blue-600" /></div>

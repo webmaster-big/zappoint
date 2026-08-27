@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from './storage';
-import { isAnalyticsDnt } from './analyticsHeaders';
+import { getSessionId, getVisitorId, isAnalyticsDnt } from './analyticsHeaders';
 
 export type AnalyticsEntityType =
   | 'package'
@@ -22,9 +22,12 @@ export interface TrackPayload {
   page_path?: string;
   page_title?: string;
   referrer?: string | null;
+  visitor_id?: string;
+  session_id?: string;
   entity_type?: AnalyticsEntityType;
   entity_id?: number;
   location_id?: number;
+  location_slug?: string;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -40,6 +43,7 @@ const BATCH_URL = `${API_BASE_URL}/analytics/track/batch`;
 let lastViewId: number | null = null;
 let lastViewStartedAt = 0;
 let maxScroll = 0;
+let armedPath: string | null = null;
 
 const readUtmFromQuery = (): Partial<TrackPayload> => {
   if (typeof window === 'undefined') return {};
@@ -61,6 +65,7 @@ const readUtmFromQuery = (): Partial<TrackPayload> => {
 
 export async function trackPageView(p: TrackPayload = {}): Promise<void> {
   if (isAnalyticsDnt() || typeof window === 'undefined') return;
+  armedPath = window.location.pathname;
   const utm = readUtmFromQuery();
   const body = {
     event_type: 'page_view' as AnalyticsEventType,
@@ -132,7 +137,82 @@ export function setupAnalytics(): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushDuration();
   });
+
+  document.addEventListener('click', recordClick, { capture: true, passive: true });
+  window.addEventListener('pagehide', flushClicks);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushClicks();
+  });
 }
+
+const CLICK_FLUSH_SIZE = 10;
+const CLICK_FLUSH_DELAY_MS = 10000;
+const CLICK_LABEL_MAX = 80;
+
+let pendingClicks: TrackPayload[] = [];
+let clickFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+const flushClicks = (): void => {
+  if (clickFlushTimer) {
+    clearTimeout(clickFlushTimer);
+    clickFlushTimer = null;
+  }
+  if (!pendingClicks.length) return;
+  const events = pendingClicks;
+  pendingClicks = [];
+  for (let i = 0; i < events.length; i += 50) {
+    sendAnalyticsBatch(events.slice(i, i + 50));
+  }
+};
+
+const recordClick = (event: MouseEvent): void => {
+  try {
+    if (isAnalyticsDnt() || typeof window === 'undefined') return;
+    if (!armedPath || armedPath !== window.location.pathname) return;
+
+    const target = event.target instanceof Element
+      ? event.target.closest('button, a, [role="button"], input[type="submit"]')
+      : null;
+    if (!target) return;
+
+    const label = (
+      target.getAttribute('aria-label') ||
+      (target as HTMLElement).innerText ||
+      target.textContent ||
+      (target as HTMLInputElement).value ||
+      ''
+    )
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, CLICK_LABEL_MAX);
+    if (!label) return;
+
+    const metadata: Record<string, unknown> = {
+      label,
+      tag: target.tagName.toLowerCase(),
+    };
+    const href = target instanceof HTMLAnchorElement ? target.getAttribute('href') : null;
+    if (href) metadata.href = href.slice(0, 200);
+
+    pendingClicks.push({
+      event_type: 'engagement',
+      event_name: 'click',
+      page_url: window.location.href,
+      page_path: window.location.pathname,
+      page_title: document.title,
+      visitor_id: getVisitorId(),
+      session_id: getSessionId(),
+      metadata,
+    });
+
+    if (pendingClicks.length >= CLICK_FLUSH_SIZE) {
+      flushClicks();
+    } else if (!clickFlushTimer) {
+      clickFlushTimer = setTimeout(flushClicks, CLICK_FLUSH_DELAY_MS);
+    }
+  } catch {
+  }
+};
 
 export function sendAnalyticsBatch(events: TrackPayload[]): void {
   if (!events?.length || isAnalyticsDnt() || typeof navigator === 'undefined') return;

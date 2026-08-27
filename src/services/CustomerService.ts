@@ -90,6 +90,7 @@ export interface GroupedAttractionLocation {
   city: string;
   state: string;
   phone: string;
+  availability?: AttractionAvailabilitySchedule[] | null;
 }
 
 export interface AttractionPurchaseLink {
@@ -153,6 +154,7 @@ export interface GroupedPackageLocation {
   city: string;
   state: string;
   phone: string;
+  availability_schedules?: PackageAvailabilitySchedule[];
 }
 
 export interface PackageBookingLink {
@@ -220,6 +222,8 @@ export interface GroupedEventLocation {
   city: string;
   state: string;
   phone: string;
+  time_start?: string | null;
+  time_end?: string | null;
   add_ons: Array<{
     id: number;
     name: string;
@@ -243,9 +247,9 @@ export interface GroupedEvent {
   date_type: 'one_time' | 'date_range';
   start_date: string;
   end_date: string | null;
-  time_start: string;
-  time_end: string;
-  interval_minutes: number;
+  time_start: string | null;
+  time_end: string | null;
+  interval_minutes: number | null;
   max_bookings_per_slot: number | null;
   price: string;
   features: string[] | null;

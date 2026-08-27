@@ -21,6 +21,12 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
+import CallToBookPanel from '../../../components/customer/CallToBookPanel';
+import CallToBookModal from '../../../components/customer/CallToBookModal';
+import { packageIsCallToBook } from '../../../utils/callToBook';
+import { getGuestIdentity } from '../../../utils/guestIdentity';
+import { useStorefrontLocations } from '../../../hooks/useStorefrontLocations';
+import { findLocationById } from '../../../services/StorefrontLocationService';
 import useAbandonedCheckout from '../../../hooks/useAbandonedCheckout';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { trackPageView } from '../../../utils/analytics';
@@ -244,6 +250,7 @@ const BookPackage: React.FC = () => {
     price: number;
   } | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showCallToBook, setShowCallToBook] = useState(false);
   const [showMobileOrderSummary, setShowMobileOrderSummary] = useState(false);
   const [showSavingsBreakdown, setShowSavingsBreakdown] = useState(false);
 
@@ -411,6 +418,20 @@ const BookPackage: React.FC = () => {
     const fetchCustomerData = async () => {
       try {
         const customerData = localStorage.getItem('zapzone_customer');
+        if (!customerData) {
+          const guest = getGuestIdentity();
+          if (guest) {
+            const [guestFirst, ...guestRest] = guest.name.split(' ');
+            setForm(prev => ({
+              ...prev,
+              firstName: prev.firstName || guestFirst || '',
+              lastName: prev.lastName || guestRest.join(' '),
+              phone: prev.phone || guest.phone,
+              email: prev.email || guest.email || '',
+            }));
+          }
+          return;
+        }
         if (customerData) {
           const customer: any = JSON.parse(customerData);
           
@@ -1046,6 +1067,10 @@ const BookPackage: React.FC = () => {
   const finalTotal = feeBreakdown
     ? Math.max(0, feeBreakdown.total - specialPricingDiscount - promoDiscount - giftCardDiscount - membershipDiscount)
     : totalAfterSpecialPricing;
+
+  const { locations: storefrontLocations } = useStorefrontLocations();
+  const callToBookVenue = pkg?.location_id ? findLocationById(storefrontLocations, pkg.location_id) : undefined;
+  const packageCallToBook = Boolean(pkg) && packageIsCallToBook(pkg?.availability_schedules ?? null);
 
   useAbandonedCheckout({
     enabled: true,
@@ -1932,6 +1957,25 @@ const BookPackage: React.FC = () => {
           <div className="space-y-4 md:space-y-6 bg-white rounded-2xl shadow-md p-4 md:p-6">
             {currentStep === 1 ? (
               <>
+                {packageCallToBook ? (
+                  <>
+                    <CallToBookPanel
+                      venueName={callToBookVenue?.name ?? pkg.location?.name ?? null}
+                      venuePhone={callToBookVenue?.phone ?? null}
+                      onRequestCall={() => setShowCallToBook(true)}
+                    />
+                    <CallToBookModal
+                      open={showCallToBook}
+                      onClose={() => setShowCallToBook(false)}
+                      locationId={pkg.location_id ?? null}
+                      venueName={callToBookVenue?.name ?? pkg.location?.name ?? null}
+                      venuePhone={callToBookVenue?.phone ?? null}
+                      entityType="package"
+                      entityId={pkg.id}
+                      entityName={pkg.name}
+                    />
+                  </>
+                ) : (
                 <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
                   <h3 className="font-medium mb-3 md:mb-4 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
@@ -2014,6 +2058,7 @@ const BookPackage: React.FC = () => {
                     />
                   </div>
                 </div>
+                )}
                 
           
                 

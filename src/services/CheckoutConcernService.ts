@@ -15,7 +15,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export type ConcernKind = 'schedule_help' | 'abandoned_checkout';
+export type ConcernKind = 'schedule_help' | 'abandoned_checkout' | 'call_to_book';
 export type ConcernStatus = 'new' | 'contacted' | 'resolved';
 export type ConcernEntityType = 'package' | 'attraction' | 'event';
 
@@ -29,6 +29,7 @@ export interface CheckoutConcernContext {
 
 export interface ScheduleConcernPayload {
   location_id: number;
+  kind?: 'schedule_help' | 'call_to_book';
   name: string;
   phone: string;
   email?: string;
@@ -41,7 +42,7 @@ export interface ScheduleConcernPayload {
   context?: CheckoutConcernContext;
 }
 
-export type AbandonedCheckoutPayload = Omit<ScheduleConcernPayload, 'message'>;
+export type AbandonedCheckoutPayload = Omit<ScheduleConcernPayload, 'message' | 'kind'>;
 
 export interface CheckoutConcern {
   id: number;
@@ -100,6 +101,7 @@ export interface CheckoutConcernStats {
   open: number;
   schedule_help: number;
   abandoned_checkout: number;
+  call_to_book: number;
   today: number;
 }
 
@@ -124,6 +126,10 @@ class CheckoutConcernService {
       }
       throw err;
     }
+  }
+
+  async submitCallToBook(payload: Omit<ScheduleConcernPayload, 'kind'>): Promise<string> {
+    return this.submitScheduleConcern({ ...payload, kind: 'call_to_book' });
   }
 
   reportAbandonedCheckout(payload: AbandonedCheckoutPayload): void {

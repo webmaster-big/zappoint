@@ -27,6 +27,8 @@ import type {
 } from '../../../types/createPackage.types';
 import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
+import CallToBookNotice from '../../../components/admin/CallToBookNotice';
+import { packageIsCallToBook } from '../../../utils/callToBook';
 
 const getOrdinal = (n: number): string => {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -492,11 +494,6 @@ const CreatePackage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (form.availability_schedules.length === 0) {
-            showToast("Please add at least one availability schedule", "error");
-            return;
-        }
-
         if (selectedLocation === null || selectedLocation === undefined) {
             showToast("Please select a location for this package", "error");
             return;
@@ -1113,11 +1110,15 @@ const CreatePackage: React.FC = () => {
                                     </StandardButton>
                                 </div>
 
+                                <div className="mb-4">
+                                    <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" />
+                                </div>
+
                                 {form.availability_schedules.length === 0 ? (
                                     <div className="bg-gray-50 rounded-lg p-6 text-center border border-dashed border-gray-300">
                                         <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                                         <p className="text-gray-600 mb-2 font-medium">No availability schedules configured</p>
-                                        <p className="text-gray-500 text-sm mb-4">Add schedules to define when this package can be booked</p>
+                                        <p className="text-gray-500 text-sm mb-4">Without a schedule this package is sold as Call to Book — add schedules to let customers pick times online</p>
                                         <StandardButton
                                             type="button"
                                             onClick={addNewSchedule}

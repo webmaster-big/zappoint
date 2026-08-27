@@ -8,9 +8,9 @@ export interface Event {
   date_type: 'one_time' | 'date_range';
   start_date: string;
   end_date: string | null;
-  time_start: string;
-  time_end: string;
-  interval_minutes: number;
+  time_start: string | null;
+  time_end: string | null;
+  interval_minutes: number | null;
   max_bookings_per_slot: number | null;
   max_tickets_per_slot?: number | null;
   price: string;

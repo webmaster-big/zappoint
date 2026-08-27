@@ -45,7 +45,8 @@ const formatDate = (date: string) => {
   return new Date(date.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const formatTime = (time: string) => {
+const formatTime = (time: string | null | undefined) => {
+  if (!time) return '—';
   const [h, m] = time.split(':');
   const hour = parseInt(h);
   const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -240,11 +241,11 @@ const Events = () => {
       label: 'Time',
       group: 'Schedule',
       sortable: true,
-      sortValue: e => e.time_start,
-      exportValue: e => `${formatTime(e.time_start)} – ${formatTime(e.time_end)}`,
+      sortValue: e => e.time_start ?? '',
+      exportValue: e => (e.time_start && e.time_end ? `${formatTime(e.time_start)} – ${formatTime(e.time_end)}` : 'Call to book'),
       render: e => (
         <span className="whitespace-nowrap text-sm text-gray-900">
-          {formatTime(e.time_start)} – {formatTime(e.time_end)}
+          {e.time_start && e.time_end ? `${formatTime(e.time_start)} – ${formatTime(e.time_end)}` : 'Call to book'}
         </span>
       ),
     },
@@ -263,10 +264,10 @@ const Events = () => {
       label: 'Slot Interval',
       group: 'Schedule',
       sortable: true,
-      sortValue: e => e.interval_minutes,
-      exportValue: e => e.interval_minutes,
+      sortValue: e => e.interval_minutes ?? 0,
+      exportValue: e => e.interval_minutes ?? '',
       defaultVisible: false,
-      render: e => <span className="whitespace-nowrap text-sm text-gray-900">{e.interval_minutes} min</span>,
+      render: e => <span className="whitespace-nowrap text-sm text-gray-900">{e.interval_minutes ? `${e.interval_minutes} min` : '—'}</span>,
     },
     {
       key: 'maxPerSlot',

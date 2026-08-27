@@ -42,6 +42,7 @@ import ViewPayment from "./pages/admin/payments/ViewPayment";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
 import CustomerListing from "./pages/admin/customer/Customers";
 import CustomerConcerns from "./pages/admin/concerns/CustomerConcerns";
+import VisitorTracking from "./pages/admin/visitors/VisitorTracking";
 import CompanyAdminRegistration from "./pages/auth/Register";
 import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
 import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
@@ -220,7 +221,7 @@ function App() {
           <Route path="/customer/membership" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_membership" /><MyMembership /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership/purchase" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_purchase" /><PurchaseMembership /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership/update-payment" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_update_payment" /><UpdatePaymentMethod /></></CustomerProtectedRoute>} />
-          <Route path="/:locationSlug" element={<><PageViewBeacon pageType="location_home" /><EntertainmentLandingPage /></>} />
+          <Route path="/:locationSlug" element={<><PageViewBeacon pageType="location_home" locationSlugParam="locationSlug" /><EntertainmentLandingPage /></>} />
         </Route>
         
         <Route element={<ProtectedRoute><LocationProvider><MainLayout /></LocationProvider></ProtectedRoute>}>
@@ -298,6 +299,7 @@ function App() {
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
           <Route path="/customer-concerns" element={<CustomerConcerns />} />
+          <Route path="/visitor-tracking" element={<VisitorTracking />} />
 
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/memberships/plans" element={<MembershipPlans />} />

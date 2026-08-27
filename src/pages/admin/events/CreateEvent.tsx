@@ -11,6 +11,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import type { CreateEventData } from '../../../types/event.types';
 import { Plus, Trash2, GripVertical, X, Calendar, Clock, DollarSign, MapPin, Star, Package } from 'lucide-react';
+import CallToBookNotice from '../../../components/admin/CallToBookNotice';
 
 const CreateEvent = () => {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ const CreateEvent = () => {
   const [timeStart, setTimeStart] = useState('09:00');
   const [timeEnd, setTimeEnd] = useState('17:00');
   const [intervalMinutes, setIntervalMinutes] = useState(60);
+  const [noSetTimes, setNoSetTimes] = useState(false);
   const [maxBookingsPerSlot, setMaxBookingsPerSlot] = useState('');
   const [maxTicketsPerSlot, setMaxTicketsPerSlot] = useState('');
   const [price, setPrice] = useState('0');
@@ -156,7 +158,7 @@ const CreateEvent = () => {
       setToast({ message: 'End date is required for date range events', type: 'error' });
       return;
     }
-    if (timeStart === timeEnd) {
+    if (!noSetTimes && timeStart === timeEnd) {
       setToast({ message: 'Start and end time cannot be the same', type: 'error' });
       return;
     }
@@ -177,9 +179,9 @@ const CreateEvent = () => {
         date_type: dateType,
         start_date: startDate,
         end_date: dateType === 'date_range' ? endDate : undefined,
-        time_start: timeStart,
-        time_end: timeEnd,
-        interval_minutes: intervalMinutes,
+        time_start: noSetTimes ? undefined : timeStart,
+        time_end: noSetTimes ? undefined : timeEnd,
+        interval_minutes: noSetTimes ? undefined : intervalMinutes,
         max_bookings_per_slot: maxBookingsPerSlot ? parseInt(maxBookingsPerSlot) : null,
         max_tickets_per_slot: maxTicketsPerSlot ? parseInt(maxTicketsPerSlot) : null,
         price: parseFloat(price) || 0,
@@ -350,6 +352,20 @@ const CreateEvent = () => {
             )}
           </div>
 
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-800">
+              <input
+                type="checkbox"
+                checked={noSetTimes}
+                onChange={e => setNoSetTimes(e.target.checked)}
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-600"
+              />
+              No set times — guests call to book this event
+            </label>
+            <CallToBookNotice active={noSetTimes} itemLabel="event" />
+          </div>
+
+          {!noSetTimes && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
@@ -390,6 +406,7 @@ const CreateEvent = () => {
               />
             </div>
           </div>
+          )}
         </div>
 
         <hr className="border-gray-100" />

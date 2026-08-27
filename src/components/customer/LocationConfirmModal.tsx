@@ -1,58 +1,40 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MapPin, Phone, Navigation, ArrowRight, X, ChevronDown } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Phone, Navigation, ArrowRight } from 'lucide-react';
 import type { StorefrontLocation } from '../../services/StorefrontLocationService';
+import { getGuestIdentity, saveGuestIdentity } from '../../utils/guestIdentity';
 
-// Nothing is remembered between loads: which venue you are standing in is not something
-// a browser can know, so every visit asks. The only exception lives in memory — after a
-// deliberate switch we skip re-asking about the venue the guest just chose, and even that
-// is gone the moment the page reloads.
-let justSwitchedTo: string | null = null;
-
-// An earlier build remembered acknowledgements; clear that key so it does not sit in
-// guests' browsers forever now that nothing reads it.
 const dropLegacyAck = () => {
   try {
     localStorage.removeItem('zapzone_location_ack');
     sessionStorage.removeItem('zapzone_location_ack');
   } catch {
-    /* nothing to clean if storage is blocked */
+    return undefined;
   }
 };
 
-/** Venue names arrive as "Brighto | Zap Zone" — the town leads, the brand is a footnote. */
 const splitName = (name: string) => {
   const [venue, ...rest] = name.split('|').map(part => part.trim());
   return { venue: venue || name, brand: rest.join(' ').trim() };
 };
 
-/**
- * Guests reach a venue page from search, a shared link or a QR code on a wall, and every
- * ZapZone looks alike once you are three taps into a booking. This confirms the venue —
- * and lets them switch right here instead of starting over somewhere else.
- */
 const LocationConfirmModal = ({
   location,
-  locations,
   counts,
   onConfirm,
 }: {
   location: StorefrontLocation;
-  locations: StorefrontLocation[];
   counts?: { packages: number; attractions: number; events: number };
   onConfirm?: () => void;
 }) => {
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [chosenSlug, setChosenSlug] = useState(location?.slug ?? '');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
 
   useEffect(() => {
     if (!location?.slug) return;
     dropLegacyAck();
-    setChosenSlug(location.slug);
 
-    if (justSwitchedTo === location.slug) {
-      justSwitchedTo = null;
+    if (getGuestIdentity()) {
       setOpen(false);
       return;
     }
@@ -60,78 +42,32 @@ const LocationConfirmModal = ({
     setOpen(true);
   }, [location?.slug]);
 
-  const ordered = useMemo(
-    () => [...(locations ?? [])].sort((a, b) => splitName(a.name).venue.localeCompare(splitName(b.name).venue)),
-    [locations],
-  );
-
-  const chosen = ordered.find(loc => loc.slug === chosenSlug) ?? location;
-  const isCurrent = chosen?.slug === location?.slug;
-
   if (!open || !location) return null;
 
-  const { venue, brand } = splitName(chosen.name);
-  const street = chosen.address?.trim();
-  const cityZip = [[chosen.city, chosen.state].filter(Boolean).join(', '), chosen.zip_code]
+  const { venue, brand } = splitName(location.name);
+  const street = location.address?.trim();
+  const cityZip = [[location.city, location.state].filter(Boolean).join(', '), location.zip_code]
     .filter(Boolean)
     .join(' ');
-  const mapQuery = encodeURIComponent([chosen.name, street, cityZip].filter(Boolean).join(', '));
+  const mapQuery = encodeURIComponent([location.name, street, cityZip].filter(Boolean).join(', '));
+
+  const canContinue = name.trim().length >= 2 && phone.replace(/\D/g, '').length >= 7;
 
   const confirm = () => {
+    if (!canContinue) return;
+    saveGuestIdentity({ name: name.trim(), phone: phone.trim() }, location.id);
     setOpen(false);
-    if (!isCurrent) {
-      justSwitchedTo = chosen.slug;
-      navigate(`/${chosen.slug}`);
-      return;
-    }
     onConfirm?.();
   };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Your venue</p>
-          <button
-            type="button"
-            onClick={confirm}
-            aria-label="Close"
-            className="p-1.5 -mr-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          >
-            <X size={18} />
-          </button>
+        <div className="px-5 pt-5 pb-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Welcome to</p>
         </div>
 
-        <div className="px-5">
-          <label htmlFor="venue-picker" className="sr-only">
-            Choose your venue
-          </label>
-          <div className="relative">
-            <select
-              id="venue-picker"
-              value={chosenSlug}
-              onChange={event => setChosenSlug(event.target.value)}
-              className="w-full appearance-none rounded-xl border-2 border-blue-800 bg-white pl-11 pr-10 py-3 text-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              {ordered.map(loc => {
-                const parts = splitName(loc.name);
-                return (
-                  <option key={loc.slug} value={loc.slug}>
-                    {parts.venue}
-                    {loc.city ? ` — ${loc.city}, ${loc.state ?? ''}`.trimEnd() : ''}
-                  </option>
-                );
-              })}
-            </select>
-            <MapPin size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-blue-800" />
-            <ChevronDown size={18} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
-          <p className="mt-1.5 text-xs text-gray-500">
-            {ordered.length} locations — pick yours to see its prices and times.
-          </p>
-        </div>
-
-        <div className="px-5 pt-4 space-y-3">
+        <div className="px-5 pt-2 space-y-3">
           <div>
             <h2 className="text-xl font-bold text-gray-900 leading-tight">{venue}</h2>
             {brand && <p className="text-xs font-semibold uppercase tracking-wider text-blue-800">{brand}</p>}
@@ -143,13 +79,13 @@ const LocationConfirmModal = ({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {chosen.phone && (
+            {location.phone && (
               <a
-                href={`tel:${chosen.phone}`}
+                href={`tel:${location.phone}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
               >
                 <Phone size={13} />
-                {chosen.phone}
+                {location.phone}
               </a>
             )}
             <a
@@ -163,25 +99,64 @@ const LocationConfirmModal = ({
             </a>
           </div>
 
-          {isCurrent && counts && (
+          {counts && (
             <p className="text-xs text-gray-500">
               {counts.packages} packages · {counts.attractions} attractions · {counts.events} events here
             </p>
           )}
-          {!isCurrent && (
-            <p className="text-xs font-medium text-blue-800">Continue to load this venue's prices and times.</p>
-          )}
+
+          <div className="pt-1 space-y-3">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Tell us who you are and we'll take you right in — the venue can help you faster with a
+              name and number.
+            </p>
+
+            <div>
+              <label htmlFor="guest-welcome-name" className="block text-sm font-medium text-gray-900 mb-1.5">
+                Your name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="guest-welcome-name"
+                type="text"
+                value={name}
+                onChange={event => setName(event.target.value)}
+                autoComplete="name"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                placeholder="Jamie Rivera"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="guest-welcome-phone" className="block text-sm font-medium text-gray-900 mb-1.5">
+                Phone number <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="guest-welcome-phone"
+                type="tel"
+                value={phone}
+                onChange={event => setPhone(event.target.value)}
+                autoComplete="tel"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                placeholder="(810) 555-0134"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="p-5 pt-4">
           <button
             type="button"
             onClick={confirm}
-            className="w-full bg-blue-800 hover:bg-blue-900 text-white px-4 py-3 font-semibold rounded-xl inline-flex items-center justify-center gap-2 text-sm shadow-md"
+            disabled={!canContinue}
+            className="w-full bg-blue-800 hover:bg-blue-900 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 font-semibold rounded-xl inline-flex items-center justify-center gap-2 text-sm shadow-md"
           >
-            {isCurrent ? `Continue at ${venue}` : `Switch to ${venue}`}
+            Continue at {venue}
             <ArrowRight size={16} />
           </button>
+          <p className="mt-2.5 text-[11px] text-gray-400 text-center leading-relaxed">
+            Saved on this device so you only enter it once. We only use it to help with your visit and
+            bookings — nothing is booked or charged.
+          </p>
         </div>
       </div>
     </div>

@@ -54,7 +54,8 @@ import {
   Layers,
   ExternalLink,
   Send as SendIcon,
-  PhoneCall
+  PhoneCall,
+  Footprints
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -98,6 +99,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Customer Analytics': 'Analytics and insights about your customers',
     'Customers': 'View and manage customer information',
     'Customer Concerns': 'Guests who asked for schedule help or left checkout unfinished',
+    'Visitor Tracking': 'Every customer visit as a session - pages, clicks and time on site',
     'Profile': 'Update your personal profile information',
     'Settings': 'Configure application settings',
     'Custom Fields': 'Extra checkboxes shown at checkout',
@@ -156,7 +158,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     { label: 'Customers', icon: Users, items: [
       { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
       { label: 'Customers', href: '/customers', icon: Dot },
-      { label: 'Customer Concerns', href: '/customer-concerns', icon: Dot }
+      { label: 'Customer Concerns', href: '/customer-concerns', icon: Dot },
+      { label: 'Visitor Tracking', href: '/visitor-tracking', icon: Dot }
     ]},
     { label: 'Memberships', icon: IdCard, items: [
       { label: 'Memberships', href: '/memberships', icon: Dot },
@@ -220,7 +223,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users },
-          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall }
+          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall },
+          { label: 'Visitor Tracking', href: '/visitor-tracking', icon: Footprints }
         ]},
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
@@ -297,7 +301,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users },
-          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall }
+          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall },
+          { label: 'Visitor Tracking', href: '/visitor-tracking', icon: Footprints }
         ]},
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
@@ -385,7 +390,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users },
-          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall }
+          { label: 'Customer Concerns', href: '/customer-concerns', icon: PhoneCall },
+          { label: 'Visitor Tracking', href: '/visitor-tracking', icon: Footprints }
         ]},
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },

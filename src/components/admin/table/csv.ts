@@ -2,7 +2,11 @@ import type { AdminColumn } from './types';
 
 const escapeCell = (value: string | number | null | undefined): string => {
   if (value === null || value === undefined) return '';
-  const str = String(value);
+  if (typeof value === 'number') return String(value);
+  let str = String(value);
+  if (/^[=+@\t\r]/.test(str) || (str.startsWith('-') && Number.isNaN(Number(str)))) {
+    str = "'" + str;
+  }
   if (/[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

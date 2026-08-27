@@ -27,6 +27,8 @@ import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, 
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
 import { useCart } from '../../contexts/CartContext';
 import LocationConfirmModal from '../../components/customer/LocationConfirmModal';
+import CallToBookModal from '../../components/customer/CallToBookModal';
+import { attractionIsCallToBook, packageIsCallToBook, eventIsCallToBook, itemCallToBookAt } from '../../utils/callToBook';
 import { findLocationBySlug } from '../../services/StorefrontLocationService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SiteFooter from '../../components/customer/SiteFooter';
@@ -58,15 +60,16 @@ interface DisplayEvent {
   date_type: 'one_time' | 'date_range';
   start_date: string;
   end_date: string | null;
-  time_start: string;
-  time_end: string;
-  interval_minutes: number;
+  time_start: string | null;
+  time_end: string | null;
+  interval_minutes: number | null;
   max_bookings_per_slot: number | null;
   price: string;
   features: string[] | null;
   availableLocations: string[];
   locations: DisplayEventLocation[];
   purchaseLinks: Array<{ location: string; url: string; event_id: number; location_id: number }>;
+  callToBookByLocation?: Record<number, boolean>;
 }
 
 type StorefrontFilter =
@@ -149,6 +152,14 @@ const EntertainmentLandingPage = () => {
   const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [callToBook, setCallToBook] = useState<{
+    locationId: number | null;
+    venueName: string | null;
+    venuePhone: string | null;
+    entityType: 'package' | 'attraction' | 'event';
+    entityId: number | null;
+    entityName: string;
+  } | null>(null);
   const [showAttractionModal, setShowAttractionModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -186,6 +197,10 @@ const EntertainmentLandingPage = () => {
         pricingType: attr.pricing_type,
         purchaseLinks: attr.purchase_links,
         availability: attr.availability,
+        callToBookByLocation: Object.fromEntries(attr.locations.map(loc => [
+          loc.location_id,
+          loc.availability !== undefined ? attractionIsCallToBook(loc.availability) : attractionIsCallToBook(attr.availability),
+        ])),
         special_pricing: attr.special_pricing,
       };
     });
@@ -218,6 +233,12 @@ const EntertainmentLandingPage = () => {
         availableLocationIds: pkg.locations.map(loc => loc.location_id),
         bookingLinks: pkg.booking_links,
         availability_schedules: pkg.availability_schedules,
+        callToBookByLocation: Object.fromEntries(pkg.locations.map(loc => [
+          loc.location_id,
+          loc.availability_schedules !== undefined
+            ? packageIsCallToBook(loc.availability_schedules)
+            : packageIsCallToBook(pkg.availability_schedules),
+        ])),
         package_type: pkg.package_type || 'regular',
         min_participants: pkg.min_participants,
         max_guests: pkg.max_guests,
@@ -253,6 +274,10 @@ const EntertainmentLandingPage = () => {
         price: evt.price,
         features: evt.features,
         availableLocations: evt.locations.map(loc => loc.location_name),
+        callToBookByLocation: Object.fromEntries(evt.locations.map(loc => [
+          loc.location_id,
+          loc.time_start !== undefined ? eventIsCallToBook(loc) : eventIsCallToBook(evt),
+        ])),
         locations: evt.locations.map(loc => ({
           location_id: loc.location_id,
           location_name: loc.location_name,
@@ -570,8 +595,64 @@ const EntertainmentLandingPage = () => {
     return `${window.location.origin}/purchase/event/${locationSlug}/${eventSlug}`;
   };
 
+  const packageCTB = (pkg: PackageType, locationId?: number | null) =>
+    itemCallToBookAt(pkg.callToBookByLocation, packageIsCallToBook(pkg.availability_schedules), locationId ?? activeLocation?.id ?? null);
+
+  const attractionCTB = (attraction: Attraction, locationId?: number | null) =>
+    itemCallToBookAt(attraction.callToBookByLocation, attractionIsCallToBook(attraction.availability), locationId ?? activeLocation?.id ?? null);
+
+  const eventCTB = (evt: DisplayEvent, locationId?: number | null) =>
+    itemCallToBookAt(evt.callToBookByLocation, eventIsCallToBook(evt), locationId ?? activeLocation?.id ?? null);
+
+  const openCallToBookFor = (
+    type: 'package' | 'attraction' | 'event',
+    item: Attraction | PackageType | DisplayEvent,
+    target: LocationRef,
+  ) => {
+    let locationId: number | null = null;
+    let entityId: number | null = null;
+    let fallbackPhone: string | null = null;
+
+    if (type === 'attraction') {
+      const attraction = item as Attraction;
+      const link = attraction.purchaseLinks?.find(l =>
+        target.id === undefined ? l.location === target.name : l.location_id === target.id);
+      locationId = link?.location_id ?? target.id ?? null;
+      entityId = link?.attraction_id ?? attraction.id ?? null;
+    } else if (type === 'package') {
+      const pkg = item as PackageType;
+      const link = pkg.bookingLinks?.find(l =>
+        target.id === undefined ? l.location === target.name : l.location_id === target.id);
+      locationId = link?.location_id ?? target.id ?? null;
+      entityId = link?.package_id ?? pkg.id ?? null;
+    } else {
+      const evt = item as DisplayEvent;
+      const locData = evt.locations.find(loc =>
+        target.id === undefined ? loc.location_name === target.name : loc.location_id === target.id);
+      locationId = locData?.location_id ?? target.id ?? null;
+      entityId = locData?.event_id ?? evt.id ?? null;
+      fallbackPhone = locData?.phone ?? null;
+    }
+
+    const venue = locationId !== null ? storefrontLocations.find(loc => loc.id === locationId) : undefined;
+
+    setCallToBook({
+      locationId,
+      venueName: venue?.name ?? target.name,
+      venuePhone: venue?.phone ?? fallbackPhone,
+      entityType: type,
+      entityId,
+      entityName: item.name,
+    });
+  };
+
   const handleBuyTickets = (attraction: Attraction) => {
     if (activeLocation) {
+      if (attractionCTB(attraction)) {
+        setShowAttractionModal(false);
+        openCallToBookFor('attraction', attraction, activeLocation);
+        return;
+      }
       const url = attractionUrlFor(attraction, activeLocation);
       if (!url) return;
       setShowAttractionModal(false);
@@ -586,6 +667,11 @@ const EntertainmentLandingPage = () => {
 
   const handleBookPackage = (pkg: PackageType) => {
     if (activeLocation) {
+      if (packageCTB(pkg)) {
+        setShowPackageModal(false);
+        openCallToBookFor('package', pkg, activeLocation);
+        return;
+      }
       const url = packageUrlFor(pkg, activeLocation);
       if (!url) return;
       setShowPackageModal(false);
@@ -605,6 +691,11 @@ const EntertainmentLandingPage = () => {
 
   const handleBuyEventTickets = (evt: DisplayEvent) => {
     if (activeLocation) {
+      if (eventCTB(evt)) {
+        setShowEventModal(false);
+        openCallToBookFor('event', evt, activeLocation);
+        return;
+      }
       const url = eventUrlFor(evt, activeLocation);
       if (!url) return;
       setShowEventModal(false);
@@ -620,6 +711,31 @@ const EntertainmentLandingPage = () => {
   const handleLocationSelect = (location: string) => {
     const target: LocationRef = { name: location };
 
+    if (activeBookingType === 'attraction' && selectedAttraction) {
+      const link = selectedAttraction.purchaseLinks?.find(l => l.location === location);
+      if (attractionCTB(selectedAttraction, link?.location_id ?? null)) {
+        setShowLocationModal(false);
+        openCallToBookFor('attraction', selectedAttraction, target);
+        return;
+      }
+    }
+    if (activeBookingType === 'package' && selectedPackage) {
+      const link = selectedPackage.bookingLinks?.find(l => l.location === location);
+      if (packageCTB(selectedPackage, link?.location_id ?? null)) {
+        setShowLocationModal(false);
+        openCallToBookFor('package', selectedPackage, target);
+        return;
+      }
+    }
+    if (activeBookingType === 'event' && selectedEvent) {
+      const locData = selectedEvent.locations.find(loc => loc.location_name === location);
+      if (eventCTB(selectedEvent, locData?.location_id ?? null)) {
+        setShowLocationModal(false);
+        openCallToBookFor('event', selectedEvent, target);
+        return;
+      }
+    }
+
     const url = activeBookingType === 'event'
       ? (selectedEvent ? eventUrlFor(selectedEvent, target) : null)
       : activeBookingType === 'attraction'
@@ -631,7 +747,7 @@ const EntertainmentLandingPage = () => {
     if (url) window.open(url, '_blank');
   };
 
-  const formatTime = (time: string) => {
+  const formatTime = (time: string | null | undefined) => {
     if (!time) return '';
     return convertTo12Hour(time);
   };
@@ -1073,12 +1189,24 @@ const EntertainmentLandingPage = () => {
       {isSingleLocationPage && activeLocation && !dataLoading && (
         <LocationConfirmModal
           location={activeLocation}
-          locations={storefrontLocations}
           counts={{
             packages: filteredPackages.length,
             attractions: filteredAttractions.length,
             events: filteredEvents.length,
           }}
+        />
+      )}
+
+      {callToBook && (
+        <CallToBookModal
+          open
+          onClose={() => setCallToBook(null)}
+          locationId={callToBook.locationId}
+          venueName={callToBook.venueName}
+          venuePhone={callToBook.venuePhone}
+          entityType={callToBook.entityType}
+          entityId={callToBook.entityId}
+          entityName={callToBook.entityName}
         />
       )}
 
@@ -1191,8 +1319,8 @@ const EntertainmentLandingPage = () => {
                             }}
                             className="bg-gradient-to-r from-blue-800 to-blue-700 hover:from-blue-900 hover:to-blue-800 text-white px-5 py-2.5 md:px-6 md:py-3 font-bold uppercase text-xs md:text-sm tracking-wider transition-all rounded-lg flex items-center gap-2 shadow-md hover:shadow-lg"
                           >
-                            Book Now
-                            <ChevronRight size={16} />
+                            {packageCTB(pkg) ? 'Call to Book' : 'Book Now'}
+                            {packageCTB(pkg) ? <Phone size={16} /> : <ChevronRight size={16} />}
                           </button>
                         </div>
                       </div>
@@ -1342,8 +1470,8 @@ const EntertainmentLandingPage = () => {
                           }}
                           className="flex-1 basis-28 whitespace-nowrap bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
                         >
-                          <Calendar size={15} />
-                          Book Now
+                          {packageCTB(pkg) ? <Phone size={15} /> : <Calendar size={15} />}
+                          {packageCTB(pkg) ? 'Call to Book' : 'Book Now'}
                         </button>
                         </div>
                       </div>
@@ -1475,10 +1603,10 @@ const EntertainmentLandingPage = () => {
                             }}
                             className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
                           >
-                            <Ticket size={15} />
-                            Buy now
+                            {attractionCTB(attraction) ? <Phone size={15} /> : <Ticket size={15} />}
+                            {attractionCTB(attraction) ? 'Call to Book' : 'Buy now'}
                           </button>
-                          {CART_ENABLED && (
+                          {CART_ENABLED && !attractionCTB(attraction) && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1601,10 +1729,10 @@ const EntertainmentLandingPage = () => {
                             }}
                             className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
                           >
-                            <Ticket size={15} />
-                            Buy now
+                            {eventCTB(evt) ? <Phone size={15} /> : <Ticket size={15} />}
+                            {eventCTB(evt) ? 'Call to Book' : 'Buy now'}
                           </button>
-                          {CART_ENABLED && (
+                          {CART_ENABLED && !eventCTB(evt) && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1842,8 +1970,8 @@ const EntertainmentLandingPage = () => {
                   }}
                   className="w-full py-3 font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-900 hover:to-blue-800 shadow-md hover:shadow-lg cursor-pointer"
                 >
-                  <Ticket size={16} />
-                  Buy Tickets
+                  {attractionCTB(selectedAttraction) ? <Phone size={16} /> : <Ticket size={16} />}
+                  {attractionCTB(selectedAttraction) ? 'Call to Book' : 'Buy Tickets'}
                 </button>
                 <button
                   onClick={(e) => {
@@ -2120,8 +2248,8 @@ const EntertainmentLandingPage = () => {
                   }}
                   className="w-full py-3 bg-gradient-to-r from-blue-800 to-blue-700 text-white font-semibold text-sm rounded-xl hover:from-blue-900 hover:to-blue-800 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                 >
-                  <Package size={16} />
-                  Book This Package
+                  {packageCTB(selectedPackage) ? <Phone size={16} /> : <Package size={16} />}
+                  {packageCTB(selectedPackage) ? 'Call to Book' : 'Book This Package'}
                 </button>
                 <button
                   onClick={(e) => {
@@ -2219,7 +2347,11 @@ const EntertainmentLandingPage = () => {
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-gray-600">
                       <Clock size={12} className="text-blue-600" />
-                      <span className="font-medium">{formatTime(selectedEvent.time_start)} – {formatTime(selectedEvent.time_end)} ({easternTimeAbbr})</span>
+                      <span className="font-medium">
+                        {eventCTB(selectedEvent)
+                          ? 'Times arranged by phone — call to book'
+                          : `${formatTime(selectedEvent.time_start)} – ${formatTime(selectedEvent.time_end)} (${easternTimeAbbr})`}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2270,8 +2402,8 @@ const EntertainmentLandingPage = () => {
                   }}
                   className="w-full py-3 font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
                 >
-                  <Ticket size={16} />
-                  Get Tickets
+                  {eventCTB(selectedEvent) ? <Phone size={16} /> : <Ticket size={16} />}
+                  {eventCTB(selectedEvent) ? 'Call to Book' : 'Get Tickets'}
                 </button>
                 <button
                   onClick={(e) => {

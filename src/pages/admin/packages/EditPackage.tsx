@@ -24,6 +24,8 @@ import type {
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { getStoredUser } from '../../../utils/storage';
+import CallToBookNotice from '../../../components/admin/CallToBookNotice';
+import { packageIsCallToBook } from '../../../utils/callToBook';
 
 const getOrdinal = (n: number): string => {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -53,6 +55,7 @@ const EditPackage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
+    const [schedulesLoaded, setSchedulesLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [packageLocationId, setPackageLocationId] = useState<number>(1);
@@ -293,6 +296,7 @@ const EditPackage: React.FC = () => {
                         time_slot_start: formatTime(schedule.time_slot_start || "09:00"),
                         time_slot_end: formatTime(schedule.time_slot_end || "17:00"),
                     })),
+
                     image: pkg.image || "",
                     partialPaymentPercentage: String(pkg.partial_payment_percentage || "0"),
                     partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
@@ -311,6 +315,7 @@ const EditPackage: React.FC = () => {
                     setImagePreview(pkg.image);
                 }
 
+                setSchedulesLoaded(true);
                 setLoading(false);
             } catch (error: unknown) {
                 console.error("Error loading data:", error);
@@ -702,7 +707,7 @@ const EditPackage: React.FC = () => {
             const response = await packageService.updatePackage(parseInt(id), updateData);
             console.log("Update response:", response);
             
-            if (form.availability_schedules.length > 0) {
+            if (schedulesLoaded) {
                 try {
                     await packageService.updateAvailabilitySchedules(parseInt(id), {
                         schedules: form.availability_schedules
@@ -1170,6 +1175,8 @@ const EditPackage: React.FC = () => {
                                         Availability schedules are managed through the package creation system and define when this package can be booked with different time configurations.
                                     </p>
                                 </div>
+
+                                <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" />
                                 
                                 {form.availability_schedules.length === 0 ? (
                                     <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">

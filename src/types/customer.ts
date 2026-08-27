@@ -70,6 +70,7 @@ export interface Attraction {
   pricingType?: string;
   purchaseLinks?: AttractionPurchaseLink[];
   availability?: AttractionAvailabilitySchedule[];
+  callToBookByLocation?: Record<number, boolean>;
   special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 
@@ -95,6 +96,7 @@ export interface Package {
   availableLocationIds?: number[];
   bookingLinks?: PackageBookingLink[];
   availability_schedules?: PackageAvailabilitySchedule[];
+  callToBookByLocation?: Record<number, boolean>;
   package_type?: string;
   min_participants?: number;
   max_guests?: number;

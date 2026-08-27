@@ -11,6 +11,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import { Plus, Trash2, GripVertical, X, Calendar, Clock, DollarSign, MapPin, Star, Package } from 'lucide-react';
+import CallToBookNotice from '../../../components/admin/CallToBookNotice';
 import type { Event, UpdateEventData } from '../../../types/event.types';
 
 const EditEvent = () => {
@@ -34,6 +35,7 @@ const EditEvent = () => {
   const [dateType, setDateType] = useState<'one_time' | 'date_range'>('one_time');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [noSetTimes, setNoSetTimes] = useState(false);
   const [timeStart, setTimeStart] = useState('09:00');
   const [timeEnd, setTimeEnd] = useState('17:00');
   const [intervalMinutes, setIntervalMinutes] = useState(60);
@@ -91,6 +93,7 @@ const EditEvent = () => {
     setDateType(event.date_type || 'one_time');
     setStartDate(event.start_date ? event.start_date.substring(0, 10) : '');
     setEndDate(event.end_date ? event.end_date.substring(0, 10) : '');
+    setNoSetTimes(!event.time_start || !event.time_end);
     setTimeStart(event.time_start ? event.time_start.substring(0, 5) : '09:00');
     setTimeEnd(event.time_end ? event.time_end.substring(0, 5) : '17:00');
     setIntervalMinutes(event.interval_minutes || 60);
@@ -244,7 +247,7 @@ const EditEvent = () => {
       setToast({ message: 'Event name is required', type: 'error' });
       return;
     }
-    if (timeStart === timeEnd) {
+    if (!noSetTimes && timeStart === timeEnd) {
       setToast({ message: 'Start and end time cannot be the same', type: 'error' });
       return;
     }
@@ -258,9 +261,9 @@ const EditEvent = () => {
         date_type: dateType,
         start_date: startDate,
         end_date: dateType === 'date_range' ? endDate : undefined,
-        time_start: timeStart,
-        time_end: timeEnd,
-        interval_minutes: intervalMinutes,
+        time_start: noSetTimes ? null : timeStart,
+        time_end: noSetTimes ? null : timeEnd,
+        interval_minutes: noSetTimes ? null : intervalMinutes,
         max_bookings_per_slot: maxBookingsPerSlot ? parseInt(maxBookingsPerSlot) : null,
         max_tickets_per_slot: maxTicketsPerSlot ? parseInt(maxTicketsPerSlot) : null,
         price: parseFloat(price) || 0,
@@ -440,6 +443,20 @@ const EditEvent = () => {
             )}
           </div>
 
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-800">
+              <input
+                type="checkbox"
+                checked={noSetTimes}
+                onChange={e => setNoSetTimes(e.target.checked)}
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-600"
+              />
+              No set times — guests call to book this event
+            </label>
+            <CallToBookNotice active={noSetTimes} itemLabel="event" />
+          </div>
+
+          {!noSetTimes && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
@@ -480,6 +497,7 @@ const EditEvent = () => {
               />
             </div>
           </div>
+          )}
         </div>
 
         <hr className="border-gray-100" />
@@ -691,7 +709,7 @@ const EditEvent = () => {
               <Clock className="w-4 h-4 text-gray-500" />
               <span className="font-semibold">Time:</span>
               <span className="text-neutral-800 text-sm">
-                {formatTimeDisplay(timeStart)} {"\u2013"} {formatTimeDisplay(timeEnd)}
+                {noSetTimes ? 'Call to book — no set times' : `${formatTimeDisplay(timeStart)} – ${formatTimeDisplay(timeEnd)}`}
               </span>
             </div>
 

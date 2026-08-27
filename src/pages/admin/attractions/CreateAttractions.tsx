@@ -17,6 +17,8 @@ import { useLocationScope } from '../../../contexts/LocationContext';
 import { Plus, Trash2, Info, Tag, Calendar, Clock, GripVertical, X } from 'lucide-react';
 import { formatDurationDisplay, formatTimeRange } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
+import CallToBookNotice from '../../../components/admin/CallToBookNotice';
+import { attractionIsCallToBook } from '../../../utils/callToBook';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
@@ -692,6 +694,9 @@ const CreateAttraction = () => {
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Availability Schedules
               </h3>
+              <div className="mb-4">
+                <CallToBookNotice active={attractionIsCallToBook(formData.availability)} itemLabel="attraction" />
+              </div>
               <div className="space-y-4">
                 {formData.availability.map((schedule, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-4">

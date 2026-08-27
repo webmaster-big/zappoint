@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Inbox,
   Mail,
+  Phone,
   PhoneCall,
   Search,
   ShoppingCart,
@@ -21,8 +22,15 @@ import Toast from '../../../components/ui/Toast';
 const KIND_TABS: { value: 'all' | ConcernKind; label: string }[] = [
   { value: 'all', label: 'Everything' },
   { value: 'schedule_help', label: 'Schedule help' },
+  { value: 'call_to_book', label: 'Call to book' },
   { value: 'abandoned_checkout', label: 'Left unfinished' },
 ];
+
+const KIND_BADGES: Record<ConcernKind, { label: string; className: string }> = {
+  schedule_help: { label: 'Schedule help', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  call_to_book: { label: 'Call to book', className: 'bg-teal-50 text-teal-700 border-teal-200' },
+  abandoned_checkout: { label: 'Left unfinished', className: 'bg-purple-50 text-purple-700 border-purple-200' },
+};
 
 const STATUS_TABS: { value: 'all' | ConcernStatus; label: string }[] = [
   { value: 'new', label: 'Needs a call' },
@@ -144,6 +152,7 @@ const CustomerConcerns = () => {
     () => [
       { label: 'Waiting on a call', value: stats?.open ?? 0, icon: PhoneCall, tone: 'text-amber-600' },
       { label: 'Schedule help', value: stats?.schedule_help ?? 0, icon: CalendarX2, tone: 'text-blue-700' },
+      { label: 'Call to book', value: stats?.call_to_book ?? 0, icon: Phone, tone: 'text-teal-700' },
       { label: 'Left unfinished', value: stats?.abandoned_checkout ?? 0, icon: ShoppingCart, tone: 'text-purple-700' },
       { label: 'Today', value: stats?.today ?? 0, icon: Inbox, tone: 'text-emerald-600' },
     ],
@@ -282,13 +291,11 @@ const CustomerConcerns = () => {
                     <td className="px-4 py-3 max-w-xs">
                       <span
                         className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                          concern.kind === 'schedule_help'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-purple-50 text-purple-700 border-purple-200'
+                          (KIND_BADGES[concern.kind] ?? KIND_BADGES.schedule_help).className
                         }`}
                       >
-                        {concern.kind === 'schedule_help' ? <CalendarX2 size={11} /> : <ShoppingCart size={11} />}
-                        {concern.kind === 'schedule_help' ? 'Schedule help' : 'Left unfinished'}
+                        {concern.kind === 'schedule_help' ? <CalendarX2 size={11} /> : concern.kind === 'call_to_book' ? <Phone size={11} /> : <ShoppingCart size={11} />}
+                        {(KIND_BADGES[concern.kind] ?? KIND_BADGES.schedule_help).label}
                       </span>
                       {concern.message && (
                         <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">“{concern.message}”</p>
