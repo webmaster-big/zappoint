@@ -15,6 +15,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
+import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import { generateTimeSlots } from '../../../utils/timeSlots';
 
@@ -216,11 +217,10 @@ const EditPurchase: React.FC = () => {
 
   const handleAddOnChange = (addOnId: number, change: number) => {
     const addOn = availableAddOns.find((a: any) => a.id === addOnId);
-    const maxQty = addOn?.max_quantity ?? 99;
+    if (!addOn) return;
     setSelectedAddOns((prev) => {
       const current = prev[addOnId] || 0;
-      let next = current + change;
-      if (next > maxQty) next = maxQty;
+      const next = clampAddOnQuantity(addOn, null, current, current + change);
       if (next <= 0) {
         const { [addOnId]: _removed, ...rest } = prev;
         return rest;
@@ -249,6 +249,7 @@ const EditPurchase: React.FC = () => {
     }, 0);
   }, [selectedAddOns, availableAddOns, getAddOnUnitPrice]);
   const additiveFeeTotal = appliedFees.filter((f) => f.fee_application_type === 'additive').reduce((s, f) => s + Number(f.fee_amount || 0), 0);
+  const discountCeiling = Math.max(0, baseSubtotal + addOnsTotal + additiveFeeTotal);
   const displayTotal = Math.max(0, baseSubtotal + addOnsTotal + additiveFeeTotal - discountAmount);
   const balance = displayTotal - amountPaid;
 
@@ -618,6 +619,7 @@ const EditPurchase: React.FC = () => {
                     const qty = selectedAddOns[addOn.id] || 0;
                     const isSelected = qty > 0;
                     const maxQty = addOn.max_quantity ?? 99;
+                    const minQty = getAddOnMinQuantity(addOn, null);
                     return (
                       <div
                         key={addOn.id}
@@ -628,6 +630,7 @@ const EditPurchase: React.FC = () => {
                           <span className={`text-sm font-bold text-${themeColor}-600`}>${getAddOnUnitPrice(addOn.id, addOn).toFixed(2)}</span>
                           <span className="text-[10px] text-gray-500">/unit</span>
                         </div>
+                        {minQty > 1 && <p className="text-[10px] text-gray-400 mb-1">Min {minQty}</p>}
                         <div className="flex items-center gap-1">
                           <StandardButton type="button" variant="secondary" size="sm" icon={Minus} onClick={() => handleAddOnChange(addOn.id, -1)} disabled={!isSelected}>
                             {''}
@@ -638,8 +641,7 @@ const EditPurchase: React.FC = () => {
                             max={maxQty}
                             value={qty}
                             onChange={(e) => {
-                              let next = parseInt(e.target.value) || 0;
-                              if (next > maxQty) next = maxQty;
+                              const next = clampAddOnQuantity(addOn, null, qty, parseInt(e.target.value) || 0);
                               if (next <= 0) {
                                 setSelectedAddOns((prev) => {
                                   const { [addOn.id]: _removed, ...rest } = prev;
@@ -773,7 +775,7 @@ const EditPurchase: React.FC = () => {
                           value={discount.discount_amount}
                           onChange={(e) => {
                             const updated = [...appliedDiscounts];
-                            updated[index] = { ...updated[index], discount_amount: parseFloat(e.target.value) || 0 };
+                            updated[index] = { ...updated[index], discount_amount: Math.max(0, parseFloat(e.target.value) || 0) };
                             setAppliedDiscounts(updated);
                           }}
                           onWheel={(e) => (e.target as HTMLInputElement).blur()}
@@ -828,7 +830,7 @@ const EditPurchase: React.FC = () => {
                       step="0.01"
                       min="0"
                       value={discountAmount}
-                      onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setDiscountAmount(Math.min(discountCeiling, Math.max(0, parseFloat(e.target.value) || 0)))}
                       onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       className={`w-full border border-gray-300 rounded pl-6 pr-2 py-2 text-sm focus:ring-1 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     />
@@ -878,7 +880,7 @@ const EditPurchase: React.FC = () => {
                       step="0.01"
                       min="0"
                       value={amountPaid}
-                      onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setAmountPaid(Math.min(displayTotal, Math.max(0, parseFloat(e.target.value) || 0)))}
                       onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       className={`w-full rounded-md border border-gray-200 pl-7 pr-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                     />

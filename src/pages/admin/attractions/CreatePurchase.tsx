@@ -52,6 +52,7 @@ import customFieldService, {
 import type { Event as ZapEvent } from '../../../types/event.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { generateTimeSlots } from '../../../utils/timeSlots';
 
 const CreatePurchase = () => {
@@ -377,9 +378,7 @@ const CreatePurchase = () => {
 
   const handleAddOnQty = (addOnId: number, qty: number) => {
     const addOn = selectedAttraction?.addOns?.find(a => a.id === addOnId);
-    const minQty = 0;
-    const maxQty = addOn?.max_quantity ?? 99;
-    const clamped = Math.max(minQty, Math.min(maxQty, qty));
+    const clamped = clampAddOnQuantity(addOn, null, selectedAddOns[addOnId] || 0, qty);
     setSelectedAddOns(prev => ({ ...prev, [addOnId]: clamped }));
   };
   
@@ -427,6 +426,7 @@ const CreatePurchase = () => {
           entity_id: Number(selectedAttraction.id),
           base_price: basePrice,
           date: pricingDate,
+          location_id: selectedAttraction.locationId ? Number(selectedAttraction.locationId) : undefined,
         });
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
@@ -1413,9 +1413,9 @@ const CreatePurchase = () => {
                       <input
                         type="number"
                         min="0"
-                        max={calculateSubtotal()}
+                        max={calculateSubtotal() + calculateAddOnsTotal()}
                         value={discount}
-                        onChange={(e) => setDiscount(Number(e.target.value))}
+                        onChange={(e) => setDiscount(Math.min(calculateSubtotal() + calculateAddOnsTotal(), Math.max(0, Number(e.target.value) || 0)))}
                         onWheel={(e) => (e.target as HTMLInputElement).blur()}
                         className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       />
@@ -1429,9 +1429,9 @@ const CreatePurchase = () => {
                     <input
                       type="number"
                       min="0"
-                      max={calculateTotal()}
+                      max={finalTotal}
                       value={paymentMethod === 'paylater' ? 0 : amountPaid}
-                      onChange={(e) => setAmountPaid(Number(e.target.value))}
+                      onChange={(e) => setAmountPaid(Math.min(finalTotal, Math.max(0, Number(e.target.value) || 0)))}
                       onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       disabled={paymentMethod === 'paylater'}
                       className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${paymentMethod === 'paylater' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -1468,6 +1468,7 @@ const CreatePurchase = () => {
                         return indexA - indexB;
                       }).map((addOn) => {
                         const maxQty = addOn.max_quantity ?? 99;
+                        const minQty = getAddOnMinQuantity(addOn, null);
                         const currentQty = selectedAddOns[addOn.id] || 0;
 
                         return (
@@ -1495,7 +1496,7 @@ const CreatePurchase = () => {
                                   </button>
                                 )}
                               </div>
-                              <span className="block text-[10px] text-gray-500">${addOn.price.toFixed(2)} each</span>
+                              <span className="block text-[10px] text-gray-500">${addOn.price.toFixed(2)} each{minQty > 1 ? ` · min ${minQty}` : ''}</span>
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <button

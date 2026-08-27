@@ -19,6 +19,7 @@ import DatePicker from '../../../components/ui/DatePicker';
 import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
+import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns } from '../../../utils/addOnQuantity';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -361,6 +362,7 @@ const EditBooking: React.FC = () => {
       if (cachedPackage) {
         setPackageDetails(cachedPackage);
         clampParticipantsToPackage(cachedPackage);
+        setSelectedAddOns(seedForcedAddOns(cachedPackage as any));
         return;
       }
       
@@ -368,6 +370,7 @@ const EditBooking: React.FC = () => {
       if (packageResponse.success && packageResponse.data) {
         setPackageDetails(packageResponse.data);
         clampParticipantsToPackage(packageResponse.data);
+        setSelectedAddOns(seedForcedAddOns(packageResponse.data as any));
       }
     } catch (error) {
       console.error('Error loading package:', error);
@@ -527,21 +530,16 @@ const EditBooking: React.FC = () => {
 
   const handleAddOnChange = (addOnId: number, change: number) => {
     const addOn = availableAddOns.find((a: any) => a.id === addOnId);
-    const minQty = addOn?.min_quantity ?? 0;
-    const maxQty = addOn?.max_quantity ?? 99;
+    if (!addOn) return;
 
     setSelectedAddOns(prev => {
       const currentValue = prev[addOnId] || 0;
-      let newValue = currentValue + change;
-
-      if (newValue > maxQty) newValue = maxQty;
+      const newValue = clampAddOnQuantity(addOn, formData.packageId, currentValue, currentValue + change);
 
       if (newValue <= 0) {
         const { [addOnId]: _removed, ...rest } = prev;
         return rest;
       }
-
-      if (currentValue === 0 && change > 0 && minQty > 1) newValue = minQty;
 
       return { ...prev, [addOnId]: newValue };
     });
@@ -1255,6 +1253,8 @@ const EditBooking: React.FC = () => {
                     const quantity = selectedAddOns[addOn.id] || 0;
                     const isSelected = quantity > 0;
                     const maxQty = addOn.max_quantity ?? 99;
+                    const isForced = isForceAddOn(addOn, formData.packageId);
+                    const minQty = isForced ? Math.max(1, getAddOnMinQuantity(addOn, formData.packageId)) : getAddOnMinQuantity(addOn, formData.packageId);
                     return (
                       <div
                         key={addOn.id}
@@ -1277,6 +1277,9 @@ const EditBooking: React.FC = () => {
                             <span className={`text-sm font-bold text-${themeColor}-600`}>${getAddOnUnitPrice(addOn.id, addOn).toFixed(2)}</span>
                             <span className="text-[10px] text-gray-500">{addOn.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
                           </div>
+                          {(isForced || minQty > 1) && (
+                            <p className={`text-[10px] mb-1 ${isForced ? 'text-amber-700' : 'text-gray-400'}`}>{isForced ? `Required · min ${minQty}` : `Min ${minQty}`}</p>
+                          )}
                           <div className="flex items-center gap-1">
                             <StandardButton
                               type="button"
@@ -1284,18 +1287,17 @@ const EditBooking: React.FC = () => {
                               size="sm"
                               icon={Minus}
                               onClick={() => handleAddOnChange(addOn.id, -1)}
-                              disabled={!isSelected}
+                              disabled={isForced ? quantity <= minQty : !isSelected}
                             >
                               {''}
                             </StandardButton>
                             <input
                               type="number"
-                              min="0"
+                              min={isForced ? minQty : 0}
                               max={maxQty}
                               value={quantity}
                               onChange={(e) => {
-                                let newQty = parseInt(e.target.value) || 0;
-                                if (newQty > maxQty) newQty = maxQty;
+                                const newQty = clampAddOnQuantity(addOn, formData.packageId, quantity, parseInt(e.target.value) || 0);
                                 if (newQty <= 0) {
                                   setSelectedAddOns(prev => {
                                     const { [addOn.id]: _removed, ...rest } = prev;

@@ -1277,29 +1277,34 @@ const PurchaseEvent = () => {
                         <p className="text-sm text-gray-400 py-4">No available time slots for this date.</p>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                          {timeSlots.map(slot => (
+                          {timeSlots.map(slot => {
+                            const left = slotRemaining?.[slot];
+                            const soldOut = left != null && left <= 0;
+                            return (
                             <button
                               key={slot}
                               type="button"
+                              disabled={soldOut}
                               onClick={() => {
+                                if (soldOut) return;
                                 setSelectedTime(slot);
-                                const left = slotRemaining?.[slot];
                                 if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
                               }}
-                              className={`px-3 py-2.5 text-sm rounded-lg border transition ${
+                              className={`px-3 py-2.5 text-sm rounded-lg border transition disabled:opacity-50 disabled:cursor-not-allowed ${
                                 selectedTime === slot
                                   ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
                                   : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
                               }`}
                             >
                               {formatTime(slot)}
-                              {slotRemaining?.[slot] != null && (
-                                <span className={`block text-[10px] font-semibold ${selectedTime === slot ? 'text-blue-100' : slotRemaining[slot] <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                  {slotRemaining[slot]} left
+                              {left != null && (
+                                <span className={`block text-[10px] font-semibold ${selectedTime === slot ? 'text-blue-100' : soldOut ? 'text-red-600' : left <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  {soldOut ? 'Sold out' : `${left} left`}
                                 </span>
                               )}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

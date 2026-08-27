@@ -275,28 +275,30 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
         </div>
       ) : availableTimeSlots.length > 0 ? (
         <div className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'} gap-1.5`}>
-          {availableTimeSlots.map((time) => (
+          {availableTimeSlots.map((time) => {
+            const left = slotRemaining ? (slotRemaining[time] ?? slotRemaining['__cap']) : null;
+            const soldOut = left != null && left <= 0;
+            return (
             <button
               key={time}
               type="button"
+              disabled={soldOut}
               onClick={() => onTimeSelect(time)}
-              className={`px-2 py-2.5 text-xs rounded-lg font-medium transition-all border
+              className={`px-2 py-2.5 text-xs rounded-lg font-medium transition-all border disabled:opacity-50 disabled:cursor-not-allowed
                 ${scheduledTime === time
                   ? `bg-${themeColor}-600 text-white border-${themeColor}-600 shadow-sm`
                   : `bg-white text-gray-700 border-gray-200 hover:border-${themeColor}-300 hover:bg-${themeColor}-50`
                 }`}
             >
               {formatTime12Hour(time)}
-              {(() => {
-                const left = slotRemaining ? (slotRemaining[time] ?? slotRemaining['__cap']) : null;
-                return left != null ? (
-                  <span className={`block text-[10px] font-semibold ${scheduledTime === time ? 'text-white/80' : left <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {left} left
-                  </span>
-                ) : null;
-              })()}
+              {left != null && (
+                <span className={`block text-[10px] font-semibold ${scheduledTime === time ? 'text-white/80' : soldOut ? 'text-red-600' : left <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {soldOut ? 'Sold out' : `${left} left`}
+                </span>
+              )}
             </button>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="text-xs text-orange-600 bg-orange-50 rounded-lg p-2.5 border border-orange-100">

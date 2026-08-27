@@ -327,6 +327,12 @@ const CreateAttraction = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const sameClockIndex = formData.availability.findIndex(s => s.start_time && s.end_time && s.start_time === s.end_time);
+    if (sameClockIndex !== -1) {
+      setToast({ message: `Schedule ${sameClockIndex + 1}: start and end time cannot be the same`, type: 'error' });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 

@@ -125,6 +125,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getStoredUser()?.token ?? ''}`,
         },
         body: JSON.stringify(requestBody),
       });

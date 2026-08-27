@@ -24,6 +24,12 @@ import {
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 
+const intOrNull = (raw: string, min: number): number | null => {
+  if (raw.trim() === '') return null;
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) ? Math.max(min, n) : null;
+};
+
 const emptyForm: CreateMembershipPlanData = {
   name: '',
   description: '',
@@ -178,7 +184,24 @@ const MembershipPlans = () => {
     setShowForm(true);
   };
 
+  const validateForm = (): string | null => {
+    if (!form.name.trim()) return 'Plan name is required';
+    if (!Number.isFinite(form.price) || form.price < 0) return 'Price must be 0 or more';
+    if (form.term_length_months != null && form.term_length_months < 1) return 'Term length must be at least 1 month';
+    if ((form.trial_days ?? 0) < 0) return 'Trial days cannot be negative';
+    if (form.included_visits_per_term != null && form.included_visits_per_term < 1) return 'Visits per term must be at least 1';
+    if (form.max_visits_per_day != null && form.max_visits_per_day < 1) return 'Max visits per day must be at least 1';
+    if (form.punch_card_total != null && form.punch_card_total < 1) return 'Punch card total must be at least 1';
+    if (form.is_family_or_group && form.max_family_size != null && form.max_family_size < 2) return 'Max family size must be at least 2';
+    return null;
+  };
+
   const save = async () => {
+    const problem = validateForm();
+    if (problem) {
+      showError(null, problem);
+      return;
+    }
     setSaving(true);
     try {
       const payload: CreateMembershipPlanData = { ...form };
@@ -848,8 +871,9 @@ const MembershipPlans = () => {
                 <input
                   type="number"
                   step="0.01"
+                  min={0}
                   value={form.price}
-                  onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) })}
+                  onChange={(e) => { const v = parseFloat(e.target.value); setForm({ ...form, price: Number.isFinite(v) ? Math.max(0, v) : 0 }); }}
                   className={inputCls}
                 />
               </div>
@@ -882,7 +906,8 @@ const MembershipPlans = () => {
                 <input
                   type="number"
                   value={form.term_length_months ?? ''}
-                  onChange={(e) => setForm({ ...form, term_length_months: e.target.value ? parseInt(e.target.value) : null })}
+                  min={1}
+                  onChange={(e) => setForm({ ...form, term_length_months: intOrNull(e.target.value, 1) })}
                   className={inputCls}
                 />
               </div>
@@ -934,7 +959,8 @@ const MembershipPlans = () => {
                   <input
                     type="number"
                     value={form.included_visits_per_term ?? ''}
-                    onChange={(e) => setForm({ ...form, included_visits_per_term: e.target.value ? parseInt(e.target.value) : null })}
+                    min={1}
+                    onChange={(e) => setForm({ ...form, included_visits_per_term: intOrNull(e.target.value, 1) })}
                     className={inputCls}
                   />
                 </div>
@@ -945,7 +971,8 @@ const MembershipPlans = () => {
                   <input
                     type="number"
                     value={form.max_visits_per_day ?? ''}
-                    onChange={(e) => setForm({ ...form, max_visits_per_day: e.target.value ? parseInt(e.target.value) : null })}
+                    min={1}
+                    onChange={(e) => setForm({ ...form, max_visits_per_day: intOrNull(e.target.value, 1) })}
                     className={inputCls}
                   />
                 </div>
@@ -956,7 +983,8 @@ const MembershipPlans = () => {
                   <input
                     type="number"
                     value={form.punch_card_total ?? ''}
-                    onChange={(e) => setForm({ ...form, punch_card_total: e.target.value ? parseInt(e.target.value) : null })}
+                    min={1}
+                    onChange={(e) => setForm({ ...form, punch_card_total: intOrNull(e.target.value, 1) })}
                     className={inputCls}
                   />
                 </div>
@@ -1157,7 +1185,7 @@ const MembershipPlans = () => {
                     type="number"
                     min={2}
                     value={form.max_family_size ?? ''}
-                    onChange={(e) => setForm({ ...form, max_family_size: e.target.value ? parseInt(e.target.value) : null })}
+                    onChange={(e) => setForm({ ...form, max_family_size: intOrNull(e.target.value, 2) })}
                     className={inputCls}
                   />
                 </div>

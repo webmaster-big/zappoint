@@ -107,6 +107,12 @@ const VALUE_MODE_MATRIX: Record<MembershipBenefitType, MembershipBenefitValueMod
 const allowedValueModesFor = (bt: MembershipBenefitType): MembershipBenefitValueMode[] =>
   VALUE_MODE_MATRIX[bt] ?? ['percent'];
 
+const intOrNull = (raw: string, min: number): number | null => {
+  if (raw.trim() === '') return null;
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) ? Math.max(min, n) : null;
+};
+
 const defaultValueFor = (mode: MembershipBenefitValueMode): number => {
   switch (mode) {
     case 'percent': return 10;
@@ -303,6 +309,27 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
   };
 
   const save = async () => {
+    const v = Number(form.value ?? 0);
+    if ((form.value_mode === 'percent' || form.value_mode === 'fixed' || form.value_mode === 'count') && (!Number.isFinite(v) || v < 0)) {
+      showError(null, 'Value must be 0 or more');
+      return;
+    }
+    if (form.value_mode === 'percent' && v > 100) {
+      showError(null, 'Percent off cannot exceed 100');
+      return;
+    }
+    if (form.value_mode === 'count' && (v < 1 || !Number.isInteger(v))) {
+      showError(null, 'Number of passes must be a whole number of at least 1');
+      return;
+    }
+    if (form.max_redemptions != null && form.max_redemptions < 1) {
+      showError(null, 'Max redemptions must be at least 1');
+      return;
+    }
+    if ((form.priority ?? 0) < 0) {
+      showError(null, 'Priority must be 0 or more');
+      return;
+    }
     setSaving(true);
     try {
       if (editingId) {
@@ -540,7 +567,11 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                       step={form.value_mode === 'count' ? 1 : 0.01}
                       min={form.value_mode === 'count' ? 1 : 0}
                       value={form.value ?? ''}
-                      onChange={(e) => setForm({ ...form, value: e.target.value ? parseFloat(e.target.value) : 0 })}
+                      onChange={(e) => {
+                        const raw = parseFloat(e.target.value);
+                        const n = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                        setForm({ ...form, value: form.value_mode === 'count' ? Math.max(1, Math.floor(n)) : form.value_mode === 'percent' ? Math.min(100, n) : n });
+                      }}
                       className={inputCls}
                     />
                   </div>
@@ -639,7 +670,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                       type="number"
                       min={1}
                       value={form.max_redemptions ?? ''}
-                      onChange={(e) => setForm({ ...form, max_redemptions: e.target.value ? parseInt(e.target.value) : null })}
+                      onChange={(e) => setForm({ ...form, max_redemptions: intOrNull(e.target.value, 1) })}
                       className={inputCls}
                       placeholder="Unlimited"
                     />
@@ -671,7 +702,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                     type="number"
                     min={0}
                     value={form.priority ?? 0}
-                    onChange={(e) => setForm({ ...form, priority: e.target.value ? parseInt(e.target.value) : 0 })}
+                    onChange={(e) => setForm({ ...form, priority: intOrNull(e.target.value, 0) ?? 0 })}
                     className={inputCls}
                   />
                 </div>

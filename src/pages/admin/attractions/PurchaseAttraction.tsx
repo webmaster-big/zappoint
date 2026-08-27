@@ -772,12 +772,12 @@ const PurchaseAttraction = () => {
     const addOn = attraction?.addOns?.find(a => a.id === id);
     if (!addOn) return;
     const maxQty = addOn.max_quantity || 99;
-    const minQty = addOn.min_quantity || 0;
+    const minQty = Math.max(1, addOn.min_quantity || 1);
     if (qty > maxQty) qty = maxQty;
     if (qty < 0) qty = 0;
     const currentQty = selectedAddOns[id] || 0;
-    if (currentQty === 0 && qty > 0 && minQty > 1) {
-      qty = minQty;
+    if (qty > 0 && qty < minQty) {
+      qty = qty < currentQty ? 0 : minQty;
     }
     setSelectedAddOns(prev => ({ ...prev, [id]: Math.max(0, qty) }));
   };
@@ -892,6 +892,7 @@ const PurchaseAttraction = () => {
           entity_id: Number(attraction.id),
           base_price: basePrice,
           date: pricingDate,
+          location_id: attraction.locationId ? Number(attraction.locationId) : undefined,
         });
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);

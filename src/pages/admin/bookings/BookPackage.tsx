@@ -400,6 +400,7 @@ const BookPackage: React.FC = () => {
           entity_id: pkg.id,
           base_price: basePrice,
           date: selectedDate,
+          location_id: pkg.location_id,
         });
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);

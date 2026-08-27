@@ -89,11 +89,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const updateQuantity = useCallback((key: string, quantity: number) => {
-    setItems(current =>
-      quantity < 1
-        ? current.filter(i => i.key !== key)
-        : current.map(i => (i.key === key ? { ...i, quantity } : i)),
-    );
+    const next = Math.max(1, Math.floor(Number(quantity) || 1));
+    setItems(current => current.map(i => (i.key === key ? { ...i, quantity: next } : i)));
   }, []);
 
   const updateItem = useCallback(

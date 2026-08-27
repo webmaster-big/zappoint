@@ -301,8 +301,9 @@ const Cart = () => {
                       <button
                         type="button"
                         aria-label={`Fewer ${item.name}`}
-                        onClick={() => updateQuantity(item.key, item.quantity - 1)}
-                        className="w-9 h-9 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 inline-flex items-center justify-center"
+                        disabled={item.quantity <= 1}
+                        onClick={() => updateQuantity(item.key, Math.max(1, item.quantity - 1))}
+                        className="w-9 h-9 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Minus size={14} />
                       </button>

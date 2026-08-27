@@ -314,6 +314,7 @@ export default function Register() {
 
       console.log("📤 STEP 3: Creating user account...");
       const userPayload: Record<string, unknown> = {
+        registration_token: token,
         company_id: companyId,
         first_name: formData.firstName,
         last_name: formData.lastName,
@@ -358,21 +359,6 @@ export default function Register() {
 
       console.log("✅ User created successfully with ID:", data.data.id);
 
-      try {
-        console.log("📤 Marking token as used...");
-        const markUsedResponse = await fetch(`${API_BASE_URL}/shareable-tokens/mark-used`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            token: token,
-            user_id: data.data.id 
-          })
-        });
-        const markUsedData = await markUsedResponse.json();
-        console.log("Mark Used Response:", markUsedData);
-      } catch (err) {
-        console.error('⚠️ Failed to mark token as used (non-critical):', err);
-      }
       
       console.log("✅ REGISTRATION COMPLETE - Redirecting to login...");
       window.location.href = '/';

@@ -20,6 +20,7 @@ import { attractionCacheService } from '../../../services/AttractionCacheService
 import type { Category } from '../../../services/CategoryService';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
+import { scheduleWindowMinutes } from '../../../utils/timeSlots';
 import type {
     CreatePackageAttraction,
     CreatePackageAddOn,
@@ -392,6 +393,7 @@ const CreatePackage: React.FC = () => {
                     time_slot_start: '09:00',
                     time_slot_end: '17:00',
                     time_slot_interval: defaultSlotInterval(),
+                    priority: prev.availability_schedules.length,
                     is_active: true,
                 }
             ]
@@ -562,6 +564,29 @@ const CreatePackage: React.FC = () => {
                 return;
             }
 
+            const durationMins = durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes);
+            for (const [index, schedule] of form.availability_schedules.entries()) {
+                const windowMins = scheduleWindowMinutes(schedule.time_slot_start, schedule.time_slot_end);
+                if (windowMins === 0) {
+                    showToast(`Schedule ${index + 1}: start and end time cannot be the same. Use 00:00 as the end time for a window that runs to midnight.`, "error");
+                    setSubmitting(false);
+                    return;
+                }
+                if (windowMins !== null && durationMins > 0 && durationMins > windowMins) {
+                    showToast(`Schedule ${index + 1}: the ${windowMins} min window is shorter than the ${durationMins} min duration, so no time slot could ever be offered.`, "error");
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
+            const bookingWindowDays = form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null;
+            const minNoticeHours = form.minBookingNoticeHours ? parseInt(form.minBookingNoticeHours) : null;
+            if (bookingWindowDays && minNoticeHours !== null && minNoticeHours >= bookingWindowDays * 24) {
+                showToast(`Advance booking time must be shorter than the booking window (${bookingWindowDays} days = ${bookingWindowDays * 24} hours), or no date could ever be booked.`, "error");
+                setSubmitting(false);
+                return;
+            }
+
             const packageData = {
                 name: form.name,
                 description: form.description,
@@ -616,7 +641,7 @@ const CreatePackage: React.FC = () => {
                 try {
                     await packageService.updateAvailabilitySchedules(
                         packageResponse.data.id,
-                        { schedules: form.availability_schedules }
+                        { schedules: form.availability_schedules.map((schedule, index) => ({ ...schedule, priority: index })) }
                     );
                 } catch (scheduleError) {
                     console.error('Error creating availability schedules:', scheduleError);
@@ -1121,6 +1146,9 @@ const CreatePackage: React.FC = () => {
                                     <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" />
                                 </div>
 
+                                {form.availability_schedules.length > 1 && (
+                                    <p className="text-xs text-gray-500 mb-3">When two schedules cover the same day, the one lower in this list wins.</p>
+                                )}
                                 {form.availability_schedules.length === 0 ? (
                                     <div className="bg-gray-50 rounded-lg p-6 text-center border border-dashed border-gray-300">
                                         <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />

@@ -27,6 +27,7 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns } from '../../../utils/addOnQuantity';
 import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
 import customFieldService, {
   firstMissingRequired,
@@ -350,6 +351,14 @@ const ManualBooking: React.FC = () => {
       const response = await bookingService.getPackageById(packageId);
       console.log('📦 Package data received:', response.data);
       setPkg(response.data);
+      const forced = seedForcedAddOns(response.data);
+      if (Object.keys(forced).length > 0) {
+        setSelectedAddOns(prev => {
+          const next = { ...prev };
+          Object.entries(forced).forEach(([id, min]) => { next[Number(id)] = Math.max(next[Number(id)] || 0, min); });
+          return next;
+        });
+      }
       
       if (response.data?.min_participants && form.participants < response.data.min_participants) {
         setForm(prev => ({
@@ -591,24 +600,15 @@ const ManualBooking: React.FC = () => {
 
   const handleAddOnChange = (addOnId: number, change: number) => {
     const addOn = pkg?.add_ons?.find((a: any) => a.id === addOnId);
-    const minQty = addOn?.min_quantity ?? 0;
-    const maxQty = addOn?.max_quantity ?? 99; // Default max to prevent unrealistic quantities
+    if (!addOn) return;
     
     setSelectedAddOns(prev => {
       const currentValue = prev[addOnId] || 0;
-      let newValue = currentValue + change;
-      
-      if (newValue > maxQty) {
-        newValue = maxQty;
-      }
+      const newValue = clampAddOnQuantity(addOn, pkg?.id ?? null, currentValue, currentValue + change);
       
       if (newValue <= 0) {
         const { [addOnId]: _removed, ...rest } = prev;
         return rest;
-      }
-      
-      if (currentValue === 0 && change > 0 && minQty > 1) {
-        newValue = minQty;
       }
       
       return { ...prev, [addOnId]: newValue };
@@ -617,24 +617,15 @@ const ManualBooking: React.FC = () => {
 
   const handleAttractionChange = (attractionId: number, change: number) => {
     const attraction = pkg?.attractions?.find((a: any) => a.id === attractionId);
-    const minQty = attraction?.min_quantity ?? 0;
-    const maxQty = attraction?.max_quantity ?? 99; // Default max to prevent unrealistic quantities
+    if (!attraction) return;
     
     setSelectedAttractions(prev => {
       const currentValue = prev[attractionId] || 0;
-      let newValue = currentValue + change;
-      
-      if (newValue > maxQty) {
-        newValue = maxQty;
-      }
+      const newValue = clampAddOnQuantity(attraction, null, currentValue, currentValue + change);
       
       if (newValue <= 0) {
         const { [attractionId]: _removed, ...rest } = prev;
         return rest;
-      }
-      
-      if (currentValue === 0 && change > 0 && minQty > 1) {
-        newValue = minQty;
       }
       
       return { ...prev, [attractionId]: newValue };
@@ -1744,6 +1735,8 @@ const ManualBooking: React.FC = () => {
                           const isSelected = selectedAddOns[addOn.id] > 0;
                           const quantity = selectedAddOns[addOn.id] || 0;
                           const maxQty = addOn.max_quantity ?? 99;
+                          const isForced = isForceAddOn(addOn, pkg.id);
+                          const minQty = isForced ? Math.max(1, getAddOnMinQuantity(addOn, pkg.id)) : getAddOnMinQuantity(addOn, pkg.id);
                           
                           return (
                             <div
@@ -1767,6 +1760,9 @@ const ManualBooking: React.FC = () => {
                                   <span className={`text-sm font-bold text-${themeColor}-600`}>${addOn.price}</span>
                                   <span className="text-[10px] text-gray-500">{addOn.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
                                 </div>
+                                {(isForced || minQty > 1) && (
+                                  <p className={`text-[10px] mb-1 ${isForced ? 'text-amber-700' : 'text-gray-400'}`}>{isForced ? `Required · min ${minQty}` : `Min ${minQty}`}</p>
+                                )}
                                 
                                 <div className="flex items-center gap-1">
                                   <StandardButton
@@ -1775,19 +1771,18 @@ const ManualBooking: React.FC = () => {
                                     size="sm"
                                     icon={Minus}
                                     onClick={() => handleAddOnChange(addOn.id, -1)}
-                                    disabled={!isSelected}
+                                    disabled={isForced ? quantity <= minQty : !isSelected}
                                   >
                                     {''}
                                   </StandardButton>
                                   <input
                                     type="number"
-                                    min="0"
+                                    min={isForced ? minQty : 0}
                                     max={maxQty}
                                     value={quantity}
                                     onChange={(e) => {
-                                      let newQty = parseInt(e.target.value) || 0;
-                                      if (newQty > maxQty) newQty = maxQty;
-                                      if (newQty === 0) {
+                                      const newQty = clampAddOnQuantity(addOn, pkg.id, quantity, parseInt(e.target.value) || 0);
+                                      if (newQty <= 0) {
                                         setSelectedAddOns(prev => {
                                           const { [addOn.id]: _removed, ...rest } = prev;
                                           return rest;
@@ -1868,9 +1863,8 @@ const ManualBooking: React.FC = () => {
                                     max={maxQty}
                                     value={quantity}
                                     onChange={(e) => {
-                                      let newQty = parseInt(e.target.value) || 0;
-                                      if (newQty > maxQty) newQty = maxQty;
-                                      if (newQty === 0) {
+                                      const newQty = clampAddOnQuantity(attraction, null, quantity, parseInt(e.target.value) || 0);
+                                      if (newQty <= 0) {
                                         setSelectedAttractions(prev => {
                                           const { [attraction.id]: _removed, ...rest } = prev;
                                           return rest;

@@ -7,6 +7,7 @@ export interface ManageAttractionsAttraction {
   price: number;
   pricingType: string;
   maxCapacity: number;
+  maxTicketsPerSlot?: number | null;
   duration: string;
   durationUnit: string;
   location: string;

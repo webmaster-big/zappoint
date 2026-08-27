@@ -195,6 +195,12 @@ const GiftCard: React.FC = () => {
       showToast('Percentage gift cards cannot exceed 100%', 'error');
       return;
     }
+    const storedExpiry = card.expiry_date ? card.expiry_date.slice(0, 10) : '';
+    const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Detroit' });
+    if (editForm.expiry_date && editForm.expiry_date !== storedExpiry && editForm.expiry_date < todayIso) {
+      showToast('Expiry date cannot be in the past. Leave it unchanged or pick a future date.', 'error');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -711,6 +717,7 @@ const GiftCard: React.FC = () => {
                       type="date" 
                       name="expiry_date" 
                       value={editForm.expiry_date || ''} 
+                      min={editForm.expiry_date && editIndex !== null && giftCards[editIndex]?.expiry_date && editForm.expiry_date === giftCards[editIndex]!.expiry_date!.slice(0, 10) ? undefined : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Detroit' })} 
                       onChange={handleEditChange} 
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     />

@@ -1,6 +1,21 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
+const getBestToken = (): string | null => {
+  const adminToken = getStoredUser()?.token;
+  if (adminToken) return adminToken;
+  try {
+    const stored = localStorage.getItem('zapzone_customer');
+    if (stored) {
+      const customer = JSON.parse(stored);
+      return customer?.token || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -11,7 +26,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = getStoredUser()?.token;
+    const token = getBestToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

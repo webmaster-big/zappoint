@@ -10,6 +10,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
+import { scheduleWindowMinutes } from '../../../utils/timeSlots';
 import { Plus, Trash2, GripVertical, X, Calendar, Clock, DollarSign, MapPin, Star, Package } from 'lucide-react';
 import CallToBookNotice from '../../../components/admin/CallToBookNotice';
 import type { Event, UpdateEventData } from '../../../types/event.types';
@@ -251,6 +252,11 @@ const EditEvent = () => {
       setToast({ message: 'Start and end time cannot be the same', type: 'error' });
       return;
     }
+    const eventWindow = noSetTimes ? null : scheduleWindowMinutes(timeStart, timeEnd);
+    if (eventWindow !== null && intervalMinutes > eventWindow) {
+      setToast({ message: `Interval (${intervalMinutes} min) is longer than the event's time window (${eventWindow} min), so no start times could be generated`, type: 'error' });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -280,7 +286,9 @@ const EditEvent = () => {
       setToast({ message: 'Event updated successfully!', type: 'success' });
       setTimeout(() => navigate('/events'), 1000);
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update event';
+      const data = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
+      const firstFieldError = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
+      const message = firstFieldError || data?.message || 'Failed to update event';
       setToast({ message, type: 'error' });
     } finally {
       setIsSubmitting(false);

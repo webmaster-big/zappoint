@@ -25,3 +25,15 @@ export function generateTimeSlots(
 
   return slots;
 }
+
+export function scheduleWindowMinutes(startTime: string, endTime: string): number | null {
+  if (!startTime || !endTime) return null;
+
+  const [startHours, startMins] = startTime.split(':').map(Number);
+  const [endHours, endMins] = endTime.split(':').map(Number);
+  if ([startHours, startMins, endHours, endMins].some((n) => Number.isNaN(n))) return null;
+
+  const diff = endHours * 60 + endMins - (startHours * 60 + startMins);
+  if (diff === 0) return 0;
+  return diff < 0 ? diff + MINUTES_PER_DAY : diff;
+}

@@ -17,6 +17,7 @@ import { addOnCacheService } from '../../../services/AddOnCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Category } from '../../../services/CategoryService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
+import { scheduleWindowMinutes } from '../../../utils/timeSlots';
 import type {
     CreatePackageAttraction,
     CreatePackageAddOn,
@@ -645,6 +646,28 @@ const EditPackage: React.FC = () => {
             return;
         }
 
+        const durationMins = form.durationUnit === 'hours and minutes'
+            ? (parseInt(form.durationHours) || 0) * 60 + (parseInt(form.durationMinutes) || 0)
+            : form.durationUnit === 'hours' ? Math.round(duration * 60) : Math.round(duration);
+        for (const [index, schedule] of form.availability_schedules.entries()) {
+            const windowMins = scheduleWindowMinutes(schedule.time_slot_start, schedule.time_slot_end);
+            if (windowMins === 0) {
+                showToast(`Schedule ${index + 1}: start and end time cannot be the same. Use 00:00 as the end time for a window that runs to midnight.`, "error");
+                return;
+            }
+            if (windowMins !== null && durationMins > 0 && durationMins > windowMins) {
+                showToast(`Schedule ${index + 1}: the ${windowMins} min window is shorter than the ${durationMins} min duration, so no time slot could ever be offered.`, "error");
+                return;
+            }
+        }
+
+        const bookingWindowDays = form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null;
+        const minNoticeHours = form.minBookingNoticeHours ? parseInt(form.minBookingNoticeHours) : null;
+        if (bookingWindowDays && minNoticeHours !== null && minNoticeHours >= bookingWindowDays * 24) {
+            showToast(`Advance booking time must be shorter than the booking window (${bookingWindowDays} days = ${bookingWindowDays * 24} hours), or no date could ever be booked.`, "error");
+            return;
+        }
+
         if (form.pricingType === 'per_person' && (!minParticipants || !maxParticipants)) {
             showToast(`Per-${(form.participantLabel.trim() || 'player').toLowerCase()} pricing needs both minimum and maximum ${(form.participantLabel.trim() || 'player').toLowerCase()}s`, "error");
             return;
@@ -717,7 +740,7 @@ const EditPackage: React.FC = () => {
             if (schedulesLoaded) {
                 try {
                     await packageService.updateAvailabilitySchedules(parseInt(id), {
-                        schedules: form.availability_schedules
+                        schedules: form.availability_schedules.map((schedule, index) => ({ ...schedule, priority: index }))
                     });
                 } catch (scheduleError) {
                     console.error('Error updating availability schedules:', scheduleError);
@@ -1185,6 +1208,9 @@ const EditPackage: React.FC = () => {
 
                                 <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" />
                                 
+                                {form.availability_schedules.length > 1 && (
+                                    <p className="text-xs text-gray-500 mb-3">When two schedules cover the same day, the one lower in this list wins.</p>
+                                )}
                                 {form.availability_schedules.length === 0 ? (
                                     <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                                         <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />

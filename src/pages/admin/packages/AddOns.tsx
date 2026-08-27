@@ -325,6 +325,20 @@ const ManageAddons = () => {
       }
     }
 
+    const minQty = formData.min_quantity ? parseInt(formData.min_quantity) : 1;
+    const maxQty = formData.max_quantity ? parseInt(formData.max_quantity) : null;
+    if (maxQty !== null && minQty > maxQty) {
+      showToast('Maximum quantity cannot be lower than minimum quantity', 'error');
+      return;
+    }
+    if (maxQty !== null && formData.is_force_add_on) {
+      const conflict = formData.price_each_packages.find(p => (p.minimum_quantity || 1) > maxQty);
+      if (conflict) {
+        showToast(`Package minimum quantity (${conflict.minimum_quantity}) exceeds the add-on maximum (${maxQty}); that package could never add this item`, 'error');
+        return;
+      }
+    }
+
     try {
       setActionLoading(true);
       const price = formData.price ? parseFloat(formData.price) : null;

@@ -33,6 +33,7 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
+import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
 import customFieldService, {
@@ -62,6 +63,7 @@ const OnsitePurchaseEvent = () => {
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
 
   const [quantity, setQuantity] = useState(1);
   const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
@@ -225,9 +227,11 @@ const OnsitePurchaseEvent = () => {
     try {
       const res = await eventService.getAvailableTimeSlots(event.id, date);
       setTimeSlots(res.time_slots || []);
+      setSlotRemaining(res.remaining_tickets ?? null);
       setSelectedTime('');
     } catch {
       setTimeSlots([]);
+      setSlotRemaining(null);
     } finally {
       setLoadingSlots(false);
     }
@@ -295,14 +299,16 @@ const OnsitePurchaseEvent = () => {
   };
 
   const handleAddOnQty = (addonId: number, qty: number) => {
-    if (qty <= 0) {
+    const addon = event?.add_ons?.find(a => a.id === addonId);
+    const clamped = clampAddOnQuantity(addon, null, selectedAddOns[addonId] || 0, qty);
+    if (clamped <= 0) {
       setSelectedAddOns(prev => {
         const copy = { ...prev };
         delete copy[addonId];
         return copy;
       });
     } else {
-      setSelectedAddOns(prev => ({ ...prev, [addonId]: qty }));
+      setSelectedAddOns(prev => ({ ...prev, [addonId]: clamped }));
     }
   };
 
@@ -846,7 +852,10 @@ const OnsitePurchaseEvent = () => {
                     <StandardButton
                       variant="ghost"
                       size="sm"
-                      onClick={() => setQuantity(quantity + 1)}
+                      onClick={() => {
+                        const left = selectedTime && slotRemaining ? slotRemaining[selectedTime] : null;
+                        setQuantity(left != null ? Math.min(Math.max(1, left), quantity + 1) : quantity + 1);
+                      }}
                       icon={Plus}
                     >
                       {''}
@@ -862,9 +871,9 @@ const OnsitePurchaseEvent = () => {
                   <input
                     type="number"
                     min="0"
-                    max={calculateSubtotal()}
+                    max={calculateSubtotal() + addOnTotal}
                     value={discount}
-                    onChange={(e) => setDiscount(Number(e.target.value))}
+                    onChange={(e) => setDiscount(Math.min(calculateSubtotal() + addOnTotal, Math.max(0, Number(e.target.value) || 0)))}
                     onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   />
@@ -924,20 +933,31 @@ const OnsitePurchaseEvent = () => {
                         <p className="text-sm text-gray-400">No available time slots for this date.</p>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                          {timeSlots.map(slot => (
+                          {timeSlots.map(slot => {
+                            const left = slotRemaining?.[slot];
+                            const soldOut = left != null && left <= 0;
+                            return (
                             <button
                               key={slot}
                               type="button"
-                              onClick={() => setSelectedTime(slot)}
-                              className={`px-3 py-2 text-sm rounded-lg border transition ${
+                              disabled={soldOut}
+                              onClick={() => {
+                                setSelectedTime(slot);
+                                if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
+                              }}
+                              className={`px-3 py-2 text-sm rounded-lg border transition disabled:opacity-50 disabled:cursor-not-allowed ${
                                 selectedTime === slot
                                   ? `bg-${themeColor}-600 text-white border-${themeColor}-600`
                                   : `bg-white text-gray-700 border-gray-200 hover:border-${themeColor}-400`
                               }`}
                             >
                               {formatTime(slot)}
+                              {left != null && (
+                                <span className={`block text-[10px] font-semibold ${selectedTime === slot ? 'text-white/80' : soldOut ? 'text-red-600' : 'text-emerald-600'}`}>{soldOut ? 'Sold out' : `${left} left`}</span>
+                              )}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -954,6 +974,7 @@ const OnsitePurchaseEvent = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {orderedAddOns.map((addon) => {
                       const maxQty = addon.max_quantity ?? 99;
+                      const minQty = getAddOnMinQuantity(addon, null);
                       const currentQty = selectedAddOns[addon.id] || 0;
 
                       return (
@@ -967,7 +988,7 @@ const OnsitePurchaseEvent = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <span className="font-medium text-gray-800 text-xs truncate block">{addon.name}</span>
-                            <span className="block text-[10px] text-gray-500">${parseFloat(addon.price).toFixed(2)} each</span>
+                            <span className="block text-[10px] text-gray-500">${parseFloat(addon.price).toFixed(2)} each{minQty > 1 ? ` · min ${minQty}` : ''}</span>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button
