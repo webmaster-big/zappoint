@@ -477,17 +477,39 @@ const VisitorTracking = () => {
         loading={loading && sessions.length === 0}
         itemLabel="sessions"
         emptyState={
-          <div className="flex flex-col items-center justify-center">
-            <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-              <Footprints className={`h-12 w-12 text-${themeColor}-400`} />
+          table.filterValues['identity'] === 'known' && sessions.length > 0 ? (
+            <div className="flex flex-col items-center justify-center">
+              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+                <UserCheck className={`h-12 w-12 text-${themeColor}-400`} />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No known customers yet</h3>
+              <p className="text-gray-500 text-sm max-w-md">
+                Guests appear here once they enter their name and number in the welcome popup.
+                There {sessions.length === 1 ? 'is' : 'are'} {sessions.length.toLocaleString()} anonymous
+                session{sessions.length === 1 ? '' : 's'} behind this filter.
+              </p>
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                className="mt-4"
+                onClick={() => table.setFilterValue('identity', 'all')}
+              >
+                Show all visitors
+              </StandardButton>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No visits recorded</h3>
-            <p className="text-gray-500 text-sm">
-              {table.searchInput || table.activeFilterCount > 0
-                ? 'Try adjusting your search or filters'
-                : 'Customer visits will appear here as they browse the booking site'}
-            </p>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center">
+              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+                <Footprints className={`h-12 w-12 text-${themeColor}-400`} />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No visits recorded</h3>
+              <p className="text-gray-500 text-sm">
+                {table.searchInput || table.activeFilterCount > 0
+                  ? 'Try adjusting your search or filters'
+                  : 'Customer visits will appear here as they browse the booking site'}
+              </p>
+            </div>
+          )
         }
         renderActions={session => (
           <button
