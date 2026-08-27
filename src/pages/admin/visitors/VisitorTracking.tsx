@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Download,
   Eye,
+  Filter,
   Footprints,
   Inbox,
   Mail,
@@ -41,6 +42,75 @@ const pageLabel = (title: string | null, path: string | null): string => {
   return '—';
 };
 
+type VisitorTab = 'all' | 'known' | 'anonymous';
+type TimeFrame = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'custom';
+type DeviceFilter = '' | 'desktop' | 'mobile' | 'tablet';
+type ActivityFilter = '' | 'purchased' | 'clicked' | 'multi_page' | 'reached_checkout';
+
+const VISITOR_TABS: { value: VisitorTab; label: string }[] = [
+  { value: 'all', label: 'All visitors' },
+  { value: 'known', label: 'Known customers' },
+  { value: 'anonymous', label: 'Anonymous' },
+];
+
+const TIME_FRAMES: { value: TimeFrame; label: string }[] = [
+  { value: 'all', label: 'All time' },
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: 'month', label: 'This month' },
+  { value: 'custom', label: 'Custom range' },
+];
+
+const DEVICE_OPTIONS: { value: DeviceFilter; label: string }[] = [
+  { value: '', label: 'All devices' },
+  { value: 'mobile', label: 'Mobile' },
+  { value: 'desktop', label: 'Desktop' },
+  { value: 'tablet', label: 'Tablet' },
+];
+
+const ACTIVITY_OPTIONS: { value: ActivityFilter; label: string }[] = [
+  { value: '', label: 'Any activity' },
+  { value: 'purchased', label: 'Made a purchase' },
+  { value: 'reached_checkout', label: 'Reached a checkout page' },
+  { value: 'clicked', label: 'Clicked something' },
+  { value: 'multi_page', label: 'Viewed 2+ pages' },
+];
+
+const localDate = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const dateRangeFor = (frame: TimeFrame, customFrom: string, customTo: string): { from?: string; to?: string } => {
+  const now = new Date();
+  const today = localDate(now);
+  const daysAgo = (n: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - n);
+    return localDate(d);
+  };
+  switch (frame) {
+    case 'today':
+      return { from: today, to: today };
+    case 'yesterday':
+      return { from: daysAgo(1), to: daysAgo(1) };
+    case '7d':
+      return { from: daysAgo(6), to: today };
+    case '30d':
+      return { from: daysAgo(29), to: today };
+    case 'month':
+      return { from: `${today.slice(0, 8)}01`, to: today };
+    case 'custom':
+      return { from: customFrom || undefined, to: customTo || undefined };
+    default:
+      return {};
+  }
+};
+
 const VisitorTracking = () => {
   const { effectiveLocationId } = useLocationScope();
 
@@ -50,9 +120,13 @@ const VisitorTracking = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [visitorTab, setVisitorTab] = useState<VisitorTab>('all');
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [identifiedOnly, setIdentifiedOnly] = useState(false);
+  const [deviceType, setDeviceType] = useState<DeviceFilter>('');
+  const [activity, setActivity] = useState<ActivityFilter>('');
+  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<VisitorSessionDetail | null>(null);
@@ -69,18 +143,56 @@ const VisitorTracking = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateFrom, dateTo, identifiedOnly, effectiveLocationId]);
+  }, [debouncedSearch, visitorTab, timeFrame, dateFrom, dateTo, deviceType, activity, effectiveLocationId]);
 
-  const filters = useMemo(
-    () => ({
+  const filters = useMemo(() => {
+    const range = dateRangeFor(timeFrame, dateFrom, dateTo);
+    return {
       location_id: effectiveLocationId ?? undefined,
-      date_from: dateFrom || undefined,
-      date_to: dateTo || undefined,
-      identified_only: identifiedOnly || undefined,
+      date_from: range.from,
+      date_to: range.to,
+      identified: visitorTab === 'all' ? undefined : visitorTab,
+      device_type: deviceType || undefined,
+      activity: activity || undefined,
       search: debouncedSearch || undefined,
-    }),
-    [effectiveLocationId, dateFrom, dateTo, identifiedOnly, debouncedSearch],
-  );
+    };
+  }, [effectiveLocationId, visitorTab, timeFrame, dateFrom, dateTo, deviceType, activity, debouncedSearch]);
+
+  const activeFilterCount = (timeFrame !== 'all' ? 1 : 0) + (deviceType ? 1 : 0) + (activity ? 1 : 0);
+
+  const filterChips = useMemo(() => {
+    const chips: { key: string; label: string; onClear: () => void }[] = [];
+    if (timeFrame !== 'all') {
+      const range = dateRangeFor(timeFrame, dateFrom, dateTo);
+      const label = timeFrame === 'custom'
+        ? `Dates: ${range.from || '…'} → ${range.to || '…'}`
+        : TIME_FRAMES.find(t => t.value === timeFrame)?.label || '';
+      chips.push({ key: 'time', label, onClear: () => { setTimeFrame('all'); setDateFrom(''); setDateTo(''); } });
+    }
+    if (deviceType) {
+      chips.push({
+        key: 'device',
+        label: `Device: ${DEVICE_OPTIONS.find(d => d.value === deviceType)?.label}`,
+        onClear: () => setDeviceType(''),
+      });
+    }
+    if (activity) {
+      chips.push({
+        key: 'activity',
+        label: ACTIVITY_OPTIONS.find(a => a.value === activity)?.label || '',
+        onClear: () => setActivity(''),
+      });
+    }
+    return chips;
+  }, [timeFrame, dateFrom, dateTo, deviceType, activity]);
+
+  const clearFilters = () => {
+    setTimeFrame('all');
+    setDateFrom('');
+    setDateTo('');
+    setDeviceType('');
+    setActivity('');
+  };
 
   useEffect(() => {
     const seq = ++requestSeq.current;
@@ -237,43 +349,138 @@ const VisitorTracking = () => {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="p-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search by name, phone or email…"
-              className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={event => setDateFrom(event.target.value)}
-              className="border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700"
-              aria-label="From date"
-            />
-            <span className="text-xs text-gray-400">to</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={event => setDateTo(event.target.value)}
-              className="border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700"
-              aria-label="To date"
-            />
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700 whitespace-nowrap pl-1">
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="flex flex-wrap gap-1.5">
+              {VISITOR_TABS.map(tab => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setVisitorTab(tab.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                    visitorTab === tab.value
+                      ? 'border-blue-800 text-blue-800 bg-blue-50'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="relative flex-1 min-w-[220px] lg:ml-auto lg:max-w-xs">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                type="checkbox"
-                checked={identifiedOnly}
-                onChange={event => setIdentifiedOnly(event.target.checked)}
-                className="rounded border-gray-300 text-blue-700 focus:ring-blue-600"
+                type="text"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                placeholder="Search by name, phone or email…"
+                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
               />
-              Known customers only
-            </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={timeFrame}
+                onChange={event => setTimeFrame(event.target.value as TimeFrame)}
+                className="border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                aria-label="Time frame"
+              >
+                {TIME_FRAMES.map(frame => (
+                  <option key={frame.value} value={frame.value}>{frame.label}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowFilters(open => !open)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                  showFilters || activeFilterCount > 0
+                    ? 'border-blue-800 text-blue-800 bg-blue-50'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Filter size={14} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-blue-800 text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+
+          {showFilters && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Device</label>
+                  <select
+                    value={deviceType}
+                    onChange={event => setDeviceType(event.target.value as DeviceFilter)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    {DEVICE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Activity</label>
+                  <select
+                    value={activity}
+                    onChange={event => setActivity(event.target.value as ActivityFilter)}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    {ACTIVITY_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {timeFrame === 'custom' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">Custom dates</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={event => setDateFrom(event.target.value)}
+                        className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-700"
+                        aria-label="From date"
+                      />
+                      <span className="text-xs text-gray-400">to</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={event => setDateTo(event.target.value)}
+                        className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-700"
+                        aria-label="To date"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {filterChips.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+              {filterChips.map(chip => (
+                <span
+                  key={chip.key}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                >
+                  {chip.label}
+                  <button type="button" onClick={chip.onClear} className="hover:text-blue-900 ml-0.5" aria-label={`Clear ${chip.label}`}>
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              {filterChips.length > 1 && (
+                <button type="button" onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 ml-1">
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">

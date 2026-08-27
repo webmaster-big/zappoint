@@ -41,7 +41,9 @@ export interface VisitorSessionFilters {
   location_id?: number;
   date_from?: string;
   date_to?: string;
-  identified_only?: boolean;
+  identified?: 'known' | 'anonymous';
+  device_type?: 'desktop' | 'mobile' | 'tablet';
+  activity?: 'purchased' | 'clicked' | 'multi_page' | 'reached_checkout';
   search?: string;
   page?: number;
   per_page?: number;
