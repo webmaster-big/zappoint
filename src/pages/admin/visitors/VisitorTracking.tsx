@@ -70,25 +70,20 @@ const VisitorTracking = () => {
 
   const loadSessions = useCallback(async () => {
     const seq = ++loadSeq.current;
-    setLoading(true);
+    const filters = { location_id: effectiveLocationId ?? undefined };
+    const cached = visitorTrackingService.peekAll(filters, MAX_LOADED_SESSIONS);
+    if (cached) {
+      setSessions(cached.sessions.slice(0, MAX_LOADED_SESSIONS));
+      setCapped(Boolean(cached.pagination.capped));
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const all: VisitorSession[] = [];
-      let page = 1;
-      let lastPage = 1;
-      do {
-        const data = await visitorTrackingService.list({
-          location_id: effectiveLocationId ?? undefined,
-          page,
-          per_page: 100,
-        });
-        if (seq !== loadSeq.current) return;
-        all.push(...data.sessions);
-        lastPage = data.pagination.last_page;
-        page += 1;
-      } while (page <= lastPage && all.length < MAX_LOADED_SESSIONS);
-
-      setSessions(all.slice(0, MAX_LOADED_SESSIONS));
-      setCapped(all.length >= MAX_LOADED_SESSIONS && page <= lastPage);
+      const data = await visitorTrackingService.listAll(filters, MAX_LOADED_SESSIONS);
+      if (seq !== loadSeq.current) return;
+      setSessions(data.sessions.slice(0, MAX_LOADED_SESSIONS));
+      setCapped(Boolean(data.pagination.capped));
     } catch {
       if (seq === loadSeq.current) {
         setToast({ message: 'Could not load visitor sessions — you may not have permission.', type: 'error' });

@@ -50,6 +50,8 @@ export interface VisitorSessionFilters {
   search?: string;
   page?: number;
   per_page?: number;
+  all?: boolean | number;
+  limit?: number;
 }
 
 export interface VisitorSessionPage {
@@ -59,6 +61,7 @@ export interface VisitorSessionPage {
     last_page: number;
     per_page: number;
     total: number;
+    capped?: boolean;
   };
 }
 
@@ -113,10 +116,25 @@ const strip = (params: object): Record<string, unknown> => {
   return out;
 };
 
+const ALL_SESSIONS_TTL_MS = 3 * 60 * 1000;
+const allSessionsCache = new Map<string, { at: number; page: VisitorSessionPage }>();
+
 class VisitorTrackingService {
   async list(filters: VisitorSessionFilters = {}): Promise<VisitorSessionPage> {
     const { data } = await api.get('/visitor-sessions', { params: strip(filters) });
     return data.data;
+  }
+
+  peekAll(filters: VisitorSessionFilters = {}, limit = 3000): VisitorSessionPage | null {
+    const hit = allSessionsCache.get(JSON.stringify({ ...strip(filters), limit }));
+    return hit && Date.now() - hit.at < ALL_SESSIONS_TTL_MS ? hit.page : null;
+  }
+
+  async listAll(filters: VisitorSessionFilters = {}, limit = 3000): Promise<VisitorSessionPage> {
+    const { data } = await api.get('/visitor-sessions', { params: { ...strip(filters), all: 1, limit } });
+    const page = data.data as VisitorSessionPage;
+    allSessionsCache.set(JSON.stringify({ ...strip(filters), limit }), { at: Date.now(), page });
+    return page;
   }
 
   async statistics(locationId?: number): Promise<VisitorSessionStats> {

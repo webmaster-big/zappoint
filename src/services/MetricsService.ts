@@ -53,6 +53,7 @@ export interface DashboardBreakdowns {
   waiverBreakdown?: BreakdownItem[];
   waiverStatusBreakdown?: BreakdownItem[];
   waiverAgeBreakdown?: BreakdownItem[];
+  waiverMinorAgeBreakdown?: BreakdownItem[];
 }
 
 export type TimeframeType = 'today' | 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';

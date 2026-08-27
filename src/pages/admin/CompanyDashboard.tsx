@@ -795,7 +795,7 @@ const CompanyDashboard: React.FC = () => {
       accent: 'bg-indigo-100 text-indigo-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.waiverBreakdown ?? [],
-      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers. "Signed" are completed waivers and matches the Waiver Records page for the same day; the total also counts pending ones, which Records only shows if you set its status to All. Open the card for the split by status, by source, adults vs minors covered, and the adult age brackets.',
+      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers. "Signed" are completed waivers and matches the Waiver Records page for the same day; the total also counts pending ones, which Records only shows if you set its status to All. Open the card for the split by status, by source, adults vs minors covered, the adult age brackets, and the minors\' ages as of the waiver date.',
     },
   ];
 
@@ -1211,6 +1211,19 @@ const CompanyDashboard: React.FC = () => {
                       <div className="space-y-1.5 mb-2 pb-2 border-b border-gray-100">
                         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Adult age brackets (signed)</span>
                         {(dashboardBreakdowns.waiverAgeBreakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
+                          <div key={item.label} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 truncate mr-2">{item.label}</span>
+                            <span className="text-gray-800 font-medium shrink-0">
+                              {item.count} <span className="text-gray-400">({item.percentage}%)</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {card.key === 'waivers' && Array.isArray(dashboardBreakdowns.waiverMinorAgeBreakdown) && dashboardBreakdowns.waiverMinorAgeBreakdown.length > 0 && (
+                      <div className="space-y-1.5 mb-2 pb-2 border-b border-gray-100">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Minor age brackets (at signing)</span>
+                        {(dashboardBreakdowns.waiverMinorAgeBreakdown as Array<{label:string;count:number;percentage:number}>).map((item) => (
                           <div key={item.label} className="flex items-center justify-between text-xs">
                             <span className="text-gray-600 truncate mr-2">{item.label}</span>
                             <span className="text-gray-800 font-medium shrink-0">
