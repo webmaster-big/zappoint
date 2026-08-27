@@ -65,6 +65,7 @@ const VisitorTracking = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const loadSeq = useRef(0);
   const detailSeq = useRef(0);
+  const defaultApplied = useRef(false);
 
   const loadSessions = useCallback(async () => {
     const seq = ++loadSeq.current;
@@ -311,6 +312,13 @@ const VisitorTracking = () => {
     defaultSort: (a, b) => (b.last_seen || b.session_date).localeCompare(a.last_seen || a.session_date),
     itemsPerPage: 10,
   });
+
+  useEffect(() => {
+    if (defaultApplied.current) return;
+    defaultApplied.current = true;
+    table.setFilterValue('identity', 'known');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openDetail = useCallback((session: VisitorSession) => {
     const seq = ++detailSeq.current;
