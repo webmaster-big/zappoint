@@ -53,6 +53,16 @@ export const getSessionId = (): string => {
   }
 };
 
+export const isTrackingSilencedHost = (): boolean => {
+  try {
+    if (typeof window === 'undefined') return true;
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  } catch {
+    return false;
+  }
+};
+
 export const isAnalyticsDnt = (): boolean => {
   try {
     return typeof window !== 'undefined' && localStorage.getItem(DNT_KEY) === '1';

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from './storage';
-import { getSessionId, getVisitorId, isAnalyticsDnt } from './analyticsHeaders';
+import { getSessionId, getVisitorId, isAnalyticsDnt, isTrackingSilencedHost } from './analyticsHeaders';
 
 export type AnalyticsEntityType =
   | 'package'
@@ -64,7 +64,7 @@ const readUtmFromQuery = (): Partial<TrackPayload> => {
 };
 
 export async function trackPageView(p: TrackPayload = {}): Promise<void> {
-  if (isAnalyticsDnt() || typeof window === 'undefined') return;
+  if (isAnalyticsDnt() || isTrackingSilencedHost() || typeof window === 'undefined') return;
   armedPath = window.location.pathname;
   const utm = readUtmFromQuery();
   const body = {
@@ -167,7 +167,7 @@ const flushClicks = (): void => {
 
 const recordClick = (event: MouseEvent): void => {
   try {
-    if (isAnalyticsDnt() || typeof window === 'undefined') return;
+    if (isAnalyticsDnt() || isTrackingSilencedHost() || typeof window === 'undefined') return;
     if (!armedPath || armedPath !== window.location.pathname) return;
 
     const target = event.target instanceof Element
@@ -215,7 +215,7 @@ const recordClick = (event: MouseEvent): void => {
 };
 
 export function sendAnalyticsBatch(events: TrackPayload[]): void {
-  if (!events?.length || isAnalyticsDnt() || typeof navigator === 'undefined') return;
+  if (!events?.length || isAnalyticsDnt() || isTrackingSilencedHost() || typeof navigator === 'undefined') return;
   try {
     const blob = new Blob([JSON.stringify({ events })], { type: 'application/json' });
     if (!navigator.sendBeacon || !navigator.sendBeacon(BATCH_URL, blob)) {

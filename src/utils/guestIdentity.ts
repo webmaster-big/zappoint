@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from './storage';
-import { getVisitorId, isAnalyticsDnt } from './analyticsHeaders';
+import { getVisitorId, isAnalyticsDnt, isTrackingSilencedHost } from './analyticsHeaders';
 
 const GUEST_KEY = 'zapzone_guest';
 const IDENTIFIED_FLAG_KEY = 'zapzone_guest_identified';
@@ -55,7 +55,7 @@ const identityFingerprint = (identity: GuestIdentity): string =>
   `${getVisitorId()}|${identity.name.trim().toLowerCase()}|${identity.phone.replace(/\D/g, '')}`;
 
 const sendIdentity = (identity: GuestIdentity, locationId?: number | null): void => {
-  if (isAnalyticsDnt()) return;
+  if (isAnalyticsDnt() || isTrackingSilencedHost()) return;
   const fingerprint = identityFingerprint(identity);
   void api
     .post('/analytics/identify', {
