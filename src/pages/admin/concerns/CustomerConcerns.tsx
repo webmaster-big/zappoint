@@ -21,6 +21,7 @@ import checkoutConcernService, {
 import {
   AdminDataTable,
   AdminTableToolbar,
+  TimeFrameSelect,
   useAdminTable,
   exportTableCsv,
 } from '../../../components/admin/table';
@@ -365,6 +366,7 @@ const CustomerConcerns = () => {
           loadConcerns();
           loadStats();
         }}
+        actions={<TimeFrameSelect table={table} filterKey="created" />}
       />
 
       <AdminDataTable

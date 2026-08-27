@@ -22,6 +22,7 @@ import visitorTrackingService, {
 import {
   AdminDataTable,
   AdminTableToolbar,
+  TimeFrameSelect,
   useAdminTable,
   toCsv,
   downloadCsv,
@@ -463,6 +464,7 @@ const VisitorTracking = () => {
           loadSessions();
           loadStats();
         }}
+        actions={<TimeFrameSelect table={table} filterKey="session_date" />}
       />
 
       {capped && (
