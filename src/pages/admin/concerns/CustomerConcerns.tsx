@@ -2,29 +2,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarX2,
   CheckCircle2,
+  Download,
   Inbox,
   Mail,
   Phone,
   PhoneCall,
-  Search,
   ShoppingCart,
+  Undo2,
 } from 'lucide-react';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import checkoutConcernService, {
   type CheckoutConcern,
   type CheckoutConcernStats,
   type ConcernKind,
   type ConcernStatus,
 } from '../../../services/CheckoutConcernService';
-import Pagination from '../../../components/ui/Pagination';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  useAdminTable,
+  exportTableCsv,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import StandardButton from '../../../components/ui/StandardButton';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 import Toast from '../../../components/ui/Toast';
 
-const KIND_TABS: { value: 'all' | ConcernKind; label: string }[] = [
-  { value: 'all', label: 'Everything' },
-  { value: 'schedule_help', label: 'Schedule help' },
-  { value: 'call_to_book', label: 'Call to book' },
-  { value: 'abandoned_checkout', label: 'Left unfinished' },
-];
+const MAX_LOADED_CONCERNS = 3000;
 
 const KIND_BADGES: Record<ConcernKind, { label: string; className: string }> = {
   schedule_help: { label: 'Schedule help', className: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -32,17 +37,16 @@ const KIND_BADGES: Record<ConcernKind, { label: string; className: string }> = {
   abandoned_checkout: { label: 'Left unfinished', className: 'bg-purple-50 text-purple-700 border-purple-200' },
 };
 
-const STATUS_TABS: { value: 'all' | ConcernStatus; label: string }[] = [
-  { value: 'new', label: 'Needs a call' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'resolved', label: 'Resolved' },
-  { value: 'all', label: 'All' },
-];
-
 const STATUS_STYLES: Record<ConcernStatus, string> = {
   new: 'bg-amber-50 text-amber-700 border-amber-200',
   contacted: 'bg-blue-50 text-blue-700 border-blue-200',
   resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
+
+const STATUS_LABELS: Record<ConcernStatus, string> = {
+  new: 'Needs a call',
+  contacted: 'Contacted',
+  resolved: 'Resolved',
 };
 
 const formatWhen = (concern: CheckoutConcern): string => {
@@ -63,84 +67,67 @@ const formatWhen = (concern: CheckoutConcern): string => {
 
 const CustomerConcerns = () => {
   const { effectiveLocationId } = useLocationScope();
+  const { themeColor } = useThemeColor();
 
   const [concerns, setConcerns] = useState<CheckoutConcern[]>([]);
   const [stats, setStats] = useState<CheckoutConcernStats | null>(null);
-  const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, per_page: 20, total: 0 });
-  const [page, setPage] = useState(1);
-  const [kind, setKind] = useState<'all' | ConcernKind>('all');
-  const [status, setStatus] = useState<'all' | ConcernStatus>('new');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
-  const requestSeq = useRef(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const loadSeq = useRef(0);
+  const defaultApplied = useRef(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => setPage(1), [kind, status, debouncedSearch, effectiveLocationId]);
-
-  const load = useCallback(async () => {
-    const seq = ++requestSeq.current;
+  const loadConcerns = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    setLoading(true);
     try {
-      setLoading(true);
-      const result = await checkoutConcernService.list({
-        page,
-        per_page: 20,
-        location_id: effectiveLocationId ?? undefined,
-        kind: kind === 'all' ? undefined : kind,
-        status: status === 'all' ? undefined : status,
-        search: debouncedSearch || undefined,
-      });
-      if (seq !== requestSeq.current) return;
-      setConcerns(result.concerns);
-      setPagination(result.pagination);
+      const all: CheckoutConcern[] = [];
+      let page = 1;
+      let lastPage = 1;
+      do {
+        const result = await checkoutConcernService.list({
+          location_id: effectiveLocationId ?? undefined,
+          page,
+          per_page: 100,
+        });
+        if (seq !== loadSeq.current) return;
+        all.push(...result.concerns);
+        lastPage = result.pagination.last_page;
+        page += 1;
+      } while (page <= lastPage && all.length < MAX_LOADED_CONCERNS);
+
+      setConcerns(all.slice(0, MAX_LOADED_CONCERNS));
     } catch {
-      if (seq !== requestSeq.current) return;
-      setToast({ message: 'Could not load customer concerns — you may not have permission.', type: 'error' });
+      if (seq === loadSeq.current) {
+        setToast({ message: 'Could not load customer concerns — you may not have permission.', type: 'error' });
+      }
     } finally {
-      if (seq === requestSeq.current) setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
-  }, [page, effectiveLocationId, kind, status, debouncedSearch, refreshTick]);
+  }, [effectiveLocationId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
+  const loadStats = useCallback(() => {
     checkoutConcernService
       .statistics(effectiveLocationId ?? undefined)
-      .then(result => {
-        if (!cancelled) setStats(result);
-      })
-      .catch(() => {
-        if (!cancelled) setStats(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveLocationId, refreshTick]);
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, [effectiveLocationId]);
+
+  useEffect(() => {
+    loadConcerns();
+    loadStats();
+  }, [loadConcerns, loadStats]);
 
   const setConcernStatus = async (concern: CheckoutConcern, next: ConcernStatus) => {
     try {
       setSavingId(concern.id);
       const updated = await checkoutConcernService.updateStatus(concern.id, next);
-      setConcerns(prev =>
-        status === 'all' || status === next
-          ? prev.map(row => (row.id === updated.id ? updated : row))
-          : prev.filter(row => row.id !== updated.id),
-      );
+      setConcerns(prev => prev.map(row => (row.id === updated.id ? updated : row)));
       setToast({
         message: next === 'resolved' ? 'Marked resolved.' : next === 'contacted' ? 'Marked as contacted.' : 'Reopened.',
         type: 'success',
       });
-      setRefreshTick(tick => tick + 1);
+      loadStats();
     } catch {
       setToast({ message: 'That did not save. Please try again.', type: 'error' });
     } finally {
@@ -148,229 +135,293 @@ const CustomerConcerns = () => {
     }
   };
 
-  const summary = useMemo(
+  const columns: AdminColumn<CheckoutConcern>[] = useMemo(
     () => [
-      { label: 'Waiting on a call', value: stats?.open ?? 0, icon: PhoneCall, tone: 'text-amber-600' },
-      { label: 'Schedule help', value: stats?.schedule_help ?? 0, icon: CalendarX2, tone: 'text-blue-700' },
-      { label: 'Call to book', value: stats?.call_to_book ?? 0, icon: Phone, tone: 'text-teal-700' },
-      { label: 'Left unfinished', value: stats?.abandoned_checkout ?? 0, icon: ShoppingCart, tone: 'text-purple-700' },
-      { label: 'Today', value: stats?.today ?? 0, icon: Inbox, tone: 'text-emerald-600' },
+      {
+        key: 'guest',
+        label: 'Guest',
+        sortable: true,
+        sortValue: c => (c.name || '').toLowerCase(),
+        exportValue: c => c.name,
+        render: c => (
+          <div>
+            <div className="font-semibold text-gray-900">{c.name}</div>
+            {c.location?.name && <div className="text-xs text-gray-400 mt-0.5">{c.location.name}</div>}
+          </div>
+        ),
+      },
+      {
+        key: 'contact',
+        label: 'Reach them on',
+        sortValue: c => c.phone || '',
+        exportValue: c => [c.phone, c.email].filter(Boolean).join(' / '),
+        cellClassName: 'whitespace-nowrap',
+        render: c => (
+          <div className="space-y-0.5">
+            {c.phone && (
+              <a
+                href={`tel:${c.phone}`}
+                className={`text-sm font-medium text-${themeColor}-700 hover:underline inline-flex items-center gap-1`}
+              >
+                <Phone size={12} />
+                {c.phone}
+              </a>
+            )}
+            {c.email && (
+              <a
+                href={`mailto:${c.email}`}
+                className="text-xs text-gray-500 hover:underline flex items-center gap-1"
+              >
+                <Mail size={11} />
+                {c.email}
+              </a>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'wanted',
+        label: 'What they wanted',
+        sortValue: c => c.entity_name || '',
+        exportValue: c => formatWhen(c),
+        render: c => (
+          <div>
+            <p className="text-sm text-gray-800">{formatWhen(c)}</p>
+            {c.context?.step_label && <p className="text-xs text-gray-400 mt-0.5">Reached: {c.context.step_label}</p>}
+          </div>
+        ),
+      },
+      {
+        key: 'why',
+        label: 'Why',
+        sortable: true,
+        sortValue: c => c.kind,
+        exportValue: c => {
+          const badge = KIND_BADGES[c.kind] ?? KIND_BADGES.schedule_help;
+          return c.message ? `${badge.label}: ${c.message}` : badge.label;
+        },
+        render: c => {
+          const badge = KIND_BADGES[c.kind] ?? KIND_BADGES.schedule_help;
+          return (
+            <div className="max-w-xs">
+              <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${badge.className}`}>
+                {c.kind === 'schedule_help' ? <CalendarX2 size={11} /> : c.kind === 'call_to_book' ? <Phone size={11} /> : <ShoppingCart size={11} />}
+                {badge.label}
+              </span>
+              {c.message && <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">“{c.message}”</p>}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        sortable: true,
+        sortValue: c => c.status,
+        exportValue: c => STATUS_LABELS[c.status] ?? c.status,
+        render: c => (
+          <div>
+            <span className={`inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_STYLES[c.status] ?? STATUS_STYLES.new}`}>
+              {STATUS_LABELS[c.status] ?? c.status}
+            </span>
+            {c.handler && (
+              <p className="text-xs text-gray-400 mt-1">
+                by {c.handler.first_name} {c.handler.last_name}
+              </p>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'when',
+        label: 'When',
+        sortable: true,
+        sortValue: c => c.created_at,
+        exportValue: c => new Date(c.created_at).toLocaleString(),
+        cellClassName: 'whitespace-nowrap',
+        render: c => <span className="text-sm text-gray-600">{new Date(c.created_at).toLocaleString()}</span>,
+      },
     ],
-    [stats],
+    [themeColor],
   );
 
+  const filterDefs: AdminFilterDef<CheckoutConcern>[] = useMemo(
+    () => [
+      {
+        type: 'select',
+        key: 'status',
+        label: 'Status',
+        allLabel: 'All statuses',
+        options: [
+          { value: 'new', label: 'Needs a call' },
+          { value: 'contacted', label: 'Contacted' },
+          { value: 'resolved', label: 'Resolved' },
+        ],
+        predicate: (c, value) => c.status === value,
+      },
+      {
+        type: 'select',
+        key: 'kind',
+        label: 'Kind',
+        allLabel: 'Everything',
+        options: [
+          { value: 'schedule_help', label: 'Schedule help' },
+          { value: 'call_to_book', label: 'Call to book' },
+          { value: 'abandoned_checkout', label: 'Left unfinished' },
+        ],
+        predicate: (c, value) => c.kind === value,
+      },
+      {
+        type: 'daterange',
+        key: 'created',
+        label: 'Received Date',
+        getDate: c => c.created_at,
+      },
+    ],
+    [],
+  );
+
+  const table = useAdminTable<CheckoutConcern>({
+    data: concerns,
+    columns,
+    getRowId: c => String(c.id),
+    storageKey: 'customer_concerns',
+    filterDefs,
+    searchFields: c => [c.name, c.phone, c.email, c.entity_name, c.message, c.location?.name],
+    defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    itemsPerPage: 10,
+  });
+
+  useEffect(() => {
+    if (defaultApplied.current) return;
+    defaultApplied.current = true;
+    table.setFilterValue('status', 'new');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const exportToCSV = () => {
+    if (!table.filteredRows.length) {
+      setToast({ message: 'Nothing to export for these filters.', type: 'error' });
+      return;
+    }
+    exportTableCsv({
+      filename: `customer-concerns-export-${new Date().toISOString().split('T')[0]}.csv`,
+      columns,
+      rows: table.filteredRows,
+    });
+  };
+
+  const metrics = [
+    { title: 'Waiting on a Call', value: stats?.open ?? 0, change: 'Open concerns', icon: PhoneCall, accentColor: 'amber' },
+    { title: 'Schedule Help', value: stats?.schedule_help ?? 0, change: 'Calendar did not work', icon: CalendarX2, accentColor: 'blue' },
+    { title: 'Call to Book', value: stats?.call_to_book ?? 0, change: 'No online schedule', icon: Phone, accentColor: 'teal' },
+    { title: 'Left Unfinished', value: stats?.abandoned_checkout ?? 0, change: 'Closed checkout mid-way', icon: ShoppingCart, accentColor: 'purple' },
+    { title: 'Today', value: stats?.today ?? 0, change: 'Received today', icon: Inbox, accentColor: 'emerald' },
+  ];
+
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customer Concerns</h1>
-        <p className="text-gray-600 mt-1">
-          Guests who asked for help with the schedule, and guests who left checkout with their details
-          filled in. Both are expecting nothing — a call is a pleasant surprise.
-        </p>
+    <div className="px-6 py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customer Concerns</h1>
+          <p className="text-gray-600 mt-1">
+            Guests who asked for schedule help, want to book by phone, or left checkout with their details filled in
+          </p>
+        </div>
+        <div className="flex gap-2 mt-4 sm:mt-0 flex-wrap">
+          <StandardButton variant="secondary" size="md" onClick={exportToCSV} icon={Download}>
+            Export CSV
+          </StandardButton>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {summary.map(card => (
-          <div key={card.label} className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3.5">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <card.icon size={14} className={card.tone} />
-              {card.label}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {metrics.map((metric, index) => {
+          const Icon = metric.icon;
+          return (
+            <div
+              key={index}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+            >
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg bg-${metric.accentColor}-100 text-${metric.accentColor}-600`}>
+                  <Icon size={20} />
+                </div>
+                <span className="text-base font-semibold text-gray-800">{metric.title}</span>
+              </div>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-600">{metric.change}</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">{card.value}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="p-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex flex-wrap gap-1.5">
-            {STATUS_TABS.map(tab => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setStatus(tab.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  status === tab.value ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search by name, phone, email, item or message..."
+        onRefresh={() => {
+          loadConcerns();
+          loadStats();
+        }}
+      />
+
+      <AdminDataTable
+        table={table}
+        loading={loading && concerns.length === 0}
+        itemLabel="concerns"
+        emptyState={
+          <div className="flex flex-col items-center justify-center">
+            <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+              <Inbox className={`h-12 w-12 text-${themeColor}-400`} />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nothing here</h3>
+            <p className="text-gray-500 text-sm">
+              {table.searchInput || table.activeFilterCount > 0
+                ? 'Try adjusting your search or filters'
+                : 'No guest is waiting on a call'}
+            </p>
+          </div>
+        }
+        renderActions={concern => (
+          <div className="flex items-center gap-1">
+            {concern.status !== 'contacted' && concern.status !== 'resolved' && (
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={PhoneCall}
+                disabled={savingId === concern.id}
+                onClick={() => setConcernStatus(concern, 'contacted')}
               >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 lg:ml-2">
-            {KIND_TABS.map(tab => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setKind(tab.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                  kind === tab.value
-                    ? 'border-blue-800 text-blue-800 bg-blue-50'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                }`}
+                Mark contacted
+              </StandardButton>
+            )}
+            {concern.status !== 'resolved' && (
+              <StandardButton
+                variant="primary"
+                size="sm"
+                icon={CheckCircle2}
+                disabled={savingId === concern.id}
+                onClick={() => setConcernStatus(concern, 'resolved')}
               >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative lg:ml-auto lg:w-72">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Name, phone, email or item"
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {['Guest', 'Reach them on', 'What they wanted', 'Why', 'Status', 'When', ''].map(header => (
-                  <th
-                    key={header}
-                    className="px-4 py-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800 mx-auto" />
-                  </td>
-                </tr>
-              ) : concerns.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
-                    <Inbox className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">Nothing here — no guest is waiting on a call.</p>
-                  </td>
-                </tr>
-              ) : (
-                concerns.map(concern => (
-                  <tr key={concern.id} className="hover:bg-gray-50 transition-colors align-top">
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-semibold text-gray-900">{concern.name}</p>
-                      {concern.location?.name && (
-                        <p className="text-xs text-gray-400 mt-0.5">{concern.location.name}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <a
-                        href={`tel:${concern.phone}`}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-800 hover:underline"
-                      >
-                        <PhoneCall size={13} />
-                        {concern.phone}
-                      </a>
-                      {concern.email && (
-                        <a
-                          href={`mailto:${concern.email}`}
-                          className="mt-1 flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          <Mail size={12} />
-                          {concern.email}
-                        </a>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-gray-700">{formatWhen(concern)}</p>
-                      {concern.context?.step_label && (
-                        <p className="text-xs text-gray-400 mt-0.5">Reached: {concern.context.step_label}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 max-w-xs">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                          (KIND_BADGES[concern.kind] ?? KIND_BADGES.schedule_help).className
-                        }`}
-                      >
-                        {concern.kind === 'schedule_help' ? <CalendarX2 size={11} /> : concern.kind === 'call_to_book' ? <Phone size={11} /> : <ShoppingCart size={11} />}
-                        {(KIND_BADGES[concern.kind] ?? KIND_BADGES.schedule_help).label}
-                      </span>
-                      {concern.message && (
-                        <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">“{concern.message}”</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[concern.status]}`}
-                      >
-                        {concern.status === 'new' ? 'Needs a call' : concern.status}
-                      </span>
-                      {concern.handler && (
-                        <p className="text-[11px] text-gray-400 mt-1">
-                          by {concern.handler.first_name} {concern.handler.last_name}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                      {new Date(concern.created_at).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex flex-col gap-1.5">
-                        {concern.status !== 'contacted' && (
-                          <button
-                            type="button"
-                            disabled={savingId === concern.id}
-                            onClick={() => setConcernStatus(concern, 'contacted')}
-                            className="text-xs font-semibold text-blue-800 hover:underline disabled:opacity-50 text-left"
-                          >
-                            Mark contacted
-                          </button>
-                        )}
-                        {concern.status !== 'resolved' && (
-                          <button
-                            type="button"
-                            disabled={savingId === concern.id}
-                            onClick={() => setConcernStatus(concern, 'resolved')}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50"
-                          >
-                            <CheckCircle2 size={12} />
-                            Resolve
-                          </button>
-                        )}
-                        {concern.status !== 'new' && (
-                          <button
-                            type="button"
-                            disabled={savingId === concern.id}
-                            onClick={() => setConcernStatus(concern, 'new')}
-                            className="text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50 text-left"
-                          >
-                            Reopen
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {pagination.last_page > 1 && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <Pagination
-              currentPage={pagination.current_page}
-              totalPages={pagination.last_page}
-              onPageChange={setPage}
-              totalItems={pagination.total}
-              itemsPerPage={pagination.per_page}
-              itemLabel="concerns"
-            />
+                Resolve
+              </StandardButton>
+            )}
+            {concern.status === 'resolved' && (
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={Undo2}
+                disabled={savingId === concern.id}
+                onClick={() => setConcernStatus(concern, 'new')}
+              >
+                Reopen
+              </StandardButton>
+            )}
           </div>
         )}
-      </div>
+      />
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

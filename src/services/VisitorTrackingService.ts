@@ -16,6 +16,9 @@ export interface VisitorSession {
   visitor_id: string;
   session_date: string;
   date_label: string;
+  first_seen: string;
+  last_seen: string;
+  reached_checkout: boolean;
   guest_name: string | null;
   guest_phone: string | null;
   guest_email: string | null;

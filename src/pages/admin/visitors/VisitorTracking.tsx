@@ -4,27 +4,34 @@ import {
   CalendarDays,
   Download,
   Eye,
-  Filter,
   Footprints,
-  Inbox,
   Mail,
   MousePointerClick,
   Phone,
-  RefreshCw,
-  Search,
   ShoppingCart,
   UserCheck,
   X,
 } from 'lucide-react';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import visitorTrackingService, {
   type VisitorSession,
   type VisitorSessionDetail,
   type VisitorSessionStats,
 } from '../../../services/VisitorTrackingService';
-import Pagination from '../../../components/ui/Pagination';
+import {
+  AdminDataTable,
+  AdminTableToolbar,
+  useAdminTable,
+  toCsv,
+  downloadCsv,
+} from '../../../components/admin/table';
+import type { AdminColumn, AdminFilterDef, DateRangeValue } from '../../../components/admin/table';
+import StandardButton from '../../../components/ui/StandardButton';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 import Toast from '../../../components/ui/Toast';
-import { toCsv, downloadCsv } from '../../../components/admin/table';
+
+const MAX_LOADED_SESSIONS = 3000;
 
 const formatDuration = (ms: number): string => {
   const totalSeconds = Math.round(ms / 1000);
@@ -42,189 +49,268 @@ const pageLabel = (title: string | null, path: string | null): string => {
   return '—';
 };
 
-type VisitorTab = 'all' | 'known' | 'anonymous';
-type TimeFrame = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'custom';
-type DeviceFilter = '' | 'desktop' | 'mobile' | 'tablet';
-type ActivityFilter = '' | 'purchased' | 'clicked' | 'multi_page' | 'reached_checkout';
-
-const VISITOR_TABS: { value: VisitorTab; label: string }[] = [
-  { value: 'all', label: 'All visitors' },
-  { value: 'known', label: 'Known customers' },
-  { value: 'anonymous', label: 'Anonymous' },
-];
-
-const TIME_FRAMES: { value: TimeFrame; label: string }[] = [
-  { value: 'all', label: 'All time' },
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: 'month', label: 'This month' },
-  { value: 'custom', label: 'Custom range' },
-];
-
-const DEVICE_OPTIONS: { value: DeviceFilter; label: string }[] = [
-  { value: '', label: 'All devices' },
-  { value: 'mobile', label: 'Mobile' },
-  { value: 'desktop', label: 'Desktop' },
-  { value: 'tablet', label: 'Tablet' },
-];
-
-const ACTIVITY_OPTIONS: { value: ActivityFilter; label: string }[] = [
-  { value: '', label: 'Any activity' },
-  { value: 'purchased', label: 'Made a purchase' },
-  { value: 'reached_checkout', label: 'Reached a checkout page' },
-  { value: 'clicked', label: 'Clicked something' },
-  { value: 'multi_page', label: 'Viewed 2+ pages' },
-];
-
-const localDate = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-
-const dateRangeFor = (frame: TimeFrame, customFrom: string, customTo: string): { from?: string; to?: string } => {
-  const now = new Date();
-  const today = localDate(now);
-  const daysAgo = (n: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - n);
-    return localDate(d);
-  };
-  switch (frame) {
-    case 'today':
-      return { from: today, to: today };
-    case 'yesterday':
-      return { from: daysAgo(1), to: daysAgo(1) };
-    case '7d':
-      return { from: daysAgo(6), to: today };
-    case '30d':
-      return { from: daysAgo(29), to: today };
-    case 'month':
-      return { from: `${today.slice(0, 8)}01`, to: today };
-    case 'custom':
-      return { from: customFrom || undefined, to: customTo || undefined };
-    default:
-      return {};
-  }
-};
+const isKnown = (session: VisitorSession): boolean => Boolean(session.guest_phone || session.guest_name);
 
 const VisitorTracking = () => {
   const { effectiveLocationId } = useLocationScope();
+  const { themeColor, fullColor } = useThemeColor();
 
   const [sessions, setSessions] = useState<VisitorSession[]>([]);
   const [stats, setStats] = useState<VisitorSessionStats | null>(null);
-  const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, per_page: 20, total: 0 });
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [visitorTab, setVisitorTab] = useState<VisitorTab>('all');
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [deviceType, setDeviceType] = useState<DeviceFilter>('');
-  const [activity, setActivity] = useState<ActivityFilter>('');
-  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [capped, setCapped] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<VisitorSessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const requestSeq = useRef(0);
+  const loadSeq = useRef(0);
   const detailSeq = useRef(0);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, visitorTab, timeFrame, dateFrom, dateTo, deviceType, activity, effectiveLocationId]);
-
-  const filters = useMemo(() => {
-    const range = dateRangeFor(timeFrame, dateFrom, dateTo);
-    return {
-      location_id: effectiveLocationId ?? undefined,
-      date_from: range.from,
-      date_to: range.to,
-      identified: visitorTab === 'all' ? undefined : visitorTab,
-      device_type: deviceType || undefined,
-      activity: activity || undefined,
-      search: debouncedSearch || undefined,
-    };
-  }, [effectiveLocationId, visitorTab, timeFrame, dateFrom, dateTo, deviceType, activity, debouncedSearch]);
-
-  const activeFilterCount = (timeFrame !== 'all' ? 1 : 0) + (deviceType ? 1 : 0) + (activity ? 1 : 0);
-
-  const filterChips = useMemo(() => {
-    const chips: { key: string; label: string; onClear: () => void }[] = [];
-    if (timeFrame !== 'all') {
-      const range = dateRangeFor(timeFrame, dateFrom, dateTo);
-      const label = timeFrame === 'custom'
-        ? `Dates: ${range.from || '…'} → ${range.to || '…'}`
-        : TIME_FRAMES.find(t => t.value === timeFrame)?.label || '';
-      chips.push({ key: 'time', label, onClear: () => { setTimeFrame('all'); setDateFrom(''); setDateTo(''); } });
-    }
-    if (deviceType) {
-      chips.push({
-        key: 'device',
-        label: `Device: ${DEVICE_OPTIONS.find(d => d.value === deviceType)?.label}`,
-        onClear: () => setDeviceType(''),
-      });
-    }
-    if (activity) {
-      chips.push({
-        key: 'activity',
-        label: ACTIVITY_OPTIONS.find(a => a.value === activity)?.label || '',
-        onClear: () => setActivity(''),
-      });
-    }
-    return chips;
-  }, [timeFrame, dateFrom, dateTo, deviceType, activity]);
-
-  const clearFilters = () => {
-    setTimeFrame('all');
-    setDateFrom('');
-    setDateTo('');
-    setDeviceType('');
-    setActivity('');
-  };
-
-  useEffect(() => {
-    const seq = ++requestSeq.current;
+  const loadSessions = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
-    visitorTrackingService
-      .list({ ...filters, page, per_page: 20 })
-      .then(data => {
-        if (seq !== requestSeq.current) return;
-        setSessions(data.sessions);
-        setPagination(data.pagination);
-      })
-      .catch(() => {
-        if (seq !== requestSeq.current) return;
-        setToast({ message: 'Could not load visitor sessions — you may not have permission.', type: 'error' });
-      })
-      .finally(() => {
-        if (seq === requestSeq.current) setLoading(false);
-      });
-  }, [filters, page, refreshTick]);
+    try {
+      const all: VisitorSession[] = [];
+      let page = 1;
+      let lastPage = 1;
+      do {
+        const data = await visitorTrackingService.list({
+          location_id: effectiveLocationId ?? undefined,
+          page,
+          per_page: 100,
+        });
+        if (seq !== loadSeq.current) return;
+        all.push(...data.sessions);
+        lastPage = data.pagination.last_page;
+        page += 1;
+      } while (page <= lastPage && all.length < MAX_LOADED_SESSIONS);
 
-  useEffect(() => {
-    let cancelled = false;
+      setSessions(all.slice(0, MAX_LOADED_SESSIONS));
+      setCapped(all.length >= MAX_LOADED_SESSIONS && page <= lastPage);
+    } catch {
+      if (seq === loadSeq.current) {
+        setToast({ message: 'Could not load visitor sessions — you may not have permission.', type: 'error' });
+      }
+    } finally {
+      if (seq === loadSeq.current) setLoading(false);
+    }
+  }, [effectiveLocationId]);
+
+  const loadStats = useCallback(() => {
     visitorTrackingService
       .statistics(effectiveLocationId ?? undefined)
-      .then(data => {
-        if (!cancelled) setStats(data);
-      })
+      .then(setStats)
       .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveLocationId, refreshTick]);
+  }, [effectiveLocationId]);
+
+  useEffect(() => {
+    loadSessions();
+    loadStats();
+  }, [loadSessions, loadStats]);
+
+  const columns: AdminColumn<VisitorSession>[] = useMemo(
+    () => [
+      {
+        key: 'customer',
+        label: 'Customer',
+        sortable: true,
+        sortValue: s => (s.guest_name || 'zzzz-anonymous').toLowerCase(),
+        exportValue: s => s.guest_name || 'Anonymous',
+        render: s => (
+          <div>
+            <div className="font-semibold text-gray-900">
+              {s.guest_name || <span className="text-gray-400 font-normal">Anonymous</span>}
+            </div>
+            {s.guest_email && (
+              <a
+                href={`mailto:${s.guest_email}`}
+                className={`text-xs text-${themeColor}-700 hover:underline inline-flex items-center gap-1 mt-0.5`}
+              >
+                <Mail size={11} />
+                {s.guest_email}
+              </a>
+            )}
+            <div className="text-[11px] text-gray-400 mt-0.5 capitalize">
+              {[s.device_type, s.browser].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        sortable: true,
+        sortValue: s => s.guest_phone || '',
+        exportValue: s => s.guest_phone,
+        cellClassName: 'whitespace-nowrap',
+        render: s =>
+          s.guest_phone ? (
+            <a
+              href={`tel:${s.guest_phone}`}
+              className={`text-sm font-medium text-${themeColor}-700 hover:underline inline-flex items-center gap-1`}
+            >
+              <Phone size={12} />
+              {s.guest_phone}
+            </a>
+          ) : (
+            <span className="text-sm text-gray-400">—</span>
+          ),
+      },
+      {
+        key: 'session',
+        label: 'Session',
+        sortable: true,
+        sortValue: s => s.page_views,
+        exportValue: s =>
+          `${s.entry_page || ''}${s.exit_page && s.exit_page !== s.entry_page ? ` -> ${s.exit_page}` : ''}`,
+        render: s => (
+          <div>
+            <div className="text-sm text-gray-800">
+              {pageLabel(s.entry_title, s.entry_page)}
+              {s.exit_page && s.exit_page !== s.entry_page && (
+                <span className="text-gray-400"> → {pageLabel(s.exit_title, s.exit_page)}</span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {s.page_views} page{s.page_views === 1 ? '' : 's'} · {s.clicks} click{s.clicks === 1 ? '' : 's'}
+              {s.conversions > 0 && ` · ${s.conversions} purchase${s.conversions === 1 ? '' : 's'}`}
+              {' · '}
+              {formatDuration(s.duration_ms)}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'pages',
+        label: 'Pages',
+        group: 'Details',
+        sortable: true,
+        sortValue: s => s.page_views,
+        exportValue: s => s.page_views,
+        defaultVisible: false,
+        render: s => <span className="text-sm text-gray-800">{s.page_views}</span>,
+      },
+      {
+        key: 'clicks',
+        label: 'Clicks',
+        group: 'Details',
+        sortable: true,
+        sortValue: s => s.clicks,
+        exportValue: s => s.clicks,
+        defaultVisible: false,
+        render: s => <span className="text-sm text-gray-800">{s.clicks}</span>,
+      },
+      {
+        key: 'purchases',
+        label: 'Purchases',
+        group: 'Details',
+        sortable: true,
+        sortValue: s => s.conversions,
+        exportValue: s => s.conversions,
+        defaultVisible: false,
+        render: s => <span className="text-sm text-gray-800">{s.conversions}</span>,
+      },
+      {
+        key: 'duration',
+        label: 'Time on site',
+        group: 'Details',
+        sortable: true,
+        sortValue: s => s.duration_ms,
+        exportValue: s => formatDuration(s.duration_ms),
+        defaultVisible: false,
+        render: s => <span className="text-sm text-gray-800">{formatDuration(s.duration_ms)}</span>,
+      },
+      {
+        key: 'date',
+        label: 'Date',
+        sortable: true,
+        sortValue: s => s.last_seen || s.session_date,
+        exportValue: s => `${s.session_date} ${s.first_seen_label}–${s.last_seen_label} ET`,
+        cellClassName: 'whitespace-nowrap',
+        render: s => (
+          <div>
+            <div className="text-sm text-gray-800">{s.date_label}</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {s.first_seen_label} – {s.last_seen_label} ET
+            </div>
+          </div>
+        ),
+      },
+    ],
+    [themeColor],
+  );
+
+  const filterDefs: AdminFilterDef<VisitorSession>[] = useMemo(
+    () => [
+      {
+        type: 'select',
+        key: 'identity',
+        label: 'Visitor Type',
+        allLabel: 'All visitors',
+        options: [
+          { value: 'known', label: 'Known customers' },
+          { value: 'anonymous', label: 'Anonymous' },
+        ],
+        predicate: (s, value) => (value === 'known' ? isKnown(s) : !isKnown(s)),
+      },
+      {
+        type: 'select',
+        key: 'device',
+        label: 'Device',
+        allLabel: 'All devices',
+        options: [
+          { value: 'mobile', label: 'Mobile' },
+          { value: 'desktop', label: 'Desktop' },
+          { value: 'tablet', label: 'Tablet' },
+        ],
+        predicate: (s, value) => s.device_type === value,
+      },
+      {
+        type: 'select',
+        key: 'activity',
+        label: 'Activity',
+        allLabel: 'Any activity',
+        options: [
+          { value: 'purchased', label: 'Made a purchase' },
+          { value: 'reached_checkout', label: 'Reached a checkout page' },
+          { value: 'clicked', label: 'Clicked something' },
+          { value: 'multi_page', label: 'Viewed 2+ pages' },
+        ],
+        predicate: (s, value) => {
+          if (value === 'purchased') return s.conversions > 0;
+          if (value === 'reached_checkout') return Boolean(s.reached_checkout);
+          if (value === 'clicked') return s.clicks > 0;
+          return s.page_views >= 2;
+        },
+      },
+      {
+        type: 'daterange',
+        key: 'session_date',
+        label: 'Session Date',
+        getDate: s => s.session_date,
+      },
+    ],
+    [],
+  );
+
+  const table = useAdminTable<VisitorSession>({
+    data: sessions,
+    columns,
+    getRowId: s => `${s.visitor_id}|${s.session_date}`,
+    storageKey: 'visitor_sessions',
+    filterDefs,
+    searchFields: s => [
+      s.guest_name,
+      s.guest_phone,
+      s.guest_email,
+      s.entry_page,
+      s.exit_page,
+      s.entry_title,
+      s.exit_title,
+    ],
+    defaultSort: (a, b) => (b.last_seen || b.session_date).localeCompare(a.last_seen || a.session_date),
+    itemsPerPage: 10,
+  });
 
   const openDetail = useCallback((session: VisitorSession) => {
     const seq = ++detailSeq.current;
@@ -252,7 +338,28 @@ const VisitorTracking = () => {
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const result = await visitorTrackingService.export(filters);
+      const identity = table.filterValues['identity'];
+      const device = table.filterValues['device'];
+      const activity = table.filterValues['activity'];
+      const range = table.filterValues['session_date'] as DateRangeValue | undefined;
+
+      const result = await visitorTrackingService.export({
+        location_id: effectiveLocationId ?? undefined,
+        identified: identity === 'known' || identity === 'anonymous' ? identity : undefined,
+        device_type:
+          device === 'mobile' || device === 'desktop' || device === 'tablet' ? device : undefined,
+        activity:
+          activity === 'purchased' ||
+          activity === 'clicked' ||
+          activity === 'multi_page' ||
+          activity === 'reached_checkout'
+            ? activity
+            : undefined,
+        date_from: range?.start || undefined,
+        date_to: range?.end || undefined,
+        search: table.searchInput.trim() || undefined,
+      });
+
       if (!result.sessions.length) {
         setToast({ message: 'Nothing to export for these filters.', type: 'error' });
         return;
@@ -281,7 +388,7 @@ const VisitorTracking = () => {
         s.actions,
       ]);
 
-      downloadCsv(`visitor-sessions-${new Date().toISOString().split('T')[0]}.csv`, toCsv(headers, rows));
+      downloadCsv(`visitor-sessions-export-${new Date().toISOString().split('T')[0]}.csv`, toCsv(headers, rows));
       setToast({
         message: result.truncated
           ? `Exported the ${result.max_sessions} most recent sessions — narrow the date range to get the rest.`
@@ -295,310 +402,108 @@ const VisitorTracking = () => {
     }
   };
 
-  const summary = useMemo(
-    () => [
-      { label: 'Sessions today', value: stats?.sessions_today ?? 0, icon: Activity, tone: 'text-blue-700 bg-blue-50 border-blue-100' },
-      { label: 'Sessions this week', value: stats?.sessions_week ?? 0, icon: CalendarDays, tone: 'text-indigo-700 bg-indigo-50 border-indigo-100' },
-      { label: 'Identified today', value: stats?.identified_today ?? 0, icon: UserCheck, tone: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-      { label: 'Known visitors', value: stats?.identified_total ?? 0, icon: Footprints, tone: 'text-amber-700 bg-amber-50 border-amber-100' },
-    ],
-    [stats],
-  );
+  const metrics = [
+    { title: 'Sessions Today', value: stats?.sessions_today ?? 0, change: 'One row per visitor per day', icon: Activity, accentColor: 'blue' },
+    { title: 'Sessions This Week', value: stats?.sessions_week ?? 0, change: 'Last 7 days', icon: CalendarDays, accentColor: 'indigo' },
+    { title: 'Identified Today', value: stats?.identified_today ?? 0, change: 'Gave a name and number', icon: UserCheck, accentColor: 'emerald' },
+    { title: 'Known Visitors', value: stats?.identified_total ?? 0, change: 'All-time identified', icon: Footprints, accentColor: 'amber' },
+  ];
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+    <div className="px-6 py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Visitor Tracking</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Every customer visit as its own session — pages, clicks and time on site. All times are Michigan (ET);
-            a session covers one visitor's activity for one day.
+          <p className="text-gray-600 mt-1">
+            Every customer visit as its own session — one visitor, one day, Michigan time
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setRefreshTick(t => t + 1)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <RefreshCw size={15} />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={exporting}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-800 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-900 disabled:opacity-60"
-          >
-            <Download size={15} />
+        <div className="flex gap-2 mt-4 sm:mt-0 flex-wrap">
+          <StandardButton variant="secondary" size="md" onClick={exportCsv} icon={Download} disabled={exporting}>
             {exporting ? 'Exporting…' : 'Export CSV'}
-          </button>
+          </StandardButton>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {summary.map(card => (
-          <div key={card.label} className={`rounded-xl border px-4 py-3 ${card.tone}`}>
-            <div className="flex items-center gap-2">
-              <card.icon size={16} />
-              <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{card.label}</span>
-            </div>
-            <p className="text-2xl font-bold mt-1">{card.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-            <div className="flex flex-wrap gap-1.5">
-              {VISITOR_TABS.map(tab => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setVisitorTab(tab.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                    visitorTab === tab.value
-                      ? 'border-blue-800 text-blue-800 bg-blue-50'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <div className="relative flex-1 min-w-[220px] lg:ml-auto lg:max-w-xs">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={event => setSearch(event.target.value)}
-                placeholder="Search by name, phone or email…"
-                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={timeFrame}
-                onChange={event => setTimeFrame(event.target.value as TimeFrame)}
-                className="border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                aria-label="Time frame"
-              >
-                {TIME_FRAMES.map(frame => (
-                  <option key={frame.value} value={frame.value}>{frame.label}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setShowFilters(open => !open)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                  showFilters || activeFilterCount > 0
-                    ? 'border-blue-800 text-blue-800 bg-blue-50'
-                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <Filter size={14} />
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-blue-800 text-white">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {showFilters && (
-            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">Device</label>
-                  <select
-                    value={deviceType}
-                    onChange={event => setDeviceType(event.target.value as DeviceFilter)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  >
-                    {DEVICE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {metrics.map((metric, index) => {
+          const Icon = metric.icon;
+          return (
+            <div
+              key={index}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+            >
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg bg-${metric.accentColor}-100 text-${metric.accentColor}-600`}>
+                  <Icon size={20} />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">Activity</label>
-                  <select
-                    value={activity}
-                    onChange={event => setActivity(event.target.value as ActivityFilter)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  >
-                    {ACTIVITY_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-                {timeFrame === 'custom' && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">Custom dates</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={event => setDateFrom(event.target.value)}
-                        className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-700"
-                        aria-label="From date"
-                      />
-                      <span className="text-xs text-gray-400">to</span>
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={event => setDateTo(event.target.value)}
-                        className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-700"
-                        aria-label="To date"
-                      />
-                    </div>
-                  </div>
-                )}
+                <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-600">{metric.change}</p>
             </div>
-          )}
-
-          {filterChips.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-              {filterChips.map(chip => (
-                <span
-                  key={chip.key}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
-                >
-                  {chip.label}
-                  <button type="button" onClick={chip.onClear} className="hover:text-blue-900 ml-0.5" aria-label={`Clear ${chip.label}`}>
-                    <X size={11} />
-                  </button>
-                </span>
-              ))}
-              {filterChips.length > 1 && (
-                <button type="button" onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 ml-1">
-                  Clear all
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {['Customer', 'Phone', 'Session', 'Date', ''].map(header => (
-                  <th
-                    key={header}
-                    className="px-4 py-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-14 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800 mx-auto" />
-                  </td>
-                </tr>
-              ) : sessions.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-14 text-center text-gray-500">
-                    <Inbox size={32} className="mx-auto mb-2 text-gray-300" />
-                    No visits recorded for these filters yet.
-                  </td>
-                </tr>
-              ) : (
-                sessions.map(session => (
-                  <tr key={`${session.visitor_id}-${session.session_date}`} className="hover:bg-gray-50 transition-colors align-top">
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-gray-900">{session.guest_name || 'Anonymous'}</div>
-                      {session.guest_email && (
-                        <a href={`mailto:${session.guest_email}`} className="text-xs text-blue-700 hover:underline inline-flex items-center gap-1 mt-0.5">
-                          <Mail size={11} />
-                          {session.guest_email}
-                        </a>
-                      )}
-                      <div className="text-[11px] text-gray-400 mt-0.5 capitalize">
-                        {[session.device_type, session.browser].filter(Boolean).join(' · ')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      {session.guest_phone ? (
-                        <a href={`tel:${session.guest_phone}`} className="text-sm font-medium text-blue-700 hover:underline inline-flex items-center gap-1">
-                          <Phone size={12} />
-                          {session.guest_phone}
-                        </a>
-                      ) : (
-                        <span className="text-sm text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="text-sm text-gray-800">
-                        {pageLabel(session.entry_title, session.entry_page)}
-                        {session.exit_page && session.exit_page !== session.entry_page && (
-                          <span className="text-gray-400"> → {pageLabel(session.exit_title, session.exit_page)}</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {session.page_views} page{session.page_views === 1 ? '' : 's'} · {session.clicks} click{session.clicks === 1 ? '' : 's'}
-                        {session.conversions > 0 && ` · ${session.conversions} purchase${session.conversions === 1 ? '' : 's'}`}
-                        {' · '}
-                        {formatDuration(session.duration_ms)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="text-sm text-gray-800">{session.date_label}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {session.first_seen_label} – {session.last_seen_label} ET
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => openDetail(session)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        <Eye size={13} />
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {pagination.last_page > 1 && (
-          <div className="p-4 border-t border-gray-100">
-            <Pagination
-              currentPage={pagination.current_page}
-              totalPages={pagination.last_page}
-              onPageChange={setPage}
-              totalItems={pagination.total}
-              itemsPerPage={pagination.per_page}
-              itemLabel="sessions"
-            />
-          </div>
-        )}
+          );
+        })}
       </div>
+
+      <AdminTableToolbar
+        table={table}
+        searchPlaceholder="Search by name, phone, email or page..."
+        onRefresh={() => {
+          loadSessions();
+          loadStats();
+        }}
+      />
+
+      {capped && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          Showing the {MAX_LOADED_SESSIONS.toLocaleString()} most recent sessions — use Export CSV or the date filter
+          for older activity.
+        </div>
+      )}
+
+      <AdminDataTable
+        table={table}
+        loading={loading && sessions.length === 0}
+        itemLabel="sessions"
+        emptyState={
+          <div className="flex flex-col items-center justify-center">
+            <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+              <Footprints className={`h-12 w-12 text-${themeColor}-400`} />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No visits recorded</h3>
+            <p className="text-gray-500 text-sm">
+              {table.searchInput || table.activeFilterCount > 0
+                ? 'Try adjusting your search or filters'
+                : 'Customer visits will appear here as they browse the booking site'}
+            </p>
+          </div>
+        }
+        renderActions={session => (
+          <button
+            className={`p-1 text-${themeColor}-600 hover:text-${fullColor}`}
+            title="View session timeline"
+            onClick={() => openDetail(session)}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        )}
+      />
 
       {(detail || detailLoading) && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
           onClick={closeDetail}
         >
           <div
-            className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+            className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-xl shadow-2xl max-h-[92vh] flex flex-col"
             onClick={event => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-100">
+            <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 border-b border-gray-100">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Session timeline</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Session timeline</p>
                 {detail ? (
                   <>
                     <h2 className="text-lg font-bold text-gray-900 leading-tight mt-0.5">
@@ -610,13 +515,19 @@ const VisitorTracking = () => {
                         {detail.summary.first_seen_label} – {detail.summary.last_seen_label} ET
                       </span>
                       {detail.guest?.phone && (
-                        <a href={`tel:${detail.guest.phone}`} className="text-blue-700 hover:underline inline-flex items-center gap-1">
+                        <a
+                          href={`tel:${detail.guest.phone}`}
+                          className={`text-${themeColor}-700 hover:underline inline-flex items-center gap-1`}
+                        >
                           <Phone size={11} />
                           {detail.guest.phone}
                         </a>
                       )}
                       {detail.guest?.email && (
-                        <a href={`mailto:${detail.guest.email}`} className="text-blue-700 hover:underline inline-flex items-center gap-1">
+                        <a
+                          href={`mailto:${detail.guest.email}`}
+                          className={`text-${themeColor}-700 hover:underline inline-flex items-center gap-1`}
+                        >
                           <Mail size={11} />
                           {detail.guest.email}
                         </a>
@@ -638,15 +549,15 @@ const VisitorTracking = () => {
             </div>
 
             {detail && (
-              <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 font-semibold">
+              <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap gap-2 text-xs">
+                <span className={`rounded-full bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 px-2.5 py-1 font-semibold`}>
                   {detail.summary.page_views} pages
                 </span>
-                <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 font-semibold">
+                <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 font-semibold">
                   {detail.summary.clicks} clicks
                 </span>
                 {detail.summary.conversions > 0 && (
-                  <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 font-semibold">
+                  <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 font-semibold">
                     {detail.summary.conversions} purchases
                   </span>
                 )}
@@ -654,15 +565,16 @@ const VisitorTracking = () => {
                   {formatDuration(detail.summary.duration_ms)} on site
                 </span>
                 <span className="rounded-full bg-gray-50 text-gray-600 border border-gray-200 px-2.5 py-1 capitalize">
-                  {[detail.device.device_type, detail.device.browser, detail.device.os].filter(Boolean).join(' · ') || 'Unknown device'}
+                  {[detail.device.device_type, detail.device.browser, detail.device.os].filter(Boolean).join(' · ') ||
+                    'Unknown device'}
                 </span>
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-4">
               {detailLoading ? (
                 <div className="py-14 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800 mx-auto" />
+                  <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${themeColor}-600 mx-auto`} />
                 </div>
               ) : detail ? (
                 <ol className="space-y-2.5">
@@ -674,7 +586,7 @@ const VisitorTracking = () => {
                             ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                             : event.event_type === 'engagement'
                             ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
-                            : 'bg-blue-50 text-blue-600 border-blue-100'
+                            : `bg-${themeColor}-50 text-${themeColor}-600 border-${themeColor}-100`
                         }`}
                       >
                         {event.event_type === 'conversion' ? (
@@ -688,12 +600,18 @@ const VisitorTracking = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-800 break-words">
                           {event.event_type === 'conversion' ? (
-                            <>Completed <span className="font-semibold">{event.event_name.replace(/_/g, ' ')}</span>
-                              {event.conversion_value ? ` — $${Number(event.conversion_value).toFixed(2)}` : ''}</>
+                            <>
+                              Completed <span className="font-semibold">{event.event_name.replace(/_/g, ' ')}</span>
+                              {event.conversion_value ? ` — $${Number(event.conversion_value).toFixed(2)}` : ''}
+                            </>
                           ) : event.event_type === 'engagement' ? (
-                            <>Clicked <span className="font-semibold">"{event.label || event.event_name}"</span></>
+                            <>
+                              Clicked <span className="font-semibold">"{event.label || event.event_name}"</span>
+                            </>
                           ) : (
-                            <>Viewed <span className="font-semibold">{pageLabel(event.page_title, event.page_path)}</span></>
+                            <>
+                              Viewed <span className="font-semibold">{pageLabel(event.page_title, event.page_path)}</span>
+                            </>
                           )}
                         </p>
                         <p className="text-[11px] text-gray-400 mt-0.5">
