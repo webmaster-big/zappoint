@@ -63,8 +63,32 @@ const readUtmFromQuery = (): Partial<TrackPayload> => {
   return out;
 };
 
+const flushDuration = (): void => {
+  if (lastViewId == null || isAnalyticsDnt()) return;
+  try {
+    const body = JSON.stringify({
+      id: lastViewId,
+      duration_ms: Date.now() - lastViewStartedAt,
+      scroll_depth: maxScroll,
+    });
+    lastViewId = null;
+    const blob = new Blob([body], { type: 'application/json' });
+    if (navigator.sendBeacon && navigator.sendBeacon(DURATION_URL, blob)) {
+    } else {
+      void fetch(DURATION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+  } catch {
+  }
+};
+
 export async function trackPageView(p: TrackPayload = {}): Promise<void> {
   if (isAnalyticsDnt() || isTrackingSilencedHost() || typeof window === 'undefined') return;
+  flushDuration();
   armedPath = window.location.pathname;
   const utm = readUtmFromQuery();
   const body = {
@@ -110,28 +134,6 @@ export function setupAnalytics(): void {
     },
     { passive: true }
   );
-
-  const flushDuration = () => {
-    if (lastViewId == null || isAnalyticsDnt()) return;
-    try {
-      const body = JSON.stringify({
-        id: lastViewId,
-        duration_ms: Date.now() - lastViewStartedAt,
-        scroll_depth: maxScroll,
-      });
-      const blob = new Blob([body], { type: 'application/json' });
-      if (navigator.sendBeacon && navigator.sendBeacon(DURATION_URL, blob)) {
-      } else {
-        void fetch(DURATION_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          keepalive: true,
-        }).catch(() => undefined);
-      }
-    } catch {
-    }
-  };
 
   window.addEventListener('pagehide', flushDuration);
   document.addEventListener('visibilitychange', () => {
