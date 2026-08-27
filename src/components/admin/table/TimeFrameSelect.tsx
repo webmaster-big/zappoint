@@ -65,7 +65,7 @@ export function TimeFrameSelect<T>({
   }, [current]);
 
   return (
-    <div className="bg-white p-3 sm:px-6 sm:py-4 rounded-xl shadow-sm border border-gray-100 mb-4 flex flex-wrap items-center gap-2">
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap items-center gap-2">
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 mr-1">
         <CalendarDays size={14} />
         {label}
