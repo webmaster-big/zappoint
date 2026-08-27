@@ -1337,7 +1337,10 @@ const PurchaseEvent = () => {
                         <input
                           type="number"
                           value={quantity}
-                          onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                          onChange={e => {
+                            const left = selectedTime && slotRemaining?.[selectedTime] != null ? Math.max(1, slotRemaining[selectedTime]) : Number.MAX_SAFE_INTEGER;
+                            setQuantity(Math.min(left, Math.max(1, parseInt(e.target.value) || 1)));
+                          }}
                           onWheel={e => (e.target as HTMLInputElement).blur()}
                           min="1"
                           className="w-20 md:w-24 text-4xl md:text-5xl font-bold text-blue-800 text-center bg-transparent border-2 border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-none rounded-lg transition-colors mb-1"

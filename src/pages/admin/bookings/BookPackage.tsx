@@ -987,12 +987,14 @@ const BookPackage: React.FC = () => {
     return slot?.remaining_tickets ?? null;
   })();
 
+  const participantFloor = Math.max(1, Number(pkg?.min_participants || 1));
+
   useEffect(() => {
     if (selectedSlotRemaining != null) {
-      setParticipants(prev => Math.min(prev, Math.max(1, selectedSlotRemaining)));
+      setParticipants(prev => Math.min(prev, Math.max(participantFloor, selectedSlotRemaining)));
     }
-  }, [selectedSlotRemaining]);
-  const participantCeiling = Math.max(1, Math.min(
+  }, [selectedSlotRemaining, participantFloor]);
+  const participantCeiling = Math.max(participantFloor, Math.min(
     Number(pkg?.max_participants || 99),
     selectedSlotRemaining ?? Number.MAX_SAFE_INTEGER,
   ));
@@ -2014,7 +2016,7 @@ const BookPackage: React.FC = () => {
                                       setSelectedRoomId(slot.room_id);
                                     }
                                     if (slot.remaining_tickets != null) {
-                                      setParticipants(prev => Math.min(prev, Math.max(1, slot.remaining_tickets as number)));
+                                      setParticipants(prev => Math.min(prev, Math.max(participantFloor, slot.remaining_tickets as number)));
                                     }
                                   }}
                                   className="accent-blue-800"
@@ -2068,16 +2070,18 @@ const BookPackage: React.FC = () => {
                     <StandardButton
                       variant="secondary"
                       size="md"
-                      onClick={() => setParticipants(Math.max(1, participants - 1))}
+                      onClick={() => setParticipants(Math.max(participantFloor, participants - 1))}
+                      disabled={participants <= participantFloor}
                     >
                       -
                     </StandardButton>
                     <input 
                       type="number" 
-                      min={1} 
+                      min={participantFloor} 
                       max={participantCeiling} 
                       value={participants} 
                       onChange={e => setParticipants(Math.max(1, Math.min(participantCeiling, Number(e.target.value))))}
+                      onBlur={() => setParticipants(prev => Math.max(participantFloor, prev))}
                       onWheel={(e) => e.currentTarget.blur()}
                       className="w-12 md:w-16 text-center rounded-lg border border-gray-300 px-1 md:px-2 py-1.5 md:py-2 text-sm md:text-base font-medium text-gray-800" 
                     />
@@ -2085,6 +2089,7 @@ const BookPackage: React.FC = () => {
                       variant="secondary"
                       size="md"
                       onClick={() => setParticipants(Math.min(participantCeiling, participants + 1))}
+                      disabled={participants >= participantCeiling}
                     >
                       +
                     </StandardButton>
@@ -2329,6 +2334,7 @@ const BookPackage: React.FC = () => {
                     variant="primary"
                     size="md"
                     onClick={() => {
+                      setParticipants(prev => Math.max(participantFloor, prev));
                       setCurrentStep(2);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}

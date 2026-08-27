@@ -23,7 +23,7 @@ import type {
     CreatePackageRoom
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
-import { getStoredUser } from '../../../utils/storage';
+import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import CallToBookNotice from '../../../components/admin/CallToBookNotice';
 import { packageIsCallToBook } from '../../../utils/callToBook';
 
@@ -297,7 +297,7 @@ const EditPackage: React.FC = () => {
                         time_slot_end: formatTime(schedule.time_slot_end || "17:00"),
                     })),
 
-                    image: pkg.image || "",
+                    image: (Array.isArray(pkg.image) ? pkg.image[0] : pkg.image) || "",
                     partialPaymentPercentage: String(pkg.partial_payment_percentage || "0"),
                     partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
                     hasGuestOfHonor: pkg.has_guest_of_honor || false,
@@ -311,8 +311,9 @@ const EditPackage: React.FC = () => {
                     displayOrder: String(pkg.display_order || "0"),
                 });
 
-                if (pkg.image) {
-                    setImagePreview(pkg.image);
+                const storedImage = Array.isArray(pkg.image) ? pkg.image[0] : pkg.image;
+                if (storedImage) {
+                    setImagePreview(getImageUrl(storedImage));
                 }
 
                 setSchedulesLoaded(true);

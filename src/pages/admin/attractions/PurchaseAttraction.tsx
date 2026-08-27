@@ -1486,7 +1486,8 @@ const PurchaseAttraction = () => {
                           value={quantity}
                           onChange={(e) => {
                             const value = parseInt(e.target.value) || 1;
-                            setQuantity(Math.max(1, value));
+                            const left = scheduledTime && slotRemaining ? (slotRemaining[scheduledTime] ?? slotRemaining['__cap']) : null;
+                            setQuantity(left != null ? Math.min(Math.max(1, left), Math.max(1, value)) : Math.max(1, value));
                           }}
                           onBlur={(e) => {
                             if (!e.target.value || parseInt(e.target.value) < 1) {

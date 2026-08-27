@@ -344,6 +344,13 @@ const EditBooking: React.FC = () => {
     };
   }, [formData.locationId, formData.date, isCompanyAdmin]);
 
+  const clampParticipantsToPackage = (pkg: PackageType) => {
+    setFormData(prev => ({
+      ...prev,
+      participants: Math.min(pkg.max_participants || Number.MAX_SAFE_INTEGER, Math.max(pkg.min_participants || 1, prev.participants)),
+    }));
+  };
+
   const handlePackageChange = async (packageId: number) => {
     setFormData(prev => ({ ...prev, packageId, date: '', time: '' }));
     setAvailableTimeSlots([]);
@@ -353,12 +360,14 @@ const EditBooking: React.FC = () => {
       const cachedPackage = availablePackages.find(pkg => pkg.id === packageId);
       if (cachedPackage) {
         setPackageDetails(cachedPackage);
+        clampParticipantsToPackage(cachedPackage);
         return;
       }
       
       const packageResponse = await packageService.getPackage(packageId);
       if (packageResponse.success && packageResponse.data) {
         setPackageDetails(packageResponse.data);
+        clampParticipantsToPackage(packageResponse.data);
       }
     } catch (error) {
       console.error('Error loading package:', error);
@@ -1202,10 +1211,15 @@ const EditBooking: React.FC = () => {
                     <input
                       type="number"
                       name="participants"
-                      min="1"
+                      min={packageDetails?.min_participants || 1}
+                      max={packageDetails?.max_participants || undefined}
                       required
                       value={formData.participants}
                       onChange={handleInputChange}
+                      onBlur={() => setFormData(prev => ({
+                        ...prev,
+                        participants: Math.min(packageDetails?.max_participants || Number.MAX_SAFE_INTEGER, Math.max(packageDetails?.min_participants || 1, prev.participants)),
+                      }))}
                       className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                     />
                   </div>

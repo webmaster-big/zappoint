@@ -2062,7 +2062,7 @@ const OnsiteBooking: React.FC = () => {
                 size="md"
                 onClick={() => setBookingData(prev => ({ 
                   ...prev, 
-                  participants: Math.max(1, prev.participants - 1) 
+                  participants: Math.max(selectedPackage?.minParticipants || 1, prev.participants - 1) 
                 }))}
               >
                 -
@@ -2070,10 +2070,11 @@ const OnsiteBooking: React.FC = () => {
               <input
                 type="number"
                 name="participants"
-                min="1"
+                min={selectedPackage?.minParticipants || 1}
                 max={selectedPackage?.maxParticipants}
                 value={bookingData.participants}
                 onChange={handleInputChange}
+                onBlur={() => setBookingData(prev => ({ ...prev, participants: Math.max(selectedPackage?.minParticipants || 1, prev.participants) }))}
                 onWheel={(e) => e.currentTarget.blur()}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

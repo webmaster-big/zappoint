@@ -1559,7 +1559,8 @@ const ManualBooking: React.FC = () => {
                                 setForm(prev => ({ ...prev, participants: value }));
                               }}
                               onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                              min="1"
+                              onBlur={() => setForm(prev => ({ ...prev, participants: Math.max(pkg?.min_participants || 1, prev.participants) }))}
+                              min={pkg?.min_participants || 1}
                               max={pkg?.max_participants}
                               required
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
@@ -1633,7 +1634,8 @@ const ManualBooking: React.FC = () => {
                                 setForm(prev => ({ ...prev, participants: value }));
                               }}
                               onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                              min="1"
+                              onBlur={() => setForm(prev => ({ ...prev, participants: Math.max(pkg?.min_participants || 1, prev.participants) }))}
+                              min={pkg?.min_participants || 1}
                               max={pkg?.max_participants}
                               required
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
