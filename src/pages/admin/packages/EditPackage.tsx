@@ -1340,7 +1340,7 @@ const EditPackage: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                                         <div>
                                                             <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
                                                             <input
@@ -1391,6 +1391,19 @@ const EditPackage: React.FC = () => {
                                                                 }
                                                                 return <p className="mt-1.5 text-xs text-gray-500">A new start time every {schedule.time_slot_interval} min.</p>;
                                                             })()}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Min players (override)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={schedule.min_participants ?? ''}
+                                                                onChange={(e) => updateSchedule(index, { min_participants: e.target.value === '' ? null : Math.max(1, parseInt(e.target.value) || 1) })}
+                                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                                                                min="1"
+                                                                placeholder="Package default"
+                                                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                                                            />
+                                                            <p className="mt-1.5 text-xs text-gray-500">Leave blank to use the package minimum on these days.</p>
                                                         </div>
                                                     </div>
 

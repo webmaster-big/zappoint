@@ -990,6 +990,8 @@ const BookPackage: React.FC = () => {
     return slot?.remaining_tickets ?? null;
   })();
 
+  const selectedSlotExclusive = Boolean((filteredTimeSlots.find(sl => sl.start_time === selectedTime) as { exclusive?: boolean } | undefined)?.exclusive);
+
   const participantFloor = dateMinParticipants;
 
   useEffect(() => {
@@ -2110,7 +2112,7 @@ const BookPackage: React.FC = () => {
                         ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()} (${pkg.min_participants || 1}–${pkg.max_participants})`
                         : `${pkg.min_participants} included, +$${pkg.price_per_additional} per additional (Max: ${pkg.max_participants})`}
                     </span>
-                    {selectedSlotRemaining != null && (
+                    {selectedSlotRemaining != null && !selectedSlotExclusive && (
                       <span className={`text-xs font-semibold w-full sm:w-auto ${selectedSlotRemaining <= 3 ? 'text-amber-700' : 'text-emerald-700'}`}>
                         {selectedSlotRemaining} {(pkg.participant_label || 'ticket').toLowerCase()}{selectedSlotRemaining === 1 ? '' : 's'} left for this time
                       </span>
