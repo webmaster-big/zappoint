@@ -990,7 +990,7 @@ const BookPackage: React.FC = () => {
     return slot?.remaining_tickets ?? null;
   })();
 
-  const selectedSlotExclusive = Boolean((filteredTimeSlots.find(sl => sl.start_time === selectedTime) as { exclusive?: boolean } | undefined)?.exclusive);
+  const selectedSlotExclusive = Boolean(filteredTimeSlots.find(sl => sl.start_time === selectedTime)?.exclusive);
 
   const participantFloor = dateMinParticipants;
 

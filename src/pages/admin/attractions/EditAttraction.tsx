@@ -283,7 +283,7 @@ const EditAttraction = () => {
     }
 
     const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
-    setImagePreviews(prev => [...prev, ...newImagePreviews]);
+    setImagePreviews(prev => [...newImagePreviews, ...prev]);
 
     const base64Promises = fileArray.map(file => {
       return new Promise<string>((resolve, reject) => {
@@ -301,7 +301,7 @@ const EditAttraction = () => {
       const base64Images = await Promise.all(base64Promises);
       setFormData(prev => ({
         ...prev,
-        images: [...prev.images, ...base64Images]
+        images: [...base64Images, ...prev.images]
       }));
     } catch (error) {
       console.error('Error converting images to base64:', error);

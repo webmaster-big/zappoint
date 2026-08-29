@@ -568,6 +568,13 @@ const CreatePackage: React.FC = () => {
             const durationMins = durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes);
             for (const [index, schedule] of form.availability_schedules.entries()) {
                 const windowMins = scheduleWindowMinutes(schedule.time_slot_start, schedule.time_slot_end);
+                const scheduleMin = schedule.min_participants ? Number(schedule.min_participants) : null;
+                const slotLimit = Math.min(parseInt(form.maxParticipants) || Number.MAX_SAFE_INTEGER, parseInt(form.maxTicketsPerSlot) || Number.MAX_SAFE_INTEGER);
+                if (scheduleMin && slotLimit !== Number.MAX_SAFE_INTEGER && scheduleMin > slotLimit) {
+                    showToast(`Schedule ${index + 1}: a minimum of ${scheduleMin} players is more than the ${slotLimit} this package can take in one slot, so no booking could be made on those days.`, "error");
+                    return;
+                }
+
                 if (windowMins === 0) {
                     showToast(`Schedule ${index + 1}: start and end time cannot be the same. Use 00:00 as the end time for a window that runs to midnight.`, "error");
                     setSubmitting(false);
@@ -1342,6 +1349,7 @@ const CreatePackage: React.FC = () => {
                                                                 onChange={(e) => updateSchedule(index, { min_participants: e.target.value === '' ? null : Math.max(1, parseInt(e.target.value) || 1) })}
                                                                 onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                                 min="1"
+                                                                max={Math.min(parseInt(form.maxParticipants) || Number.MAX_SAFE_INTEGER, parseInt(form.maxTicketsPerSlot) || Number.MAX_SAFE_INTEGER) || undefined}
                                                                 placeholder="Package default"
                                                                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
                                                             />
