@@ -102,7 +102,7 @@ class CustomerDataCacheService {
     return !!meta;
   }
 
-  async isCacheStale(maxAgeMinutes = 5): Promise<boolean> {
+  async isCacheStale(maxAgeMinutes = 1): Promise<boolean> {
     const cache = await this.getCache();
     if (!cache) return true;
     const meta = await this.getJSON<CacheMetadata>(cache, METADATA_KEY);
@@ -155,7 +155,7 @@ class CustomerDataCacheService {
    * so navigating the storefront costs nothing until the data actually ages out.
    * Subscribers repaint through onCacheUpdate when the background sync lands.
    */
-  async getWithBackgroundSync(maxAgeMinutes = 5): Promise<CustomerDataCache> {
+  async getWithBackgroundSync(maxAgeMinutes = 1): Promise<CustomerDataCache> {
     // One shared read per burst: the layout warmup and the page mount fire together on a
     // cold cache, and without this they would each kick off a full catalog fetch.
     if (this.swrInFlight) return this.swrInFlight;
@@ -189,7 +189,7 @@ class CustomerDataCacheService {
   }
 
   /** The grouped-events payload already holds every event, so one page need not refetch the catalog. */
-  async getGroupedEvents(maxAgeMinutes = 5): Promise<GroupedEvent[]> {
+  async getGroupedEvents(maxAgeMinutes = 1): Promise<GroupedEvent[]> {
     const data = await this.getWithBackgroundSync(maxAgeMinutes);
     return data.events ?? [];
   }
