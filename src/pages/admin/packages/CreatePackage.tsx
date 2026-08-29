@@ -393,6 +393,7 @@ const CreatePackage: React.FC = () => {
                     time_slot_start: '09:00',
                     time_slot_end: '17:00',
                     time_slot_interval: defaultSlotInterval(),
+                    min_participants: null,
                     priority: prev.availability_schedules.length,
                     is_active: true,
                 }

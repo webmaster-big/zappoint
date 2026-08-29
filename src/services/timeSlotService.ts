@@ -31,6 +31,8 @@ export interface TimeSlot {
   room_name?: string | null;
   available_rooms_count?: number;
   remaining_tickets?: number | null;
+  min_participants?: number;
+  exclusive?: boolean;
 }
 
 export interface BookedSlot {

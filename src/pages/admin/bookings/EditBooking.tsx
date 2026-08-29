@@ -590,6 +590,8 @@ const EditBooking: React.FC = () => {
     return norm(originalMap) !== norm(selectedAddOns);
   }, [originalBooking, selectedAddOns]);
 
+  const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? packageDetails?.min_participants ?? 1));
+
   const filteredTimeSlots = availableTimeSlots.filter(slot => {
     if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
 
@@ -1209,14 +1211,14 @@ const EditBooking: React.FC = () => {
                     <input
                       type="number"
                       name="participants"
-                      min={packageDetails?.min_participants || 1}
+                      min={dateMinParticipants}
                       max={packageDetails?.max_participants || undefined}
                       required
                       value={formData.participants}
                       onChange={handleInputChange}
                       onBlur={() => setFormData(prev => ({
                         ...prev,
-                        participants: Math.min(packageDetails?.max_participants || Number.MAX_SAFE_INTEGER, Math.max(packageDetails?.min_participants || 1, prev.participants)),
+                        participants: Math.min(packageDetails?.max_participants || Number.MAX_SAFE_INTEGER, Math.max(dateMinParticipants, prev.participants)),
                       }))}
                       className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                     />

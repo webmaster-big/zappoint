@@ -222,6 +222,8 @@ const ManualBooking: React.FC = () => {
     return false;
   };
 
+  const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? pkg?.min_participants ?? 1));
+
   const filteredTimeSlots = availableTimeSlots.filter(slot =>
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
   );
@@ -1512,7 +1514,7 @@ const ManualBooking: React.FC = () => {
                                     }`}
                                   >
                                     {formatTimeTo12Hour(slot.start_time)}
-                                    {slot.remaining_tickets != null && (
+                                    {slot.remaining_tickets != null && !slot.exclusive && (
                                       <span className={`block text-[10px] font-semibold ${slot.remaining_tickets <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>{slot.remaining_tickets} left</span>
                                     )}
                                   </button>
@@ -1550,8 +1552,8 @@ const ManualBooking: React.FC = () => {
                                 setForm(prev => ({ ...prev, participants: value }));
                               }}
                               onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                              onBlur={() => setForm(prev => ({ ...prev, participants: Math.max(pkg?.min_participants || 1, prev.participants) }))}
-                              min={pkg?.min_participants || 1}
+                              onBlur={() => setForm(prev => ({ ...prev, participants: Math.max(dateMinParticipants, prev.participants) }))}
+                              min={dateMinParticipants}
                               max={pkg?.max_participants}
                               required
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
@@ -1625,8 +1627,8 @@ const ManualBooking: React.FC = () => {
                                 setForm(prev => ({ ...prev, participants: value }));
                               }}
                               onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                              onBlur={() => setForm(prev => ({ ...prev, participants: Math.max(pkg?.min_participants || 1, prev.participants) }))}
-                              min={pkg?.min_participants || 1}
+                              onBlur={() => setForm(prev => ({ ...prev, participants: Math.max(dateMinParticipants, prev.participants) }))}
+                              min={dateMinParticipants}
                               max={pkg?.max_participants}
                               required
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}

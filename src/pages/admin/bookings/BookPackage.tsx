@@ -964,6 +964,8 @@ const BookPackage: React.FC = () => {
     }
   };
 
+  const dateMinParticipants = Math.max(1, Number(availableTimeSlots[0]?.min_participants ?? pkg?.min_participants ?? 1));
+
   const calculateBasePrice = () => {
     if (!pkg) return 0;
     const basePrice = Number(pkg.price);
@@ -988,13 +990,17 @@ const BookPackage: React.FC = () => {
     return slot?.remaining_tickets ?? null;
   })();
 
-  const participantFloor = Math.max(1, Number(pkg?.min_participants || 1));
+  const participantFloor = dateMinParticipants;
 
   useEffect(() => {
     if (selectedSlotRemaining != null) {
       setParticipants(prev => Math.min(prev, Math.max(participantFloor, selectedSlotRemaining)));
     }
   }, [selectedSlotRemaining, participantFloor]);
+
+  useEffect(() => {
+    setParticipants(prev => Math.max(participantFloor, prev));
+  }, [participantFloor]);
   const participantCeiling = Math.max(participantFloor, Math.min(
     Number(pkg?.max_participants || 99),
     selectedSlotRemaining ?? Number.MAX_SAFE_INTEGER,
@@ -2026,9 +2032,14 @@ const BookPackage: React.FC = () => {
                                   <span className="text-sm text-gray-800">{formatTimeTo12Hour(slot.start_time)}</span>
                                   <span className="text-xs text-gray-500">{formatTimeTo12Hour(slot.end_time)}</span>
                                 </div>
-                                {slot.remaining_tickets != null && (
+                                {slot.remaining_tickets != null && !slot.exclusive && (
                                   <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${slot.remaining_tickets <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
                                     {slot.remaining_tickets} left
+                                  </span>
+                                )}
+                                {slot.exclusive && (
+                                  <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                    Private
                                   </span>
                                 )}
                               </label>

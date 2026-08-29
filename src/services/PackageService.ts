@@ -106,6 +106,7 @@ export interface AvailabilitySchedule {
   time_slot_start: string;
   time_slot_end: string;
   time_slot_interval: number;
+  min_participants?: number | null;
   priority?: number;
   is_active?: boolean;
 }

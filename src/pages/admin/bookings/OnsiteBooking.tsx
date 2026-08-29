@@ -292,6 +292,8 @@ const OnsiteBooking: React.FC = () => {
     return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, selectedPackage.id));
   }, [dayOffsWithTime, selectedPackage]);
 
+  const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? selectedPackage?.minParticipants ?? 1));
+
   const filteredTimeSlots = availableTimeSlots.filter(slot => 
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
   );
@@ -2062,7 +2064,7 @@ const OnsiteBooking: React.FC = () => {
                 size="md"
                 onClick={() => setBookingData(prev => ({ 
                   ...prev, 
-                  participants: Math.max(selectedPackage?.minParticipants || 1, prev.participants - 1) 
+                  participants: Math.max(dateMinParticipants, prev.participants - 1) 
                 }))}
               >
                 -
@@ -2070,11 +2072,11 @@ const OnsiteBooking: React.FC = () => {
               <input
                 type="number"
                 name="participants"
-                min={selectedPackage?.minParticipants || 1}
+                min={dateMinParticipants}
                 max={selectedPackage?.maxParticipants}
                 value={bookingData.participants}
                 onChange={handleInputChange}
-                onBlur={() => setBookingData(prev => ({ ...prev, participants: Math.max(selectedPackage?.minParticipants || 1, prev.participants) }))}
+                onBlur={() => setBookingData(prev => ({ ...prev, participants: Math.max(dateMinParticipants, prev.participants) }))}
                 onWheel={(e) => e.currentTarget.blur()}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -2141,7 +2143,7 @@ const OnsiteBooking: React.FC = () => {
                         className={`accent-${fullColor} w-4 h-4`}
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
-                      {slot.remaining_tickets != null && (
+                      {slot.remaining_tickets != null && !slot.exclusive && (
                         <span className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${slot.remaining_tickets <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{slot.remaining_tickets} left</span>
                       )}
                     </div>
