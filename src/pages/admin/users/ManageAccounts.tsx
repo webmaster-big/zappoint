@@ -402,21 +402,30 @@ const ManageAccounts = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
+      const allUsers: Record<string, unknown>[] = [];
+      let page = 1;
+      let lastPage = 1;
+      do {
+        const response = await fetch(`${API_BASE_URL}/users?per_page=100&page=${page}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to load accounts');
-      }
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load accounts');
+        }
 
-      const transformedAccounts: ManageAccountsAccount[] = data.data.users.map((user: Record<string, unknown>) => ({
+        allUsers.push(...data.data.users);
+        lastPage = data.data.pagination?.last_page ?? 1;
+        page += 1;
+      } while (page <= lastPage && page <= 20);
+
+      const transformedAccounts: ManageAccountsAccount[] = allUsers.map((user: Record<string, unknown>) => ({
         id: String(user.id),
         firstName: String(user.first_name || ''),
         lastName: String(user.last_name || ''),

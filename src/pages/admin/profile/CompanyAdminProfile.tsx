@@ -166,7 +166,7 @@ const CompanyAdminProfile = () => {
         if (company.users && Array.isArray(company.users)) {
           totalEmployees = company.users.filter((u: any) => u.role !== 'company_admin').length;
         } else {
-          const usersResponse = await fetch(`${API_BASE_URL}/users`, {
+          const usersResponse = await fetch(`${API_BASE_URL}/users?per_page=100`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ const CompanyAdminProfile = () => {
           
           if (usersResponse.ok) {
             const usersData = await usersResponse.json();
-            const users = Array.isArray(usersData.data) ? usersData.data : [];
+            const users = Array.isArray(usersData.data?.users) ? usersData.data.users : (Array.isArray(usersData.data) ? usersData.data : []);
             totalEmployees = users.filter((u: any) => 
               u.company_id === user.company_id && u.role !== 'company_admin'
             ).length;
