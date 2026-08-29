@@ -79,6 +79,11 @@ const columnKeyAtPointFromDom = (x: number, y: number): string | null => {
   return th ? th.getAttribute('data-col-key') : null;
 };
 
+const BOOKINGS_VIEW_STATE_KEY = 'bookings_view_state';
+
+const filterSignature = (value: BookingsPageFilterOptions): string =>
+  JSON.stringify([value.status, value.payment, value.packageId, value.roomId, value.customerId, value.search, value.dateRange?.start, value.dateRange?.end]);
+
 const Bookings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
@@ -144,19 +149,36 @@ const Bookings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [savingStatusBookingId, setSavingStatusBookingId] = useState<string | null>(null);
   const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
-  const [filters, setFilters] = useState<BookingsPageFilterOptions>({
-    status: 'all',
-    dateRange: {
-      start: '',
-      end: ''
-    },
-    search: '',
-    payment: 'all',
-    packageId: 'all',
-    roomId: 'all',
-    customerId: 'all'
+  const [filters, setFilters] = useState<BookingsPageFilterOptions>(() => {
+    const fallback: BookingsPageFilterOptions = {
+      status: 'all',
+      dateRange: {
+        start: '',
+        end: ''
+      },
+      search: '',
+      payment: 'all',
+      packageId: 'all',
+      roomId: 'all',
+      customerId: 'all'
+    };
+    try {
+      const saved = sessionStorage.getItem(BOOKINGS_VIEW_STATE_KEY);
+      const parsed = saved ? JSON.parse(saved) : null;
+      return parsed?.filters ? { ...fallback, ...parsed.filters } : fallback;
+    } catch {
+      return fallback;
+    }
   });
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(BOOKINGS_VIEW_STATE_KEY);
+      const parsed = saved ? JSON.parse(saved) : null;
+      return Math.max(1, Number(parsed?.currentPage) || 1);
+    } catch {
+      return 1;
+    }
+  });
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -349,6 +371,14 @@ const Bookings: React.FC = () => {
   const [savingCell, setSavingCell] = useState<{ bookingId: string; field: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const filterVersionRef = useRef(0);
+  const lastFilterSignatureRef = useRef<string | null>(filterSignature(filters));
+
+  const resetPageIfFiltersChanged = () => {
+    const signature = filterSignature(filters);
+    if (lastFilterSignatureRef.current === signature) return;
+    lastFilterSignatureRef.current = signature;
+    setCurrentPage(1);
+  };
 
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -697,6 +727,14 @@ const Bookings: React.FC = () => {
     setFilterCustomers(Array.from(uniqueCustomers.entries()).map(([id, name]) => ({ id, name })));
   };
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(BOOKINGS_VIEW_STATE_KEY, JSON.stringify({ filters, currentPage }));
+    } catch {
+      return;
+    }
+  }, [filters, currentPage]);
+
   const applyFilters = async () => {
     const currentVersion = ++filterVersionRef.current;
 
@@ -787,7 +825,7 @@ const Bookings: React.FC = () => {
           result = applyDefaultSort(result);
           
           setFilteredBookings(result);
-          setCurrentPage(1);
+          resetPageIfFiltersChanged();
           return;
         }
       } catch (error) {
@@ -846,7 +884,7 @@ const Bookings: React.FC = () => {
     result = applyDefaultSort(result);
 
     setFilteredBookings(result);
-    setCurrentPage(1);
+    resetPageIfFiltersChanged();
   };
 
   const applyDefaultSort = (list: BookingsPageBooking[]): BookingsPageBooking[] => {

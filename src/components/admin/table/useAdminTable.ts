@@ -55,6 +55,41 @@ const readJson = <V,>(key: string): V | null => {
   }
 };
 
+interface StoredViewState {
+  page?: number;
+  filterValues?: Record<string, FilterValue>;
+  searchInput?: string;
+  sortColumn?: string | null;
+  sortDirection?: SortDirection;
+}
+
+const readViewState = (key: string): StoredViewState | null => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as StoredViewState) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeViewState = (key: string, state: StoredViewState): void => {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    return;
+  }
+};
+
+const stableStringify = (value: unknown): string =>
+  JSON.stringify(value, (_key, val) =>
+    val && typeof val === 'object' && !Array.isArray(val)
+      ? Object.keys(val as Record<string, unknown>).sort().reduce((acc, k) => {
+          acc[k] = (val as Record<string, unknown>)[k];
+          return acc;
+        }, {} as Record<string, unknown>)
+      : val
+  );
+
 const compareValues = (a: string | number, b: string | number): number => {
   if (typeof a === 'number' && typeof b === 'number') return a - b;
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
@@ -85,6 +120,8 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const visibilityStorageKey = `${storageKey}_column_visibility`;
   const orderStorageKey = `${storageKey}_column_order`;
   const versionStorageKey = `${storageKey}_columns_version`;
+  const viewStateKey = `${storageKey}_view_state`;
+  const savedView = useMemo(() => readViewState(viewStateKey), [viewStateKey]);
 
   const versionMatches = useMemo(() => {
     if (columnsVersion === undefined) return true;
@@ -135,23 +172,25 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
   const columnKeysRef = useRef<string[]>([]);
   const persistOrderRef = useRef<(next: string[]) => void>(() => {});
 
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchInput, setSearchInput] = useState(() => savedView?.searchInput ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => (savedView?.searchInput ?? '').trim());
   const [serverResults, setServerResults] = useState<T[] | null>(null);
   const [searching, setSearching] = useState(false);
   const searchVersionRef = useRef(0);
 
   const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>(() => {
+    const restored = savedView?.filterValues;
     const initial: Record<string, FilterValue> = {};
     filterDefs.forEach(def => {
-      initial[def.key] = defaultFilterValue(def);
+      const saved = restored?.[def.key];
+      initial[def.key] = saved !== undefined ? saved : defaultFilterValue(def);
     });
     return initial;
   });
 
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [page, setPage] = useState(1);
+  const [sortColumn, setSortColumn] = useState<string | null>(() => savedView?.sortColumn ?? null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => savedView?.sortDirection ?? 'asc');
+  const [page, setPage] = useState(() => Math.max(1, savedView?.page ?? 1));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -263,13 +302,38 @@ export function useAdminTable<T>(config: AdminTableConfig<T>): AdminTableInstanc
     [filteredRows, safePage, itemsPerPage]
   );
 
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, filterValues]);
+  const viewSignature = stableStringify({ debouncedSearch, filterValues });
+  const lastViewSignature = useRef(viewSignature);
 
   useEffect(() => {
+    if (lastViewSignature.current === viewSignature) return;
+    lastViewSignature.current = viewSignature;
+    setPage(1);
+  }, [viewSignature]);
+
+  const defaultFilterSignature = useMemo(() => {
+    const defaults: Record<string, FilterValue> = {};
+    filterDefs.forEach(def => {
+      defaults[def.key] = defaultFilterValue(def);
+    });
+    return stableStringify(defaults);
+  }, [filterDefs]);
+
+  const hasMeaningfulView =
+    page > 1 ||
+    searchInput !== '' ||
+    sortColumn !== null ||
+    stableStringify(filterValues) !== defaultFilterSignature;
+
+  useEffect(() => {
+    if (!hasMeaningfulView && data.length === 0) return;
+    writeViewState(viewStateKey, { page, filterValues, searchInput, sortColumn, sortDirection });
+  }, [viewStateKey, page, filterValues, searchInput, sortColumn, sortDirection, hasMeaningfulView, data.length]);
+
+  useEffect(() => {
+    if (totalItems === 0) return;
     if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  }, [page, totalPages, totalItems]);
 
   const setFilterValue = (key: string, value: FilterValue) => {
     setFilterValues(prev => ({ ...prev, [key]: value }));
