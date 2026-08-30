@@ -52,8 +52,8 @@ export interface Package {
   partial_payment_fixed?: number;
   has_guest_of_honor?: boolean;
   customer_notes?: string;
-  invitation_download_link?: string;
-  invitation_file?: string;
+  invitation_download_link?: string | null;
+  invitation_file?: string | null;
   booking_window_days?: number | null;
   min_booking_notice_hours?: number | null;
   availability_schedules?: AvailabilitySchedule[];
@@ -142,8 +142,8 @@ export interface CreatePackageData {
   partial_payment_fixed?: number;
   has_guest_of_honor?: boolean;
   customer_notes?: string;
-  invitation_download_link?: string;
-  invitation_file?: string;
+  invitation_download_link?: string | null;
+  invitation_file?: string | null;
   booking_window_days?: number | null;
   min_booking_notice_hours?: number | null;
   attraction_ids?: (number | undefined)[];
