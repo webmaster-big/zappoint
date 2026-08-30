@@ -82,6 +82,7 @@ export interface ApiResponse<T> {
 }
 
 export interface GroupedAttractionLocation {
+  image?: string | string[] | null;
   location_id: number;
   location_name: string;
   location_slug: string;
@@ -146,6 +147,7 @@ export interface GroupedAttraction {
 }
 
 export interface GroupedPackageLocation {
+  image?: string | string[] | null;
   location_id: number;
   location_name: string;
   location_slug: string;
@@ -214,6 +216,7 @@ export interface GroupedPackage {
 }
 
 export interface GroupedEventLocation {
+  image?: string | string[] | null;
   location_id: number;
   location_name: string;
   location_slug: string;

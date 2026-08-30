@@ -70,6 +70,7 @@ interface DisplayEvent {
   locations: DisplayEventLocation[];
   purchaseLinks: Array<{ location: string; url: string; event_id: number; location_id: number }>;
   callToBookByLocation?: Record<number, boolean>;
+  imageByLocation?: Record<number, string | null>;
 }
 
 type StorefrontFilter =
@@ -92,6 +93,14 @@ const categoryKeyOf = (value?: string | null) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+const firstImage = (value?: string | string[] | null): string | null => {
+  if (Array.isArray(value)) return value.find(item => typeof item === 'string' && item.trim() !== '') ?? null;
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+};
+
+const imagesByLocation = (locations: Array<{ location_id: number; image?: string | string[] | null }>) =>
+  Object.fromEntries(locations.map(loc => [loc.location_id, firstImage(loc.image)]));
 
 const EVENTS_CATEGORY_LABEL = 'Events';
 
@@ -189,7 +198,8 @@ const EntertainmentLandingPage = () => {
         capacity: attr.max_capacity,
         displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
         rating: attr.rating || 4.5,
-        image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
+        image: firstImage(attr.image) ?? '',
+        imageByLocation: imagesByLocation(attr.locations),
         category: attr.category,
         availableLocations: attr.locations.map(loc => loc.location_name),
         availableLocationIds: attr.locations.map(loc => loc.location_id),
@@ -227,7 +237,8 @@ const EntertainmentLandingPage = () => {
         participants: participantsText,
         includes: [],
         rating: 4.8,
-        image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
+        image: firstImage(pkg.image) ?? '',
+        imageByLocation: imagesByLocation(pkg.locations),
         category: pkg.category,
         availableLocations: pkg.locations.map(loc => loc.location_name),
         availableLocationIds: pkg.locations.map(loc => loc.location_id),
@@ -263,7 +274,8 @@ const EntertainmentLandingPage = () => {
         id: evt.purchase_links[0]?.event_id || 0,
         name: evt.name,
         description: evt.description,
-        image: evt.image,
+        image: firstImage(evt.image),
+        imageByLocation: imagesByLocation(evt.locations),
         date_type: evt.date_type,
         start_date: evt.start_date,
         end_date: evt.end_date,
@@ -603,6 +615,22 @@ const EntertainmentLandingPage = () => {
 
   const eventCTB = (evt: DisplayEvent, locationId?: number | null) =>
     itemCallToBookAt(evt.callToBookByLocation, eventIsCallToBook(evt), locationId ?? activeLocation?.id ?? null);
+
+  // A package sold at ten locations keeps ten separate photos, so a card has to
+  // show the one belonging to the location the guest is actually looking at.
+  const viewedLocationId = useMemo(() => {
+    if (activeLocation) return activeLocation.id;
+    if (selectedLocation === 'All Locations') return null;
+    return storefrontLocations.find(loc => loc.name === selectedLocation)?.id ?? null;
+  }, [activeLocation, selectedLocation, storefrontLocations]);
+
+  const imageFor = (item: { image?: string | null; imageByLocation?: Record<number, string | null> }) => {
+    if (viewedLocationId !== null) {
+      const own = item.imageByLocation?.[viewedLocationId];
+      if (own) return own;
+    }
+    return item.image ?? null;
+  };
 
   const openCallToBookFor = (
     type: 'package' | 'attraction' | 'event',
@@ -1243,9 +1271,9 @@ const EntertainmentLandingPage = () => {
                   >
                     <div className="flex flex-col md:flex-row">
                       <div className="aspect-video md:aspect-auto md:h-auto md:w-2/5 bg-gray-50 relative overflow-hidden rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none">
-                        {pkg.image ? (
+                        {imageFor(pkg) ? (
                           <img 
-                            src={getImageUrl(pkg.image)} 
+                            src={getImageUrl(imageFor(pkg))} 
                             alt={pkg.name}
                             className="absolute inset-0 w-full h-full object-contain"
                           />
@@ -1370,9 +1398,9 @@ const EntertainmentLandingPage = () => {
                     className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
                   >
                     <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
-                      {pkg.image ? (
+                      {imageFor(pkg) ? (
                         <img 
-                          src={getImageUrl(pkg.image)} 
+                          src={getImageUrl(imageFor(pkg))} 
                           alt={pkg.name}
                           className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                         />
@@ -1523,9 +1551,9 @@ const EntertainmentLandingPage = () => {
                     className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
                   >
                     <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
-                      {attraction.image ? (
+                      {imageFor(attraction) ? (
                         <img 
-                          src={getImageUrl(attraction.image)} 
+                          src={getImageUrl(imageFor(attraction))} 
                           alt={attraction.name}
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -1675,9 +1703,9 @@ const EntertainmentLandingPage = () => {
                     className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
                   >
                     <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
-                      {evt.image ? (
+                      {imageFor(evt) ? (
                         <img
-                          src={getImageUrl(evt.image)}
+                          src={getImageUrl(imageFor(evt))}
                           alt={evt.name}
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
