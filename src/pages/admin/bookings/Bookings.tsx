@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
@@ -56,6 +56,7 @@ import { roomService, type Room } from '../../../services/RoomService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import BulkImportModal from '../../../components/admin/bookings/BulkImportModal';
+import CategoryTabs from '../../../components/admin/CategoryTabs';
 import { toCsv } from '../../../components/admin/table';
 
 const formatTime12Hour = (time24: string): string => {
@@ -82,7 +83,7 @@ const columnKeyAtPointFromDom = (x: number, y: number): string | null => {
 const BOOKINGS_VIEW_STATE_KEY = 'bookings_view_state';
 
 const filterSignature = (value: BookingsPageFilterOptions): string =>
-  JSON.stringify([value.status, value.payment, value.packageId, value.roomId, value.customerId, value.search, value.dateRange?.start, value.dateRange?.end]);
+  JSON.stringify([value.status, value.payment, value.packageId, value.roomId, value.customerId, value.category, value.search, value.dateRange?.start, value.dateRange?.end]);
 
 const Bookings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -125,6 +126,7 @@ const Bookings: React.FC = () => {
         ? formatDurationDisplay(booking.duration, booking.duration_unit)
         : '2 hours',
       activity: booking.package?.category || 'Package Booking',
+      category: booking.package?.category || '',
       notes: booking.notes,
       specialRequests: booking.special_requests,
       referenceNumber: booking.reference_number,
@@ -160,7 +162,8 @@ const Bookings: React.FC = () => {
       payment: 'all',
       packageId: 'all',
       roomId: 'all',
-      customerId: 'all'
+      customerId: 'all',
+      category: 'all'
     };
     try {
       const saved = sessionStorage.getItem(BOOKINGS_VIEW_STATE_KEY);
@@ -783,6 +786,7 @@ const Bookings: React.FC = () => {
                 ? formatDurationDisplay(booking.duration, booking.duration_unit)
                 : '2 hours',
               activity: booking.package?.category || 'Package Booking',
+              category: booking.package?.category || '',
               notes: booking.notes,
               referenceNumber: booking.reference_number,
               location: booking.location?.name || 'N/A',
@@ -808,6 +812,9 @@ const Bookings: React.FC = () => {
           }
           if (filters.customerId !== 'all') {
             result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
+          }
+          if (filters.category !== 'all') {
+            result = result.filter(booking => (booking.category || 'Uncategorized') === filters.category);
           }
           if (filters.dateRange.start) {
             result = result.filter(booking => {
@@ -866,6 +873,10 @@ const Bookings: React.FC = () => {
     
     if (filters.customerId !== 'all') {
       result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
+    }
+
+    if (filters.category !== 'all') {
+      result = result.filter(booking => (booking.category || 'Uncategorized') === filters.category);
     }
 
     if (filters.dateRange.start) {
@@ -977,6 +988,17 @@ const Bookings: React.FC = () => {
     });
   };
 
+  const categoryTabs = useMemo(() => {
+    const counts = new Map<string, number>();
+    bookings.forEach(booking => {
+      const key = booking.category || 'Uncategorized';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .sort((a, b) => (a[0] === 'Uncategorized' ? 1 : b[0] === 'Uncategorized' ? -1 : a[0].localeCompare(b[0])))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [bookings]);
+
   const handleFilterChange = (key: keyof BookingsPageFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -995,7 +1017,8 @@ const Bookings: React.FC = () => {
       payment: 'all',
       packageId: 'all',
       roomId: 'all',
-      customerId: 'all'
+      customerId: 'all',
+      category: 'all'
     });
   };
 
@@ -1188,7 +1211,7 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, packageName: pkg.name, activity: pkg.category || 'Package Booking' }
+              ? { ...b, packageName: pkg.name, activity: pkg.category || 'Package Booking', category: pkg.category || '' }
               : b
           )
         );
@@ -2939,6 +2962,13 @@ const Bookings: React.FC = () => {
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+          <CategoryTabs
+            options={categoryTabs}
+            value={filters.category}
+            onChange={value => handleFilterChange('category', value)}
+            totalCount={bookings.length}
+            allLabel="All Categories"
+          />
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-lg">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -2961,7 +2991,7 @@ const Bookings: React.FC = () => {
               >
                 Filters
                 {(() => {
-                  const count = [filters.status !== 'all', filters.payment !== 'all', filters.packageId !== 'all', filters.roomId !== 'all', filters.customerId !== 'all', !!filters.dateRange.start || !!filters.dateRange.end].filter(Boolean).length;
+                  const count = [filters.status !== 'all', filters.payment !== 'all', filters.packageId !== 'all', filters.roomId !== 'all', filters.customerId !== 'all', filters.category !== 'all', !!filters.dateRange.start || !!filters.dateRange.end].filter(Boolean).length;
                   return count > 0 ? <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-${themeColor}-600 text-white`}>{count}</span> : null;
                 })()}
               </StandardButton>
@@ -3100,6 +3130,7 @@ const Bookings: React.FC = () => {
             const chips: { label: string; onClear: () => void }[] = [];
             if (filters.status !== 'all') chips.push({ label: `Status: ${filters.status}`, onClear: () => handleFilterChange('status', 'all') });
             if (filters.payment !== 'all') chips.push({ label: `Payment: ${filters.payment}`, onClear: () => handleFilterChange('payment', 'all') });
+            if (filters.category !== 'all') chips.push({ label: `Category: ${filters.category}`, onClear: () => handleFilterChange('category', 'all') });
             if (filters.packageId !== 'all') {
               const pkg = filterPackages.find(p => p.id.toString() === filters.packageId);
               chips.push({ label: `Package: ${pkg?.name || filters.packageId}`, onClear: () => handleFilterChange('packageId', 'all') });

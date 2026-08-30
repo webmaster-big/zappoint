@@ -43,6 +43,7 @@ import {
   useAdminTable,
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import CategoryTabs from '../../../components/admin/CategoryTabs';
 
 type AttractionRow = ManageAttractionsAttraction & { updatedAt?: string };
 
@@ -572,6 +573,19 @@ const ManageAttractions = () => {
     return unique.map(category => ({ value: category, label: category }));
   }, [attractions]);
 
+  const categoryTabs = useMemo(() => {
+    const counts = new Map<string, number>();
+    attractions.forEach(attraction => {
+      const key = attraction.category || 'Uncategorized';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return categoryOptions.map(option => ({
+      value: option.value,
+      label: option.label,
+      count: counts.get(option.value) ?? 0,
+    }));
+  }, [attractions, categoryOptions]);
+
   const filterDefs: AdminFilterDef<AttractionRow>[] = useMemo(() => [
     {
       type: 'select',
@@ -961,6 +975,14 @@ const ManageAttractions = () => {
           );
         })}
       </div>
+
+      <CategoryTabs
+        options={categoryTabs}
+        value={(table.filterValues.category as string) || 'all'}
+        onChange={value => table.setFilterValue('category', value)}
+        totalCount={attractions.length}
+        allLabel="All Categories"
+      />
 
       <AdminTableToolbar
         table={table}

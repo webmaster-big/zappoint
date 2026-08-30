@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import {
   Download,
   RefreshCcw,
@@ -44,6 +44,44 @@ const calculateChange = (primary: number, compare: number): { value: number; dis
   const sign = change >= 0 ? '+' : '';
   const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
   return { value: change, display: `${sign}${change.toFixed(1)}%`, direction };
+};
+
+type ItemTotals = Omit<CategoryItem, 'name' | 'sub_category'>;
+
+const emptyTotals = (): ItemTotals => ({
+  quantity_sold: 0,
+  gross_sales: 0,
+  net_sales: 0,
+  fee_amount: 0,
+  discount_amount: 0,
+  tax_amount: 0,
+  total_billed: 0,
+  grand_total: 0,
+  balance_due: 0,
+  collected_via_gateway: 0,
+  collected_via_gateway_net: 0,
+});
+
+const sumItems = (items: CategoryItem[]): ItemTotals =>
+  items.reduce<ItemTotals>((acc, item) => {
+    (Object.keys(acc) as Array<keyof ItemTotals>).forEach(key => {
+      acc[key] += item[key] ?? 0;
+    });
+    return acc;
+  }, emptyTotals());
+
+// Packages cover both parties and escape rooms, and attractions cover both
+// activities and wristbands, so each section is broken out by its own labels.
+const groupItemsByLabel = (items: CategoryItem[]) => {
+  const groups = new Map<string, CategoryItem[]>();
+  items.forEach(item => {
+    const key = item.sub_category || 'Uncategorized';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(item);
+  });
+  return [...groups.entries()]
+    .sort((a, b) => (a[0] === 'Uncategorized' ? 1 : b[0] === 'Uncategorized' ? -1 : a[0].localeCompare(b[0])))
+    .map(([name, groupItems]) => ({ name, items: groupItems, totals: sumItems(groupItems) }));
 };
 
 const formatDateRange = (start: string, end: string): string => {
@@ -422,6 +460,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   if (comparisonCategory) {
     comparisonCategory.items.forEach(item => comparisonItemMap.set(item.name, item));
   }
+  const labelGroups = groupItemsByLabel(category.items);
+  const showLabelGroups = labelGroups.length > 1;
   return (
     <div>
       <button
@@ -470,39 +510,66 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {category.items.map((item, index) => {
-                    const compareItem = comparisonItemMap.get(item.name);
-                    const change = compareItem ? calculateChange(item.grand_total, compareItem.grand_total) : null;
-                    return (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="py-3 px-2 font-medium text-gray-900">{item.name}</td>
-                        <td className="py-3 px-2 text-gray-600">{item.sub_category}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{item.quantity_sold}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.gross_sales)}</td>
-                        <td className="py-3 px-2 text-right text-red-600">-{formatCurrency(item.discount_amount)}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.net_sales)}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.fee_amount)}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.tax_amount)}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.total_billed)}</td>
-                        <td className="py-3 px-2 text-right font-semibold text-gray-900">
-                          <div>{formatCurrency(item.grand_total)}</div>
-                          {compareItem && change && (
-                            <div className="flex items-center justify-end gap-1 mt-0.5">
-                              <span className="text-[10px] text-gray-400">vs {formatCurrency(compareItem.grand_total)}</span>
-                              <span className={`text-[10px] font-medium px-1 py-px rounded ${
-                                change.direction === 'up' ? 'bg-green-100 text-green-700' : change.direction === 'down' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {change.direction === 'up' ? '▲' : change.direction === 'down' ? '▼' : ''}{change.display}
-                              </span>
-                            </div>
-                          )}
+                  {labelGroups.map(group => (
+                    <Fragment key={group.name}>
+                    {showLabelGroups && (
+                      <tr className="bg-gray-100/70">
+                        <td colSpan={13} className="py-2 px-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                          {group.name}
                         </td>
-                        <td className={`py-3 px-2 text-right font-semibold ${item.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(item.balance_due)}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway)}</td>
-                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway_net)}</td>
                       </tr>
-                    );
-                  })}
+                    )}
+                    {group.items.map((item, index) => {
+                      const compareItem = comparisonItemMap.get(item.name);
+                      const change = compareItem ? calculateChange(item.grand_total, compareItem.grand_total) : null;
+                      return (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="py-3 px-2 font-medium text-gray-900">{item.name}</td>
+                          <td className="py-3 px-2 text-gray-600">{item.sub_category}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{item.quantity_sold}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.gross_sales)}</td>
+                          <td className="py-3 px-2 text-right text-red-600">-{formatCurrency(item.discount_amount)}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.net_sales)}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.fee_amount)}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.tax_amount)}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.total_billed)}</td>
+                          <td className="py-3 px-2 text-right font-semibold text-gray-900">
+                            <div>{formatCurrency(item.grand_total)}</div>
+                            {compareItem && change && (
+                              <div className="flex items-center justify-end gap-1 mt-0.5">
+                                <span className="text-[10px] text-gray-400">vs {formatCurrency(compareItem.grand_total)}</span>
+                                <span className={`text-[10px] font-medium px-1 py-px rounded ${
+                                  change.direction === 'up' ? 'bg-green-100 text-green-700' : change.direction === 'down' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {change.direction === 'up' ? '▲' : change.direction === 'down' ? '▼' : ''}{change.display}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className={`py-3 px-2 text-right font-semibold ${item.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(item.balance_due)}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway)}</td>
+                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway_net)}</td>
+                        </tr>
+                      );
+                    })}
+                    {showLabelGroups && (
+                      <tr className="bg-gray-50 font-medium text-gray-700">
+                        <td className="py-2.5 px-2" colSpan={2}>{group.name} total</td>
+                        <td className="py-2.5 px-2 text-right">{group.totals.quantity_sold}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.gross_sales)}</td>
+                        <td className="py-2.5 px-2 text-right text-red-600">-{formatCurrency(group.totals.discount_amount)}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.net_sales)}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.fee_amount)}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.tax_amount)}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.total_billed)}</td>
+                        <td className="py-2.5 px-2 text-right font-semibold">{formatCurrency(group.totals.grand_total)}</td>
+                        <td className={`py-2.5 px-2 text-right font-semibold ${group.totals.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(group.totals.balance_due)}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.collected_via_gateway)}</td>
+                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.collected_via_gateway_net)}</td>
+                      </tr>
+                    )}
+                    </Fragment>
+                  ))}
                   <tr className={`bg-${themeColor}-50 font-semibold`}>
                     <td className="py-3 px-2 text-gray-900" colSpan={2}>SUBTOTAL</td>
                     <td className="py-3 px-2 text-right text-gray-900">{category.summary.quantity_sold}</td>

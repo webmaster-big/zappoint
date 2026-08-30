@@ -26,6 +26,7 @@ export interface BookingsPageBooking {
   duration?: string;
   referenceNumber: string;
   activity?: string;
+  category?: string;
   location?: string;
   locationId?: number;
   notes?: string;
@@ -63,6 +64,7 @@ export interface BookingsPageFilterOptions {
   packageId: string;
   roomId: string;
   customerId: string;
+  category: string;
 }
 
 export interface BookingsColumnVisibility {
