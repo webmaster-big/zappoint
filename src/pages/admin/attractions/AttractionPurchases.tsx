@@ -35,6 +35,7 @@ import {
   useAdminTable,
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import CategoryTabs from '../../../components/admin/CategoryTabs';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -419,7 +420,26 @@ const ManagePurchases = () => {
     return unique.map(name => ({ value: name, label: name }));
   }, [purchases]);
 
+  const categoryTabs = useMemo(() => {
+    const counts = new Map<string, number>();
+    purchases.forEach(purchase => {
+      const key = purchase.activity || 'Uncategorized';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .sort((a, b) => (a[0] === 'Uncategorized' ? 1 : b[0] === 'Uncategorized' ? -1 : a[0].localeCompare(b[0])))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [purchases]);
+
   const filterDefs: AdminFilterDef<AttractionPurchasesPurchase>[] = useMemo(() => [
+    {
+      type: 'select',
+      key: 'category',
+      label: 'Category',
+      allLabel: 'All Categories',
+      options: categoryTabs.map(tab => ({ value: tab.value, label: tab.label })),
+      predicate: (purchase, value) => (purchase.activity || 'Uncategorized') === value,
+    },
     {
       type: 'select',
       key: 'status',
@@ -473,7 +493,7 @@ const ManagePurchases = () => {
       label: 'Total Amount ($)',
       getValue: p => p.totalAmount,
     },
-  ], [attractionOptions]);
+  ], [attractionOptions, categoryTabs]);
 
   const table = useAdminTable<AttractionPurchasesPurchase>({
     data: purchases,
@@ -825,6 +845,14 @@ const ManagePurchases = () => {
 
       {!showTrashed && (
         <>
+          <CategoryTabs
+            options={categoryTabs}
+            value={(table.filterValues.category as string) || 'all'}
+            onChange={value => table.setFilterValue('category', value)}
+            totalCount={purchases.length}
+            allLabel="All Categories"
+          />
+
           <AdminTableToolbar
             table={table}
             searchPlaceholder="Search purchases..."

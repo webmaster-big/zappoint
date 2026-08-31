@@ -126,7 +126,7 @@ const Bookings: React.FC = () => {
         ? formatDurationDisplay(booking.duration, booking.duration_unit)
         : '2 hours',
       activity: booking.package?.category || 'Package Booking',
-      category: booking.package?.category || '',
+      category: booking.package?.display_label || booking.package?.category || '',
       notes: booking.notes,
       specialRequests: booking.special_requests,
       referenceNumber: booking.reference_number,
@@ -786,7 +786,7 @@ const Bookings: React.FC = () => {
                 ? formatDurationDisplay(booking.duration, booking.duration_unit)
                 : '2 hours',
               activity: booking.package?.category || 'Package Booking',
-              category: booking.package?.category || '',
+              category: booking.package?.display_label || booking.package?.category || '',
               notes: booking.notes,
               referenceNumber: booking.reference_number,
               location: booking.location?.name || 'N/A',
@@ -1211,7 +1211,7 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, packageName: pkg.name, activity: pkg.category || 'Package Booking', category: pkg.category || '' }
+              ? { ...b, packageName: pkg.name, activity: pkg.category || 'Package Booking', category: pkg.display_label || pkg.category || '' }
               : b
           )
         );
