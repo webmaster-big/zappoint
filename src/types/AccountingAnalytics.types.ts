@@ -56,7 +56,8 @@ export interface FiltersApplied {
 }
 
 export interface LocationInfo {
-  id: number;
+  id: number | null;
+  location_count?: number;
   name: string;
   company_name: string | null;
   timezone: string;
@@ -102,7 +103,7 @@ export interface SummaryTrendResponse {
 }
 
 export interface AccountingReportParams {
-  location_id: number;
+  location_id: number | null;
   start_date: string;
   end_date?: string; // Optional, defaults to start_date for single-day report
   compare_start_date?: string;
@@ -114,14 +115,14 @@ export interface AccountingReportParams {
 }
 
 export interface SummaryTrendParams {
-  location_id: number;
+  location_id: number | null;
   start_date: string;
   end_date: string;
   view_mode?: 'booked_on' | 'booked_for';
 }
 
 export interface ExportParams {
-  location_id: number;
+  location_id: number | null;
   start_date: string;
   end_date?: string;
   view_mode?: 'booked_on' | 'booked_for';

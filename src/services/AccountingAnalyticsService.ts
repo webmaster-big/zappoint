@@ -33,7 +33,7 @@ export const accountingAnalyticsService = {
   async getReport(params: AccountingReportParams): Promise<AccountingReportResponse> {
     const queryParams = new URLSearchParams();
     
-    queryParams.append('location_id', params.location_id.toString());
+    queryParams.append('location_id', params.location_id === null ? 'all' : params.location_id.toString());
     queryParams.append('start_date', params.start_date);
     
     if (params.end_date) {
@@ -67,7 +67,7 @@ export const accountingAnalyticsService = {
   async getSummaryTrend(params: SummaryTrendParams): Promise<SummaryTrendResponse> {
     const queryParams = new URLSearchParams();
     
-    queryParams.append('location_id', params.location_id.toString());
+    queryParams.append('location_id', params.location_id === null ? 'all' : params.location_id.toString());
     queryParams.append('start_date', params.start_date);
     queryParams.append('end_date', params.end_date);
     
@@ -84,7 +84,7 @@ export const accountingAnalyticsService = {
   async exportReport(params: ExportParams): Promise<Blob | object> {
     const queryParams = new URLSearchParams();
     
-    queryParams.append('location_id', params.location_id.toString());
+    queryParams.append('location_id', params.location_id === null ? 'all' : params.location_id.toString());
     queryParams.append('start_date', params.start_date);
     if (params.end_date) {
       queryParams.append('end_date', params.end_date);
@@ -109,9 +109,9 @@ export const accountingAnalyticsService = {
     return response.data;
   },
 
-  downloadCSV(locationId: number, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for'): void {
+  downloadCSV(locationId: number | null, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for'): void {
     const queryParams = new URLSearchParams({
-      location_id: locationId.toString(),
+      location_id: locationId === null ? 'all' : locationId.toString(),
       start_date: startDate,
       view_mode: viewMode,
       format: 'csv',

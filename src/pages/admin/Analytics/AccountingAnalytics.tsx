@@ -113,7 +113,8 @@ const AccountingAnalytics: React.FC = () => {
   
   const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_on');
 
-  const selectedLocation = effectiveLocationId === null ? '' : String(effectiveLocationId);
+  const reportLocationId = effectiveLocationId;
+  const locationCacheKey = reportLocationId === null ? 'all' : String(reportLocationId);
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['Parties', 'Attractions', 'Events', 'Add-ons'])
@@ -122,9 +123,9 @@ const AccountingAnalytics: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const fetchReport = async (showRefreshing = false) => {
-    if (!selectedLocation || !startDate) return;
+    if (!startDate) return;
 
-    const cacheKey = `zapzone_acct_report_${selectedLocation}_${startDate}_${endDate || ''}_${viewMode}`;
+    const cacheKey = `zapzone_acct_report_${locationCacheKey}_${startDate}_${endDate || ''}_${viewMode}`;
 
     if (!showRefreshing && !reportData) {
       try {
@@ -148,7 +149,7 @@ const AccountingAnalytics: React.FC = () => {
 
     try {
       const response = await accountingAnalyticsService.getReport({
-        location_id: parseInt(selectedLocation),
+        location_id: reportLocationId,
         start_date: startDate,
         end_date: endDate || undefined,
         compare_start_date: compareStartDate || undefined,
@@ -178,13 +179,13 @@ const AccountingAnalytics: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedLocation) {
+    if (locationCacheKey) {
       fetchReport();
     } else {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLocation]);
+  }, [locationCacheKey]);
 
 
 
@@ -198,9 +199,9 @@ const AccountingAnalytics: React.FC = () => {
   };
 
   const handleExport = async () => {
-    if (!selectedLocation || !startDate) return;
+    if (!startDate) return;
     try {
-      accountingAnalyticsService.downloadCSV(parseInt(selectedLocation), startDate, endDate || undefined, viewMode);
+      accountingAnalyticsService.downloadCSV(reportLocationId, startDate, endDate || undefined, viewMode);
       setToast({ message: 'Downloading CSV...', type: 'success' });
     } catch {
       setToast({ message: 'Export failed', type: 'error' });
@@ -430,11 +431,7 @@ const AccountingAnalytics: React.FC = () => {
 
       {!reportData && !loading && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <p className="text-gray-500">
-            {!selectedLocation
-              ? 'Select a specific location from the sidebar to view its accounting report.'
-              : 'No data available for the selected date range.'}
-          </p>
+          <p className="text-gray-500">No data available for the selected date range.</p>
         </div>
       )}
     </div>
