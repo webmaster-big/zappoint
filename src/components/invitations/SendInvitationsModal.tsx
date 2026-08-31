@@ -168,7 +168,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
         className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 rounded-t-xl text-white">
+        <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 rounded-t-xl text-white">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold" style={{ color: '#ffffff' }}>Send Party Invitations</h3>

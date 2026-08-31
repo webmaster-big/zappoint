@@ -1147,3 +1147,21 @@ html.dark a:not([class*="bg-"]):hover {
 .zz-popup strong { font-size: 14px; font-weight: 700; color: #fff; }
 .zz-popup span { color: rgba(255, 255, 255, 0.7); }
 .zz-popup em { color: #fde047; font-style: normal; font-weight: 600; }
+
+/* Waiver kiosk confirmation: two beats, the tick then the takeaway. */
+@keyframes zz-card-in { from { opacity: 0; transform: translateY(8px) scale(.975); } to { opacity: 1; transform: none; } }
+@keyframes zz-step-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes zz-step-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-8px); } }
+@keyframes zz-ring-in { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: none; } }
+@keyframes zz-tick-draw { from { stroke-dashoffset: 30; } to { stroke-dashoffset: 0; } }
+
+.zz-card-in { animation: zz-card-in .34s cubic-bezier(.22,.68,.36,1) both; }
+.zz-step-in { animation: zz-step-in .3s cubic-bezier(.22,.68,.36,1) both; }
+.zz-step-out { animation: zz-step-out .22s ease-in both; }
+.zz-ring-in { animation: zz-ring-in .42s cubic-bezier(.34,1.4,.5,1) .08s both; }
+.zz-tick path { stroke-dasharray: 30; animation: zz-tick-draw .38s cubic-bezier(.65,0,.35,1) .3s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .zz-card-in, .zz-step-in, .zz-step-out, .zz-ring-in, .zz-tick path { animation: none; }
+  .zz-tick path { stroke-dasharray: none; }
+}

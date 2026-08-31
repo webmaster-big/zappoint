@@ -167,7 +167,7 @@ const WaiverBulk = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-5">
-        <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white rounded-xl shadow-sm p-7 text-center">
+        <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white rounded-xl shadow-sm p-7 text-center">
           <p className="text-blue-200/80 text-xs font-semibold uppercase tracking-wider mb-2">Group Waivers</p>
           <h1 className="text-xl font-bold mb-1" style={{ color: 'white' }}>
             {view.chaperone_name}

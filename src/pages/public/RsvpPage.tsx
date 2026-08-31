@@ -206,7 +206,7 @@ const RsvpPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white max-w-lg w-full rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white p-7 text-center">
+          <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white p-7 text-center">
             <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center mx-auto mb-3 border border-white/15">
               {isAttending ? (
                 <svg className="w-6 h-6 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -273,7 +273,7 @@ const RsvpPage = () => {
 
       <div className="max-w-lg mx-auto space-y-5">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white p-7 text-center">
+          <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white p-7 text-center">
             <p className="text-blue-200/80 text-xs font-semibold uppercase tracking-wider mb-2">You're Invited!</p>
             <h1 className="text-xl font-bold mb-2" style={{ color: 'white' }}>
               {party.host_name} invited you to a party at {company.name || 'Zap Zone'}!
