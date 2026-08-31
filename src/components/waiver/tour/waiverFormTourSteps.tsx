@@ -20,13 +20,6 @@ export const WAIVER_FORM_TOUR_STEPS: Step[] = [
     content: 'This quick tour explains each section of the signing form. It takes about 90 seconds. Use Next / Back to move, or skip at any time.',
   },
   {
-    target: '[data-tour="wf-legal-body"]',
-    placement: 'auto',
-    disableBeacon: true,
-    title: 'Waiver Agreement text',
-    content: 'This box contains the full legal text of the waiver. Scroll through and read it carefully before signing. The title and version number are shown at the top of the card.',
-  },
-  {
     target: '[data-tour="wf-adult-section"]',
     placement: 'auto',
     disableBeacon: true,
@@ -89,25 +82,18 @@ export const WAIVER_FORM_TOUR_STEPS: Step[] = [
     ),
   },
   {
+    target: '[data-tour="wf-legal-body"]',
+    placement: 'auto',
+    disableBeacon: true,
+    title: 'Waiver Agreement text',
+    content: 'This box contains the full legal text of the waiver. Scroll through and read it carefully before signing. The title and version number are shown at the top of the card.',
+  },
+  {
     target: '[data-tour="wf-consent-section"]',
     placement: 'top',
     disableBeacon: true,
     title: 'Acknowledgment & Consent',
     content: 'This section contains any optional consent checkboxes (photo/video, marketing), your electronic signature field, and the final acceptance checkbox required to submit.',
-  },
-  {
-    target: '[data-tour="wf-photo-consent"]',
-    placement: 'top',
-    disableBeacon: true,
-    title: 'Photo & video consent',
-    content: 'Check this to allow the venue to use photos or videos taken during your visit for promotional materials. This is optional — leaving it unchecked does not affect your visit.',
-  },
-  {
-    target: '[data-tour="wf-marketing-consent"]',
-    placement: 'top',
-    disableBeacon: true,
-    title: 'Marketing opt-in',
-    content: 'Check this to receive future promotions, event announcements, and special offers from the venue. Always unchecked by default — the choice is entirely yours.',
   },
   {
     target: '[data-tour="wf-legal-name"]',
@@ -122,6 +108,20 @@ export const WAIVER_FORM_TOUR_STEPS: Step[] = [
     disableBeacon: true,
     title: 'E-signature agreement',
     content: 'Check this to confirm that your typed name carries the same legal weight as a handwritten signature. Required on waivers that have electronic consent enabled.',
+  },
+  {
+    target: '[data-tour="wf-photo-consent"]',
+    placement: 'top',
+    disableBeacon: true,
+    title: 'Photo & video consent',
+    content: 'Check this to allow the venue to use photos or videos taken during your visit for promotional materials. This is optional — leaving it unchecked does not affect your visit.',
+  },
+  {
+    target: '[data-tour="wf-marketing-consent"]',
+    placement: 'top',
+    disableBeacon: true,
+    title: 'Marketing opt-in',
+    content: 'Check this to receive future promotions, event announcements, and special offers from the venue. Always unchecked by default — the choice is entirely yours.',
   },
   {
     target: '[data-tour="wf-agreement"]',

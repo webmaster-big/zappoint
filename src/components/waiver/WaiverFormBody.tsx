@@ -184,52 +184,6 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     <>
     <WaiverFormTour />
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" autoComplete={autoCompleteOff}>
-      {highlightPoints.length > 0 && (
-        <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-5 py-4">
-          <h2 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">Please note</h2>
-          <ul className="space-y-1.5">
-            {highlightPoints.map((point, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-blue-900/90 leading-relaxed">
-                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Legal body */}
-      {context.body && (
-        <div data-tour="wf-legal-body" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900">{tpl?.title || 'Waiver Agreement'}</h2>
-            {tpl?.version != null && (
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                v{tpl.version}
-              </span>
-            )}
-          </div>
-          <div className="max-h-[42vh] overflow-y-auto">
-            <div
-              className="px-5 py-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(context.body) }}
-            />
-            {tpl?.photo_video_release_enabled && tpl?.photo_video_release_text && (
-              <div className="px-5 py-4 border-t border-gray-100">
-                <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Photo &amp; Video Release</h3>
-                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
-                  {tpl.photo_video_release_text}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-xs text-red-700">{error}</div>
-      )}
-
       {/* Adult / signer */}
       <div data-tour="wf-adult-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100">
@@ -273,6 +227,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             <label className={labelClass}>Phone *</label>
             <input
               type="tel"
+              inputMode="tel"
               value={adultPhone}
               autoComplete={autoCompleteOff}
               onChange={(e) => setAdultPhone(e.target.value)}
@@ -410,12 +365,95 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
         </div>
       )}
 
+      {highlightPoints.length > 0 && (
+        <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-5 py-4">
+          <h2 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">Please note</h2>
+          <ul className="space-y-1.5">
+            {highlightPoints.map((point, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-blue-900/90 leading-relaxed">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Legal body */}
+      {context.body && (
+        <div data-tour="wf-legal-body" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-900">{tpl?.title || 'Waiver Agreement'}</h2>
+            {tpl?.version != null && (
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                v{tpl.version}
+              </span>
+            )}
+          </div>
+          <div className="max-h-[42vh] overflow-y-auto">
+            <div
+              className="px-5 py-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(context.body) }}
+            />
+            {tpl?.photo_video_release_enabled && tpl?.photo_video_release_text && (
+              <div className="px-5 py-4 border-t border-gray-100">
+                <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Photo &amp; Video Release</h3>
+                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                  {tpl.photo_video_release_text}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Consents + signature */}
       <div data-tour="wf-consent-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900">Acknowledgment & Consent</h2>
+          <h2 className="text-sm font-bold text-gray-900">Sign &amp; Agree</h2>
         </div>
         <div className="p-5 space-y-4">
+          <div data-tour="wf-legal-name" className="pt-1">
+            <label className={labelClass}>Type your full legal name *</label>
+            <input
+              type="text"
+              value={typedLegalName}
+              autoComplete={autoCompleteOff}
+              onChange={(e) => {
+                const value = e.target.value;
+                setTypedLegalName(value);
+                if (value.trim() && !electronicTouched.current) {
+                  setElectronicConsent(true);
+                  logAudit('electronic_consent_auto_checked');
+                }
+              }}
+              placeholder="Full legal name"
+              className={`${inputClass} ${formErrors.typedLegalName ? 'border-red-300' : ''}`}
+            />
+            {formErrors.typedLegalName && (
+              <p className="text-[11px] text-red-600 mt-1">{formErrors.typedLegalName}</p>
+            )}
+            <p className="text-[11px] text-gray-400 mt-1">
+              Typing your name serves as your electronic signature for this agreement.
+            </p>
+          </div>
+
+          <div data-tour="wf-signature">
+            <WaiverSignaturePad
+              onChange={(dataUrl) => {
+                setSignatureImage(dataUrl);
+                if (dataUrl) {
+                  if (!signatureLogged.current) {
+                    signatureLogged.current = true;
+                    logAudit('signature_drawn');
+                  }
+                } else {
+                  signatureLogged.current = false;
+                }
+              }}
+            />
+          </div>
+
           {tpl?.photo_video_release_enabled && (
             <label data-tour="wf-photo-consent" className="flex items-start gap-2.5 cursor-pointer border border-gray-100 rounded-lg px-3.5 py-3 bg-gray-50/40">
               <input
@@ -459,47 +497,6 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             </div>
           )}
 
-          <div data-tour="wf-legal-name" className="pt-1">
-            <label className={labelClass}>Type your full legal name *</label>
-            <input
-              type="text"
-              value={typedLegalName}
-              autoComplete={autoCompleteOff}
-              onChange={(e) => {
-                const value = e.target.value;
-                setTypedLegalName(value);
-                if (value.trim() && !electronicTouched.current) {
-                  setElectronicConsent(true);
-                  logAudit('electronic_consent_auto_checked');
-                }
-              }}
-              placeholder="Full legal name"
-              className={`${inputClass} ${formErrors.typedLegalName ? 'border-red-300' : ''}`}
-            />
-            {formErrors.typedLegalName && (
-              <p className="text-[11px] text-red-600 mt-1">{formErrors.typedLegalName}</p>
-            )}
-            <p className="text-[11px] text-gray-400 mt-1">
-              Typing your name serves as your electronic signature for this agreement.
-            </p>
-          </div>
-
-          <div data-tour="wf-signature">
-            <WaiverSignaturePad
-              onChange={(dataUrl) => {
-                setSignatureImage(dataUrl);
-                if (dataUrl) {
-                  if (!signatureLogged.current) {
-                    signatureLogged.current = true;
-                    logAudit('signature_drawn');
-                  }
-                } else {
-                  signatureLogged.current = false;
-                }
-              }}
-            />
-          </div>
-
           {tpl?.electronic_consent_enabled && (
             <label data-tour="wf-electronic-consent" className="flex items-start gap-2.5 cursor-pointer">
               <input
@@ -538,6 +535,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           {formErrors.agreement && <p className="text-[11px] text-red-600 -mt-2">{formErrors.agreement}</p>}
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-xs text-red-700">{error}</div>
+      )}
 
       <button
         data-tour="wf-submit"

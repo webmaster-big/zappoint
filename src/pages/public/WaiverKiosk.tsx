@@ -4,6 +4,10 @@ import type { WaiverFormContext, WaiverSubmission } from '../../types/waiver.typ
 import waiverService from '../../services/waiverService';
 import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError } from '../../components/waiver/WaiverStates';
+import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
+
+// long enough for a guest to actually read the confirmation and scan the QR
+const SUCCESS_HOLD_SECONDS = 25;
 
 const WaiverKiosk = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +23,7 @@ const WaiverKiosk = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [completed, setCompleted] = useState<WaiverSubmission | null>(null);
   // remounts WaiverFormBody to clear all field state on reset
   const [formKey, setFormKey] = useState(0);
 
@@ -55,6 +60,7 @@ const WaiverKiosk = () => {
     setFormKey((k) => k + 1);
     setSubmitError(null);
     setJustCompleted(false);
+    setCompleted(null);
   }, []);
 
   // Inactivity reset — any interaction restarts the countdown.
@@ -88,10 +94,11 @@ const WaiverKiosk = () => {
     }
     setSubmitting(true);
     setSubmitError(null);
+    setCompleted(data);
     try {
       await waiverService.kioskSubmit(templateId, data, locationId);
       setJustCompleted(true);
-      completeTimer.current = setTimeout(resetForm, 4000);
+      completeTimer.current = setTimeout(resetForm, SUCCESS_HOLD_SECONDS * 1000);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setSubmitError(e.response?.data?.message || 'Failed to submit waiver. Please try again.');
@@ -103,35 +110,6 @@ const WaiverKiosk = () => {
   if (loading) return <WaiverLoading label="Loading waiver..." />;
   if (error) return <WaiverError message={error} />;
   if (!context) return null;
-
-  if (justCompleted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white max-w-lg w-full rounded-xl border border-gray-100 shadow-sm overflow-hidden text-center">
-          <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white p-8">
-            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center mx-auto mb-3 border border-white/15">
-              <svg className="w-7 h-7 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold" style={{ color: 'white' }}>
-              Thank You!
-            </h1>
-            <p className="text-blue-200 text-sm mt-1">Your waiver has been recorded.</p>
-          </div>
-          <div className="p-6">
-            <p className="text-gray-500 text-sm mb-4">Returning to a new waiver…</p>
-            <button
-              onClick={resetForm}
-              className="w-full py-3 bg-blue-700 text-white text-sm font-semibold rounded-lg hover:bg-blue-800 transition"
-            >
-              Start Next Waiver
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <WaiverShell title={context.template?.title || 'Waiver'} subtitle="Please complete the waiver below to continue">
@@ -149,6 +127,16 @@ const WaiverKiosk = () => {
         error={submitError}
         onSubmit={handleSubmit}
       />
+      {justCompleted && (
+        <WaiverSuccessModal
+          signerFirstName={completed?.adult_first_name}
+          signerEmail={completed?.adult_email}
+          marketingOptIn={completed?.marketing_consent}
+          locationId={locationId}
+          autoCloseSeconds={SUCCESS_HOLD_SECONDS}
+          onStartNext={resetForm}
+        />
+      )}
     </WaiverShell>
   );
 };
