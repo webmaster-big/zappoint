@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -20,6 +20,8 @@ import { attractionCacheService } from '../../../services/AttractionCacheService
 import type { Category } from '../../../services/CategoryService';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
+import { ScheduleIntervalNote, ScheduleStartTimesPreview, spacesDriveStartTimes } from '../../../components/admin/packages/ScheduleStartTimes';
+import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 import { scheduleWindowMinutes } from '../../../utils/timeSlots';
 import type {
     CreatePackageAttraction,
@@ -68,6 +70,7 @@ const CreatePackage: React.FC = () => {
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]); // must include id
     const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]); // must include id
+    const [slotCleanupMinutes, setSlotCleanupMinutes] = useState<number>(DEFAULT_SLOT_CLEANUP_MINUTES);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     
@@ -132,7 +135,7 @@ const CreatePackage: React.FC = () => {
                 if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(params);
 
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0)
-                    ? Promise.resolve({ data: { rooms: cachedRooms } })
+                    ? Promise.resolve({ data: { rooms: cachedRooms, slot_cleanup_minutes: undefined as number | undefined } })
                     : roomService.getRooms(params);
 
                 const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
@@ -164,10 +167,14 @@ const CreatePackage: React.FC = () => {
 
                 let roomsData: CreatePackageRoom[] = [];
                 const roomsList = roomsRes.data?.rooms || [];
+                if (typeof roomsRes.data?.slot_cleanup_minutes === 'number') {
+                    setSlotCleanupMinutes(roomsRes.data.slot_cleanup_minutes);
+                }
                 roomsData = roomsList.map((room: any) => ({
                     id: room.id,
                     name: room.name,
-                    area_group: room.area_group || undefined
+                    area_group: room.area_group || undefined,
+                    booking_interval: room.booking_interval ?? undefined
                 }));
 
                 if (!cachedRooms || cachedRooms.length === 0) {
@@ -381,6 +388,15 @@ const CreatePackage: React.FC = () => {
         const minutes = durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes);
         return minutes >= 15 ? minutes : 30;
     };
+
+    // the spaces chosen for this package decide how often bookings can start
+    const selectedSpaceIntervals = useMemo(
+        () => form.rooms
+            .map(name => rooms.find(room => room.name === name)?.booking_interval ?? 0)
+            .filter(minutes => minutes > 0),
+        [form.rooms, rooms],
+    );
+    const spacesRunStartTimes = spacesDriveStartTimes(selectedSpaceIntervals);
 
     const addNewSchedule = () => {
         setForm(prev => ({
@@ -1317,29 +1333,19 @@ const CreatePackage: React.FC = () => {
                                                                 onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                                 min="15"
                                                                 step="15"
-                                                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                                                                readOnly={spacesRunStartTimes}
+                                                                title={spacesRunStartTimes ? "Your spaces set the start times. Edit the interval on the space instead." : undefined}
+                                                                className={`w-full rounded-md border border-gray-200 px-3 py-2 text-sm ${spacesRunStartTimes ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
                                                             />
-                                                            {(() => {
-                                                                const durationMins = durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes);
-                                                                if (!durationMins || !schedule.time_slot_interval) return null;
-                                                                if (schedule.time_slot_interval < durationMins) {
-                                                                    return (
-                                                                        <div className="mt-1.5 flex items-start gap-1.5">
-                                                                            <p className="text-xs text-amber-700">
-                                                                                Start times are {schedule.time_slot_interval} min apart but this lasts {durationMins} min, so slots overlap.
-                                                                            </p>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => updateSchedule(index, { time_slot_interval: durationMins })}
-                                                                                className="text-xs font-semibold text-blue-700 hover:underline whitespace-nowrap"
-                                                                            >
-                                                                                Use {durationMins} min
-                                                                            </button>
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                return <p className="mt-1.5 text-xs text-gray-500">A new start time every {schedule.time_slot_interval} min.</p>;
-                                                            })()}
+                                                            <ScheduleIntervalNote
+                                                                startTime={schedule.time_slot_start}
+                                                                endTime={schedule.time_slot_end}
+                                                                durationMinutes={durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes)}
+                                                                interval={schedule.time_slot_interval}
+                                                                spaceIntervals={selectedSpaceIntervals}
+                                                                cleanupMinutes={slotCleanupMinutes}
+                                                                onUseDuration={() => updateSchedule(index, { time_slot_interval: durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes) })}
+                                                            />
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-medium text-gray-600 mb-1">Min players (override)</label>
@@ -1358,52 +1364,14 @@ const CreatePackage: React.FC = () => {
                                                     </div>
 
                                                     {((form.durationUnit === 'hours and minutes' && (form.durationHours || form.durationMinutes)) || (form.durationUnit !== 'hours and minutes' && form.duration)) && schedule.time_slot_start && schedule.time_slot_end && (
-                                                        <div className="mt-3 pt-3 border-t border-gray-200">
-                                                            <p className="text-xs font-medium text-gray-600 mb-2">Generated Time Slots:</p>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {(() => {
-                                                                    let slotDuration: number;
-                                                                    if (form.durationUnit === 'hours and minutes') {
-                                                                        const hours = parseInt(form.durationHours) || 0;
-                                                                        const mins = parseInt(form.durationMinutes) || 0;
-                                                                        slotDuration = hours * 60 + mins;
-                                                                    } else if (form.durationUnit === 'hours') {
-                                                                        slotDuration = parseInt(form.duration) * 60;
-                                                                    } else {
-                                                                        slotDuration = parseInt(form.duration);
-                                                                    }
-                                                                    const interval = schedule.time_slot_interval;
-                                                                    const [startHour, startMin] = schedule.time_slot_start.split(':').map(Number);
-                                                                    const [endHour, endMin] = schedule.time_slot_end.split(':').map(Number);
-                                                                    let currentMinutes = startHour * 60 + startMin;
-                                                                    let endMinutes = endHour * 60 + endMin;
-                                                                    if (endMinutes <= currentMinutes) endMinutes += 24 * 60;
-                                                                    const slots = [];
-                                                                    
-                                                                    while (currentMinutes < endMinutes) {
-                                                                        const slotEndMinutes = currentMinutes + slotDuration;
-                                                                        if (slotEndMinutes <= endMinutes) {
-                                                                            const displayStart = currentMinutes % (24 * 60);
-                                                                            const displayEnd = slotEndMinutes % (24 * 60);
-                                                                            const startH = Math.floor(displayStart / 60);
-                                                                            const startM = displayStart % 60;
-                                                                            const endH = Math.floor(displayEnd / 60);
-                                                                            const endM = displayEnd % 60;
-                                                                            const startTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
-                                                                            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-                                                                            slots.push(
-                                                                                <span key={currentMinutes} className="px-2 py-1 bg-white border border-gray-200 rounded text-xs">
-                                                                                    {formatTimeRange(startTime, endTime)}
-                                                                                </span>
-                                                                            );
-                                                                        }
-                                                                        currentMinutes += interval;
-                                                                    }
-                                                                    
-                                                                    return slots.length > 0 ? slots : <span className="text-xs text-gray-500">No valid slots with current configuration</span>;
-                                                                })()}
-                                                            </div>
-                                                        </div>
+                                                        <ScheduleStartTimesPreview
+                                                            startTime={schedule.time_slot_start}
+                                                            endTime={schedule.time_slot_end}
+                                                            durationMinutes={durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes)}
+                                                            interval={schedule.time_slot_interval}
+                                                            spaceIntervals={selectedSpaceIntervals}
+                                                            cleanupMinutes={slotCleanupMinutes}
+                                                        />
                                                     )}
                                                 </div>
                                             </div>

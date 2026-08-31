@@ -74,6 +74,7 @@ export interface PaginatedResponse<T> {
   success: boolean;
   data: {
     rooms: T[];
+    slot_cleanup_minutes?: number;
     pagination: {
       current_page: number;
       last_page: number;
