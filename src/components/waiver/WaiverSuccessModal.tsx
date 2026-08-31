@@ -133,7 +133,7 @@ const WaiverSuccessModal = ({
         aria-labelledby="waiver-success-title"
         className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden my-6"
       >
-        <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 px-6 py-7 text-center">
+        <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 px-6 py-7 text-center">
           <img src="/Zap-Zone.png" alt="Zap Zone" className="h-12 mx-auto object-contain mb-4" />
           <div className="w-16 h-16 rounded-full bg-emerald-400/15 border border-emerald-300/40 flex items-center justify-center mx-auto mb-3">
             <svg className="w-9 h-9 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
