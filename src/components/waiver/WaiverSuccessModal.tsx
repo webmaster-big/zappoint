@@ -140,9 +140,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
       >
         {!showTakeaway ? (
           <div className={`px-8 py-11 text-center ${handingOver && hasTakeaway ? 'zz-step-out' : 'zz-step-in'}`}>
-            <img src="/Zap-Zone.png" alt="Zap Zone" className="h-9 mx-auto object-contain" />
-
-            <div className="zz-ring-in w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mt-7 mb-5">
+            <div className="zz-ring-in w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
               <svg className="zz-tick w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
