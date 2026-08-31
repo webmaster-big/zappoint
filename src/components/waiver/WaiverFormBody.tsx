@@ -184,6 +184,20 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
     <>
     <WaiverFormTour />
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" autoComplete={autoCompleteOff}>
+      {highlightPoints.length > 0 && (
+        <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-5 py-4">
+          <h2 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">Please note</h2>
+          <ul className="space-y-1.5">
+            {highlightPoints.map((point, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-blue-900/90 leading-relaxed">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Adult / signer */}
       <div data-tour="wf-adult-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100">
@@ -362,20 +376,6 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {highlightPoints.length > 0 && (
-        <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-5 py-4">
-          <h2 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">Please note</h2>
-          <ul className="space-y-1.5">
-            {highlightPoints.map((point, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-blue-900/90 leading-relaxed">
-                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 
