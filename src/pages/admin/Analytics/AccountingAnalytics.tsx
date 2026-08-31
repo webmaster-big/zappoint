@@ -461,7 +461,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     comparisonCategory.items.forEach(item => comparisonItemMap.set(item.name, item));
   }
   const labelGroups = groupItemsByLabel(category.items);
-  const showLabelGroups = labelGroups.length > 1;
+  const showLabelGroups = labelGroups.length > 0;
+  const showLabelTotals = labelGroups.length > 1;
   return (
     <div>
       <button
@@ -552,7 +553,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         </tr>
                       );
                     })}
-                    {showLabelGroups && (
+                    {showLabelTotals && (
                       <tr className="bg-gray-50 font-medium text-gray-700">
                         <td className="py-2.5 px-2" colSpan={2}>{group.name} total</td>
                         <td className="py-2.5 px-2 text-right">{group.totals.quantity_sold}</td>
