@@ -21,8 +21,6 @@ interface MarketingContent {
 
 interface Props {
   signerFirstName?: string;
-  signerEmail?: string;
-  marketingOptIn?: boolean;
   locationId: number | null;
   autoCloseSeconds?: number;
   onStartNext: () => void;
@@ -99,8 +97,6 @@ const loadMarketing = async (locationId: number | null): Promise<MarketingConten
 
 const WaiverSuccessModal = ({
   signerFirstName,
-  signerEmail,
-  marketingOptIn,
   locationId,
   autoCloseSeconds = 25,
   onStartNext,
@@ -152,6 +148,7 @@ const WaiverSuccessModal = ({
           <div className="px-6 py-5 border-b border-gray-100 space-y-4">
             <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Before you go</h2>
 
+
             {marketing?.bookUrl && (
               <div className="flex items-center gap-4 rounded-xl border border-gray-100 bg-gray-50/60 p-3.5">
                 <div className="bg-white p-2 rounded-lg border border-gray-100 shrink-0">
@@ -197,11 +194,6 @@ const WaiverSuccessModal = ({
         )}
 
         <div className="px-6 py-5">
-          {marketingOptIn && signerEmail && (
-            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5 mb-3.5 leading-relaxed">
-              You're on the list — offers and event news will go to <span className="font-semibold">{signerEmail}</span>.
-            </p>
-          )}
           <button
             onClick={onStartNext}
             className="w-full py-3.5 bg-blue-700 text-white text-sm font-semibold rounded-lg hover:bg-blue-800 transition"

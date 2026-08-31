@@ -130,8 +130,6 @@ const WaiverKiosk = () => {
       {justCompleted && (
         <WaiverSuccessModal
           signerFirstName={completed?.adult_first_name}
-          signerEmail={completed?.adult_email}
-          marketingOptIn={completed?.marketing_consent}
           locationId={locationId}
           autoCloseSeconds={SUCCESS_HOLD_SECONDS}
           onStartNext={resetForm}
