@@ -2,20 +2,22 @@ import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { API_BASE_URL } from '../../utils/storage';
 
-interface UpcomingEvent {
-  id: number;
+/** One thing worth mentioning on the way out. */
+interface Pick {
+  key: string;
+  label: string;
   name: string;
-  price?: string | number | null;
-  start_date?: string | null;
-  end_date?: string | null;
+  price: string | null;
+  was: string | null;
+  when: string | null;
+  rank: number;
 }
 
-interface MarketingContent {
+interface Takeaway {
   bookUrl: string | null;
   locationName: string | null;
   phone: string | null;
-  events: UpcomingEvent[];
-  plan: { name: string; price: string } | null;
+  picks: Pick[];
 }
 
 interface Props {
@@ -27,8 +29,11 @@ interface Props {
 
 /** How long the plain confirmation holds before the takeaway slides in. */
 const CONFIRM_BEAT_MS = 2000;
+const MAX_PICKS = 3;
 
-const money = (value: string | number | null | undefined) => {
+const today = () => new Date().toISOString().slice(0, 10);
+
+const money = (value: unknown) => {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? `$${n.toFixed(2)}` : null;
 };
@@ -40,18 +45,74 @@ const shortDate = (value?: string | null) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-/** A run already under way reads "through <end>" — printing its start date looks stale. */
-const eventWhen = (event: UpcomingEvent) => {
-  const today = new Date().toISOString().slice(0, 10);
-  const start = (event.start_date || '').slice(0, 10);
-  if (start && start >= today) return shortDate(event.start_date);
-  const end = shortDate(event.end_date);
-  return end ? `through ${end}` : null;
+/** A run already under way reads "through <end>" — its start date would look stale. */
+const eventWhen = (start?: string | null, end?: string | null) => {
+  const from = (start || '').slice(0, 10);
+  if (from && from >= today()) return shortDate(start);
+  const until = shortDate(end);
+  return until ? `through ${until}` : null;
 };
 
-/** Best-effort: a kiosk must still confirm the waiver if any of this fails to load. */
-const loadMarketing = async (locationId: number | null): Promise<MarketingContent> => {
-  const empty: MarketingContent = { bookUrl: null, locationName: null, phone: null, events: [], plan: null };
+const perPerson = (pricingType?: string | null) => (pricingType === 'per_person' ? '/person' : '');
+
+type SpecialPricing = { has_special_pricing?: boolean; original_price?: number; discounted_price?: number };
+
+/** What this venue charges today, and what it charged before any automatic discount. */
+const priceNow = (sp: SpecialPricing | undefined, fallback: unknown, pricingType?: string | null) => {
+  const suffix = perPerson(pricingType);
+  const discounted = sp?.has_special_pricing ? money(sp.discounted_price) : null;
+  const base = money(sp?.original_price ?? fallback);
+  if (discounted && base && discounted !== base) {
+    return { price: `${discounted}${suffix}`, was: base, discounted: true };
+  }
+  return { price: base ? `${base}${suffix}` : null, was: null, discounted: false };
+};
+
+const shuffle = <T,>(list: T[]) => {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
+/**
+ * One pick per label, best first, ties broken at random — so a venue with escape
+ * rooms, wristbands and an event shows a spread of all three rather than three
+ * escape rooms, and two guests in a row do not see the same list.
+ */
+const spread = (pool: Pick[]): Pick[] => {
+  const byLabel = new Map<string, Pick[]>();
+  pool.forEach((pick) => {
+    const list = byLabel.get(pick.label);
+    if (list) list.push(pick);
+    else byLabel.set(pick.label, [pick]);
+  });
+
+  const champions = [...byLabel.values()].map((list) => {
+    const best = Math.max(...list.map((p) => p.rank));
+    return shuffle(list.filter((p) => p.rank === best))[0];
+  });
+
+  return shuffle(champions)
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, MAX_PICKS);
+};
+
+interface CatalogLocation {
+  location_id: number;
+  package_id?: number;
+  attraction_id?: number;
+  special_pricing?: SpecialPricing;
+}
+
+const atLocation = (entry: { locations?: CatalogLocation[] }, locationId: number): CatalogLocation | undefined =>
+  (entry.locations ?? []).find((l) => Number(l.location_id) === Number(locationId));
+
+/** Best-effort: the waiver must still confirm if none of this loads. */
+const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
+  const empty: Takeaway = { bookUrl: null, locationName: null, phone: null, picks: [] };
   if (locationId === null) return empty;
 
   const getJson = async (path: string) => {
@@ -63,50 +124,84 @@ const loadMarketing = async (locationId: number | null): Promise<MarketingConten
       return null;
     }
   };
+  const list = (res: unknown): any[] => {
+    const body = res as { data?: unknown } | unknown[];
+    if (Array.isArray(body)) return body;
+    const inner = (body as { data?: unknown })?.data;
+    return Array.isArray(inner) ? inner : [];
+  };
 
-  const [locationsRes, eventsRes, plansRes] = await Promise.all([
+  const [locationsRes, packagesRes, attractionsRes, eventsRes, plansRes] = await Promise.all([
     getJson('/storefront/locations'),
+    getJson('/packages/grouped-by-name'),
+    getJson('/attractions/grouped'),
     getJson(`/events/location/${locationId}`),
     getJson('/membership-plans/public'),
   ]);
 
-  const locations = Array.isArray(locationsRes?.data) ? locationsRes.data : Array.isArray(locationsRes) ? locationsRes : [];
-  const venue = locations.find((l: { id: number }) => Number(l.id) === Number(locationId));
+  const venue = list(locationsRes).find((l) => Number(l.id) === Number(locationId));
+  const pool: Pick[] = [];
 
-  const rawEvents = Array.isArray(eventsRes?.data) ? eventsRes.data : Array.isArray(eventsRes) ? eventsRes : [];
-  const today = new Date().toISOString().slice(0, 10);
-  const events: UpcomingEvent[] = rawEvents
-    .filter((e: UpcomingEvent & { is_active?: boolean }) => {
-      if (e.is_active === false) return false;
-      const until = (e.end_date || e.start_date || '').slice(0, 10);
-      return !until || until >= today;
-    })
-    .slice(0, 2);
+  // packages carry their venue label in display_label; category holds the escape-room difficulty
+  list(packagesRes).forEach((pkg) => {
+    const here = atLocation(pkg, locationId);
+    if (!here) return;
+    const label = String(pkg.display_label || pkg.category || 'Packages').trim();
+    const { price, was, discounted } = priceNow(here.special_pricing ?? pkg.special_pricing, pkg.price, pkg.pricing_type);
+    if (!price) return;
+    pool.push({ key: `pkg-${here.package_id}`, label, name: pkg.name, price, was, when: null, rank: discounted ? 3 : 1 });
+  });
 
-  const rawPlans = Array.isArray(plansRes?.data) ? plansRes.data : Array.isArray(plansRes) ? plansRes : [];
-  const cheapest = rawPlans
-    .filter((p: { is_active?: boolean; price?: string }) => p.is_active !== false && Number(p.price) > 0)
-    .sort((a: { price: string }, b: { price: string }) => Number(a.price) - Number(b.price))[0];
+  list(attractionsRes).forEach((attr) => {
+    const here = atLocation(attr, locationId);
+    if (!here) return;
+    const label = String(attr.category || 'Activities').trim();
+    const { price, was, discounted } = priceNow(here.special_pricing ?? attr.special_pricing, attr.price, attr.pricing_type);
+    if (!price) return;
+    pool.push({ key: `attr-${here.attraction_id}`, label, name: attr.name, price, was, when: null, rank: discounted ? 3 : 1 });
+  });
+
+  list(eventsRes).forEach((evt) => {
+    if (evt.is_active === false) return;
+    const until = (evt.end_date || evt.start_date || '').slice(0, 10);
+    if (until && until < today()) return;
+    pool.push({
+      key: `evt-${evt.id}`,
+      label: 'Events',
+      name: evt.name,
+      price: money(evt.price),
+      was: null,
+      when: eventWhen(evt.start_date, evt.end_date),
+      // dated, so it is the one thing that stops being true if they wait
+      rank: 2,
+    });
+  });
+
+  list(plansRes).forEach((plan) => {
+    if (plan.is_active === false) return;
+    const price = money(plan.price);
+    if (!price) return;
+    pool.push({ key: `plan-${plan.id}`, label: 'Passes', name: plan.name, price, was: null, when: null, rank: 1 });
+  });
 
   return {
     bookUrl: venue?.slug ? `${window.location.origin}/${venue.slug}` : null,
     locationName: venue?.name ?? null,
     phone: venue?.phone ?? null,
-    events,
-    plan: cheapest ? { name: cheapest.name, price: cheapest.price } : null,
+    picks: spread(pool),
   };
 };
 
 const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext }: Props) => {
-  const [marketing, setMarketing] = useState<MarketingContent | null>(null);
+  const [takeaway, setTakeaway] = useState<Takeaway | null>(null);
   const [beatDone, setBeatDone] = useState(false);
   const [handingOver, setHandingOver] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(autoCloseSeconds);
 
   useEffect(() => {
     let alive = true;
-    loadMarketing(locationId).then((data) => {
-      if (alive) setMarketing(data);
+    loadTakeaway(locationId).then((data) => {
+      if (alive) setTakeaway(data);
     });
     return () => {
       alive = false;
@@ -127,7 +222,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
     return () => clearInterval(tick);
   }, []);
 
-  const hasTakeaway = !!marketing && !!(marketing.bookUrl || marketing.events.length > 0 || marketing.plan);
+  const hasTakeaway = !!takeaway && !!(takeaway.bookUrl || takeaway.picks.length > 0);
   const showTakeaway = beatDone && hasTakeaway;
 
   return (
@@ -150,7 +245,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
               {signerFirstName ? `You're all set, ${signerFirstName}!` : "You're all set!"}
             </h1>
             <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-              Your waiver is signed and saved{marketing?.locationName ? ` at ${marketing.locationName}` : ''}.
+              Your waiver is signed and saved{takeaway?.locationName ? ` at ${takeaway.locationName}` : ''}.
             </p>
 
             {beatDone && !hasTakeaway && (
@@ -175,53 +270,50 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
               </p>
             </div>
 
-            <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-3">Before you go</h2>
+            <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-3">
+              While you&rsquo;re here
+            </h2>
 
-            {marketing?.bookUrl && (
-              <div className="flex items-center gap-4 rounded-xl border border-blue-100 bg-blue-50 p-3.5">
+            {takeaway && takeaway.picks.length > 0 && (
+              <ul className="divide-y divide-gray-100 border-y border-gray-100">
+                {takeaway.picks.map((pick) => (
+                  <li key={pick.key} className="flex items-start justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{pick.label}</p>
+                      <p className="text-[13px] font-medium text-gray-800 truncate">{pick.name}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {pick.price && (
+                        <p className="text-[13px] font-semibold text-gray-900 tabular-nums">
+                          {pick.was && <span className="font-normal text-gray-400 line-through mr-1.5">{pick.was}</span>}
+                          {pick.price}
+                        </p>
+                      )}
+                      {pick.when && <p className="text-[11px] text-gray-500">{pick.when}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {takeaway?.bookUrl && (
+              <div className="flex items-center gap-4 rounded-xl border border-blue-100 bg-blue-50 p-3.5 mt-4">
                 <div className="bg-white p-1.5 rounded-lg border border-blue-100 shrink-0">
-                  <QRCodeSVG value={marketing.bookUrl} size={78} level="M" />
+                  <QRCodeSVG value={takeaway.bookUrl} size={72} level="M" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Book your next visit</p>
+                  <p className="text-sm font-semibold text-gray-900">See everything on offer</p>
                   <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Scan with your phone to see parties, escape rooms and passes, and book online.
+                    Scan to browse and book at this venue
+                    {takeaway.phone ? `, or call ${takeaway.phone}` : ''}.
                   </p>
                 </div>
               </div>
             )}
 
-            {marketing && marketing.events.length > 0 && (
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-gray-700 mb-2">Coming up here</p>
-                <ul className="divide-y divide-gray-100 border-y border-gray-100">
-                  {marketing.events.map((event) => {
-                    const when = eventWhen(event);
-                    const price = money(event.price);
-                    return (
-                      <li key={event.id} className="flex items-baseline justify-between gap-3 py-2 text-xs">
-                        <span className="font-medium text-gray-800">{event.name}</span>
-                        <span className="text-gray-500 whitespace-nowrap tabular-nums">
-                          {[when, price].filter(Boolean).join(' · ')}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-
-            {marketing?.plan && (
-              <p className="text-xs text-gray-500 leading-relaxed mt-4">
-                Visiting often? <span className="font-semibold text-gray-800">{marketing.plan.name}</span> starts at{' '}
-                <span className="font-semibold text-gray-800">{money(marketing.plan.price)}</span> — ask our staff
-                {marketing.phone ? ` or call ${marketing.phone}` : ''}.
-              </p>
-            )}
-
             <button
               onClick={onStartNext}
-              className="mt-6 w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+              className="mt-5 w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
             >
               Start Next Waiver
             </button>
