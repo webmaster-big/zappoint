@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import EmailInput from '../../../components/ui/EmailInput';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import contactService, {
   type Contact,
@@ -1573,8 +1574,7 @@ const CustomerListing: React.FC = () => {
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">Email <span className="text-red-500">*</span></label>
-                      <input
-                        type="email"
+                      <EmailInput
                         value={newContact.email}
                         onChange={(e) => setNewContact(prev => ({ ...prev, email: e.target.value }))}
                         className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
@@ -1956,8 +1956,7 @@ const CustomerListing: React.FC = () => {
                     <div>
                       <label className="text-xs text-gray-500">Email</label>
                       {viewEditMode ? (
-                        <input
-                          type="email"
+                        <EmailInput
                           value={viewEditData.email || ''}
                           onChange={(e) => setViewEditData(prev => ({ ...prev, email: e.target.value }))}
                           className={`w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}

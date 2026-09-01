@@ -29,6 +29,7 @@ import { emailNotificationService } from '../../../services/EmailNotificationSer
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
+import EmailInput from '../../../components/ui/EmailInput';
 
 import type { 
   EmailNotification, 
@@ -700,8 +701,7 @@ const EmailNotificationDetails: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
               </label>
-              <input
-                type="email"
+              <EmailInput
                 value={testEmail}
                 onChange={(e) => setTestEmail(e.target.value)}
                 placeholder="Enter test email address..."

@@ -16,6 +16,7 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import locationService, { type Location } from '../../../services/LocationService';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import DatePicker from '../../../components/ui/DatePicker';
+import EmailInput from '../../../components/ui/EmailInput';
 import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
@@ -1094,8 +1095,7 @@ const EditBooking: React.FC = () => {
                     <label className="block font-semibold mb-2 text-base text-neutral-800">
                       Email
                     </label>
-                    <input
-                      type="email"
+                    <EmailInput
                       name="email"
                       required
                       value={formData.email}

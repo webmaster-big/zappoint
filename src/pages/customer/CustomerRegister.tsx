@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import EmailInput from '../../components/ui/EmailInput';
 import type { RegisterFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
 
@@ -260,7 +261,7 @@ const CustomerRegister = () => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className={lbl}>Email</label>
-                      <input type="email" name="email" autoComplete="email" required value={formData.email} onChange={handleChange} className={inp} placeholder="you@email.com" />
+                      <EmailInput name="email" autoComplete="email" required value={formData.email} onChange={handleChange} className={inp} placeholder="you@email.com" />
                     </div>
                     <div>
                       <label className={lbl}>Phone</label>

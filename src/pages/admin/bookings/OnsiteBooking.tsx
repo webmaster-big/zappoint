@@ -5,6 +5,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import DatePicker from '../../../components/ui/DatePicker';
+import EmailInput from '../../../components/ui/EmailInput';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { 
   OnsiteBookingPackage, 
@@ -2448,8 +2449,7 @@ const OnsiteBooking: React.FC = () => {
                   <span className="ml-2 text-xs text-${the}-600 animate-pulse">(Searching...)</span>
                 )}
               </label>
-              <input
-                type="email"
+              <EmailInput
                 name="customer.email"
                 value={bookingData.customer.email}
                 onChange={handleInputChange}

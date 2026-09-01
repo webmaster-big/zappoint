@@ -17,6 +17,7 @@ import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import type { PhotoChannel, PhotoMessageTemplateRecord, PhotoSettingsResponse } from '../../../types/photo.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
@@ -77,20 +78,37 @@ const ChannelTest = ({
         {label}
       </label>
       <div className="mt-1 flex gap-2">
-        <input
-          id={inputId}
-          type={inputType}
-          value={destination}
-          placeholder={placeholder}
-          onChange={(e) => setDestination(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              send();
-            }
-          }}
-          className="flex-1 min-w-0 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-        />
+        {inputType === 'email' ? (
+          <EmailInput
+            id={inputId}
+            value={destination}
+            placeholder={placeholder}
+            onChange={(e) => setDestination(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                send();
+              }
+            }}
+            wrapperClassName="flex-1 min-w-0"
+            className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+          />
+        ) : (
+          <input
+            id={inputId}
+            type={inputType}
+            value={destination}
+            placeholder={placeholder}
+            onChange={(e) => setDestination(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                send();
+              }
+            }}
+            className="flex-1 min-w-0 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+          />
+        )}
         <button
           type="button"
           onClick={send}
@@ -619,9 +637,8 @@ const PhotoSettings = () => {
                   <label htmlFor="ps-alert" className="block text-sm text-gray-700 mb-1">
                     Failure alert email
                   </label>
-                  <input
+                  <EmailInput
                     id="ps-alert"
-                    type="email"
                     value={String(form.failure_notify_email ?? '')}
                     onChange={(e) => setForm((prev) => ({ ...prev, failure_notify_email: e.target.value }))}
                     placeholder="manager@example.com"

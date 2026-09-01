@@ -47,6 +47,7 @@ import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import HtmlCodeEditor from '../../../components/admin/email/HtmlCodeEditor';
+import EmailInput from '../../../components/ui/EmailInput';
 import { getStoredUser } from '../../../utils/storage';
 import type { 
   CreateEmailNotificationData, 
@@ -742,13 +743,13 @@ const CreateEmailNotification: React.FC = () => {
                 <div className="pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Custom Email Addresses</label>
                   <div className="flex gap-2 mb-2">
-                    <input
-                      type="email"
+                    <EmailInput
                       value={customEmail}
                       onChange={(e) => setCustomEmail(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomEmail())}
                       placeholder="Enter email address..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      wrapperClassName="flex-1 min-w-0"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                     <StandardButton type="button" variant="secondary" icon={Plus} onClick={addCustomEmail}>
                       Add

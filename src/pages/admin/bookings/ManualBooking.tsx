@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
 import DatePicker from '../../../components/ui/DatePicker';
+import EmailInput from '../../../components/ui/EmailInput';
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
@@ -1387,8 +1388,7 @@ const ManualBooking: React.FC = () => {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
-                          <input
-                            type="email"
+                          <EmailInput
                             name="email"
                             value={form.email}
                             onChange={handleInputChange}

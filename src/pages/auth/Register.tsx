@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { API_BASE_URL } from "../../utils/storage";
+import EmailInput from "../../components/ui/EmailInput";
 
 type UserRole = 'company_admin' | 'location_manager' | 'attendant';
 
@@ -450,8 +451,7 @@ export default function Register() {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-zinc-700 mb-1">Company Email</label>
-                        <input
-                          type="email"
+                        <EmailInput
                           name="companyEmail"
                           className="w-full rounded-md border border-zinc-200 px-2.5 py-1.5 text-zinc-900 bg-white focus:outline-none focus:ring-1 focus:ring-blue-800 focus:border-blue-800 transition text-sm"
                           placeholder="company@example.com"
@@ -612,8 +612,7 @@ export default function Register() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-zinc-700 mb-1">Location Email</label>
-                          <input
-                            type="email"
+                          <EmailInput
                             name="locationEmail"
                             className={`w-full rounded-md border border-zinc-200 px-2.5 py-1.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-blue-800 focus:border-blue-800 transition text-sm ${
                               !isNewLocation ? 'bg-zinc-100 cursor-not-allowed' : 'bg-white'

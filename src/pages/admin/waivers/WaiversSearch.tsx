@@ -37,6 +37,7 @@ import type { EventPurchase } from '../../../types/event.types';
 import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus, WaiverTimeframe, WaiverPeriodSummary } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_RECORDS_STEPS } from '../../../components/waiver/tour/tourSteps';
@@ -1227,7 +1228,7 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-            <input type="email" value={form.adult_email} onChange={(e) => setForm((f) => ({ ...f, adult_email: e.target.value }))} className={fieldCls} placeholder="customer@email.com" />
+            <EmailInput value={form.adult_email} onChange={(e) => setForm((f) => ({ ...f, adult_email: e.target.value }))} className={fieldCls} placeholder="customer@email.com" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>

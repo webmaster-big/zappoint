@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { RsvpPageData, RsvpSubmitRequest } from '../../types/invitation.types';
 import invitationService from '../../services/invitationService';
+import EmailInput from '../../components/ui/EmailInput';
 
 const ConfettiCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -372,8 +373,7 @@ const RsvpPage = () => {
 
             <div>
               <label className={labelClass}>Email *</label>
-              <input
-                type="email"
+              <EmailInput
                 value={email}
                 onChange={e => { setEmail(e.target.value); setFormErrors(p => ({ ...p, email: '' })); }}
                 className={`${inputClass} ${formErrors.email ? 'border-red-300 focus:ring-red-500/20 focus:border-red-400' : ''}`}

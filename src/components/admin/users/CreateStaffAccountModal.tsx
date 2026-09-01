@@ -12,6 +12,7 @@ import {
   Plus,
 } from 'lucide-react';
 import StandardButton from '../../ui/StandardButton';
+import EmailInput from '../../ui/EmailInput';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { userService } from '../../../services/UserService';
 import { locationService } from '../../../services/LocationService';
@@ -325,8 +326,7 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
               <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="email"
+                <EmailInput
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
                   disabled={submitting}

@@ -15,6 +15,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { API_BASE_URL, getStoredUser, setStoredUser, getImageUrl } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import type { LocationManagerProfileData } from '../../../types/LocationManagerProfile.types';
 import { getAuthToken } from '../../../services';
 
@@ -529,8 +530,7 @@ const LocationManagerProfile = () => {
                     <Mail size={16} className="mr-2 text-gray-400" />
                     Email Address
                   </label>
-                  <input
-                    type="email"
+                  <EmailInput
                     value={isEditing ? editedData.personal.email : profileData.personal.email}
                     onChange={(e) => handleInputChange('personal', 'email', e.target.value)}
                     disabled={!isEditing}
@@ -648,8 +648,7 @@ const LocationManagerProfile = () => {
                     <Mail size={16} className="mr-2 text-gray-400" />
                     Location Email
                   </label>
-                  <input
-                    type="email"
+                  <EmailInput
                     value={isEditing ? editedData.location.email : profileData.location.email}
                     onChange={(e) => handleInputChange('location', 'email', e.target.value)}
                     disabled={!isEditing}

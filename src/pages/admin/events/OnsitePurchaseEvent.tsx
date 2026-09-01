@@ -22,6 +22,7 @@ import { eventPurchaseService } from '../../../services/EventPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import type { Event, EventAddOn } from '../../../types/event.types';
 import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -757,8 +758,7 @@ const OnsitePurchaseEvent = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email {selectedCustomerId && <span className="text-green-600 text-xs">(Customer Found)</span>}
                 </label>
-                <input
-                  type="email"
+                <EmailInput
                   name="email"
                   value={guestEmail}
                   onChange={handleCustomerInfoChange}
@@ -766,6 +766,7 @@ const OnsitePurchaseEvent = () => {
                   onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
                   className={`w-full border ${selectedCustomerId ? 'border-green-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   placeholder="customer@example.com"
+                  suppressSuggestions={showCustomerDropdown && foundCustomers.length > 0}
                 />
                 {searchingCustomer && (
                   <div className="absolute right-3 top-9 text-gray-400">

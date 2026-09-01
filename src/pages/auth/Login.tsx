@@ -2,6 +2,7 @@ import { useState } from "react";
 import { API_BASE_URL } from "../../utils/storage";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import EmailInput from "../../components/ui/EmailInput";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -162,8 +163,7 @@ export default function Login() {
         <form className="flex flex-col gap-5" onSubmit={handleSubmit} name="login" method="post">
           <div>
             <label className="block text-sm font-medium text-zinc-800 mb-1">Email</label>
-            <input
-              type="email"
+            <EmailInput
               name="email"
               id="email"
               autoComplete="username email"

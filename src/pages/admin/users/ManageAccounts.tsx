@@ -22,6 +22,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { API_BASE_URL } from '../../../utils/storage';
 import { locationService } from '../../../services';
@@ -246,8 +247,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email Address
             </label>
-            <input
-              type="email"
+            <EmailInput
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email address"

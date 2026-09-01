@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Building2, Save, CheckCircle } from 'lucide-react';
 import StandardButton from '../../ui/StandardButton';
+import EmailInput from '../../ui/EmailInput';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { locationService } from '../../../services/LocationService';
 import type { Location, UpdateLocationData } from '../../../services/LocationService';
@@ -270,8 +271,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
+            <EmailInput
               value={form.email ?? ''}
               onChange={(e) => update('email', e.target.value)}
               disabled={submitting}

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import type { Booking } from '../../services/bookingService';
 import type { InvitationGuest, InvitationPreviewResponse } from '../../types/invitation.types';
 import invitationService from '../../services/invitationService';
+import EmailInput from '../ui/EmailInput';
 import { convertTo12Hour } from '../../utils/timeFormat';
 
 interface Props {
@@ -250,8 +251,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Email {guest.send_via !== 'text' ? '*' : ''}
                   </label>
-                  <input
-                    type="email"
+                  <EmailInput
                     value={guest.email}
                     onChange={e => updateGuest(guest.id, 'email', e.target.value)}
                     placeholder="email@example.com"

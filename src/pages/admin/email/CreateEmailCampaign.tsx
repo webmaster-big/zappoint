@@ -46,6 +46,7 @@ import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
+import EmailInput from '../../../components/ui/EmailInput';
 import { getStoredUser } from '../../../utils/storage';
 import type { 
   CreateEmailCampaignData, 
@@ -736,13 +737,13 @@ const CreateEmailCampaign: React.FC = () => {
                   Custom Email Addresses
                 </label>
                 <div className="flex gap-2 mb-2">
-                  <input
-                    type="email"
+                  <EmailInput
                     value={customEmailInput}
                     onChange={(e) => setCustomEmailInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomEmail())}
                     placeholder="Enter email address..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    wrapperClassName="flex-1 min-w-0"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <StandardButton variant="secondary" icon={Plus} onClick={addCustomEmail}>
                     Add
@@ -1256,8 +1257,7 @@ const CreateEmailCampaign: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Test Email Address
               </label>
-              <input
-                type="email"
+              <EmailInput
                 value={testEmail}
                 onChange={(e) => setTestEmail(e.target.value)}
                 placeholder="Enter your email..."

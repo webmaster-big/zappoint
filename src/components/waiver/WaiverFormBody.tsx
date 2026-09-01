@@ -9,6 +9,7 @@ import WaiverFormTour from './tour/WaiverFormTour';
 import WaiverSignaturePad from './WaiverSignaturePad';
 import DateOfBirthSelect from './DateOfBirthSelect';
 import RelationshipSelect from './RelationshipSelect';
+import EmailInput from '../ui/EmailInput';
 import { getDeviceId } from '../../utils/deviceId';
 import { ADULT_AGE, calculateAge, isFutureDate } from '../../utils/age';
 
@@ -228,8 +229,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
           </div>
           <div data-tour="wf-adult-contact">
             <label className={labelClass}>Email *</label>
-            <input
-              type="email"
+            <EmailInput
               value={adultEmail}
               autoComplete={autoCompleteOff}
               onChange={(e) => setAdultEmail(e.target.value)}

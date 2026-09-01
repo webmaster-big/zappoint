@@ -39,6 +39,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SignatureCapture from '../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../components/TermsAndConditionsCheckbox';
 import StandardButton from '../../components/ui/StandardButton';
+import EmailInput from '../../components/ui/EmailInput';
 import type { FeeBreakdown } from '../../types/FeeSupport.types';
 import { buildAppliedFees } from '../../utils/fees';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../utils/discounts';
@@ -1508,8 +1509,7 @@ const PurchaseEvent = () => {
                         Email Address <span className="text-red-500">*</span>
                         {selectedCustomerId && <span className="ml-2 text-emerald-600 text-xs font-normal">✓ Existing customer found</span>}
                       </label>
-                      <input
-                        type="email"
+                      <EmailInput
                         value={guestEmail}
                         onChange={e => setGuestEmail(e.target.value)}
                         onFocus={() => foundCustomers.length > 0 && setShowCustomerDropdown(true)}
@@ -1517,6 +1517,7 @@ const PurchaseEvent = () => {
                         placeholder="john.doe@example.com"
                         className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${selectedCustomerId ? 'border-emerald-400 bg-emerald-50' : 'border-gray-300'}`}
                         required
+                        suppressSuggestions={showCustomerDropdown && foundCustomers.length > 0}
                       />
                       {searchingCustomer && (
                         <div className="absolute right-3 top-11 text-gray-400">

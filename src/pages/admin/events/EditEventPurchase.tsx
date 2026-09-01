@@ -5,6 +5,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import Toast from '../../../components/ui/Toast';
+import EmailInput from '../../../components/ui/EmailInput';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { eventPurchaseService } from '../../../services/EventPurchaseService';
 import { eventService } from '../../../services/EventService';
@@ -522,12 +523,12 @@ const EditEventPurchase: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block font-semibold mb-2 text-base text-neutral-800">Email</label>
-                    <input
-                      type="email"
+                    <EmailInput
                       value={guestEmail}
                       onChange={(e) => setGuestEmail(e.target.value)}
                       className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                       placeholder="customer@example.com"
+                      suppressSuggestions={isOrderLine}
                     />
                   </div>
                   <div>

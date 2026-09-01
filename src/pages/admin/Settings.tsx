@@ -3,6 +3,7 @@ import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCi
 import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
 import Toast from '../../components/ui/Toast';
+import EmailInput from '../../components/ui/EmailInput';
 import {
   getAuthorizeNetAccount,
   getAllAuthorizeNetAccounts,
@@ -1422,8 +1423,7 @@ const Settings = () => {
                   <label className="block text-xs font-medium text-gray-700 mb-1.5">
                     New Email Address
                   </label>
-                  <input
-                    type="email"
+                  <EmailInput
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}

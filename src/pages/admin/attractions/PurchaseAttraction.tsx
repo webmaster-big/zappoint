@@ -32,6 +32,7 @@ import { attractionPurchaseService } from '../../../services/AttractionPurchaseS
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
+import EmailInput from '../../../components/ui/EmailInput';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
 import CallToBookPanel from '../../../components/customer/CallToBookPanel';
@@ -1776,8 +1777,7 @@ const PurchaseAttraction = () => {
                         Email Address <span className="text-red-500">*</span>
                         {selectedCustomerId && <span className="ml-2 text-green-600 text-xs font-normal">✓ Existing customer found</span>}
                       </label>
-                      <input
-                        type="email"
+                      <EmailInput
                         name="email"
                         value={customerInfo.email}
                         onChange={handleInputChange}
@@ -1788,6 +1788,7 @@ const PurchaseAttraction = () => {
                           selectedCustomerId ? 'border-green-400 bg-green-50' : 'border-gray-300'
                         }`}
                         required
+                        suppressSuggestions={showCustomerDropdown && foundCustomers.length > 0}
                       />
                       {searchingCustomer && (
                         <div className="absolute right-3 top-11 text-gray-400">

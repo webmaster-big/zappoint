@@ -6,6 +6,7 @@ import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_BULK_STEPS } from '../../../components/waiver/tour/tourSteps';
 import { formatDateLong } from '../../../utils/timeFormat';
@@ -203,7 +204,7 @@ const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClos
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-              <input type="email" value={form.chaperone_email} onChange={(e) => setForm((f) => ({ ...f, chaperone_email: e.target.value }))} className={fieldCls} />
+              <EmailInput value={form.chaperone_email} onChange={(e) => setForm((f) => ({ ...f, chaperone_email: e.target.value }))} className={fieldCls} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Clock, Download, ImageOff, Lock } from 'lucide-react';
+import EmailInput from '../../components/ui/EmailInput';
 import photoService from '../../services/PhotoService';
 import type { CustomerPhotoPage } from '../../types/photo.types';
 
@@ -202,14 +203,15 @@ const CustomerPhotos = () => {
                 <label htmlFor="cp-email" className="block text-sm text-zinc-300 mb-1">
                   Email address
                 </label>
-                <input
+                <EmailInput
                   id="cp-email"
-                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={fieldClass('email')}
                   placeholder="you@example.com"
                   autoComplete="email"
+                  listClassName="!bg-zinc-900 !border-zinc-700"
+                  optionClassName="!text-zinc-200 hover:!bg-zinc-800 aria-selected:!bg-zinc-800 aria-selected:!text-white"
                 />
                 {errors.email && <p className="mt-1 text-sm text-red-400">{errors.email}</p>}
               </div>

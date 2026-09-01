@@ -3,6 +3,7 @@ import { CalendarX2, CheckCircle2, Loader2, X } from 'lucide-react';
 import checkoutConcernService, {
   type ConcernEntityType,
 } from '../../services/CheckoutConcernService';
+import EmailInput from '../ui/EmailInput';
 
 export interface ScheduleHelpModalProps {
   locationId?: number | null;
@@ -215,9 +216,8 @@ const ScheduleHelpModal = ({
                   <label htmlFor="schedule-help-email" className="block text-sm font-medium text-gray-900 mb-1.5">
                     Email <span className="text-gray-400 font-normal">(optional)</span>
                   </label>
-                  <input
+                  <EmailInput
                     id="schedule-help-email"
-                    type="email"
                     value={email}
                     onChange={event => setEmail(event.target.value)}
                     autoComplete="email"

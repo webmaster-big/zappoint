@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Pencil, RefreshCw } from 'lucide-react';
 import StandardButton from '../../ui/StandardButton';
+import EmailInput from '../../ui/EmailInput';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { userService } from '../../../services/UserService';
 import Toast from '../../ui/Toast';
@@ -211,8 +212,7 @@ const AccountEditModal = ({ isOpen, onClose, account, onSaved }: AccountEditModa
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-            <input
-              type="email"
+            <EmailInput
               value={form.email}
               onChange={(e) => update('email', e.target.value)}
               disabled={submitting}

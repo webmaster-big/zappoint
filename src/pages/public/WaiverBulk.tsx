@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import type { BulkChaperoneView } from '../../types/waiver.types';
 import waiverService from '../../services/waiverService';
 import { WaiverLoading, WaiverError } from '../../components/waiver/WaiverStates';
+import EmailInput from '../../components/ui/EmailInput';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -242,8 +243,7 @@ const WaiverBulk = () => {
                       className={inputClass}
                       placeholder="Name"
                     />
-                    <input
-                      type="email"
+                    <EmailInput
                       value={row.email}
                       onChange={(e) => updateRow(i, 'email', e.target.value)}
                       className={inputClass}

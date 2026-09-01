@@ -19,6 +19,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { API_BASE_URL, getStoredUser, setStoredUser, getImageUrl } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import type { CompanyAdminProfileData } from '../../../types/CompanyAdminProfile.types';
 import { getAuthToken } from '../../../services';
 
@@ -790,8 +791,7 @@ const CompanyAdminProfile = () => {
                     <Mail size={16} className="mr-2 text-gray-400" />
                     Email Address
                   </label>
-                  <input
-                    type="email"
+                  <EmailInput
                     value={isEditing ? editedData.personal.email : profileData.personal.email}
                     onChange={(e) => handleInputChange('personal', 'email', e.target.value)}
                     disabled={!isEditing}
@@ -928,8 +928,7 @@ const CompanyAdminProfile = () => {
                     <Mail size={16} className="mr-2 text-gray-400" />
                     Company Email
                   </label>
-                  <input
-                    type="email"
+                  <EmailInput
                     value={isEditing ? editedData.company.email : profileData.company.email}
                     onChange={(e) => handleInputChange('company', 'email', e.target.value)}
                     disabled={!isEditing}

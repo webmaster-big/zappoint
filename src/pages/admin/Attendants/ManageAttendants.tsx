@@ -18,6 +18,7 @@ import {
   Download,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
@@ -215,8 +216,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email Address
             </label>
-            <input
-              type="email"
+            <EmailInput
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email address"

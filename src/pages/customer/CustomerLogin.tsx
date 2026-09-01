@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import EmailInput from '../../components/ui/EmailInput';
 import type { LoginFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
 
@@ -161,7 +162,7 @@ const CustomerLogin = () => {
             <form className="space-y-3" onSubmit={handleSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" name="email" autoComplete="username email" required value={formData.email} onChange={handleChange}
+                <EmailInput name="email" autoComplete="username email" required value={formData.email} onChange={handleChange}
                   className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm text-gray-900 bg-gray-50/60 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
                   placeholder="you@email.com" />
               </div>

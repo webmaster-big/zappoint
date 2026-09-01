@@ -20,6 +20,7 @@ import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber,
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
+import EmailInput from '../../../components/ui/EmailInput';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
 import CallToBookPanel from '../../../components/customer/CallToBookPanel';
 import CallToBookModal from '../../../components/customer/CallToBookModal';
@@ -2368,8 +2369,7 @@ const BookPackage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5" onFocusCapture={handleFormStarted}>
                   <div className="md:col-span-2">
                     <label className="block font-medium mb-2 text-gray-800 text-sm">Email</label>
-                    <input 
-                      type="email" 
+                    <EmailInput 
                       placeholder="Email" 
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
                       value={form.email} 

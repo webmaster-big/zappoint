@@ -23,6 +23,7 @@ import { loadAcceptJS, tokenizeCard } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
@@ -371,7 +372,7 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Email <span className="text-gray-400 font-normal">(optional)</span></label>
-                      <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className={ic} placeholder="jane@example.com" />
+                      <EmailInput value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className={ic} placeholder="jane@example.com" />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Phone <span className="text-gray-400 font-normal">(optional)</span></label>

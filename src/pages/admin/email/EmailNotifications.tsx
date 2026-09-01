@@ -29,6 +29,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import EmailInput from '../../../components/ui/EmailInput';
 import { getStoredUser } from '../../../utils/storage';
 import {
   AdminDataTable,
@@ -970,8 +971,7 @@ const EmailNotifications = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
               </label>
-              <input
-                type="email"
+              <EmailInput
                 value={testEmail}
                 onChange={(e) => setTestEmail(e.target.value)}
                 placeholder="Enter test email address..."

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { promoService } from "../../services/PromoService";
 import { giftCardService } from "../../services/GiftCardService";
+import EmailInput from "../ui/EmailInput";
 
 interface Attraction { name: string; price: number; unit?: string; }
 interface PromoOrGiftCard { name: string; code: string; description?: string; }
@@ -569,8 +570,7 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
               </div>
               <div className="md:col-span-2">
                 <label className="block font-medium mb-2 text-gray-700 text-sm">Email</label>
-                <input 
-                  type="email" 
+                <EmailInput 
                   placeholder="Email" 
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
                   value={form.email} 
