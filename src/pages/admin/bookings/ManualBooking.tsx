@@ -36,6 +36,7 @@ import customFieldService, {
   toCustomFieldPayload,
   type ApplicableCustomField,
 } from '../../../services/CustomFieldService';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -1340,7 +1341,7 @@ const ManualBooking: React.FC = () => {
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{p.description}</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-${themeColor}-50 text-${themeColor}-700`}>
-                            {p.category || 'Package'}
+                            {normalizeCategory(p.category) || 'Package'}
                           </span>
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
                             {formatDurationDisplay(p.duration, p.duration_unit)}

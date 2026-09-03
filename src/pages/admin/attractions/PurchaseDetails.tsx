@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import { 
@@ -272,7 +273,7 @@ const PurchaseDetails = () => {
                   <p className="text-sm text-gray-500">Attraction Name</p>
                   <p className="font-medium text-gray-900">{purchase.attraction?.name || 'Unknown'}</p>
                   {purchase.attraction?.category && (
-                    <p className="text-sm text-gray-600">{purchase.attraction.category}</p>
+                    <p className="text-sm text-gray-600">{normalizeCategory(purchase.attraction.category)}</p>
                   )}
                 </div>
               </div>

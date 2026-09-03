@@ -1,5 +1,6 @@
 
 import { attractionService, type Attraction, type AttractionFilters } from './AttractionService';
+import { normalizeCategory } from '../utils/venueCategories';
 
 const CACHE_NAME = 'zapzone-attractions-cache-v1';
 const ATTRACTIONS_CACHE_KEY = '/api/attractions/cached';
@@ -264,7 +265,7 @@ class AttractionCacheService {
         return false;
       }
 
-      if (filters.category && attraction.category !== filters.category) {
+      if (filters.category && normalizeCategory(attraction.category) !== normalizeCategory(filters.category)) {
         return false;
       }
 
@@ -276,7 +277,7 @@ class AttractionCacheService {
         const searchLower = filters.search.toLowerCase();
         const name = attraction.name?.toLowerCase() || '';
         const description = attraction.description?.toLowerCase() || '';
-        const category = attraction.category?.toLowerCase() || '';
+        const category = normalizeCategory(attraction.category).toLowerCase();
         
         if (!name.includes(searchLower) && 
             !description.includes(searchLower) && 

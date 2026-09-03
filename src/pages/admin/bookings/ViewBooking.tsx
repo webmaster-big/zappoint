@@ -27,6 +27,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -289,7 +290,7 @@ const ViewBooking: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-500">Package</p>
                     <p className="font-medium text-gray-900">{booking.package.name}</p>
-                    {booking.package.category && <p className="text-sm text-gray-600">{booking.package.category}</p>}
+                    {normalizeCategory(booking.package.category) && <p className="text-sm text-gray-600">{normalizeCategory(booking.package.category)}</p>}
                   </div>
                 </div>
               ) : null}

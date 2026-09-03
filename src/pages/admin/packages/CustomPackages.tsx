@@ -8,6 +8,7 @@ import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { createSlugWithId } from '../../../utils/slug';
 import Toast from '../../../components/ui/Toast';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 const packageTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
   custom: { label: 'Custom', icon: Sparkles, color: 'text-blue-600', bgColor: 'bg-blue-50' },
@@ -115,7 +116,7 @@ const CustomPackages: React.FC = () => {
     }
 
     if (filterCategory !== "all") {
-      result = result.filter(pkg => pkg.category === filterCategory);
+      result = result.filter(pkg => normalizeCategory(pkg.category) === normalizeCategory(filterCategory));
     }
 
     if (searchTerm.trim()) {
@@ -127,7 +128,7 @@ const CustomPackages: React.FC = () => {
         
         return pkg.name?.toLowerCase().includes(search) ||
           pkg.description?.toLowerCase().includes(search) ||
-          pkg.category?.toLowerCase().includes(search) ||
+          normalizeCategory(pkg.category).toLowerCase().includes(search) ||
           featuresStr.includes(search);
       });
     }
@@ -143,8 +144,8 @@ const CustomPackages: React.FC = () => {
         aValue = Number(a.price) || 0;
         bValue = Number(b.price) || 0;
       } else if (sortBy === 'category') {
-        aValue = (a.category || '').toLowerCase();
-        bValue = (b.category || '').toLowerCase();
+        aValue = normalizeCategory(a.category).toLowerCase();
+        bValue = normalizeCategory(b.category).toLowerCase();
       } else if (sortBy === 'type') {
         aValue = (a.package_type || '').toLowerCase();
         bValue = (b.package_type || '').toLowerCase();
@@ -160,7 +161,7 @@ const CustomPackages: React.FC = () => {
     setFilteredPackages(result);
   }, [packages, filterType, filterCategory, effectiveLocationId, searchTerm, sortBy, sortOrder]);
 
-  const categories = ["all", ...new Set(packages.map(pkg => pkg.category).filter(Boolean))];
+  const categories = ["all", ...new Set(packages.map(pkg => normalizeCategory(pkg.category)).filter(Boolean))];
 
   const packageTypes = ["all", ...new Set(packages.map(pkg => pkg.package_type).filter(Boolean))];
 
@@ -409,7 +410,7 @@ const CustomPackages: React.FC = () => {
                         </span>
                         {pkg.category && (
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
-                            {pkg.category}
+                            {normalizeCategory(pkg.category)}
                           </span>
                         )}
                         {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (

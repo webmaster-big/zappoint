@@ -19,6 +19,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 const PackageDetails = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -151,7 +152,7 @@ const PackageDetails = () => {
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{packageData.name}</h1>
-              <p className="text-gray-600 mt-2">{packageData.category || "No category"}</p>
+              <p className="text-gray-600 mt-2">{normalizeCategory(packageData.category) || "No category"}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <span className={`px-4 py-2 rounded-full text-sm font-medium ${
@@ -212,7 +213,7 @@ const PackageDetails = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Category</p>
-                  <p className="font-medium text-gray-900">{packageData.category || "No category"}</p>
+                  <p className="font-medium text-gray-900">{normalizeCategory(packageData.category) || "No category"}</p>
                 </div>
               </div>
               {packageData.package_type && (

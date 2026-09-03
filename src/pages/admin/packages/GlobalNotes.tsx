@@ -15,6 +15,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
 import { packageService, type Package as PackageType } from '../../../services/PackageService';
 import Toast from '../../../components/ui/Toast';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 const GlobalNotes: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -368,8 +369,8 @@ const GlobalNotes: React.FC = () => {
                             className={`rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
                           />
                           <span className="text-sm text-gray-900">{pkg.name}</span>
-                          {pkg.category && (
-                            <span className="text-xs text-gray-500">({pkg.category})</span>
+                          {normalizeCategory(pkg.category) && (
+                            <span className="text-xs text-gray-500">({normalizeCategory(pkg.category)})</span>
                           )}
                         </label>
                       ))}

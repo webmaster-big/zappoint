@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import { 
   ShoppingCart, 
   CreditCard, 
@@ -144,7 +145,7 @@ const CreatePurchase = () => {
             id: attr.id.toString(),
             name: attr.name,
             description: attr.description,
-            category: attr.category,
+            category: normalizeCategory(attr.category),
             price: attr.price,
             pricingType: attr.pricing_type,
             maxCapacity: attr.max_capacity,
@@ -196,7 +197,7 @@ const CreatePurchase = () => {
           id: attr.id.toString(),
           name: attr.name,
           description: attr.description,
-          category: attr.category,
+          category: normalizeCategory(attr.category),
           price: attr.price,
           pricingType: attr.pricing_type,
           maxCapacity: attr.max_capacity,

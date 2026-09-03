@@ -8,6 +8,7 @@ import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 interface UserData {
   name: string;
@@ -129,7 +130,7 @@ const TrashedPackages: React.FC = () => {
       result = result.filter(pkg => {
         return pkg.name?.toLowerCase().includes(search) ||
           pkg.description?.toLowerCase().includes(search) ||
-          pkg.category?.toLowerCase().includes(search);
+          normalizeCategory(pkg.category).toLowerCase().includes(search);
       });
     }
 
@@ -320,7 +321,7 @@ const TrashedPackages: React.FC = () => {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         <Tag className="w-3 h-3" />
-                        {pkg.category || 'Uncategorized'}
+                        {normalizeCategory(pkg.category) || 'Uncategorized'}
                       </span>
                     </td>
                     <td className="px-6 py-4">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -157,7 +158,7 @@ const AttractionDetails = () => {
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{attraction.name}</h1>
-              <p className="text-gray-600 mt-2">{attraction.category}</p>
+              <p className="text-gray-600 mt-2">{normalizeCategory(attraction.category)}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span className={`px-4 py-2 rounded-full text-sm font-medium ${
@@ -225,7 +226,7 @@ const AttractionDetails = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Category</p>
-                  <p className="font-medium text-gray-900">{attraction.category}</p>
+                  <p className="font-medium text-gray-900">{normalizeCategory(attraction.category)}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

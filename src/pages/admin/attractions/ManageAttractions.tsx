@@ -46,7 +46,7 @@ import {
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 import CategoryTabs from '../../../components/admin/CategoryTabs';
 
-type AttractionRow = ManageAttractionsAttraction & { updatedAt?: string };
+type AttractionRow = ManageAttractionsAttraction & { updatedAt?: string; categoryRaw?: string };
 
 type RawAttraction = Attraction & { location?: { id: number; name: string } };
 
@@ -55,6 +55,7 @@ const convertAttraction = (attr: RawAttraction): AttractionRow => ({
   name: attr.name,
   description: attr.description,
   category: normalizeCategory(attr.category),
+  categoryRaw: attr.category,
   price: attr.price,
   pricingType: attr.pricing_type,
   maxCapacity: attr.max_capacity,
@@ -787,6 +788,8 @@ const ManageAttractions = () => {
       delete clean.id;
       delete clean.location_id;
       delete clean.location;
+      clean.category = clean.categoryRaw ?? clean.category;
+      delete clean.categoryRaw;
       return clean;
     });
     const jsonData = JSON.stringify(cleanedAttractions, null, 2);

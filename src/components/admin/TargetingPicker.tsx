@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { normalizeCategory } from '../../utils/venueCategories';
 import { Search, X, MapPin, Package as PackageIcon, Ticket, CalendarDays, Check } from 'lucide-react';
 import targetingOptionsService, {
   type TargetingOption,
@@ -55,7 +56,7 @@ const TargetingPicker = ({ value, onChange }: { value: TargetingValue; onChange:
 
   const categories = useMemo(() => {
     const all = new Set<string>();
-    GROUPS.forEach(g => (options?.[g.key] ?? []).forEach(item => { if (item.category) all.add(item.category); }));
+    GROUPS.forEach(g => (options?.[g.key] ?? []).forEach(item => { const c = normalizeCategory(item.category); if (c) all.add(c); }));
     return [...all].sort();
   }, [options]);
 
@@ -67,8 +68,8 @@ const TargetingPicker = ({ value, onChange }: { value: TargetingValue; onChange:
     const term = search.trim().toLowerCase();
     return items.filter(item => {
       if (venueScope.length && !venueScope.includes(item.location_id)) return false;
-      if (categoryFilter.length && !categoryFilter.includes(item.category ?? '')) return false;
-      if (term && !`${item.name} ${locationName[item.location_id] ?? ''} ${item.category ?? ''}`.toLowerCase().includes(term)) return false;
+      if (categoryFilter.length && !categoryFilter.includes(normalizeCategory(item.category))) return false;
+      if (term && !`${item.name} ${locationName[item.location_id] ?? ''} ${normalizeCategory(item.category)}`.toLowerCase().includes(term)) return false;
       return true;
     });
   };
@@ -251,7 +252,7 @@ const TargetingPicker = ({ value, onChange }: { value: TargetingValue; onChange:
                         <span className="block text-sm text-gray-800 truncate">{item.name}</span>
                         <span className="block text-[11px] text-gray-500 truncate">
                           {locationName[item.location_id] ?? `Venue ${item.location_id}`}
-                          {item.category ? ` · ${item.category}` : ''}
+                          {normalizeCategory(item.category) ? ` · ${normalizeCategory(item.category)}` : ''}
                         </span>
                       </span>
                     </label>

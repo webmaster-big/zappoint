@@ -126,7 +126,7 @@ const Bookings: React.FC = () => {
       duration: booking.duration && booking.duration_unit
         ? formatDurationDisplay(booking.duration, booking.duration_unit)
         : '2 hours',
-      activity: booking.package?.category || 'Package Booking',
+      activity: normalizeCategory(booking.package?.category) || 'Package Booking',
       category: normalizeCategory(booking.package?.display_label || booking.package?.category),
       notes: booking.notes,
       specialRequests: booking.special_requests,
@@ -786,7 +786,7 @@ const Bookings: React.FC = () => {
               duration: booking.duration && booking.duration_unit 
                 ? formatDurationDisplay(booking.duration, booking.duration_unit)
                 : '2 hours',
-              activity: booking.package?.category || 'Package Booking',
+              activity: normalizeCategory(booking.package?.category) || 'Package Booking',
               category: normalizeCategory(booking.package?.display_label || booking.package?.category),
               notes: booking.notes,
               referenceNumber: booking.reference_number,
@@ -815,7 +815,7 @@ const Bookings: React.FC = () => {
             result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
           }
           if (filters.category !== 'all') {
-            result = result.filter(booking => (booking.category || 'Uncategorized') === filters.category);
+            result = result.filter(booking => (booking.category || 'Uncategorized') === normalizeCategory(filters.category));
           }
           if (filters.dateRange.start) {
             result = result.filter(booking => {
@@ -877,7 +877,7 @@ const Bookings: React.FC = () => {
     }
 
     if (filters.category !== 'all') {
-      result = result.filter(booking => (booking.category || 'Uncategorized') === filters.category);
+      result = result.filter(booking => (booking.category || 'Uncategorized') === normalizeCategory(filters.category));
     }
 
     if (filters.dateRange.start) {
@@ -1212,7 +1212,7 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, packageName: pkg.name, activity: pkg.category || 'Package Booking', category: pkg.display_label || pkg.category || '' }
+              ? { ...b, packageName: pkg.name, activity: normalizeCategory(pkg.category) || 'Package Booking', category: normalizeCategory(pkg.display_label || pkg.category) }
               : b
           )
         );
@@ -2965,7 +2965,7 @@ const Bookings: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
           <CategoryTabs
             options={categoryTabs}
-            value={filters.category}
+            value={normalizeCategory(filters.category)}
             onChange={value => handleFilterChange('category', value)}
             totalCount={bookings.length}
             allLabel="All Categories"
@@ -3131,7 +3131,7 @@ const Bookings: React.FC = () => {
             const chips: { label: string; onClear: () => void }[] = [];
             if (filters.status !== 'all') chips.push({ label: `Status: ${filters.status}`, onClear: () => handleFilterChange('status', 'all') });
             if (filters.payment !== 'all') chips.push({ label: `Payment: ${filters.payment}`, onClear: () => handleFilterChange('payment', 'all') });
-            if (filters.category !== 'all') chips.push({ label: `Category: ${filters.category}`, onClear: () => handleFilterChange('category', 'all') });
+            if (filters.category !== 'all') chips.push({ label: `Category: ${normalizeCategory(filters.category)}`, onClear: () => handleFilterChange('category', 'all') });
             if (filters.packageId !== 'all') {
               const pkg = filterPackages.find(p => p.id.toString() === filters.packageId);
               chips.push({ label: `Package: ${pkg?.name || filters.packageId}`, onClear: () => handleFilterChange('packageId', 'all') });
@@ -4131,7 +4131,7 @@ const Bookings: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium text-gray-900">{pkg.name}</div>
-                            <div className="text-xs text-gray-500">{pkg.category}</div>
+                            <div className="text-xs text-gray-500">{normalizeCategory(pkg.category)}</div>
                           </div>
                           <div className="text-right">
                             <div className="font-semibold text-gray-900">${Number(pkg.price || 0).toFixed(2)}</div>

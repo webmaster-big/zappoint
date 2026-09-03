@@ -9,6 +9,7 @@ import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { createSlugWithId } from '../../../utils/slug';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 interface UserData {
   name: string;
@@ -187,7 +188,7 @@ const Packages: React.FC = () => {
     }
 
     if (filterCategory !== "all") {
-      result = result.filter(pkg => pkg.category === filterCategory);
+      result = result.filter(pkg => normalizeCategory(pkg.category) === normalizeCategory(filterCategory));
     }
 
     if (searchTerm.trim()) {
@@ -199,7 +200,7 @@ const Packages: React.FC = () => {
         
         return pkg.name?.toLowerCase().includes(search) ||
           pkg.description?.toLowerCase().includes(search) ||
-          pkg.category?.toLowerCase().includes(search) ||
+          normalizeCategory(pkg.category).toLowerCase().includes(search) ||
           featuresStr.includes(search);
       });
     }
@@ -215,8 +216,8 @@ const Packages: React.FC = () => {
         aValue = Number(a.price) || 0;
         bValue = Number(b.price) || 0;
       } else if (sortBy === 'category') {
-        aValue = (a.category || '').toLowerCase();
-        bValue = (b.category || '').toLowerCase();
+        aValue = normalizeCategory(a.category).toLowerCase();
+        bValue = normalizeCategory(b.category).toLowerCase();
       } else if (sortBy === 'display_order') {
         aValue = a.display_order ?? 0;
         bValue = b.display_order ?? 0;
@@ -232,7 +233,7 @@ const Packages: React.FC = () => {
     setFilteredPackages(result);
   }, [packages, filterCategory, effectiveLocationId, searchTerm, sortBy, sortOrder]);
 
-  const categories = ["all", ...new Set(packages.map(pkg => pkg.category).filter(Boolean))];
+  const categories = ["all", ...new Set(packages.map(pkg => normalizeCategory(pkg.category)).filter(Boolean))];
 
   const isCompanyAdmin = userData?.role === 'company_admin';
 
@@ -806,7 +807,7 @@ const Packages: React.FC = () => {
                     <p className="text-sm text-gray-600 line-clamp-2 mb-2">{pkg.description || "No description"}</p>
                     <div className="flex flex-wrap gap-1">
                       <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
-                        {pkg.category || "Uncategorized"}
+                        {normalizeCategory(pkg.category) || "Uncategorized"}
                       </span>
                       {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
@@ -968,7 +969,7 @@ const Packages: React.FC = () => {
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900">{pkg.name || 'Unnamed Package'}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{pkg.category} • ${pkg.price}</p>
+                        <p className="text-sm text-gray-600 mt-1">{normalizeCategory(pkg.category)} • ${pkg.price}</p>
                         {pkg.description && (
                           <p className="text-xs text-gray-500 mt-1 line-clamp-1">{pkg.description}</p>
                         )}

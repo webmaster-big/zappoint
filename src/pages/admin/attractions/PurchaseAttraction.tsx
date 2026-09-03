@@ -64,6 +64,7 @@ import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
 import { generateTimeSlots } from '../../../utils/timeSlots';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -611,7 +612,7 @@ const PurchaseAttraction = () => {
           id: attr.id.toString(),
           name: attr.name,
           description: attr.description,
-          category: attr.category,
+          category: normalizeCategory(attr.category),
           price: attr.price,
           pricingType: attr.pricing_type as 'per_person' | 'fixed' | 'per_group' | 'per_hour' | 'per_game',
           maxCapacity: attr.max_capacity,
@@ -2622,7 +2623,7 @@ const PurchaseAttraction = () => {
                   <div className="flex items-center gap-2 mb-3">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       <Tag className="h-3 w-3 mr-1" />
-                      {attraction.category}
+                      {normalizeCategory(attraction.category)}
                     </span>
                   </div>
                   <p className="text-sm md:text-base text-gray-500 leading-relaxed">{attraction.description}</p>
@@ -2885,7 +2886,7 @@ const PurchaseAttraction = () => {
                 )}
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   <Tag className="h-3 w-3 mr-1" />
-                  {attraction.category}
+                  {normalizeCategory(attraction.category)}
                 </span>
               </div>
 

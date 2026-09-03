@@ -1,5 +1,6 @@
 
 import packageService, { type Package, type PackageFilters, type PaginatedResponse } from './PackageService';
+import { normalizeCategory } from '../utils/venueCategories';
 
 const CACHE_NAME = 'zapzone-packages-cache-v1';
 const PACKAGES_CACHE_KEY = '/api/packages/cached';
@@ -264,7 +265,7 @@ class PackageCacheService {
         return false;
       }
 
-      if (filters.category && pkg.category !== filters.category) {
+      if (filters.category && normalizeCategory(pkg.category) !== normalizeCategory(filters.category)) {
         return false;
       }
 
@@ -280,7 +281,7 @@ class PackageCacheService {
         const searchLower = filters.search.toLowerCase();
         const name = pkg.name?.toLowerCase() || '';
         const description = pkg.description?.toLowerCase() || '';
-        const category = pkg.category?.toLowerCase() || '';
+        const category = normalizeCategory(pkg.category).toLowerCase();
         
         if (!name.includes(searchLower) && 
             !description.includes(searchLower) && 
