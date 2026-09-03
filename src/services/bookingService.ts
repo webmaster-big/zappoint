@@ -420,10 +420,6 @@ const bookingService = {
     return response.data;
   },
 
-  async getCustomerBookings(email: string): Promise<{ success: boolean; data: Booking[] }> {
-    const response = await api.get(`/bookings/customer/${email}`);
-    return response.data;
-  },
 
   async getCustomerBookingsFiltered(params: {
     customer_id?: number;

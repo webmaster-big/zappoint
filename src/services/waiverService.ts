@@ -146,7 +146,6 @@ const waiverService = {
     activity_name?: string;
   }): Promise<ApiResponse<Waiver>> => (await api.post('/waivers/assign', data)).data,
 
-  resendLink: async (id: number) => (await api.post(`/waivers/${id}/resend-link`, {})).data,
 
   remove: async (id: number, reason?: string) =>
     (await api.delete(`/waivers/${id}`, { data: { reason } })).data,

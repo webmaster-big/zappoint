@@ -112,6 +112,7 @@ const AccountingAnalytics: React.FC = () => {
   const [compareEndDate, setCompareEndDate] = useState<string>('');
   
   const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_on');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
 
   const reportLocationId = effectiveLocationId;
   const locationCacheKey = reportLocationId === null ? 'all' : String(reportLocationId);
@@ -122,10 +123,12 @@ const AccountingAnalytics: React.FC = () => {
   
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+
   const fetchReport = async (showRefreshing = false) => {
     if (!startDate) return;
 
-    const cacheKey = `zapzone_acct_report_${locationCacheKey}_${startDate}_${endDate || ''}_${viewMode}`;
+    const cacheKey = `zapzone_acct_report_${locationCacheKey}_${startDate}_${endDate || ''}_${viewMode}_${categoryFilter || 'all'}`;
 
     if (!showRefreshing && !reportData) {
       try {
@@ -155,10 +158,22 @@ const AccountingAnalytics: React.FC = () => {
         compare_start_date: compareStartDate || undefined,
         compare_end_date: compareEndDate || undefined,
         view_mode: viewMode,
+        category_filter: categoryFilter || undefined,
       });
 
       if (response.success) {
         setReportData(response.data);
+        if (!categoryFilter) {
+          setAvailableCategories(
+            Array.from(
+              new Set(
+                (response.data.primary.categories ?? [])
+                  .flatMap((category) => category.items.map((item) => item.sub_category))
+                  .filter((name): name is string => !!name && name !== 'Uncategorized'),
+              ),
+            ).sort((a, b) => a.localeCompare(b)),
+          );
+        }
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
         } catch { /* sessionStorage full — ignore */ }
@@ -201,7 +216,7 @@ const AccountingAnalytics: React.FC = () => {
   const handleExport = async () => {
     if (!startDate) return;
     try {
-      accountingAnalyticsService.downloadCSV(reportLocationId, startDate, endDate || undefined, viewMode);
+      accountingAnalyticsService.downloadCSV(reportLocationId, startDate, endDate || undefined, viewMode, categoryFilter || undefined);
       setToast({ message: 'Downloading CSV...', type: 'success' });
     } catch {
       setToast({ message: 'Export failed', type: 'error' });
@@ -264,6 +279,20 @@ const AccountingAnalytics: React.FC = () => {
         >
           <option value="booked_for">Booked For</option>
           <option value="booked_on">Created On</option>
+        </select>
+        <select
+          value={categoryFilter}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value);
+            setToast({ message: 'Click the refresh button to update the report', type: 'success' });
+          }}
+          aria-label="Filter by category"
+          className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+        >
+          <option value="">All categories</option>
+          {availableCategories.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
         </select>
         <StandardButton
           onClick={() => setShowCompare(!showCompare)}

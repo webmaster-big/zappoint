@@ -109,7 +109,7 @@ export const accountingAnalyticsService = {
     return response.data;
   },
 
-  downloadCSV(locationId: number | null, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for'): void {
+  downloadCSV(locationId: number | null, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for', categoryFilter?: string): void {
     const queryParams = new URLSearchParams({
       location_id: locationId === null ? 'all' : locationId.toString(),
       start_date: startDate,
@@ -119,7 +119,10 @@ export const accountingAnalyticsService = {
     if (endDate) {
       queryParams.append('end_date', endDate);
     }
-    
+    if (categoryFilter) {
+      queryParams.append('category_filter', categoryFilter);
+    }
+
     api.get(`/accounting-analytics/export?${queryParams.toString()}`, {
       responseType: 'blob',
     }).then((response) => {
