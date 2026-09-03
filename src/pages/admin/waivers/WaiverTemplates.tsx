@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, FileText, Power, ArrowLeft, RefreshCcw, Tablet, Trash2, RotateCcw, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, FileText, Power, ArrowLeft, RefreshCcw, Tablet, Trash2, RotateCcw, AlertTriangle, ChevronDown, ChevronRight, Megaphone } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate, TemplateStatus } from '../../../types/waiver.types';
@@ -243,6 +243,7 @@ const WaiverTemplates = () => {
                           <button onClick={() => setKioskTarget(t)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
                           <button onClick={() => cycleStatus(t)} className={`p-2 rounded-lg transition-colors ${t.status === 'active' ? `text-${fullColor} hover:bg-${themeColor}-50` : 'text-gray-400 hover:bg-gray-100'}`} title={t.status === 'active' ? 'Deactivate' : 'Activate'}><Power className="w-4 h-4" /></button>
                           <button onClick={() => navigate(`/waivers/templates/${t.id}/edit`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit"><Pencil className="w-4 h-4" /></button>
+                          <button onClick={() => navigate(`/waivers/templates/${t.id}/ads`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Post-waiver ads"><Megaphone className="w-4 h-4" /></button>
                           <button onClick={() => setDeleteTarget(t)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>

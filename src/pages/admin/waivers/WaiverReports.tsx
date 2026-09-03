@@ -7,7 +7,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_REPORTS_STEPS } from '../../../components/waiver/tour/tourSteps';
-import { getImageUrl } from '../../../utils/storage';
+import { getImageUrl, getStoredUser } from '../../../utils/storage';
 
 const REPORT_TYPES: Array<{ value: string; label: string; dated: boolean }> = [
   { value: 'completed-by-date', label: 'Completed by date', dated: true },
@@ -31,6 +31,9 @@ const titleize = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.t
 const WaiverReports = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
+  const canSeeAdReporting = ['company_admin', 'location_manager'].includes(getStoredUser()?.role ?? '');
+  const reportTypes = REPORT_TYPES.filter((r) => r.value !== 'ad-performance' || canSeeAdReporting);
+
   const [type, setType] = useState('completed-by-date');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -38,7 +41,7 @@ const WaiverReports = () => {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const current = REPORT_TYPES.find((r) => r.value === type)!;
+  const current = reportTypes.find((r) => r.value === type) ?? reportTypes[0];
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -79,7 +82,7 @@ const WaiverReports = () => {
         <div data-tour="reports-type-select">
           <label className="block text-xs font-medium text-gray-600 mb-1">Report</label>
           <select value={type} onChange={(e) => { setType(e.target.value); setResult(null); }} className={fieldCls}>
-            {REPORT_TYPES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            {reportTypes.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
         {current.dated && (
