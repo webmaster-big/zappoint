@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { API_BASE_URL, getImageUrl } from '../../utils/storage';
+import { normalizeCategory } from '../../utils/venueCategories';
 import waiverService from '../../services/waiverService';
 import type { KioskAd } from '../../types/waiver.types';
 
@@ -154,7 +155,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   list(packagesRes).forEach((pkg) => {
     const here = atLocation(pkg, locationId);
     if (!here) return;
-    const label = String(pkg.display_label || pkg.category || 'Packages').trim();
+    const label = normalizeCategory(String(pkg.display_label || pkg.category || '')) || 'Packages';
     const { price, was, discounted } = priceNow(here.special_pricing ?? pkg.special_pricing, pkg.price, pkg.pricing_type);
     if (!price) return;
     pool.push({ key: `pkg-${here.package_id}`, label, name: pkg.name, price, was, when: null, rank: discounted ? 3 : 1 });
@@ -163,7 +164,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   list(attractionsRes).forEach((attr) => {
     const here = atLocation(attr, locationId);
     if (!here) return;
-    const label = String(attr.category || 'Activities').trim();
+    const label = normalizeCategory(String(attr.category || '')) || 'Activities';
     const { price, was, discounted } = priceNow(here.special_pricing ?? attr.special_pricing, attr.price, attr.pricing_type);
     if (!price) return;
     pool.push({ key: `attr-${here.attraction_id}`, label, name: attr.name, price, was, when: null, rank: discounted ? 3 : 1 });

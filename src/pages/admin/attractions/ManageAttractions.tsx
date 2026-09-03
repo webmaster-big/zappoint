@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
@@ -53,7 +54,7 @@ const convertAttraction = (attr: RawAttraction): AttractionRow => ({
   id: attr.id.toString(),
   name: attr.name,
   description: attr.description,
-  category: attr.category,
+  category: normalizeCategory(attr.category),
   price: attr.price,
   pricingType: attr.pricing_type,
   maxCapacity: attr.max_capacity,

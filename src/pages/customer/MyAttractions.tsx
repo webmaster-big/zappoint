@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { normalizeCategory } from '../../utils/venueCategories';
 import {
   Calendar,
   MapPin,
@@ -358,7 +359,7 @@ const MyAttractions = () => {
                             </span>
                             {purchase.attraction?.category && (
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                                {purchase.attraction.category}
+                                {normalizeCategory(purchase.attraction.category)}
                               </span>
                             )}
                           </div>
@@ -526,7 +527,7 @@ const MyAttractions = () => {
                       </span>
                       {selectedPurchase.attraction?.category && (
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                          {selectedPurchase.attraction.category}
+                          {normalizeCategory(selectedPurchase.attraction.category)}
                         </span>
                       )}
                     </div>

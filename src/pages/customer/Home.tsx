@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { normalizeCategory } from '../../utils/venueCategories';
 import { useParams } from 'react-router-dom';
 import {
   MapPin,
@@ -107,7 +108,7 @@ const EVENTS_CATEGORY_LABEL = 'Events';
 // A package shown as "Escape Room" belongs under that name, not under its
 // internal category, so the storefront filters read the way guests think.
 const categoryLabelOfPackage = (pkg: { display_label?: string | null; category?: string | null }) =>
-  (pkg.display_label || pkg.category || '').trim();
+  normalizeCategory(pkg.display_label || pkg.category);
 
 const EntertainmentLandingPage = () => {
   const { locationSlug } = useParams<{ locationSlug?: string }>();
@@ -200,7 +201,7 @@ const EntertainmentLandingPage = () => {
         rating: attr.rating || 4.5,
         image: firstImage(attr.image) ?? '',
         imageByLocation: imagesByLocation(attr.locations),
-        category: attr.category,
+        category: normalizeCategory(attr.category),
         availableLocations: attr.locations.map(loc => loc.location_name),
         availableLocationIds: attr.locations.map(loc => loc.location_id),
         duration: !attr.duration || attr.duration === 0 || String(attr.duration) === '0' ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
@@ -239,7 +240,7 @@ const EntertainmentLandingPage = () => {
         rating: 4.8,
         image: firstImage(pkg.image) ?? '',
         imageByLocation: imagesByLocation(pkg.locations),
-        category: pkg.category,
+        category: normalizeCategory(pkg.category),
         availableLocations: pkg.locations.map(loc => loc.location_name),
         availableLocationIds: pkg.locations.map(loc => loc.location_id),
         bookingLinks: pkg.booking_links,
@@ -1424,7 +1425,7 @@ const EntertainmentLandingPage = () => {
                       )}
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
-                          {pkg.display_label || pkg.category || 'Package'}
+                          {normalizeCategory(pkg.display_label || pkg.category) || 'Package'}
                         </span>
                       </div>
                     </div>
@@ -1577,7 +1578,7 @@ const EntertainmentLandingPage = () => {
                       )}
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
-                          {attraction.category || 'Attraction'}
+                          {normalizeCategory(attraction.category) || 'Attraction'}
                         </span>
                       </div>
                     </div>
@@ -1893,7 +1894,7 @@ const EntertainmentLandingPage = () => {
                     <Ticket size={12} />
                     <span className="text-xs font-medium">Category</span>
                   </div>
-                  <div className="text-sm font-bold text-gray-900 capitalize">{selectedAttraction.category}</div>
+                  <div className="text-sm font-bold text-gray-900 capitalize">{normalizeCategory(selectedAttraction.category)}</div>
                 </div>
               </div>
 

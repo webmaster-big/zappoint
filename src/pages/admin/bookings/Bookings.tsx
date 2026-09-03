@@ -34,6 +34,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import Pagination from '../../../components/ui/Pagination';
@@ -126,7 +127,7 @@ const Bookings: React.FC = () => {
         ? formatDurationDisplay(booking.duration, booking.duration_unit)
         : '2 hours',
       activity: booking.package?.category || 'Package Booking',
-      category: booking.package?.display_label || booking.package?.category || '',
+      category: normalizeCategory(booking.package?.display_label || booking.package?.category),
       notes: booking.notes,
       specialRequests: booking.special_requests,
       referenceNumber: booking.reference_number,
@@ -786,7 +787,7 @@ const Bookings: React.FC = () => {
                 ? formatDurationDisplay(booking.duration, booking.duration_unit)
                 : '2 hours',
               activity: booking.package?.category || 'Package Booking',
-              category: booking.package?.display_label || booking.package?.category || '',
+              category: normalizeCategory(booking.package?.display_label || booking.package?.category),
               notes: booking.notes,
               referenceNumber: booking.reference_number,
               location: booking.location?.name || 'N/A',

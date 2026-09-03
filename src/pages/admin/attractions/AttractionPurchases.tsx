@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase } from '../../../types/AttractionPurchases.types';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
@@ -127,7 +128,7 @@ const ManagePurchases = () => {
       createdAt: purchase.created_at,
       paymentMethod: purchase.payment_method as string,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
-      activity: purchase.attraction?.category || '',
+      activity: normalizeCategory(purchase.attraction?.category),
       locationId: purchase.location_id,
       scheduledDate: purchase.scheduled_date || null,
       scheduledTime: purchase.scheduled_time || null,
@@ -687,7 +688,7 @@ const ManagePurchases = () => {
       deletedAt: purchase.deleted_at,
       paymentMethod: purchase.payment_method as string,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
-      activity: purchase.attraction?.category || '',
+      activity: normalizeCategory(purchase.attraction?.category),
       locationId: purchase.location_id,
       scheduledDate: purchase.scheduled_date || null,
       scheduledTime: purchase.scheduled_time || null,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { normalizeCategory } from '../../../utils/venueCategories';
 
 export type CategorySource = 'booking' | 'attraction' | 'event';
 
@@ -33,8 +34,8 @@ export interface CategoryFilterState {
 }
 
 export const categoryKeyOf = (value?: string | null): string => {
-  const trimmed = (value ?? '').trim();
-  return trimmed === '' ? UNCATEGORISED_CATEGORY_KEY : trimmed;
+  const normalized = normalizeCategory(value);
+  return normalized === '' ? UNCATEGORISED_CATEGORY_KEY : normalized;
 };
 
 export const categoryLabelOf = (key: string): string => {
