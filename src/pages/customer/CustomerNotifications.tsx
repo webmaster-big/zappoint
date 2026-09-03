@@ -44,8 +44,8 @@ const CustomerNotifications = () => {
         page: currentPage,
       };
 
-      if (filter === 'unread') params.is_read = false;
-      else if (filter === 'read') params.is_read = true;
+      if (filter === 'unread') params.unread = 1;
+      else if (filter === 'read') params.read = 1;
       if (typeFilter !== 'all') params.type = typeFilter;
 
       const res = await customerNotificationService.getNotifications(params as never);

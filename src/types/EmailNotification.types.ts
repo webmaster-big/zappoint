@@ -83,7 +83,7 @@ export interface EmailNotification {
     name: string;
     address?: string;
   };
-  email_template?: {
+  template?: {
     id: number;
     name: string;
     subject: string;

@@ -71,7 +71,8 @@ export interface CustomerNotification {
 export interface NotificationFilters {
   customer_id?: number;
   type?: CustomerNotificationType;
-  is_read?: boolean;
+  unread?: 1;
+  read?: 1;
   priority?: CustomerNotificationPriority;
   per_page?: number;
   page?: number;

@@ -482,10 +482,10 @@ const EmailNotificationDetails: React.FC = () => {
               </StandardButton>
             </div>
             
-            {notification.email_template ? (
+            {notification.template ? (
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">Using template:</p>
-                <p className="font-medium text-gray-900">{notification.email_template.name}</p>
+                <p className="font-medium text-gray-900">{notification.template.name}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -752,7 +752,7 @@ const EmailNotificationDetails: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-4">
                 <label className="text-sm font-medium text-gray-500">Subject</label>
-                <p className="text-gray-900 mt-1">{notification.subject || notification.email_template?.subject || '(No subject)'}</p>
+                <p className="text-gray-900 mt-1">{notification.subject || notification.template?.subject || '(No subject)'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Body</label>

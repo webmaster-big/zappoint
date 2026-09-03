@@ -572,7 +572,7 @@ const EmailNotifications = () => {
         { label: 'Include QR Code', value: n => (n.include_qr_code ? 'Yes' : 'No') },
         { label: 'Send Before (hours)', value: n => n.send_before_hours ?? '' },
         { label: 'Send After (hours)', value: n => n.send_after_hours ?? '' },
-        { label: 'Email Template', value: n => n.email_template?.name || '' },
+        { label: 'Email Template', value: n => n.template?.name || '' },
         { label: 'Entity IDs', value: n => n.entity_ids?.join('; ') || '' },
         { label: 'Logs Count', value: n => n.logs_count ?? '' },
       ],

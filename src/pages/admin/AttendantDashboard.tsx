@@ -1037,7 +1037,7 @@ const AttendantDashboard: React.FC = () => {
                                  className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition ${getBgColor()}`}
                                  style={{ verticalAlign: 'top' }}
                                >
-                                 <Link to={`/admin/bookings/${booking.id}?from=dashboard`} className="block h-full">
+                                 <Link to={`/bookings/${booking.id}?from=dashboard`} className="block h-full">
                                    <div className="flex flex-col p-2 h-full">
                                      <div className="font-bold text-xs text-gray-900 mb-1">
                                        {formatTime12Hour(booking.booking_time || '00:00')} - {formatTime12Hour(calculateEndTime(booking.booking_time || '00:00', booking.duration || 1, booking.duration_unit || 'hours'))}
@@ -1097,7 +1097,7 @@ const AttendantDashboard: React.FC = () => {
                                  className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition ${getBgColor()}`}
                                  style={{ verticalAlign: 'top' }}
                                >
-                                 <Link to={`/admin/bookings/${booking.id}?from=dashboard`} className="block h-full">
+                                 <Link to={`/bookings/${booking.id}?from=dashboard`} className="block h-full">
                                    <div className="flex flex-col p-2 h-full">
                                      <div className="font-bold text-xs text-gray-900 mb-1">
                                        {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration || 1, booking.duration_unit || 'hours'))}
@@ -1444,7 +1444,7 @@ const AttendantDashboard: React.FC = () => {
                          </span>
                        </td>
                        <td className="px-4 py-3">
-                         <Link to={`/admin/bookings/${booking.id}?from=dashboard`} className={`text-sm text-${fullColor} hover:underline`}>
+                         <Link to={`/bookings/${booking.id}?from=dashboard`} className={`text-sm text-${fullColor} hover:underline`}>
                            View
                          </Link>
                        </td>

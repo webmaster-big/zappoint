@@ -1864,7 +1864,7 @@ const CompanyDashboard: React.FC = () => {
                                       ? 'bg-green-100 border border-green-300 text-green-800'
                                       : booking.status === 'pending'
                                       ? 'bg-yellow-100 border border-yellow-300 text-yellow-800'
-                                      : booking.status === 'checked_in'
+                                      : booking.status === 'checked-in'
                                       ? 'bg-blue-100 border border-blue-300 text-blue-800'
                                       : booking.status === 'cancelled'
                                       ? 'bg-red-100 border border-red-300 text-red-800'
@@ -1890,7 +1890,7 @@ const CompanyDashboard: React.FC = () => {
                                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
                                       booking.status === 'confirmed' ? 'bg-green-200' :
                                       booking.status === 'pending' ? 'bg-yellow-200' :
-                                      booking.status === 'checked_in' ? 'bg-blue-200' :
+                                      booking.status === 'checked-in' ? 'bg-blue-200' :
                                       'bg-gray-200'
                                     }`}>
                                       {booking.status}
