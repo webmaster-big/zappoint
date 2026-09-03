@@ -38,7 +38,7 @@ interface AdFormState {
   destinationUrl: string;
   startsAt: string;
   endsAt: string;
-  locationId: string;
+  locationIds: number[];
 }
 
 const emptyForm: AdFormState = {
@@ -48,7 +48,7 @@ const emptyForm: AdFormState = {
   destinationUrl: '',
   startsAt: '',
   endsAt: '',
-  locationId: '',
+  locationIds: [],
 };
 
 type ModalState =
@@ -159,7 +159,7 @@ const WaiverAds = () => {
       destinationUrl: ad.destination_url ?? '',
       startsAt: toLocalInput(ad.starts_at),
       endsAt: toLocalInput(ad.ends_at),
-      locationId: ad.location_id != null ? String(ad.location_id) : '',
+      locationIds: ad.location_ids ?? [],
     });
     setModal({ kind: 'edit', ad });
   };
@@ -183,7 +183,7 @@ const WaiverAds = () => {
       if (modal.kind === 'create') {
         if (form.destinationUrl.trim()) data.append('destination_url', form.destinationUrl.trim());
         if (!modal.fallback) {
-          if (form.locationId) data.append('location_id', form.locationId);
+          form.locationIds.forEach((id) => data.append('location_ids[]', String(id)));
           if (form.startsAt) data.append('starts_at', form.startsAt);
           if (form.endsAt) data.append('ends_at', form.endsAt);
         }
@@ -204,10 +204,10 @@ const WaiverAds = () => {
             data.append('starts_at', form.startsAt);
             data.append('ends_at', form.endsAt);
           }
-          if (form.locationId) {
-            data.append('location_id', form.locationId);
-          } else if (ad.location_id != null) {
-            data.append('location_id', '');
+          if (form.locationIds.length > 0) {
+            form.locationIds.forEach((id) => data.append('location_ids[]', String(id)));
+          } else if (ad.location_ids.length > 0) {
+            data.append('location_ids', '');
           }
         }
         await waiverService.updateTemplateAd(ad.id, data);
@@ -330,7 +330,11 @@ const WaiverAds = () => {
           <span className={`text-[11px] rounded-full px-2 py-0.5 ${STATUS_STYLES[ad.status]}`}>{ad.status}</span>
           <span className="text-[11px] rounded-full px-2 py-0.5 bg-gray-100 text-gray-600 inline-flex items-center gap-1">
             <MapPin className="w-3 h-3" />
-            {ad.location_name ?? 'All locations'}
+            {ad.location_names.length === 0
+              ? 'All locations'
+              : ad.location_names.length <= 2
+                ? ad.location_names.join(', ')
+                : `${ad.location_names.length} locations`}
           </span>
         </div>
         {ad.destination_url && (
@@ -583,18 +587,57 @@ const WaiverAds = () => {
                 <>
                   {locations.length > 0 && (
                     <div>
-                      <label htmlFor="ad-location" className={labelCls}>Location</label>
-                      <select
-                        id="ad-location"
-                        value={form.locationId}
-                        onChange={(e) => setForm((f) => ({ ...f, locationId: e.target.value }))}
-                        className={fieldCls}
-                      >
-                        <option value="">All locations</option>
-                        {locations.map((loc) => (
-                          <option key={loc.id} value={loc.id}>{loc.name}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className={labelCls}>Locations</span>
+                        <div className="flex items-center gap-2 text-[11px] font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, locationIds: locations.map((l) => l.id) }))}
+                            className={`text-${themeColor}-600 hover:underline`}
+                          >
+                            Select all
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, locationIds: [] }))}
+                            className="text-gray-500 hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                        {locations.map((loc) => {
+                          const checked = form.locationIds.includes(loc.id);
+                          return (
+                            <label
+                              key={loc.id}
+                              className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm transition ${checked ? `bg-${themeColor}-50/60` : 'hover:bg-gray-50'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setForm((f) => ({
+                                    ...f,
+                                    locationIds: f.locationIds.includes(loc.id)
+                                      ? f.locationIds.filter((id) => id !== loc.id)
+                                      : [...f.locationIds, loc.id],
+                                  }))
+                                }
+                                className={`h-4 w-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
+                              />
+                              <span className="text-gray-800">{loc.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        {form.locationIds.length === 0
+                          ? 'Nothing selected, so this ad runs at every location.'
+                          : `Runs at ${form.locationIds.length} of ${locations.length} locations.`}
+                      </p>
                     </div>
                   )}
 

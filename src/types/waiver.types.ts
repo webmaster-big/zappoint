@@ -456,8 +456,8 @@ export type WaiverAdStatus = 'active' | 'scheduled' | 'expired' | 'disabled';
 export interface WaiverAdRecord {
   id: number;
   waiver_template_id: number;
-  location_id: number | null;
-  location_name: string | null;
+  location_ids: number[];
+  location_names: string[];
   name: string | null;
   image_path: string | null;
   destination_url: string | null;
