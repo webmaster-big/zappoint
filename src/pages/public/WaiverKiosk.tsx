@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import type { WaiverFormContext, WaiverSubmission } from '../../types/waiver.types';
+import type {
+  KioskActivity,
+  KioskAd,
+  WaiverFormContext,
+  WaiverProfileRecord,
+  WaiverReturningSelection,
+  WaiverSubmission,
+} from '../../types/waiver.types';
 import waiverService from '../../services/waiverService';
 import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError } from '../../components/waiver/WaiverStates';
+import WaiverReturningPanel, { WaiverReturningSummary } from '../../components/waiver/WaiverReturningPanel';
 import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
 
 // long enough for a guest to actually read the confirmation and scan the QR
@@ -17,6 +25,19 @@ const WaiverKiosk = () => {
   const locationParam = searchParams.get('location_id');
   const locationId = locationParam ? Number(locationParam) : null;
 
+  const packageId = Number(searchParams.get('package_id')) || undefined;
+  const attractionId = Number(searchParams.get('attraction_id')) || undefined;
+  const eventId = Number(searchParams.get('event_id')) || undefined;
+  const activity: KioskActivity | undefined =
+    packageId || attractionId || eventId
+      ? {
+          ...(packageId ? { package_id: packageId } : {}),
+          ...(attractionId ? { attraction_id: attractionId } : {}),
+          ...(eventId ? { event_id: eventId } : {}),
+        }
+      : undefined;
+  const activityKey = JSON.stringify(activity ?? null);
+
   const [context, setContext] = useState<WaiverFormContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +45,11 @@ const WaiverKiosk = () => {
   const [submitting, setSubmitting] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
   const [completed, setCompleted] = useState<WaiverSubmission | null>(null);
+  const [completedAd, setCompletedAd] = useState<KioskAd | null>(null);
+  const [completedWaiverId, setCompletedWaiverId] = useState<number | null>(null);
+  const [phase, setPhase] = useState<'start' | 'lookup' | 'returning' | 'form'>('start');
+  const [profile, setProfile] = useState<WaiverProfileRecord | null>(null);
+  const [returning, setReturning] = useState<WaiverReturningSelection | null>(null);
   // remounts WaiverFormBody to clear all field state on reset
   const [formKey, setFormKey] = useState(0);
 
@@ -31,6 +57,7 @@ const WaiverKiosk = () => {
   const completeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const timeoutSeconds = context?.settings?.inactivity_timeout_seconds ?? 120;
+  const returningEnabled = !!context?.settings?.returning_enabled;
 
   const load = useCallback(async () => {
     if (!templateId) {
@@ -42,7 +69,7 @@ const WaiverKiosk = () => {
       setLoading(true);
       const ctx = preview
         ? await waiverService.getKioskPreview(templateId)
-        : await waiverService.getKioskForm(templateId, locationId);
+        : await waiverService.getKioskForm(templateId, locationId, activity);
       setContext(ctx);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -50,17 +77,26 @@ const WaiverKiosk = () => {
     } finally {
       setLoading(false);
     }
-  }, [templateId, preview, locationId]);
+  }, [templateId, preview, locationId, activityKey]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const resetForm = useCallback(() => {
+    if (completeTimer.current) {
+      clearTimeout(completeTimer.current);
+      completeTimer.current = null;
+    }
     setFormKey((k) => k + 1);
     setSubmitError(null);
     setJustCompleted(false);
     setCompleted(null);
+    setCompletedAd(null);
+    setCompletedWaiverId(null);
+    setProfile(null);
+    setReturning(null);
+    setPhase('start');
   }, []);
 
   // Inactivity reset — any interaction restarts the countdown.
@@ -92,13 +128,31 @@ const WaiverKiosk = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    const payload: WaiverSubmission = returning
+      ? { ...data, minors: returning.new_dependents.length ? returning.new_dependents : undefined }
+      : data;
     setSubmitting(true);
     setSubmitError(null);
-    setCompleted(data);
+    setCompleted(payload);
     try {
-      await waiverService.kioskSubmit(templateId, data, locationId);
+      const res = await waiverService.kioskSubmit(
+        templateId,
+        payload,
+        locationId,
+        activity,
+        returning
+          ? {
+              waiver_profile_id: returning.waiver_profile_id,
+              selected_dependent_ids: returning.selected_dependent_ids,
+            }
+          : undefined,
+      );
+      const ad: KioskAd | null = res?.data?.ad ?? null;
+      setCompletedAd(ad);
+      setCompletedWaiverId(res?.data?.id ?? null);
       setJustCompleted(true);
-      completeTimer.current = setTimeout(resetForm, SUCCESS_HOLD_SECONDS * 1000);
+      const holdSeconds = ad ? 2 + ad.display_seconds : SUCCESS_HOLD_SECONDS;
+      completeTimer.current = setTimeout(resetForm, (holdSeconds + 90) * 1000);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setSubmitError(e.response?.data?.message || 'Failed to submit waiver. Please try again.');
@@ -110,6 +164,60 @@ const WaiverKiosk = () => {
   if (loading) return <WaiverLoading label="Loading waiver..." />;
   if (error) return <WaiverError message={error} />;
   if (!context) return null;
+
+  if (phase === 'start' && returningEnabled && !justCompleted) {
+    return (
+      <WaiverShell title={context.template?.title || 'Waiver'} subtitle="Welcome! Choose an option to begin">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-10 sm:px-10">
+          <div className="max-w-md mx-auto space-y-4">
+            <button
+              onClick={() => setPhase('form')}
+              className="w-full py-5 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+            >
+              New Customer
+            </button>
+            <button
+              onClick={() => setPhase('lookup')}
+              className="w-full py-5 bg-white text-blue-700 text-lg font-semibold rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+            >
+              Returning Customer
+            </button>
+          </div>
+        </div>
+      </WaiverShell>
+    );
+  }
+
+  if ((phase === 'lookup' || phase === 'returning') && returningEnabled && !justCompleted) {
+    return (
+      <WaiverShell
+        title={context.template?.title || 'Waiver'}
+        subtitle={phase === 'lookup' ? 'Returning customer' : 'Please review your saved information'}
+      >
+        <WaiverReturningPanel
+          key={profile?.id ?? 'lookup'}
+          templateId={templateId}
+          profile={profile}
+          maxMinors={context.template?.max_minors ?? 0}
+          dependentsEnabled={!!context.template?.minor_section_enabled && (context.template?.max_minors ?? 0) > 0}
+          onFound={(found) => {
+            setProfile(found);
+            setPhase('returning');
+          }}
+          onContinue={(selection) => {
+            setReturning(selection);
+            setPhase('form');
+          }}
+          onNewCustomer={() => {
+            setProfile(null);
+            setReturning(null);
+            setPhase('form');
+          }}
+          onCancel={resetForm}
+        />
+      </WaiverShell>
+    );
+  }
 
   return (
     <WaiverShell title={context.template?.title || 'Waiver'} subtitle="Please complete the waiver below to continue">
@@ -123,6 +231,22 @@ const WaiverKiosk = () => {
         key={formKey}
         context={context}
         noAutofill
+        lockedAdult={
+          profile && returning
+            ? {
+                first_name: profile.first_name,
+                last_name: profile.last_name,
+                email: profile.email,
+                phone: profile.phone,
+                date_of_birth: profile.date_of_birth,
+              }
+            : undefined
+        }
+        hideMinors={!!returning}
+        participantsPanel={
+          profile && returning ? <WaiverReturningSummary profile={profile} selection={returning} /> : undefined
+        }
+        submitLabel={returning ? 'Submit Waiver' : undefined}
         submitting={submitting}
         error={submitError}
         onSubmit={handleSubmit}
@@ -131,8 +255,10 @@ const WaiverKiosk = () => {
         <WaiverSuccessModal
           signerFirstName={completed?.adult_first_name}
           locationId={locationId}
-          autoCloseSeconds={SUCCESS_HOLD_SECONDS}
+          autoCloseSeconds={completedAd ? 2 + completedAd.display_seconds : SUCCESS_HOLD_SECONDS}
           onStartNext={resetForm}
+          ad={completedAd}
+          waiverId={completedWaiverId}
         />
       )}
     </WaiverShell>

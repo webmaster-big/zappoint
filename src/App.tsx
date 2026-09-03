@@ -109,11 +109,13 @@ import WaiverBulk from "./pages/public/WaiverBulk";
 import WaiversSearch from "./pages/admin/waivers/WaiversSearch";
 import WaiverTemplates from "./pages/admin/waivers/WaiverTemplates";
 import WaiverBuilder from "./pages/admin/waivers/WaiverBuilder";
+import WaiverAds from "./pages/admin/waivers/WaiverAds";
 import WaiverBulkInvites from "./pages/admin/waivers/WaiverBulkInvites";
 import WaiverSettings from "./pages/admin/waivers/WaiverSettings";
 import CustomFields from "./pages/admin/settings/CustomFields";
 import WaiverDeletionLog from "./pages/admin/waivers/WaiverDeletionLog";
 import WaiverReports from "./pages/admin/waivers/WaiverReports";
+import WaiverProfiles from "./pages/admin/waivers/WaiverProfiles";
 import Events from "./pages/admin/events/Events";
 import CreateEvent from "./pages/admin/events/CreateEvent";
 import EditEvent from "./pages/admin/events/EditEvent";
@@ -269,9 +271,11 @@ function App() {
           <Route path="/waivers/templates" element={<WaiverTemplates />} />
           <Route path="/waivers/templates/create" element={<WaiverBuilder />} />
           <Route path="/waivers/templates/:id/edit" element={<WaiverBuilder />} />
+          <Route path="/waivers/templates/:id/ads" element={<WaiverAds />} />
           <Route path="/waivers/bulk" element={<WaiverBulkInvites />} />
           <Route path="/waivers/deletion-log" element={<WaiverDeletionLog />} />
           <Route path="/waivers/reports" element={<WaiverReports />} />
+          <Route path="/waivers/profiles" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><WaiverProfiles /></ProtectedRoute>} />
           <Route path="/waivers/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><WaiverSettings /></ProtectedRoute>} />
 
           <Route path="/settings/custom-fields" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><CustomFields /></ProtectedRoute>} />

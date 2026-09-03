@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { WaiverFormContext, WaiverSubmission } from '../../types/waiver.types';
+import type { KioskAd, WaiverFormContext, WaiverSubmission } from '../../types/waiver.types';
 import waiverService from '../../services/waiverService';
 import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError, WaiverCompleted, WaiverSuccess } from '../../components/waiver/WaiverStates';
+import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
 
 const WaiverKioskSession = () => {
   const { token } = useParams<{ token: string }>();
@@ -16,6 +17,10 @@ const WaiverKioskSession = () => {
   const [done, setDone] = useState(false);
   const [alreadyCompleted, setAlreadyCompleted] = useState<{ submitted_at?: string; message?: string } | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [completedAd, setCompletedAd] = useState<KioskAd | null>(null);
+  const [completedWaiverId, setCompletedWaiverId] = useState<number | null>(null);
+  const [adDismissed, setAdDismissed] = useState(false);
+  const [signerFirstName, setSignerFirstName] = useState<string | undefined>(undefined);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutSeconds = context?.settings?.inactivity_timeout_seconds ?? 120;
@@ -67,7 +72,10 @@ const WaiverKioskSession = () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await waiverService.submit(token, data);
+      const res = await waiverService.submit(token, data, { kiosk: true });
+      setCompletedAd(res?.data?.ad ?? null);
+      setCompletedWaiverId(res?.data?.id ?? null);
+      setSignerFirstName(data.adult_first_name);
       setDone(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: unknown) {
@@ -81,7 +89,25 @@ const WaiverKioskSession = () => {
   if (loading) return <WaiverLoading label="Loading waiver..." />;
   if (error) return <WaiverError message={error} />;
   if (alreadyCompleted) return <WaiverCompleted submittedAt={alreadyCompleted.submitted_at} message={alreadyCompleted.message} />;
-  if (done) return <WaiverSuccess />;
+  if (done) {
+    return (
+      <>
+        <WaiverSuccess />
+        {completedAd && !adDismissed && (
+          <WaiverSuccessModal
+            signerFirstName={signerFirstName}
+            locationId={null}
+            autoCloseSeconds={2 + completedAd.display_seconds}
+            onStartNext={() => setAdDismissed(true)}
+            ad={completedAd}
+            waiverId={completedWaiverId}
+            nextLabel="Done"
+            closingText="Closing"
+          />
+        )}
+      </>
+    );
+  }
   if (!context) return null;
 
   return (

@@ -17,6 +17,16 @@ import type {
   WaiverMinor,
   ConnectedWaiver,
   EntityWaiverSummary,
+  KioskActivity,
+  WaiverAdRecord,
+  WaiverAdSettings,
+  WaiverLookupResult,
+  WaiverProfileStaffView,
+  WaiverProfileStaffDependent,
+  WaiverProfileListFilters,
+  WaiverProfileListResponse,
+  WaiverProfilePayload,
+  WaiverProfileDependentPayload,
 } from '../types/waiver.types';
 
 const getAuthToken = (): string | null => {
@@ -56,20 +66,46 @@ const waiverService = {
   getStatus: async (token: string) =>
     (await publicApi.get(`/waivers/status/${token}`)).data,
 
-  submit: async (token: string, data: WaiverSubmission) =>
-    (await publicApi.post(`/waivers/access/${token}/submit`, data)).data,
+  submit: async (token: string, data: WaiverSubmission, opts?: { kiosk?: boolean }) =>
+    (await publicApi.post(`/waivers/access/${token}/submit`, opts?.kiosk ? { ...data, kiosk: true } : data)).data,
 
   // ---- public: kiosk ----
-  getKioskForm: async (templateId: number, locationId?: number | null): Promise<WaiverFormContext> =>
+  getKioskForm: async (
+    templateId: number,
+    locationId?: number | null,
+    activity?: KioskActivity,
+  ): Promise<WaiverFormContext> =>
     (await publicApi.get<ApiResponse<WaiverFormContext>>(`/waivers/kiosk/${templateId}`, {
-      params: locationId != null ? { location_id: locationId } : undefined,
+      params: { ...(locationId != null ? { location_id: locationId } : {}), ...(activity ?? {}) },
     })).data.data,
 
   getKioskPreview: async (templateId: number): Promise<WaiverFormContext> =>
     (await api.get<ApiResponse<WaiverFormContext>>(`/waiver-templates/${templateId}/kiosk-preview`)).data.data,
 
-  kioskSubmit: async (templateId: number, data: WaiverSubmission, locationId?: number | null) =>
-    (await publicApi.post(`/waivers/kiosk/${templateId}/submit`, locationId != null ? { ...data, location_id: locationId } : data)).data,
+  kioskLookup: async (templateId: number, phone: string): Promise<WaiverLookupResult> =>
+    (await publicApi.post<ApiResponse<WaiverLookupResult>>(`/waivers/kiosk/${templateId}/lookup`, { phone })).data.data,
+
+  kioskSubmit: async (
+    templateId: number,
+    data: WaiverSubmission,
+    locationId?: number | null,
+    activity?: KioskActivity,
+    returning?: { waiver_profile_id?: number; selected_dependent_ids?: number[] },
+  ) =>
+    (await publicApi.post(`/waivers/kiosk/${templateId}/submit`, {
+      ...data,
+      ...(locationId != null ? { location_id: locationId } : {}),
+      ...(activity ?? {}),
+      ...(returning?.waiver_profile_id
+        ? {
+            waiver_profile_id: returning.waiver_profile_id,
+            selected_dependent_ids: returning.selected_dependent_ids ?? [],
+          }
+        : {}),
+    })).data,
+
+  adLearnMore: async (waiverId: number, adId: number, channel: 'email' | 'sms'): Promise<{ success: boolean; message: string }> =>
+    (await publicApi.post('/waivers/ads/learn-more', { waiver_id: waiverId, ad_id: adId, channel })).data,
 
   // ---- public: chaperone (bulk) ----
   getBulk: async (manageToken: string): Promise<BulkChaperoneView> =>
@@ -219,6 +255,48 @@ const waiverService = {
 
   updateSettings: async (data: Partial<WaiverSettings>): Promise<ApiResponse<WaiverSettings>> =>
     (await api.put('/waiver-settings', data)).data,
+
+  getTemplateAds: async (templateId: number): Promise<ApiResponse<{ settings: WaiverAdSettings; ads: WaiverAdRecord[] }>> =>
+    (await api.get(`/waiver-templates/${templateId}/ads`)).data,
+
+  createTemplateAd: async (templateId: number, form: FormData): Promise<ApiResponse<WaiverAdRecord>> =>
+    (await api.post(`/waiver-templates/${templateId}/ads`, form, { headers: { 'Content-Type': 'multipart/form-data' } })).data,
+
+  updateTemplateAd: async (adId: number, form: FormData): Promise<ApiResponse<WaiverAdRecord>> =>
+    (await api.post(`/waiver-ads/${adId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } })).data,
+
+  deleteTemplateAd: async (adId: number) =>
+    (await api.delete(`/waiver-ads/${adId}`)).data,
+
+  reorderTemplateAds: async (templateId: number, orderedIds: number[]) =>
+    (await api.put(`/waiver-templates/${templateId}/ads/reorder`, { ordered_ids: orderedIds })).data,
+
+  updateAdSettings: async (templateId: number, settings: Partial<WaiverAdSettings>): Promise<ApiResponse<WaiverAdSettings>> =>
+    (await api.patch(`/waiver-templates/${templateId}/ad-settings`, settings)).data,
+
+  listProfiles: async (filters: WaiverProfileListFilters = {}): Promise<WaiverProfileListResponse> =>
+    (await api.get('/waiver-profiles', { params: filters })).data,
+
+  getProfile: async (id: number): Promise<ApiResponse<WaiverProfileStaffView>> =>
+    (await api.get(`/waiver-profiles/${id}`)).data,
+
+  updateProfile: async (id: number, data: WaiverProfilePayload): Promise<ApiResponse<WaiverProfileStaffView>> =>
+    (await api.patch(`/waiver-profiles/${id}`, data)).data,
+
+  addProfileDependent: async (
+    profileId: number,
+    data: WaiverProfileDependentPayload,
+  ): Promise<ApiResponse<WaiverProfileStaffDependent>> =>
+    (await api.post(`/waiver-profiles/${profileId}/dependents`, data)).data,
+
+  updateProfileDependent: async (
+    dependentId: number,
+    data: WaiverProfileDependentPayload,
+  ): Promise<ApiResponse<WaiverProfileStaffDependent>> =>
+    (await api.patch(`/waiver-profile-dependents/${dependentId}`, data)).data,
+
+  retireProfileDependent: async (dependentId: number): Promise<ApiResponse<WaiverProfileStaffDependent>> =>
+    (await api.delete(`/waiver-profile-dependents/${dependentId}`)).data,
 };
 
 export type { WaiverMinor };

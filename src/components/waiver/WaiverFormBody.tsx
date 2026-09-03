@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import DOMPurify from 'dompurify';
 import type {
   WaiverFormContext,
   WaiverSubmission,
   WaiverMinor,
+  WaiverLockedAdult,
 } from '../../types/waiver.types';
 import WaiverFormTour from './tour/WaiverFormTour';
 import WaiverSignaturePad from './WaiverSignaturePad';
@@ -12,10 +14,17 @@ import RelationshipSelect from './RelationshipSelect';
 import EmailInput from '../ui/EmailInput';
 import { getDeviceId } from '../../utils/deviceId';
 import { ADULT_AGE, calculateAge, isFutureDate } from '../../utils/age';
+import { formatDateLong } from '../../utils/timeFormat';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
 const labelClass = 'block text-xs font-semibold text-gray-700 mb-1';
+
+const LockedValue = ({ value }: { value: string }) => (
+  <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-sm font-medium text-gray-700 break-words">
+    {value}
+  </div>
+);
 
 interface MinorRow extends WaiverMinor {
   _key: number;
@@ -25,6 +34,10 @@ interface Props {
   context: WaiverFormContext;
   noAutofill?: boolean;
   disableBrowserAutofill?: boolean;
+  lockedAdult?: WaiverLockedAdult;
+  hideMinors?: boolean;
+  participantsPanel?: ReactNode;
+  submitLabel?: string;
   submitting: boolean;
   error?: string | null;
   onSubmit: (data: WaiverSubmission) => void | Promise<void>;
@@ -32,15 +45,34 @@ interface Props {
 
 let minorKeySeq = 1;
 
-const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = false, submitting, error, onSubmit }: Props) => {
+const WaiverFormBody = ({
+  context,
+  noAutofill = false,
+  disableBrowserAutofill = false,
+  lockedAdult,
+  hideMinors = false,
+  participantsPanel,
+  submitLabel,
+  submitting,
+  error,
+  onSubmit,
+}: Props) => {
   const tpl = context.template;
   const prefill = noAutofill ? undefined : context.prefill;
 
-  const [adultFirstName, setAdultFirstName] = useState(prefill?.adult_first_name ?? '');
-  const [adultLastName, setAdultLastName] = useState(prefill?.adult_last_name ?? '');
-  const [adultEmail, setAdultEmail] = useState(prefill?.adult_email ?? '');
-  const [adultPhone, setAdultPhone] = useState(prefill?.adult_phone ?? '');
-  const [adultDob, setAdultDob] = useState(prefill?.adult_dob ?? '');
+  const locked = {
+    first: lockedAdult?.first_name?.trim() ?? '',
+    last: lockedAdult?.last_name?.trim() ?? '',
+    email: lockedAdult?.email?.trim() ?? '',
+    phone: lockedAdult?.phone?.trim() ?? '',
+    dob: (lockedAdult?.date_of_birth ?? '').split('T')[0],
+  };
+
+  const [adultFirstName, setAdultFirstName] = useState(locked.first || prefill?.adult_first_name || '');
+  const [adultLastName, setAdultLastName] = useState(locked.last || prefill?.adult_last_name || '');
+  const [adultEmail, setAdultEmail] = useState(locked.email || prefill?.adult_email || '');
+  const [adultPhone, setAdultPhone] = useState(locked.phone || prefill?.adult_phone || '');
+  const [adultDob, setAdultDob] = useState(locked.dob || prefill?.adult_dob || '');
   const [typedLegalName, setTypedLegalName] = useState('');
   const [signatureImage, setSignatureImage] = useState('');
   const [agreementAccepted, setAgreementAccepted] = useState(false);
@@ -168,7 +200,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
       gps_longitude: gps.current.lng,
       gps_accuracy: gps.current.acc,
       audit_trail: auditTrail.current,
-      minors: minors.length
+      minors: !hideMinors && minors.length
         ? minors.map((m) => ({
             first_name: m.first_name.trim(),
             last_name: m.last_name.trim(),
@@ -207,66 +239,94 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div data-tour="wf-adult-names">
             <label className={labelClass}>First Name *</label>
-            <input
-              type="text"
-              value={adultFirstName}
-              autoComplete={autoCompleteOff}
-              onChange={(e) => setAdultFirstName(e.target.value)}
-              className={`${inputClass} ${formErrors.adultFirstName ? 'border-red-300' : ''}`}
-            />
+            {locked.first ? (
+              <LockedValue value={locked.first} />
+            ) : (
+              <input
+                type="text"
+                value={adultFirstName}
+                autoComplete={autoCompleteOff}
+                onChange={(e) => setAdultFirstName(e.target.value)}
+                className={`${inputClass} ${formErrors.adultFirstName ? 'border-red-300' : ''}`}
+              />
+            )}
             {formErrors.adultFirstName && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultFirstName}</p>}
           </div>
           <div>
             <label className={labelClass}>Last Name *</label>
-            <input
-              type="text"
-              value={adultLastName}
-              autoComplete={autoCompleteOff}
-              onChange={(e) => setAdultLastName(e.target.value)}
-              className={`${inputClass} ${formErrors.adultLastName ? 'border-red-300' : ''}`}
-            />
+            {locked.last ? (
+              <LockedValue value={locked.last} />
+            ) : (
+              <input
+                type="text"
+                value={adultLastName}
+                autoComplete={autoCompleteOff}
+                onChange={(e) => setAdultLastName(e.target.value)}
+                className={`${inputClass} ${formErrors.adultLastName ? 'border-red-300' : ''}`}
+              />
+            )}
             {formErrors.adultLastName && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultLastName}</p>}
           </div>
           <div data-tour="wf-adult-contact">
             <label className={labelClass}>Email *</label>
-            <EmailInput
-              value={adultEmail}
-              autoComplete={autoCompleteOff}
-              onChange={(e) => setAdultEmail(e.target.value)}
-              className={`${inputClass} ${formErrors.adultEmail ? 'border-red-300' : ''}`}
-            />
+            {locked.email ? (
+              <LockedValue value={locked.email} />
+            ) : (
+              <EmailInput
+                value={adultEmail}
+                autoComplete={autoCompleteOff}
+                onChange={(e) => setAdultEmail(e.target.value)}
+                className={`${inputClass} ${formErrors.adultEmail ? 'border-red-300' : ''}`}
+              />
+            )}
             {formErrors.adultEmail && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultEmail}</p>}
           </div>
           <div>
             <label className={labelClass}>Phone *</label>
-            <input
-              type="tel"
-              inputMode="tel"
-              value={adultPhone}
-              autoComplete={autoCompleteOff}
-              onChange={(e) => setAdultPhone(e.target.value)}
-              className={`${inputClass} ${formErrors.adultPhone ? 'border-red-300' : ''}`}
-            />
+            {locked.phone ? (
+              <LockedValue value={locked.phone} />
+            ) : (
+              <input
+                type="tel"
+                inputMode="tel"
+                value={adultPhone}
+                autoComplete={autoCompleteOff}
+                onChange={(e) => setAdultPhone(e.target.value)}
+                className={`${inputClass} ${formErrors.adultPhone ? 'border-red-300' : ''}`}
+              />
+            )}
             {formErrors.adultPhone && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultPhone}</p>}
           </div>
           <div data-tour="wf-adult-dob">
             <label className={labelClass}>Date of Birth *</label>
-            <DateOfBirthSelect
-              value={adultDob}
-              onChange={(v) => {
-                setAdultDob(v);
-                setFormErrors((prev) => {
-                  if (!prev.adultDob) return prev;
-                  const next = { ...prev };
-                  delete next.adultDob;
-                  return next;
-                });
-              }}
-              error={!!formErrors.adultDob}
-            />
+            {locked.dob ? (
+              <LockedValue value={formatDateLong(locked.dob)} />
+            ) : (
+              <DateOfBirthSelect
+                value={adultDob}
+                onChange={(v) => {
+                  setAdultDob(v);
+                  setFormErrors((prev) => {
+                    if (!prev.adultDob) return prev;
+                    const next = { ...prev };
+                    delete next.adultDob;
+                    return next;
+                  });
+                }}
+                error={!!formErrors.adultDob}
+              />
+            )}
             {formErrors.adultDob && <p className="text-[11px] text-red-600 mt-1">{formErrors.adultDob}</p>}
           </div>
         </div>
+        {lockedAdult && (
+          <div className="mx-5 mb-5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <p className="text-[11px] leading-relaxed text-gray-600">
+              This is the information saved on your record and it cannot be changed here. If anything is wrong, please
+              ask a Location Manager or Admin at the front desk to update it for you.
+            </p>
+          </div>
+        )}
         {signerIsMinor && (
           <div className="mx-5 mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
             <h3 className="text-xs font-bold text-amber-900">A parent or guardian needs to sign for you</h3>
@@ -280,8 +340,10 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
         )}
       </div>
 
+      {participantsPanel}
+
       {/* Minors */}
-      {tpl?.minor_section_enabled && (
+      {tpl?.minor_section_enabled && !hideMinors && (
         <div data-tour="wf-minors-section" className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
             <div>
@@ -554,7 +616,7 @@ const WaiverFormBody = ({ context, noAutofill = false, disableBrowserAutofill = 
             Submitting...
           </span>
         ) : (
-          'Sign & Submit Waiver'
+          submitLabel ?? 'Sign & Submit Waiver'
         )}
       </button>
     </form>

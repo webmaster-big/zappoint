@@ -7,6 +7,20 @@ export type MarketingConsentStatus = 'not_opted_in' | 'opted_in' | 'withdrawn';
 export type WaiverSource =
   | 'checkout' | 'confirmation_email' | 'sms_link' | 'kiosk' | 'staff_sent' | 'bulk_invite';
 export type RecipientStatus = 'not_sent' | 'sent' | 'complete' | 'not_complete' | 'failed';
+
+export interface KioskActivity {
+  package_id?: number;
+  attraction_id?: number;
+  event_id?: number;
+}
+
+export interface KioskAd {
+  id: number;
+  name: string | null;
+  image_path: string;
+  display_seconds: number;
+  has_link: boolean;
+}
 export type ActivityType = 'package' | 'attraction' | 'event' | 'party_type';
 
 export interface ApiResponse<T> {
@@ -154,7 +168,12 @@ export interface WaiverFormContext {
   }>;
   selected_date?: string;
   kiosk?: boolean;
-  settings?: { inactivity_timeout_seconds?: number; disable_autofill?: boolean; gps_capture_enabled?: boolean };
+  settings?: {
+    inactivity_timeout_seconds?: number;
+    disable_autofill?: boolean;
+    gps_capture_enabled?: boolean;
+    returning_enabled?: boolean;
+  };
 }
 
 export interface WaiverSubmission {
@@ -178,6 +197,152 @@ export interface WaiverSubmission {
   audit_trail?: Array<{ event: string; at: string; meta?: Record<string, unknown> }>;
   minors?: WaiverMinor[];
   selected_date?: string;
+}
+
+export interface WaiverProfileDependentRecord {
+  id: number;
+  first_name: string;
+  last_name: string;
+  age?: number | null;
+  relationship?: string | null;
+}
+
+export interface WaiverProfileRecord {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email?: string | null;
+  phone?: string | null;
+  date_of_birth?: string | null;
+  dependents: WaiverProfileDependentRecord[];
+}
+
+export type WaiverLookupStatus = 'found' | 'not_found' | 'needs_staff';
+
+export interface WaiverLookupResult {
+  status: WaiverLookupStatus;
+  profile?: WaiverProfileRecord;
+}
+
+export interface WaiverReturningSelection {
+  waiver_profile_id: number;
+  selected_dependent_ids: number[];
+  new_dependents: WaiverMinor[];
+}
+
+export interface WaiverLockedAdult {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  date_of_birth?: string | null;
+}
+
+export interface WaiverProfileStaffRow {
+  id: number;
+  first_name: string | null;
+  last_name: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  phone_digits: string | null;
+  date_of_birth: string | null;
+  needs_staff_review: boolean;
+  submissions_count: number;
+  last_waiver_at: string | null;
+  dependents_count: number;
+  last_location_id: number | null;
+  last_location_name: string | null;
+}
+
+export interface WaiverProfileStaffDependent {
+  id: number;
+  waiver_profile_id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  date_of_birth: string | null;
+  relationship: string | null;
+  is_active: boolean;
+}
+
+export interface WaiverProfileStaffDetail extends WaiverProfileStaffRow {
+  phone_e164: string | null;
+  created_at: string | null;
+  dependents: WaiverProfileStaffDependent[];
+}
+
+export interface WaiverProfileHistoryDependent {
+  id: number;
+  waiver_profile_dependent_id: number | null;
+  name: string;
+  date_of_birth: string | null;
+  relationship: string | null;
+  was_new_this_visit: boolean;
+}
+
+export interface WaiverProfileHistoryEntry {
+  id: number;
+  submitted_at: string | null;
+  created_at: string | null;
+  status: WaiverStatus;
+  source: WaiverSource | null;
+  template_title: string | null;
+  version: number | null;
+  location_name: string | null;
+  typed_legal_name: string | null;
+  has_signature: boolean;
+  agreement_accepted: boolean;
+  electronic_consent_accepted: boolean;
+  photo_video_consent: boolean;
+  marketing_consent_status: MarketingConsentStatus | null;
+  checked_in_at: string | null;
+  dependents: WaiverProfileHistoryDependent[];
+  new_dependents_count: number;
+}
+
+export interface WaiverProfileSharedPhoneEntry {
+  id: number;
+  name: string;
+  email: string | null;
+  submissions_count: number;
+  last_waiver_at: string | null;
+}
+
+export interface WaiverProfileStaffView {
+  profile: WaiverProfileStaffDetail;
+  history: WaiverProfileHistoryEntry[];
+  shared_phone_profiles: WaiverProfileSharedPhoneEntry[];
+}
+
+export interface WaiverProfileListFilters {
+  search?: string;
+  per_page?: number;
+  page?: number;
+  needs_review?: 1;
+}
+
+export interface WaiverProfileListResponse {
+  success: boolean;
+  data: WaiverProfileStaffRow[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+}
+
+export interface WaiverProfilePayload {
+  first_name?: string;
+  last_name?: string;
+  email?: string | null;
+  date_of_birth?: string | null;
+  phone?: string;
+  needs_staff_review?: boolean;
+}
+
+export interface WaiverProfileDependentPayload {
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string | null;
+  relationship?: string | null;
+  is_active?: boolean;
 }
 
 export interface BulkRecipientView {
@@ -284,4 +449,29 @@ export interface WaiverSearchFilters {
   marketing_consent_status?: MarketingConsentStatus;
   per_page?: number;
   page?: number;
+}
+
+export type WaiverAdStatus = 'active' | 'scheduled' | 'expired' | 'disabled';
+
+export interface WaiverAdRecord {
+  id: number;
+  waiver_template_id: number;
+  location_id: number | null;
+  location_name: string | null;
+  name: string | null;
+  image_path: string | null;
+  destination_url: string | null;
+  is_enabled: boolean;
+  is_fallback: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  position: number;
+  status: WaiverAdStatus;
+  created_at: string | null;
+}
+
+export interface WaiverAdSettings {
+  ads_enabled: boolean;
+  ads_rotation_mode: 'random' | 'ordered';
+  ads_display_seconds: number;
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Code2, CheckSquare, Square, Eye, Tablet, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, Code2, CheckSquare, Square, Eye, Tablet, MapPin, Megaphone } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
 import { locationService } from '../../../services/LocationService';
@@ -252,6 +252,15 @@ const WaiverBuilder = () => {
           </div>
         </div>
         <div data-tour="builder-save" className="flex flex-wrap items-center gap-2">
+          {isEdit && (
+            <StandardButton
+              variant="secondary"
+              icon={Megaphone}
+              onClick={() => navigate(`/waivers/templates/${id}/ads`)}
+            >
+              Post-Waiver Ads
+            </StandardButton>
+          )}
           {isEdit && (
             <StandardButton
               variant="secondary"

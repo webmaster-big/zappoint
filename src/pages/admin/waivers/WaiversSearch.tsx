@@ -22,6 +22,7 @@ import {
   Link2,
   Fingerprint,
   ListChecks,
+  UserCog,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -600,6 +601,7 @@ const WaiversSearch = () => {
             items={[
               { label: 'Templates', icon: FileText, onClick: () => navigate('/waivers/templates'), hidden: !(isAdmin || isManager) },
               { label: 'Group Invites', icon: Users, onClick: () => navigate('/waivers/bulk'), hidden: !(isAdmin || isManager) },
+              { label: 'Returning Customers', icon: UserCog, onClick: () => navigate('/waivers/profiles'), hidden: !(isAdmin || isManager) },
               { label: 'Reports', icon: BarChart3, onClick: () => navigate('/waivers/reports') },
               { label: 'Deletion Log', icon: ClipboardList, onClick: () => navigate('/waivers/deletion-log'), hidden: !(isAdmin || isManager), dividerBefore: true },
               { label: 'Settings', icon: SettingsIcon, onClick: () => navigate('/waivers/settings'), hidden: !isAdmin },

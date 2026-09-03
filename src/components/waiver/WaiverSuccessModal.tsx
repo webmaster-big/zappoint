@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { API_BASE_URL } from '../../utils/storage';
+import { API_BASE_URL, getImageUrl } from '../../utils/storage';
+import waiverService from '../../services/waiverService';
+import type { KioskAd } from '../../types/waiver.types';
 
 /** One thing worth mentioning on the way out. */
 interface Pick {
@@ -25,7 +27,13 @@ interface Props {
   locationId: number | null;
   autoCloseSeconds?: number;
   onStartNext: () => void;
+  ad?: KioskAd | null;
+  waiverId?: number | null;
+  nextLabel?: string;
+  closingText?: string;
 }
+
+type LearnMoreStep = 'idle' | 'choose' | 'sending' | 'done';
 
 /** How long the plain confirmation holds before the takeaway slides in. */
 const CONFIRM_BEAT_MS = 2000;
@@ -192,13 +200,17 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   };
 };
 
-const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext }: Props) => {
+const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, ad = null, waiverId = null, nextLabel = 'Start Next Waiver', closingText = 'Returning to the start screen' }: Props) => {
   const [takeaway, setTakeaway] = useState<Takeaway | null>(null);
   const [beatDone, setBeatDone] = useState(false);
   const [handingOver, setHandingOver] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(autoCloseSeconds);
+  const [learnMoreStep, setLearnMoreStep] = useState<LearnMoreStep>('idle');
+  const [learnMoreMessage, setLearnMoreMessage] = useState<string | null>(null);
+  const [learnMoreFailed, setLearnMoreFailed] = useState(false);
 
   useEffect(() => {
+    if (ad) return;
     let alive = true;
     loadTakeaway(locationId).then((data) => {
       if (alive) setTakeaway(data);
@@ -206,7 +218,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
     return () => {
       alive = false;
     };
-  }, [locationId]);
+  }, [locationId, ad]);
 
   useEffect(() => {
     const out = setTimeout(() => setHandingOver(true), CONFIRM_BEAT_MS);
@@ -222,8 +234,35 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
     return () => clearInterval(tick);
   }, []);
 
+  useEffect(() => {
+    if (secondsLeft === 0 && learnMoreStep !== 'sending') onStartNext();
+  }, [secondsLeft, learnMoreStep]);
+
+  const openLearnMore = () => {
+    setLearnMoreStep('choose');
+    setSecondsLeft((s) => Math.max(s, 25));
+  };
+
+  const sendLearnMore = async (channel: 'email' | 'sms') => {
+    if (!ad || !waiverId) return;
+    setLearnMoreStep('sending');
+    setLearnMoreFailed(false);
+    try {
+      const res = await waiverService.adLearnMore(waiverId, ad.id, channel);
+      setLearnMoreMessage(res?.message || (channel === 'email' ? 'Additional information sent by email.' : 'Additional information sent by text.'));
+      setLearnMoreStep('done');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setLearnMoreMessage(e.response?.data?.message || 'The message could not be sent. Please try again.');
+      setLearnMoreFailed(true);
+      setLearnMoreStep('choose');
+    }
+    setSecondsLeft((s) => Math.max(s, 12));
+  };
+
   const hasTakeaway = !!takeaway && !!(takeaway.bookUrl || takeaway.picks.length > 0);
-  const showTakeaway = beatDone && hasTakeaway;
+  const showAd = beatDone && !!ad;
+  const showTakeaway = beatDone && !ad && hasTakeaway;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/55 backdrop-blur-sm p-4 overflow-y-auto">
@@ -233,8 +272,85 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
         aria-labelledby="waiver-success-title"
         className="zz-card-in bg-white w-full max-w-md rounded-2xl border border-gray-100 shadow-xl overflow-hidden my-6"
       >
-        {!showTakeaway ? (
-          <div className={`px-8 py-11 text-center ${handingOver && hasTakeaway ? 'zz-step-out' : 'zz-step-in'}`}>
+        {showAd && ad ? (
+          <div className="zz-step-in">
+            <div className="flex items-center gap-2 px-7 pt-5 pb-4 border-b border-gray-100">
+              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                <svg className="w-3 h-3 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              <p className="text-xs font-semibold text-gray-500">
+                Waiver signed{signerFirstName ? ` — thanks, ${signerFirstName}` : ''}
+              </p>
+            </div>
+
+            <img
+              src={getImageUrl(ad.image_path)}
+              alt={ad.name || 'Announcement'}
+              className="w-full max-h-72 object-contain bg-gray-50"
+            />
+
+            <div className="px-7 py-5">
+              {learnMoreStep === 'idle' && ad.has_link && (
+                <button
+                  onClick={openLearnMore}
+                  className="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+                >
+                  Learn More
+                </button>
+              )}
+
+              {(learnMoreStep === 'choose' || learnMoreStep === 'sending') && (
+                <div>
+                  {learnMoreFailed && learnMoreMessage && (
+                    <p className="text-xs text-red-600 mb-2 text-center">{learnMoreMessage}</p>
+                  )}
+                  <p className="text-xs font-medium text-gray-600 mb-2 text-center">
+                    Where should we send the details?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => sendLearnMore('email')}
+                      disabled={learnMoreStep === 'sending'}
+                      className="py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                      {learnMoreStep === 'sending' ? 'Sending…' : 'Send by Email'}
+                    </button>
+                    <button
+                      onClick={() => sendLearnMore('sms')}
+                      disabled={learnMoreStep === 'sending'}
+                      className="py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                      {learnMoreStep === 'sending' ? 'Sending…' : 'Send by Text'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {learnMoreStep === 'done' && learnMoreMessage && (
+                <p className="text-sm font-medium text-green-700 bg-green-50 border border-green-100 rounded-lg py-2.5 px-3 text-center">
+                  {learnMoreMessage}
+                </p>
+              )}
+
+              <button
+                onClick={onStartNext}
+                className={`w-full py-3 text-sm font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ${
+                  learnMoreStep === 'idle' && ad.has_link
+                    ? 'mt-2.5 bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                    : 'mt-3 bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {nextLabel}
+              </button>
+              <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
+                {secondsLeft > 0 ? `${closingText} in ${secondsLeft}s` : `${closingText}…`}
+              </p>
+            </div>
+          </div>
+        ) : !showTakeaway ? (
+          <div className={`px-8 py-11 text-center ${handingOver && (hasTakeaway || !!ad) ? 'zz-step-out' : 'zz-step-in'}`}>
             <div className="zz-ring-in w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
               <svg className="zz-tick w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />

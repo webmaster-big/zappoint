@@ -7,6 +7,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_REPORTS_STEPS } from '../../../components/waiver/tour/tourSteps';
+import { getImageUrl } from '../../../utils/storage';
 
 const REPORT_TYPES: Array<{ value: string; label: string; dated: boolean }> = [
   { value: 'completed-by-date', label: 'Completed by date', dated: true },
@@ -16,6 +17,7 @@ const REPORT_TYPES: Array<{ value: string; label: string; dated: boolean }> = [
   { value: 'by-template', label: 'By template', dated: true },
   { value: 'by-source', label: 'By source', dated: true },
   { value: 'marketing-consent', label: 'Marketing consent', dated: true },
+  { value: 'ad-performance', label: 'Ad performance', dated: true },
   { value: 'deleted', label: 'Deleted waivers', dated: false },
 ];
 
@@ -148,8 +150,97 @@ const EmptyState = ({ fullColor }: { fullColor: string }) => (
   </div>
 );
 
+interface AdPerformanceRow {
+  ad_id: number;
+  ad_name: string | null;
+  image_path: string | null;
+  template: string | null;
+  is_fallback: boolean;
+  displays: number;
+  learn_more_requests: number;
+  sent_by_email: number;
+  sent_by_text: number;
+  request_rate: number;
+}
+
+interface AdRecentRequest {
+  ad_name: string | null;
+  channel: string;
+  status: string;
+  requested_at: string | null;
+}
+
+const AdPerformanceResult = ({ data, fullColor }: { data: { ads?: AdPerformanceRow[]; recent_requests?: AdRecentRequest[] }; fullColor: string }) => {
+  const ads = data.ads ?? [];
+  const recent = data.recent_requests ?? [];
+  if (ads.length === 0 && recent.length === 0) return <EmptyState fullColor={fullColor} />;
+  const numCls = 'px-3 py-2 text-sm text-gray-700 text-right';
+  const numStyle = { fontVariantNumeric: 'tabular-nums' as const };
+  return (
+    <div>
+      {ads.length === 0 ? (
+        <EmptyState fullColor={fullColor} />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ad</th>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Template</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Displays</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Learn More</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">By Email</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">By Text</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Request Rate</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {ads.map((ad) => (
+                <tr key={ad.ad_id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm text-gray-700">
+                    <div className="flex items-center gap-2">
+                      {ad.image_path && <img src={getImageUrl(ad.image_path)} alt="" className="w-9 h-9 rounded object-cover border border-gray-100" />}
+                      <span>{ad.ad_name || '—'}</span>
+                      {ad.is_fallback && <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-100 rounded px-1.5 py-0.5">Fallback</span>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-sm text-gray-700">{ad.template || '—'}</td>
+                  <td className={numCls} style={numStyle}>{ad.displays}</td>
+                  <td className={numCls} style={numStyle}>{ad.learn_more_requests}</td>
+                  <td className={numCls} style={numStyle}>{ad.sent_by_email}</td>
+                  <td className={numCls} style={numStyle}>{ad.sent_by_text}</td>
+                  <td className={numCls} style={numStyle}>{(Number(ad.request_rate) * 100).toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="mt-6">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Recent Learn More requests</p>
+          <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg">
+            {recent.map((r, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                <span className="text-gray-700 font-medium">{r.ad_name || '—'}</span>
+                <span className="text-gray-500">{titleize(r.channel)}</span>
+                <span className="text-gray-500">{titleize(r.status)}</span>
+                <span className="text-gray-400 ml-auto" style={numStyle}>{r.requested_at ? new Date(r.requested_at).toLocaleString() : '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ReportResult = ({ type, data, fullColor }: { type: string; data: unknown; fullColor: string }) => {
   if (data == null) return <EmptyState fullColor={fullColor} />;
+
+  if (type === 'ad-performance' && typeof data === 'object' && !Array.isArray(data)) {
+    return <AdPerformanceResult data={data as { ads?: AdPerformanceRow[]; recent_requests?: AdRecentRequest[] }} fullColor={fullColor} />;
+  }
 
   if (Array.isArray(data)) {
     return <SimpleTable rows={data as Array<Record<string, unknown>>} fullColor={fullColor} />;

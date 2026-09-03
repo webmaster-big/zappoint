@@ -31,3 +31,6 @@ dist-ssr
 # Documentation files
 *.md
 build_output.txt
+
+# Redis dump written when running a local redis in this directory
+dump.rdb
