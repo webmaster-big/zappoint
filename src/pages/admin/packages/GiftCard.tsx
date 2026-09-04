@@ -562,7 +562,6 @@ const GiftCard: React.FC = () => {
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   >
                     <option value="fixed">Fixed Value</option>
-                    <option value="percentage">Percentage</option>
                   </select>
                 </div>
                 <div>
@@ -669,7 +668,6 @@ const GiftCard: React.FC = () => {
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     >
                       <option value="fixed">Fixed Value</option>
-                      <option value="percentage">Percentage</option>
                     </select>
                   </div>
                   <div>
