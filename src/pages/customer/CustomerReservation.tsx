@@ -18,6 +18,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
+import { bookingDurationMinutes } from '../../utils/calendarInvite';
 import type { SortBy, SortOrder } from '../../types/customer';
 import bookingService, { type Booking } from '../../services/bookingService';
 import type { BookPackagePackage } from '../../types/BookPackage.types';
@@ -466,6 +468,19 @@ const CustomerReservations = () => {
                               <QrCode size={14} className="text-blue-600" />
                               Download QR Code
                             </button>
+                            <AddToCalendarButton
+                              filename={`zapzone-booking-${booking.reference_number}`}
+                              className="mt-2 w-full flex items-center justify-center gap-2.5 px-3.5 py-2.5 text-sm border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition font-medium"
+                              event={{
+                                uid: `booking-${booking.reference_number}@zap-zone.com`,
+                                title: `Zap Zone: ${getPackageName(booking)}`,
+                                date: booking.booking_date,
+                                time: booking.booking_time,
+                                durationMinutes: bookingDurationMinutes(booking.duration, booking.duration_unit),
+                                location: getLocationName(booking),
+                                description: `Booking ${booking.reference_number} for ${booking.participants} guest${booking.participants > 1 ? 's' : ''}.`,
+                              }}
+                            />
                           </div>
                         </div>
 

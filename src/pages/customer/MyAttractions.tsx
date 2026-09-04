@@ -23,6 +23,7 @@ import { attractionPurchaseService } from '../../services/AttractionPurchaseServ
 import type { AttractionPurchase } from '../../services/AttractionPurchaseService';
 import { getImageUrl } from '../../utils/storage';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../utils/qrcode';
+import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 
@@ -360,6 +361,20 @@ const MyAttractions = () => {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
+                          <AddToCalendarButton
+                            filename={`zapzone-attraction-${purchase.id}`}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition"
+                            label="Calendar"
+                            event={{
+                              uid: `attraction-${purchase.id}@zap-zone.com`,
+                              title: `Zap Zone: ${purchase.attraction?.name ?? 'Attraction'}`,
+                              date: purchase.scheduled_date || purchase.purchase_date,
+                              time: purchase.scheduled_time,
+                              durationMinutes: 90,
+                              location: purchase.attraction?.location?.name,
+                              description: `${purchase.quantity} ticket${purchase.quantity > 1 ? 's' : ''} for ${purchase.attraction?.name ?? 'your attraction'}.`,
+                            }}
+                          />
                           <button
                             onClick={() => handleDownloadQRCode(purchase)}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition"

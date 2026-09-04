@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
 import {
   Calendar,
   MapPin,
@@ -333,6 +334,19 @@ const MyEvents = () => {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
+                          <AddToCalendarButton
+                            filename={`zapzone-event-${purchase.reference_number ?? purchase.id}`}
+                            label="Calendar"
+                            event={{
+                              uid: `event-${purchase.id}@zap-zone.com`,
+                              title: `Zap Zone: ${purchase.event?.name ?? 'Event'}`,
+                              date: purchase.purchase_date,
+                              time: purchase.purchase_time,
+                              durationMinutes: 120,
+                              location: purchase.location?.name,
+                              description: `${purchase.quantity} ticket${purchase.quantity > 1 ? 's' : ''} for ${purchase.event?.name ?? 'your event'}.`,
+                            }}
+                          />
                           <button
                             onClick={() => { setSelectedPurchase(purchase); setShowDetailsModal(true); }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition"
