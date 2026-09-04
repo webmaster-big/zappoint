@@ -287,10 +287,11 @@ const CustomerGiftCards = () => {
                         <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50">
                           <span className="text-xs text-gray-400">Click for details</span>
                           <button
-                            className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-1.5 font-medium text-sm rounded-lg transition-all duration-200"
-                            onClick={e => { e.stopPropagation(); setShowPaymentModal(card); }}
+                            disabled
+                            title="Gift card purchase is not available yet"
+                            className="bg-gray-200 text-gray-500 px-4 py-1.5 font-medium text-sm rounded-lg cursor-not-allowed"
                           >
-                            Buy Now
+                            Coming Soon
                           </button>
                         </div>
                       </div>

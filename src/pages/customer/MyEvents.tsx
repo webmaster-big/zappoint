@@ -40,12 +40,6 @@ const MyEvents = () => {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (window.location.hostname === 'booking.zap-zone.com') {
-      setShowComingSoon(true);
-    }
-  }, []);
-
   const customerData = (() => {
     try {
       const data = localStorage.getItem('zapzone_customer');
