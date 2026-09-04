@@ -4,6 +4,7 @@ export const PAYMENT_TYPE = {
   ATTRACTION_PURCHASE: 'attraction_purchase',
   EVENT_PURCHASE: 'event_purchase',
   TICKET_ORDER: 'ticket_order',
+  GIFT_CARD: 'gift_card',
 } as const;
 
 export type PaymentPayableType = typeof PAYMENT_TYPE[keyof typeof PAYMENT_TYPE];

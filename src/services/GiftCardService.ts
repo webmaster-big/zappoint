@@ -86,6 +86,34 @@ export interface GiftCardCodeValidationResult {
   };
 }
 
+export interface PurchaseGiftCardData {
+  location_id: number;
+  amount: number;
+  payment_method: 'cash' | 'in-store';
+  purchaser_name: string;
+  purchaser_email: string;
+  purchaser_phone?: string;
+  customer_id?: number;
+}
+
+export interface PurchasedGiftCard {
+  id: number;
+  code: string;
+  balance: number;
+  initial_value: number;
+  location: string;
+  expiry_date?: string | null;
+  transaction_id?: string | null;
+  emailed_to: string;
+}
+
+export interface PurchaseGiftCardResult {
+  success: boolean;
+  message?: string;
+  duplicate?: boolean;
+  data: PurchasedGiftCard;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -138,6 +166,11 @@ class GiftCardService {
     context: { location_id?: number | null; subtotal?: number; items?: { type: 'package' | 'attraction' | 'event'; id: number }[] } = {}
   ): Promise<GiftCardCodeValidationResult> {
     const response = await api.post('/gift-cards/validate-code', { code, ...context });
+    return response.data;
+  }
+
+  async purchaseGiftCard(data: PurchaseGiftCardData): Promise<PurchaseGiftCardResult> {
+    const response = await api.post('/gift-cards/purchase', data);
     return response.data;
   }
 }

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy, Search, Filter, RefreshCcw } from "lucide-react";
+import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy, Search, Filter, RefreshCcw, ShoppingCart, CheckCircle2 } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
+import EmailInput from '../../../components/ui/EmailInput';
 import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/GiftCard.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { giftCardService } from '../../../services';
+import { giftCardService, locationService } from '../../../services';
+import type { Location } from '../../../services';
+import type { PurchasedGiftCard } from '../../../services/GiftCardService';
 import { getStoredUser } from '../../../utils/storage';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
@@ -16,9 +19,31 @@ const EMPTY_TARGETING: TargetingValue = {
   event_ids: null,
 };
 
+const GIFT_CARD_AMOUNTS = [25, 50, 100, 150, 200];
+const GIFT_CARD_MIN_AMOUNT = 10;
+const GIFT_CARD_MAX_AMOUNT = 500;
+
+type SellForm = {
+  amount: string;
+  purchaser_name: string;
+  purchaser_email: string;
+  purchaser_phone: string;
+  location_id: string;
+  payment_method: 'cash' | 'in-store';
+};
+
+const EMPTY_SELL_FORM: SellForm = {
+  amount: '',
+  purchaser_name: '',
+  purchaser_email: '',
+  purchaser_phone: '',
+  location_id: '',
+  payment_method: 'cash',
+};
+
 const GiftCard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const { effectiveLocationId } = useLocationScope();
+  const { effectiveLocationId, locations, isCompanyAdmin } = useLocationScope();
   const [giftCards, setGiftCards] = useState<GiftCardItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -41,6 +66,12 @@ const GiftCard: React.FC = () => {
   const [editForm, setEditForm] = useState<null | Partial<Record<string, string>>>(null);
   const [targeting, setTargeting] = useState<TargetingValue>(EMPTY_TARGETING);
   const [editTargeting, setEditTargeting] = useState<TargetingValue>(EMPTY_TARGETING);
+  const [showSellModal, setShowSellModal] = useState(false);
+  const [selling, setSelling] = useState(false);
+  const [sellForm, setSellForm] = useState<SellForm>(EMPTY_SELL_FORM);
+  const [soldCard, setSoldCard] = useState<PurchasedGiftCard | null>(null);
+  const [fallbackLocations, setFallbackLocations] = useState<Location[]>([]);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
@@ -55,6 +86,14 @@ const GiftCard: React.FC = () => {
     loadGiftCards();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveLocationId]);
+
+  useEffect(() => {
+    if (!showSellModal || locations.length > 0) return;
+    locationService
+      .getLocations({ per_page: 100 })
+      .then((res) => setFallbackLocations(res.data || []))
+      .catch(() => setFallbackLocations([]));
+  }, [showSellModal, locations.length]);
 
   const loadGiftCards = async () => {
     try {
@@ -289,6 +328,90 @@ const GiftCard: React.FC = () => {
     navigator.clipboard.writeText(text);
   };
 
+  const sellLocations = (locations.length > 0 ? locations : fallbackLocations).filter(
+    (location) => isCompanyAdmin || !effectiveLocationId || location.id === effectiveLocationId
+  );
+
+  const openSellModal = () => {
+    setSellForm({ ...EMPTY_SELL_FORM, location_id: effectiveLocationId ? String(effectiveLocationId) : '' });
+    setSoldCard(null);
+    setCodeCopied(false);
+    setShowSellModal(true);
+  };
+
+  const closeSellModal = () => {
+    setShowSellModal(false);
+    setSoldCard(null);
+    setCodeCopied(false);
+    setSellForm(EMPTY_SELL_FORM);
+  };
+
+  const handleSellChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setSellForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCopyCode = (code: string) => {
+    copyToClipboard(code);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const handleSell = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(sellForm.amount);
+    const locationId = sellForm.location_id ? Number(sellForm.location_id) : effectiveLocationId;
+
+    if (!locationId) {
+      showToast('Please select the location making this sale', 'error');
+      return;
+    }
+    if (!sellForm.amount.trim() || isNaN(amount)) {
+      showToast('Please enter a valid amount', 'error');
+      return;
+    }
+    if (amount < GIFT_CARD_MIN_AMOUNT || amount > GIFT_CARD_MAX_AMOUNT) {
+      showToast(`Amount must be between $${GIFT_CARD_MIN_AMOUNT} and $${GIFT_CARD_MAX_AMOUNT}`, 'error');
+      return;
+    }
+    if (!sellForm.purchaser_name.trim()) {
+      showToast('Please enter the purchaser name', 'error');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sellForm.purchaser_email.trim())) {
+      showToast('Please enter a valid purchaser email', 'error');
+      return;
+    }
+
+    try {
+      setSelling(true);
+      const response = await giftCardService.purchaseGiftCard({
+        location_id: locationId,
+        amount,
+        payment_method: sellForm.payment_method,
+        purchaser_name: sellForm.purchaser_name.trim(),
+        purchaser_email: sellForm.purchaser_email.trim(),
+        purchaser_phone: sellForm.purchaser_phone.trim() || undefined,
+      });
+
+      setSoldCard(response.data);
+      showToast(
+        response.duplicate ? 'This sale was already recorded - showing the same card' : 'Gift card sold successfully!',
+        'success'
+      );
+      await loadGiftCards();
+    } catch (error) {
+      const err = error as { response?: { status?: number; data?: { message?: string } } };
+      const message = err.response?.data?.message;
+      if (!message) {
+        console.error('Error selling gift card:', error);
+      }
+      showToast(message || 'Error selling gift card', 'error');
+    } finally {
+      setSelling(false);
+    }
+  };
+
   const getStatusColor = (status: GiftCardStatus) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
@@ -331,14 +454,24 @@ const GiftCard: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gift Cards</h1>
           <p className="text-gray-600 mt-2">Create and manage gift cards for your customers</p>
         </div>
-        <StandardButton
-          variant="primary"
-          size="md"
-          onClick={() => setShowModal(true)}
-          icon={Plus}
-        >
-          Create Gift Card
-        </StandardButton>
+        <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+          <StandardButton
+            variant="primary"
+            size="md"
+            onClick={openSellModal}
+            icon={ShoppingCart}
+          >
+            Sell Gift Card
+          </StandardButton>
+          <StandardButton
+            variant="secondary"
+            size="md"
+            onClick={() => setShowModal(true)}
+            icon={Plus}
+          >
+            Create Gift Card
+          </StandardButton>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -642,6 +775,173 @@ const GiftCard: React.FC = () => {
                   {loading ? 'Creating...' : 'Create Gift Card'}
                 </StandardButton>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showSellModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl relative border border-gray-200 m-4 max-h-[90vh] overflow-y-auto">
+            <StandardButton 
+              className="absolute top-4 right-4" 
+              variant="ghost" 
+              size="sm" 
+              icon={X} 
+              onClick={closeSellModal}
+            />
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">Sell Gift Card</h3>
+            {soldCard ? (
+              <div className="space-y-4">
+                <div className={`flex items-center gap-2 text-${fullColor}`}>
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="text-sm font-medium">Gift card sold</span>
+                </div>
+                <div className={`border-2 border-${themeColor}-200 bg-${themeColor}-50 rounded-lg p-6 text-center`}>
+                  <div className="text-sm text-gray-500 mb-1">Gift Card Code</div>
+                  <div className="font-mono text-2xl sm:text-3xl font-bold tracking-wider text-gray-900 break-all">
+                    {soldCard.code}
+                  </div>
+                  <div className="text-lg font-semibold text-gray-900 mt-3">
+                    ${Number(soldCard.initial_value).toFixed(2)}
+                  </div>
+                  {soldCard.location && (
+                    <div className="text-sm text-gray-500 mt-1">{soldCard.location}</div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600">
+                  Give this code to the customer - it is what they redeem. A copy was emailed to {soldCard.emailed_to}.
+                </p>
+                <div className="flex gap-3 mt-6">
+                  <StandardButton
+                    onClick={() => handleCopyCode(soldCard.code)}
+                    variant="primary"
+                    size="md"
+                    icon={Copy}
+                    className="flex-1"
+                  >
+                    {codeCopied ? 'Copied!' : 'Copy code'}
+                  </StandardButton>
+                  <StandardButton 
+                    onClick={closeSellModal} 
+                    variant="secondary"
+                    size="md"
+                    className="flex-1"
+                  >
+                    Done
+                  </StandardButton>
+                </div>
+              </div>
+            ) : (
+              <form className="space-y-4" onSubmit={handleSell}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Amount ($)</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {GIFT_CARD_AMOUNTS.map((amount) => (
+                      <StandardButton
+                        key={amount}
+                        onClick={() => setSellForm((prev) => ({ ...prev, amount: String(amount) }))}
+                        variant={Number(sellForm.amount) === amount ? 'primary' : 'secondary'}
+                        size="sm"
+                      >
+                        {`$${amount}`}
+                      </StandardButton>
+                    ))}
+                  </div>
+                  <input 
+                    type="number" 
+                    name="amount" 
+                    value={sellForm.amount} 
+                    onChange={handleSellChange} 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    min={GIFT_CARD_MIN_AMOUNT} 
+                    max={GIFT_CARD_MAX_AMOUNT} 
+                    step="0.01" 
+                    required 
+                    placeholder="Custom amount"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Pick a preset or enter any amount from ${GIFT_CARD_MIN_AMOUNT} to ${GIFT_CARD_MAX_AMOUNT}.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Purchaser Name</label>
+                  <input 
+                    type="text" 
+                    name="purchaser_name" 
+                    value={sellForm.purchaser_name} 
+                    onChange={handleSellChange} 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    maxLength={255} 
+                    required 
+                    placeholder="Jane Doe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Purchaser Email</label>
+                  <EmailInput 
+                    name="purchaser_email" 
+                    value={sellForm.purchaser_email} 
+                    onChange={handleSellChange} 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    required 
+                    placeholder="jane@example.com"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">The code is emailed here as soon as the sale goes through.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">
+                    Purchaser Phone <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input 
+                    type="tel" 
+                    name="purchaser_phone" 
+                    value={sellForm.purchaser_phone} 
+                    onChange={handleSellChange} 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    placeholder="+1 555 000 0000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Location</label>
+                  <select 
+                    name="location_id" 
+                    value={sellForm.location_id} 
+                    onChange={handleSellChange} 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    required
+                  >
+                    <option value="">Select a location</option>
+                    {sellLocations.map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Payment Method</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['cash', 'in-store'] as const).map((method) => (
+                      <StandardButton
+                        key={method}
+                        onClick={() => setSellForm((prev) => ({ ...prev, payment_method: method }))}
+                        variant={sellForm.payment_method === method ? 'primary' : 'secondary'}
+                        size="md"
+                      >
+                        {method === 'cash' ? 'Cash' : 'In-store'}
+                      </StandardButton>
+                    ))}
+                  </div>
+                </div>
+                <StandardButton
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  disabled={selling}
+                  className="w-full mt-2"
+                >
+                  {selling ? 'Processing...' : 'Complete Sale'}
+                </StandardButton>
+              </form>
+            )}
           </div>
         </div>
       )}

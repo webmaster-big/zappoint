@@ -23,7 +23,8 @@ import {
   Undo2,
   AlertTriangle,
   Archive,
-  ShoppingCart
+  ShoppingCart,
+  Gift
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import {
@@ -77,6 +78,7 @@ const normalizePayableType = (type?: string | null): PaymentPayableType | undefi
   if (lower === PAYMENT_TYPE.BOOKING || lower.includes('booking')) return PAYMENT_TYPE.BOOKING;
   if (lower === PAYMENT_TYPE.ATTRACTION_PURCHASE || lower.includes('attractionpurchase') || lower.includes('attraction_purchase')) return PAYMENT_TYPE.ATTRACTION_PURCHASE;
   if (lower === PAYMENT_TYPE.EVENT_PURCHASE || lower.includes('eventpurchase') || lower.includes('event_purchase')) return PAYMENT_TYPE.EVENT_PURCHASE;
+  if (lower === PAYMENT_TYPE.GIFT_CARD || lower.includes('giftcard') || lower.includes('gift_card')) return PAYMENT_TYPE.GIFT_CARD;
   return type as PaymentPayableType;
 };
 
@@ -249,7 +251,8 @@ const Payments = () => {
     booking: { icon: Package, label: 'Package Booking', color: `bg-${themeColor}-100 text-${fullColor}` },
     attraction_purchase: { icon: Ticket, label: 'Attraction Purchase', color: 'bg-purple-100 text-purple-800' },
     event_purchase: { icon: Calendar, label: 'Event Purchase', color: 'bg-amber-100 text-amber-800' },
-    ticket_order: { icon: ShoppingCart, label: 'Bulk Order', color: 'bg-blue-100 text-blue-800' }
+    ticket_order: { icon: ShoppingCart, label: 'Bulk Order', color: 'bg-blue-100 text-blue-800' },
+    gift_card: { icon: Gift, label: 'Gift Card', color: 'bg-emerald-100 text-emerald-800' }
   };
 
   const metrics: PaymentsMetrics = {
@@ -910,6 +913,7 @@ const Payments = () => {
         { value: 'booking', label: 'Bookings' },
         { value: 'attraction_purchase', label: 'Attractions' },
         { value: 'event_purchase', label: 'Events' },
+        { value: 'gift_card', label: 'Gift Cards' },
       ],
       predicate: (p, value) => p.payable_type === value,
     },
