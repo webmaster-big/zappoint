@@ -212,8 +212,9 @@ export interface WaiverProfileRecord {
   first_name: string;
   last_name: string;
   email?: string | null;
+  has_email?: boolean;
   phone?: string | null;
-  date_of_birth?: string | null;
+  age?: number | null;
   dependents: WaiverProfileDependentRecord[];
 }
 
@@ -222,10 +223,12 @@ export type WaiverLookupStatus = 'found' | 'not_found' | 'needs_staff';
 export interface WaiverLookupResult {
   status: WaiverLookupStatus;
   profile?: WaiverProfileRecord;
+  lookup_token?: string | null;
 }
 
 export interface WaiverReturningSelection {
   waiver_profile_id: number;
+  lookup_token?: string | null;
   selected_dependent_ids: number[];
   new_dependents: WaiverMinor[];
 }

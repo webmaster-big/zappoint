@@ -82,15 +82,20 @@ const waiverService = {
   getKioskPreview: async (templateId: number): Promise<WaiverFormContext> =>
     (await api.get<ApiResponse<WaiverFormContext>>(`/waiver-templates/${templateId}/kiosk-preview`)).data.data,
 
-  kioskLookup: async (templateId: number, phone: string): Promise<WaiverLookupResult> =>
-    (await publicApi.post<ApiResponse<WaiverLookupResult>>(`/waivers/kiosk/${templateId}/lookup`, { phone })).data.data,
+  kioskLookup: async (templateId: number, phone: string, lastName: string): Promise<WaiverLookupResult> =>
+    (
+      await publicApi.post<ApiResponse<WaiverLookupResult>>(`/waivers/kiosk/${templateId}/lookup`, {
+        phone,
+        last_name: lastName,
+      })
+    ).data.data,
 
   kioskSubmit: async (
     templateId: number,
     data: WaiverSubmission,
     locationId?: number | null,
     activity?: KioskActivity,
-    returning?: { waiver_profile_id?: number; selected_dependent_ids?: number[] },
+    returning?: { waiver_profile_id?: number; lookup_token?: string | null; selected_dependent_ids?: number[] },
   ) =>
     (await publicApi.post(`/waivers/kiosk/${templateId}/submit`, {
       ...data,
@@ -100,6 +105,7 @@ const waiverService = {
         ? {
             waiver_profile_id: returning.waiver_profile_id,
             selected_dependent_ids: returning.selected_dependent_ids ?? [],
+            ...(returning.lookup_token ? { lookup_token: returning.lookup_token } : {}),
           }
         : {}),
     })).data,

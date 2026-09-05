@@ -50,6 +50,7 @@ const WaiverKiosk = () => {
   const [phase, setPhase] = useState<'start' | 'lookup' | 'returning' | 'form'>('start');
   const [profile, setProfile] = useState<WaiverProfileRecord | null>(null);
   const [returning, setReturning] = useState<WaiverReturningSelection | null>(null);
+  const [lookupToken, setLookupToken] = useState<string | null>(null);
   // remounts WaiverFormBody to clear all field state on reset
   const [formKey, setFormKey] = useState(0);
 
@@ -96,6 +97,7 @@ const WaiverKiosk = () => {
     setCompletedWaiverId(null);
     setProfile(null);
     setReturning(null);
+    setLookupToken(null);
     setPhase('start');
   }, []);
 
@@ -143,6 +145,7 @@ const WaiverKiosk = () => {
         returning
           ? {
               waiver_profile_id: returning.waiver_profile_id,
+              lookup_token: lookupToken,
               selected_dependent_ids: returning.selected_dependent_ids,
             }
           : undefined,
@@ -200,8 +203,9 @@ const WaiverKiosk = () => {
           profile={profile}
           maxMinors={context.template?.max_minors ?? 0}
           dependentsEnabled={!!context.template?.minor_section_enabled && (context.template?.max_minors ?? 0) > 0}
-          onFound={(found) => {
+          onFound={(found, token) => {
             setProfile(found);
+            setLookupToken(token);
             setPhase('returning');
           }}
           onContinue={(selection) => {
@@ -227,6 +231,17 @@ const WaiverKiosk = () => {
           <p className="text-xs text-amber-700 mt-0.5">This is a test view. Submitting is disabled until the template is active.</p>
         </div>
       )}
+      {returning && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={resetForm}
+            className="text-xs font-semibold text-gray-500 underline underline-offset-2 hover:text-gray-700"
+          >
+            Start Over
+          </button>
+        </div>
+      )}
       <WaiverFormBody
         key={formKey}
         context={context}
@@ -236,9 +251,8 @@ const WaiverKiosk = () => {
             ? {
                 first_name: profile.first_name,
                 last_name: profile.last_name,
-                email: profile.email,
+                email: profile.has_email ? profile.email : null,
                 phone: profile.phone,
-                date_of_birth: profile.date_of_birth,
               }
             : undefined
         }

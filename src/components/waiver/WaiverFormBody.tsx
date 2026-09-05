@@ -322,8 +322,9 @@ const WaiverFormBody = ({
         {lockedAdult && (
           <div className="mx-5 mb-5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
             <p className="text-[11px] leading-relaxed text-gray-600">
-              This is the information saved on your record and it cannot be changed here. If anything is wrong, please
-              ask a Location Manager or Admin at the front desk to update it for you.
+              {locked.dob
+                ? 'This is the information saved on your record and it cannot be changed here. If anything is wrong, please ask a Location Manager or Admin at the front desk to update it for you.'
+                : 'Your saved details are shown above and cannot be changed here. Please confirm your date of birth to continue. If anything else is wrong, ask a Location Manager or Admin at the front desk to update it for you.'}
             </p>
           </div>
         )}

@@ -9,7 +9,6 @@ import waiverService from '../../services/waiverService';
 import DateOfBirthSelect from './DateOfBirthSelect';
 import RelationshipSelect from './RelationshipSelect';
 import { calculateAge, isFutureDate } from '../../utils/age';
-import { formatDateLong } from '../../utils/timeFormat';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -112,7 +111,7 @@ interface Props {
   profile: WaiverProfileRecord | null;
   maxMinors: number;
   dependentsEnabled: boolean;
-  onFound: (profile: WaiverProfileRecord) => void;
+  onFound: (profile: WaiverProfileRecord, lookupToken: string | null) => void;
   onContinue: (selection: WaiverReturningSelection) => void;
   onNewCustomer: () => void;
   onCancel: () => void;
@@ -129,6 +128,7 @@ const WaiverReturningPanel = ({
   onCancel,
 }: Props) => {
   const [phone, setPhone] = useState('');
+  const [lastName, setLastName] = useState('');
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<'idle' | 'not_found' | 'needs_staff'>('idle');
@@ -140,17 +140,26 @@ const WaiverReturningPanel = ({
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     const value = phone.trim();
+    const surname = lastName.trim();
     if (!value) {
       setLookupError('Please enter your phone number.');
+      return;
+    }
+    if (value.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '').length !== 10) {
+      setLookupError('Please enter your full 10-digit phone number.');
+      return;
+    }
+    if (!surname) {
+      setLookupError('Please enter your last name.');
       return;
     }
     setLooking(true);
     setLookupError(null);
     setOutcome('idle');
     try {
-      const result = await waiverService.kioskLookup(templateId, value);
+      const result = await waiverService.kioskLookup(templateId, value, surname);
       if (result.status === 'found' && result.profile) {
-        onFound(result.profile);
+        onFound(result.profile, result.lookup_token ?? null);
         return;
       }
       setOutcome(result.status === 'needs_staff' ? 'needs_staff' : 'not_found');
@@ -168,6 +177,7 @@ const WaiverReturningPanel = ({
 
   const tryAgain = () => {
     setPhone('');
+    setLastName('');
     setOutcome('idle');
     setLookupError(null);
   };
@@ -281,7 +291,8 @@ const WaiverReturningPanel = ({
         <form onSubmit={handleLookup} className="max-w-md mx-auto" autoComplete="off">
           <h2 className="text-lg font-bold text-gray-900 text-center">Find My Information</h2>
           <p className="text-sm text-gray-500 mt-2 text-center leading-relaxed">
-            Enter the phone number you used on your last waiver and we will pull up your saved information.
+            Enter the phone number and last name you used on your last waiver and we will pull up your saved
+            information.
           </p>
           <div className="mt-6">
             <label className={labelClass}>Phone Number *</label>
@@ -293,6 +304,20 @@ const WaiverReturningPanel = ({
               placeholder="(555) 123-4567"
               onChange={(e) => {
                 setPhone(e.target.value);
+                setLookupError(null);
+              }}
+              className={`${inputClass} py-3 text-base ${lookupError ? 'border-red-300' : ''}`}
+            />
+          </div>
+          <div className="mt-4">
+            <label className={labelClass}>Last Name *</label>
+            <input
+              type="text"
+              value={lastName}
+              autoComplete="off"
+              placeholder="Last name on your waiver"
+              onChange={(e) => {
+                setLastName(e.target.value);
                 setLookupError(null);
               }}
               className={`${inputClass} py-3 text-base ${lookupError ? 'border-red-300' : ''}`}
@@ -327,9 +352,9 @@ const WaiverReturningPanel = ({
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <ReadOnlyRow label="First Name" value={profile.first_name} />
           <ReadOnlyRow label="Last Name" value={profile.last_name} />
-          <ReadOnlyRow label="Email" value={profile.email || ''} />
+          <ReadOnlyRow label="Email" value={profile.email || (profile.has_email ? 'On file' : '')} />
           <ReadOnlyRow label="Phone" value={profile.phone || ''} />
-          <ReadOnlyRow label="Date of Birth" value={profile.date_of_birth ? formatDateLong(profile.date_of_birth) : ''} />
+          <ReadOnlyRow label="Age" value={profile.age != null ? `${profile.age}` : ''} />
         </div>
         <div className="mx-5 mb-5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
           <p className="text-[11px] leading-relaxed text-gray-600">
