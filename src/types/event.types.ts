@@ -109,6 +109,7 @@ export interface CreateEventData {
 export type UpdateEventData = Partial<CreateEventData>;
 
 export interface CreateEventPurchaseData {
+  gift_card_code?: string | null;
   event_id: number;
   customer_id?: number | null;
   location_id: number;

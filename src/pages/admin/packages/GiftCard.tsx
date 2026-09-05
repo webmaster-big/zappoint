@@ -150,10 +150,6 @@ const GiftCard: React.FC = () => {
       showToast('Please enter a valid initial value', 'error');
       return;
     }
-    if (form.type === 'percentage' && Number(form.initial_value) > 100) {
-      showToast('Percentage gift cards cannot exceed 100%', 'error');
-      return;
-    }
     if (!form.balance.trim() || isNaN(Number(form.balance))) {
       showToast('Please enter a valid balance', 'error');
       return;
@@ -230,10 +226,6 @@ const GiftCard: React.FC = () => {
       showToast('Cannot update: gift card has no ID', 'error');
       return;
     }
-    if ((editForm.type || card.type) === 'percentage' && editForm.initial_value !== undefined && Number(editForm.initial_value) > 100) {
-      showToast('Percentage gift cards cannot exceed 100%', 'error');
-      return;
-    }
     const storedExpiry = card.expiry_date ? card.expiry_date.slice(0, 10) : '';
     const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Detroit' });
     if (editForm.expiry_date && editForm.expiry_date !== storedExpiry && editForm.expiry_date < todayIso) {
@@ -244,7 +236,7 @@ const GiftCard: React.FC = () => {
     try {
       setLoading(true);
       await giftCardService.updateGiftCard(cardId, {
-        type: (editForm.type as 'fixed' | 'percentage') || undefined,
+        type: (editForm.type as 'fixed') || undefined,
         initial_value: editForm.initial_value !== undefined ? Number(editForm.initial_value) : undefined,
         balance: editForm.balance !== undefined ? Number(editForm.balance) : undefined,
         max_usage: editForm.max_usage !== undefined ? Number(editForm.max_usage) : undefined,
@@ -699,18 +691,17 @@ const GiftCard: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-800 mb-1">
-                    {form.type === "fixed" ? "Value ($)" : "Percentage (%)"}
+                    Value ($)
                   </label>
                   <input 
                     type="number" 
                     name="initial_value" 
                     value={form.initial_value}
-                    max={form.type === "percentage" ? 100 : undefined}
                     onChange={handleChange} 
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     min="0" 
                     required 
-                    placeholder={form.type === "fixed" ? "0.00" : "0"}
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
@@ -725,7 +716,7 @@ const GiftCard: React.FC = () => {
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     min="0" 
                     required 
-                    placeholder={form.type === "fixed" ? "0.00" : "0"}
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
@@ -971,12 +962,11 @@ const GiftCard: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1">{editForm.type === "fixed" ? "Value ($)" : "Percentage (%)"}</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Value ($)</label>
                     <input 
                       type="number" 
                       name="initial_value" 
                       value={editForm.initial_value || ''}
-                      max={editForm.type === "percentage" ? 100 : undefined}
                       onChange={handleEditChange} 
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="0" 

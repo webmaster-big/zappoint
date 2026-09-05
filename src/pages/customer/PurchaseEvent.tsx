@@ -35,6 +35,7 @@ import ticketOrderService, { type CartQuote as OrderQuote, type TicketOrder as P
 import { trackPageView } from '../../utils/analytics';
 import { setNextTrackingId } from '../../utils/analyticsHeaders';
 import Toast from '../../components/ui/Toast';
+import GiftCardCheckoutField, { type AppliedGiftCard } from '../../components/customer/GiftCardCheckoutField';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SignatureCapture from '../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../components/TermsAndConditionsCheckbox';
@@ -170,6 +171,7 @@ const PurchaseEvent = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [quantity, setQuantity] = useState(1);
+  const [giftCard, setGiftCard] = useState<AppliedGiftCard | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
 
   const [guestName, setGuestName] = useState('');
@@ -612,8 +614,24 @@ const PurchaseEvent = () => {
   const membershipBenefits = useMembershipBenefits(customerData?.id ?? null, event?.location_id ?? null, benefitItems, { self: true });
   const membershipDiscount = membershipBenefits.discount;
   const totalAmount = Math.max(0, totalBeforeMembership - membershipDiscount);
+  const giftCardDiscount = giftCard ? Math.min(giftCard.discount_amount, totalAmount) : 0;
+  const singleDueEstimate = Math.max(0, Math.round((totalAmount - giftCardDiscount) * 100) / 100);
 
   const checkoutLocationId = (event?.location_id ? Number(event.location_id) : null) ?? cart?.items[0]?.locationId ?? null;
+  const orderPreDue = orderQuote ? Number(orderQuote.total_amount) : null;
+  const displayDue = orderMode
+    ? Math.max(0, (orderPreDue ?? 0) - (giftCard && orderPreDue != null ? Math.min(giftCard.discount_amount, orderPreDue) : 0))
+    : singleDueEstimate;
+  const orderGiftCardDiscount = orderMode && giftCard && orderPreDue != null
+    ? Math.min(giftCard.discount_amount, orderPreDue)
+    : 0;
+  const cardEntryRequired = displayDue > 0;
+  const giftCardItems = orderMode && cart
+    ? cart.items.map((i) => ({ type: i.type, id: Number(i.id) }))
+    : event
+      ? [{ type: 'event' as const, id: Number(event.id) }]
+      : [];
+  const giftCardSubtotal = orderMode ? (orderPreDue ?? 0) : totalAmount;
   const { locations: storefrontLocations } = useStorefrontLocations();
   const callToBookVenue = checkoutLocationId ? findLocationById(storefrontLocations, checkoutLocationId) : undefined;
   const eventCallToBook = Boolean(event) && eventIsCallToBook(event);
@@ -790,22 +808,27 @@ const PurchaseEvent = () => {
     }
     setSignatureTermsErrors({});
 
-    if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+    const dueBeforeCharge = orderMode && orderQuote
+      ? Math.max(0, orderQuote.total_amount - (giftCard ? Math.min(giftCard.discount_amount, orderQuote.total_amount) : 0))
+      : singleDueEstimate;
+    const cardRequired = dueBeforeCharge > 0;
+
+    if (cardRequired && (!cardNumber || !cardMonth || !cardYear || !cardCVV)) {
       setPaymentError('Please fill in all card details');
       isSubmittingRef.current = false;
       return;
     }
-    if (!validateCardNumber(cardNumber)) {
+    if (cardRequired && !validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
       isSubmittingRef.current = false;
       return;
     }
-    if (isTestCardNumber(cardNumber)) {
+    if (cardRequired && isTestCardNumber(cardNumber)) {
       setPaymentError('Test card numbers are not allowed. Please use a real card.');
       isSubmittingRef.current = false;
       return;
     }
-    if (!authorizeApiLoginId) {
+    if (cardRequired && !authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
       isSubmittingRef.current = false;
       return;
@@ -867,6 +890,7 @@ const PurchaseEvent = () => {
             sms_consent: smsConsent,
             custom_fields: toCustomFieldPayload(customFieldAnswers),
             payment_method: 'authorize.net',
+            gift_card_code: giftCard?.code ?? null,
             notes: specialRequests || `Bulk order — ${orderItemsPayload.length} items`,
           });
         } catch (createErr) {
@@ -882,6 +906,20 @@ const PurchaseEvent = () => {
           setOrderQrImage(orderQr);
           void ticketOrderService.storeQrCode(order.id, orderQr);
         } catch { void 0; }
+
+        if (Number(order.total_amount) <= 0) {
+          setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: 0, remaining_balance: 0, status: 'confirmed' })));
+          cart.clear();
+          setToast({ message: 'Order confirmed — your gift card covered it in full!', type: 'success' });
+          setPurchaseComplete(true);
+          setCurrentStep(4);
+          return;
+        }
+
+        if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+          await ticketOrderService.rollback(order.id).catch(() => void 0);
+          throw new Error(`This order still owes $${Number(order.total_amount).toFixed(2)} — your gift card balance changed. Please enter card details and try again.`);
+        }
 
         let orderPayment;
         try {
@@ -937,13 +975,14 @@ const PurchaseEvent = () => {
           quantity,
           total_amount: totalAmount,
           amount_paid: 0,
+          gift_card_code: giftCard?.code ?? undefined,
           discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
           membership_id: membershipBenefits.membershipId ?? undefined,
           membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
           payment_method: 'authorize.net',
           payment_status: 'pending',
           special_requests: specialRequests || undefined,
-          send_email: false,
+          send_email: !!giftCard,
           applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
           applied_discounts: (() => {
             const items = [
@@ -960,10 +999,34 @@ const PurchaseEvent = () => {
       }
 
       const createdPurchase = response.data || response;
+      const serverTotal = Number(createdPurchase.total_amount ?? totalAmount);
+      const serverPaid = Number(createdPurchase.amount_paid ?? 0);
+      const serverDue = Math.max(0, Math.round((serverTotal - serverPaid) * 100) / 100);
+
+      if (serverDue <= 0 && createdPurchase.status === 'confirmed') {
+        setToast({ message: 'Purchase confirmed — your gift card covered it in full!', type: 'success' });
+        setPurchaseComplete(true);
+        setCurrentStep(4);
+        return;
+      }
+
+      if (serverDue <= 0) {
+        try {
+          await eventPurchaseService.forceDeletePurchase(createdPurchase.id);
+        } catch { void 0; }
+        throw new Error('The price of this order changed while you were checking out. Nothing was charged and your gift card was not used — please try again.');
+      }
+
+      if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+        try {
+          await eventPurchaseService.forceDeletePurchase(createdPurchase.id);
+        } catch { void 0; }
+        throw new Error(`This order still owes $${serverDue.toFixed(2)}. Please enter your card details and try again.`);
+      }
 
       const paymentData = {
         location_id: event!.location_id,
-        amount: totalAmount,
+        amount: serverDue,
         order_id: `E${event!.id}-${Date.now().toString().slice(-8)}`,
         description: `Event Purchase: ${event!.name}`,
         customer_id: selectedCustomerId || customerData?.id || undefined,
@@ -1147,10 +1210,13 @@ const PurchaseEvent = () => {
                   {orderQuote && orderQuote.fee_total > 0 && (
                     <div className="flex items-center justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
                   )}
+                  {orderGiftCardDiscount > 0 && (
+                    <div className="flex items-center justify-between"><span className="text-emerald-700">Gift card {giftCard?.code}</span><span className="tabular-nums text-emerald-700">−${orderGiftCardDiscount.toFixed(2)}</span></div>
+                  )}
                   <div className="flex items-center justify-between pt-1">
                     <span className="font-bold text-gray-900">Order total</span>
                     <span className="font-extrabold text-gray-900 tabular-nums">
-                      {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}
+                      {orderQuote ? `$${displayDue.toFixed(2)}` : 'pricing…'}
                     </span>
                   </div>
                 </div>
@@ -1416,7 +1482,7 @@ const PurchaseEvent = () => {
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm px-1">
                         <button type="button" onClick={() => navigate('/cart')} className="font-semibold text-blue-800 hover:text-blue-900">Edit cart — change dates &amp; times</button>
                         <span className="font-bold text-gray-900">
-                          Order total: <span className="tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                          Order total: <span className="tabular-nums">{orderQuote ? `$${displayDue.toFixed(2)}` : 'pricing…'}</span>
                         </span>
                       </div>
                     </div>
@@ -1794,6 +1860,21 @@ const PurchaseEvent = () => {
                     </div>
                   </div>
 
+                  <div className="mb-4">
+                    <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Have a gift card?</label>
+                    <GiftCardCheckoutField
+                      locationId={checkoutLocationId}
+                      items={giftCardItems}
+                      subtotal={giftCardSubtotal}
+                      applied={giftCard}
+                      onApplied={setGiftCard}
+                      disabled={submitting || isProcessingPayment}
+                    />
+                    {!cardEntryRequired && giftCard && (
+                      <p className="text-xs text-emerald-700 mt-1.5">Your gift card covers the full amount — no card needed.</p>
+                    )}
+                  </div>
+
                   <div className="space-y-4">
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Card Number</label>
@@ -1909,7 +1990,7 @@ const PurchaseEvent = () => {
                     <button
                       type="button"
                       onClick={handlePurchase}
-                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                      disabled={purchaseComplete || submitting || isProcessingPayment || (cardEntryRequired && (!cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber))) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (
@@ -1925,7 +2006,7 @@ const PurchaseEvent = () => {
                           {submitting ? (
                             <><span className="hidden sm:inline">Processing…</span><span className="sm:hidden">Wait…</span></>
                           ) : (
-                            <><span className="hidden sm:inline">Pay ${(orderMode && orderQuote ? orderQuote.total_amount : totalAmount).toFixed(2)}</span><span className="sm:hidden">${(orderMode && orderQuote ? orderQuote.total_amount : totalAmount).toFixed(2)}</span></>
+                            <><span className="hidden sm:inline">{displayDue > 0 ? `Pay $${displayDue.toFixed(2)}` : 'Complete with Gift Card'}</span><span className="sm:hidden">{displayDue > 0 ? `$${displayDue.toFixed(2)}` : 'Use Gift Card'}</span></>
                           )}
                         </>
                       )}
@@ -2260,10 +2341,16 @@ const PurchaseEvent = () => {
                       )}
                     </div>
                   )}
+                  {giftCardDiscount > 0 && (
+                    <div className="mt-3 flex justify-between text-emerald-600 text-xs">
+                      <span>Gift card {giftCard?.code}</span>
+                      <span>-${giftCardDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Total</span>
-                      <span className="text-xl md:text-2xl font-extrabold text-white">${totalAmount.toFixed(2)}</span>
+                      <span className="text-xl md:text-2xl font-extrabold text-white">${singleDueEstimate.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -2420,10 +2507,16 @@ const PurchaseEvent = () => {
                     )}
                   </div>
                 )}
+                {giftCardDiscount > 0 && (
+                  <div className="mt-3 flex justify-between text-emerald-600 text-xs">
+                    <span>Gift card {giftCard?.code}</span>
+                    <span>-${giftCardDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-white text-sm">Total</span>
-                    <span className="text-xl font-extrabold text-white">${totalAmount.toFixed(2)}</span>
+                    <span className="text-xl font-extrabold text-white">${singleDueEstimate.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

@@ -144,6 +144,46 @@ class CustomerGiftCardService {
     });
     return response.data;
   }
+
+  async claimGiftCard(code: string): Promise<{ success: boolean; message: string; data?: Partial<CustomerGiftCard> }> {
+    const response = await api.post('/gift-cards/claim', { code });
+    return response.data;
+  }
+
+  async purchaseGiftCard(payload: GiftCardPurchaseRequest): Promise<GiftCardPurchaseResponse> {
+    const response = await api.post('/gift-cards/purchase', {
+      ...payload,
+      customer_id: payload.customer_id ?? getCustomerId() ?? undefined,
+    });
+    return response.data;
+  }
+}
+
+export interface GiftCardPurchaseRequest {
+  location_id: number;
+  amount: number;
+  payment_method: 'authorize.net';
+  purchaser_name: string;
+  purchaser_email: string;
+  purchaser_phone?: string;
+  customer_id?: number;
+  opaque_data: { dataDescriptor: string; dataValue: string };
+}
+
+export interface GiftCardPurchaseResponse {
+  success: boolean;
+  message: string;
+  duplicate?: boolean;
+  data?: {
+    id: number;
+    code: string;
+    balance: number;
+    initial_value: number;
+    location: string;
+    expiry_date: string | null;
+    transaction_id: string | null;
+    emailed_to: string;
+  };
 }
 
 export const customerGiftCardService = new CustomerGiftCardService();

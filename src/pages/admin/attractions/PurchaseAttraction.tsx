@@ -32,6 +32,7 @@ import { attractionPurchaseService } from '../../../services/AttractionPurchaseS
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
+import GiftCardCheckoutField, { type AppliedGiftCard } from '../../../components/customer/GiftCardCheckoutField';
 import EmailInput from '../../../components/ui/EmailInput';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
@@ -170,6 +171,7 @@ const PurchaseAttraction = () => {
   const isCustomerMode = useMemo(() => !getStoredUser(), []);
 
   const [orderQuote, setOrderQuote] = useState<OrderQuote | null>(null);
+  const [giftCard, setGiftCard] = useState<AppliedGiftCard | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [orderQrImage, setOrderQrImage] = useState<string | null>(null);
   const [orderPrefilled, setOrderPrefilled] = useState(false);
@@ -813,6 +815,22 @@ const PurchaseAttraction = () => {
   const total = Math.max(0, totalBeforeMembership - membershipDiscount);
 
   const checkoutLocationId = attraction?.locationId ?? cart?.items[0]?.locationId ?? null;
+  const giftCardDiscount = giftCard ? Math.min(giftCard.discount_amount, total) : 0;
+  const singleDueEstimate = Math.max(0, Math.round((total - giftCardDiscount) * 100) / 100);
+  const orderPreDue = orderQuote ? Number(orderQuote.total_amount) : null;
+  const orderGiftCardDiscount = orderMode && giftCard && orderPreDue != null
+    ? Math.min(giftCard.discount_amount, orderPreDue)
+    : 0;
+  const displayDue = orderMode
+    ? Math.max(0, (orderPreDue ?? 0) - orderGiftCardDiscount)
+    : singleDueEstimate;
+  const cardEntryRequired = displayDue > 0;
+  const giftCardItems = orderMode && cart
+    ? cart.items.map((i) => ({ type: i.type, id: Number(i.id) }))
+    : attraction
+      ? [{ type: 'attraction' as const, id: Number(attraction.id) }]
+      : [];
+  const giftCardSubtotal = orderMode ? (orderPreDue ?? 0) : total;
   const { locations: storefrontLocations } = useStorefrontLocations();
   const callToBookVenue = checkoutLocationId ? findLocationById(storefrontLocations, checkoutLocationId) : undefined;
   const attractionCallToBook = Boolean(attraction) && attractionIsCallToBook(getAttractionAvailability());
@@ -975,22 +993,22 @@ const PurchaseAttraction = () => {
     }
     setSignatureTermsErrors({});
 
-    if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+    if (cardEntryRequired && (!cardNumber || !cardMonth || !cardYear || !cardCVV)) {
       setPaymentError('Please fill in all card details');
       isSubmittingRef.current = false;
       return;
     }
-    if (!validateCardNumber(cardNumber)) {
+    if (cardEntryRequired && !validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
       isSubmittingRef.current = false;
       return;
     }
-    if (isTestCardNumber(cardNumber)) {
+    if (cardEntryRequired && isTestCardNumber(cardNumber)) {
       setPaymentError('Test card numbers are not allowed. Please use a real card.');
       isSubmittingRef.current = false;
       return;
     }
-    if (!authorizeApiLoginId) {
+    if (cardEntryRequired && !authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
       isSubmittingRef.current = false;
       return;
@@ -1047,7 +1065,8 @@ const PurchaseAttraction = () => {
         quantity: quantity,
         amount: totalAmount,
         total_amount: totalAmount, // Include fees in total_amount
-        amount_paid: totalAmount,
+        amount_paid: giftCard ? 0 : totalAmount,
+        gift_card_code: giftCard?.code ?? undefined,
         currency: 'USD',
         method: 'authorize.net',
         payment_method: 'authorize.net' as 'in-store' | 'paylater' | 'authorize.net',
@@ -1088,6 +1107,7 @@ const PurchaseAttraction = () => {
             sms_consent: smsConsent,
             custom_fields: toCustomFieldPayload(customFieldAnswers),
             payment_method: 'authorize.net',
+            gift_card_code: giftCard?.code ?? null,
             notes: `Bulk order — ${orderItemsPayload.length} items`,
           });
         } catch (createErr) {
@@ -1097,6 +1117,25 @@ const PurchaseAttraction = () => {
               ? createErr.message
               : "We couldn't process your order right now. No charges were made.",
           );
+        }
+
+        if (Number(order.total_amount) <= 0) {
+          try {
+            const orderQr = await generateOrderQRCode(order.id);
+            setOrderQrImage(orderQr);
+            void ticketOrderService.storeQrCode(order.id, orderQr);
+          } catch { void 0; }
+          setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: 0, remaining_balance: 0, status: 'confirmed' })));
+          cart.clear();
+          setToast({ message: 'Order confirmed — your gift card covered it in full!', type: 'success' });
+          setPurchaseComplete(true);
+          setCurrentStep(4);
+          return;
+        }
+
+        if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+          await ticketOrderService.rollback(order.id).catch(() => void 0);
+          throw new Error(`This order still owes $${Number(order.total_amount).toFixed(2)} — your gift card balance changed. Please enter card details and try again.`);
         }
 
         const orderPaymentData = {
@@ -1163,9 +1202,35 @@ const PurchaseAttraction = () => {
         console.error('⚠️ QR code generation failed:', qrError);
       }
 
+      const serverTotal = Number(createdPurchase.total_amount ?? totalAmount);
+      const serverPaid = giftCard ? Number(createdPurchase.amount_paid ?? 0) : 0;
+      const serverDue = Math.max(0, Math.round((serverTotal - serverPaid) * 100) / 100);
+
+      if (giftCard && serverDue <= 0 && createdPurchase.status === 'confirmed') {
+        setQrCodeImage(qrData);
+        setToast({ message: 'Purchase confirmed — your gift card covered it in full!', type: 'success' });
+        setPurchaseComplete(true);
+        setCurrentStep(4);
+        return;
+      }
+
+      if (giftCard && serverDue <= 0) {
+        try {
+          await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
+        } catch { void 0; }
+        throw new Error('The price of this order changed while you were checking out. Nothing was charged and your gift card was not used — please try again.');
+      }
+
+      if (giftCard && (!cardNumber || !cardMonth || !cardYear || !cardCVV)) {
+        try {
+          await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
+        } catch { void 0; }
+        throw new Error(`This order still owes $${serverDue.toFixed(2)}. Please enter your card details and try again.`);
+      }
+
       const paymentData = {
         location_id: attraction.locationId || 1,
-        amount: totalAmount,
+        amount: giftCard ? serverDue : totalAmount,
         order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`,
         description: `Attraction Purchase: ${attraction.name}`,
         customer_id: selectedCustomerId || undefined,
@@ -1400,10 +1465,13 @@ const PurchaseAttraction = () => {
                   {orderQuote && orderQuote.fee_total > 0 && (
                     <div className="flex items-center justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
                   )}
+                  {orderGiftCardDiscount > 0 && (
+                    <div className="flex items-center justify-between"><span className="text-emerald-700">Gift card {giftCard?.code}</span><span className="tabular-nums text-emerald-700">−${orderGiftCardDiscount.toFixed(2)}</span></div>
+                  )}
                   <div className="flex items-center justify-between pt-1">
                     <span className="font-bold text-gray-900">Order total</span>
                     <span className="font-extrabold text-gray-900 tabular-nums">
-                      {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}
+                      {orderQuote ? `$${displayDue.toFixed(2)}` : 'pricing…'}
                     </span>
                   </div>
                 </div>
@@ -1651,7 +1719,7 @@ const PurchaseAttraction = () => {
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm px-1">
                         <button type="button" onClick={() => navigate('/cart')} className="font-semibold text-blue-800 hover:text-blue-900">Edit cart — change dates &amp; times</button>
                         <span className="font-bold text-gray-900">
-                          Order total: <span className="tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                          Order total: <span className="tabular-nums">{orderQuote ? `$${displayDue.toFixed(2)}` : 'pricing…'}</span>
                         </span>
                       </div>
                       <div className="px-1">
@@ -2112,9 +2180,12 @@ const PurchaseAttraction = () => {
                         {orderQuote && orderQuote.fee_total > 0 && (
                           <div className="flex items-center justify-between"><span className="text-gray-600">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
                         )}
+                        {orderGiftCardDiscount > 0 && (
+                          <div className="flex items-center justify-between"><span className="text-emerald-700">Gift card {giftCard?.code}</span><span className="tabular-nums text-emerald-700">−${orderGiftCardDiscount.toFixed(2)}</span></div>
+                        )}
                         <div className="flex items-center justify-between pt-1">
                           <span className="font-bold text-gray-900">Order total ({orderQuote?.ticket_count ?? '…'} tickets)</span>
-                          <span className="font-extrabold text-gray-900 tabular-nums">{orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : 'pricing…'}</span>
+                          <span className="font-extrabold text-gray-900 tabular-nums">{orderQuote ? `$${displayDue.toFixed(2)}` : 'pricing…'}</span>
                         </div>
                       </div>
                     </div>
@@ -2149,6 +2220,20 @@ const PurchaseAttraction = () => {
                   </div>
 
                   <div className="space-y-4">
+                    <div className="mb-1">
+                      <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Have a gift card?</label>
+                      <GiftCardCheckoutField
+                        locationId={checkoutLocationId}
+                        items={giftCardItems}
+                        subtotal={giftCardSubtotal}
+                        applied={giftCard}
+                        onApplied={setGiftCard}
+                        disabled={submitting || isProcessingPayment}
+                      />
+                      {!cardEntryRequired && giftCard && (
+                        <p className="text-xs text-emerald-700 mt-1.5">Your gift card covers the full amount — no card needed.</p>
+                      )}
+                    </div>
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Card Number</label>
                       <div className="relative">
@@ -2302,7 +2387,7 @@ const PurchaseAttraction = () => {
                     <button
                       type="button"
                       onClick={handlePurchase}
-                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                      disabled={purchaseComplete || submitting || isProcessingPayment || (cardEntryRequired && (!cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber))) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (
@@ -2323,8 +2408,8 @@ const PurchaseAttraction = () => {
                             </>
                           ) : (
                             <>
-                              <span className="hidden sm:inline">Pay ${(orderMode && orderQuote ? orderQuote.total_amount : total).toFixed(2)}</span>
-                              <span className="sm:hidden">${(orderMode && orderQuote ? orderQuote.total_amount : total).toFixed(2)}</span>
+                              <span className="hidden sm:inline">{displayDue > 0 ? `Pay $${displayDue.toFixed(2)}` : 'Complete with Gift Card'}</span>
+                              <span className="sm:hidden">{displayDue > 0 ? `$${displayDue.toFixed(2)}` : 'Use Gift Card'}</span>
                             </>
                           )}
                         </>
@@ -2805,10 +2890,16 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
                   
+                  {giftCardDiscount > 0 && (
+                    <div className="mt-3 flex justify-between text-emerald-600 text-xs">
+                      <span>Gift card {giftCard?.code}</span>
+                      <span>-${giftCardDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Total</span>
-                      <span className="text-xl md:text-2xl font-extrabold text-white">${total.toFixed(2)}</span>
+                      <span className="text-xl md:text-2xl font-extrabold text-white">${singleDueEstimate.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -3073,16 +3164,22 @@ const PurchaseAttraction = () => {
                   </div>
                 )}
 
+                {giftCardDiscount > 0 && !orderMode && (
+                  <div className="mt-3 flex justify-between text-emerald-600 text-xs">
+                    <span>Gift card {giftCard?.code}</span>
+                    <span>-${giftCardDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-white text-sm">{orderMode ? 'This item' : 'Total'}</span>
-                    <span className="text-xl font-extrabold text-white">${total.toFixed(2)}</span>
+                    <span className="text-xl font-extrabold text-white">${(orderMode ? total : singleDueEstimate).toFixed(2)}</span>
                   </div>
                   {orderMode && (
                     <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-white/20">
                       <span className="font-bold text-white text-sm">Order total</span>
                       <span className="text-xl font-extrabold text-white">
-                        {orderQuote ? `$${orderQuote.total_amount.toFixed(2)}` : '…'}
+                        {orderQuote ? `$${displayDue.toFixed(2)}` : '…'}
                       </span>
                     </div>
                   )}

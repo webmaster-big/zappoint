@@ -49,6 +49,7 @@ export interface AttractionPurchase {
   guest_phone?: string;
   quantity: number;
   total_amount: number;
+  amount_paid?: number | string;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   status: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   purchase_date: string;
@@ -113,6 +114,7 @@ export interface AttractionPurchase {
 }
 
 export interface CreatePurchaseData {
+  gift_card_code?: string | null;
   attraction_id: number;
   customer_id?: number;
   guest_name?: string;

@@ -137,6 +137,7 @@ export interface TicketOrder {
 }
 
 export interface CheckoutPayload {
+  gift_card_code?: string | null;
   customer_id?: number | null;
   guest_name?: string;
   guest_email?: string;

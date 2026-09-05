@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
 import {
   Calendar,
@@ -16,8 +15,7 @@ import {
   AlertCircle,
   Ticket,
   Users,
-  Construction,
-} from 'lucide-react';
+  } from 'lucide-react';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { getImageUrl } from '../../utils/storage';
 import Toast from '../../components/ui/Toast';
@@ -38,8 +36,6 @@ const MyEvents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [showComingSoon, setShowComingSoon] = useState(false);
-  const navigate = useNavigate();
 
   const customerData = (() => {
     try {
@@ -569,25 +565,6 @@ const MyEvents = () => {
         </div>
       )}
 
-      {showComingSoon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-6 py-5 text-center text-white">
-              <Construction className="w-10 h-10 mx-auto mb-2" strokeWidth={2} style={{ color: 'white' }} />
-              <h2 className="text-lg font-bold" style={{ color: 'white' }}>Coming Soon</h2>
-            </div>
-            <div className="p-6 text-center">
-              <p className="text-gray-600 text-sm mb-5">This feature is currently under development and not yet available. Stay tuned for updates!</p>
-              <button
-                onClick={() => { setShowComingSoon(false); navigate('/'); }}
-                className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-2.5 rounded-lg transition-all text-sm"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
