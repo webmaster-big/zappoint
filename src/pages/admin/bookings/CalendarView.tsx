@@ -49,6 +49,13 @@ const michiganToday = (): Date => {
   return new Date(now.year, now.month - 1, now.day);
 };
 
+const localDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
   const [hours24, minutes] = time24.split(':');
@@ -147,6 +154,7 @@ const CalendarView: React.FC = () => {
           date_from: filters.dateRange.start,
           date_to: filters.dateRange.end,
           per_page: 1000,
+          user_id: getStoredUser()?.id,
         });
         
         if (response.success && response.data) {
@@ -157,8 +165,8 @@ const CalendarView: React.FC = () => {
       }
 
       const dateParams = {
-        date_from: startDate.toISOString().split('T')[0],
-        date_to: endDate.toISOString().split('T')[0],
+        date_from: localDateKey(startDate),
+        date_to: localDateKey(endDate),
       };
 
       const hasCache = await bookingCacheService.hasCachedData();
@@ -177,9 +185,6 @@ const CalendarView: React.FC = () => {
         });
         
         if (response.success && response.data) {
-          console.log('Loaded Bookings:', response.data.bookings);
-          console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
-          console.log('Total bookings loaded:', response.data.bookings.length);
           setBookings(response.data.bookings);
           await bookingCacheService.cacheBookings(response.data.bookings);
         } else {
