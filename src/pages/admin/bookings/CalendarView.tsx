@@ -42,7 +42,12 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
-import { formatDurationDisplay, parseLocalDate } from '../../../utils/timeFormat';
+import { formatDurationDisplay, parseLocalDate, getMichiganNow } from '../../../utils/timeFormat';
+
+const michiganToday = (): Date => {
+  const now = getMichiganNow();
+  return new Date(now.year, now.month - 1, now.day);
+};
 
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -71,7 +76,7 @@ const CalendarView: React.FC = () => {
   const [eventPurchases, setEventPurchases] = useState<EventPurchase[]>([]);
   const [initialLoading, setInitialLoading] = useState(true); // Only for first load
   const [dataLoading, setDataLoading] = useState(false); // For navigation changes
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => michiganToday());
   const [filters, setFilters] = useState<CalendarViewFilterOptions>({
     view: 'month',
     packages: [],
@@ -86,7 +91,7 @@ const CalendarView: React.FC = () => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [pickerMonth, setPickerMonth] = useState(new Date());
+  const [pickerMonth, setPickerMonth] = useState(() => michiganToday());
   const [showColorLegend, setShowColorLegend] = useState(false);
 
   const [checkInLoading, setCheckInLoading] = useState(false);
@@ -370,7 +375,7 @@ const CalendarView: React.FC = () => {
   };
 
   const goToToday = () => {
-    const today = new Date();
+    const today = michiganToday();
     setCurrentDate(today);
     setPickerMonth(today);
   };
@@ -400,7 +405,7 @@ const CalendarView: React.FC = () => {
   };
 
   const isTodayDate = (date: Date): boolean => {
-    return isSameDay(date, new Date());
+    return isSameDay(date, michiganToday());
   };
 
   const selectPickerDate = (date: Date) => {
@@ -821,7 +826,7 @@ const CalendarView: React.FC = () => {
               <div
                 key={day.toISOString()}
                 className={`border border-gray-200 rounded-lg p-3 md:p-2 min-h-0 md:min-h-40 cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
-                  day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
+                  day.toDateString() === michiganToday().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
                 onClick={() => setSelectedDate(formatDateKey(day))}
               >
@@ -882,7 +887,7 @@ const CalendarView: React.FC = () => {
               <div
                 key={day.toISOString()}
                 className={`border border-gray-200 rounded-lg p-1 sm:p-2 h-24 sm:h-32 overflow-y-auto cursor-pointer hover:border-${themeColor}-300 hover:shadow-sm transition ${
-                  day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
+                  day.toDateString() === michiganToday().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
                 onClick={() => setSelectedDate(formatDateKey(day))}
               >
@@ -1168,7 +1173,7 @@ const CalendarView: React.FC = () => {
 
                           const isSelected = isSameDay(day, currentDate);
                           const isToday = isTodayDate(day);
-                          const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+                          const isPast = day < michiganToday();
 
                           return (
                             <button
@@ -1399,7 +1404,7 @@ const CalendarView: React.FC = () => {
               </p>
               <StandardButton
                 variant="secondary"
-                onClick={() => setCurrentDate(new Date())}
+                onClick={() => setCurrentDate(michiganToday())}
                 className="mt-4"
               >
                 Go to Today

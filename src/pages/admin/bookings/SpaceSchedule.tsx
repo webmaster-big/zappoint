@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, Edit, LogIn, CheckCircle, FileText, Save, DollarSign } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
-import { roomService, type BreakTime } from '../../../services/RoomService';
+import { roomService } from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getStoredUser } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import CategoryTabs from '../../../components/admin/CategoryTabs';
+import { formatDurationDisplay, getMichiganNow } from '../../../utils/timeFormat';
+import { normalizeCategory } from '../../../utils/venueCategories';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 
@@ -21,31 +23,177 @@ const parseLocalDate = (isoDateString: string): Date => {
   return new Date(year, month - 1, day);
 };
 
-interface TimeSlot {
-  time: string;
-  hour: number;
-  minute: number;
+const timeToMinutes = (time: string): number => {
+  if (!time) return 0;
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+const durationToMinutes = (duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): number => {
+  if (unit === 'hours and minutes') {
+    const hours = Math.floor(duration);
+    const mins = Math.round((duration % 1) * 60);
+    return hours * 60 + mins;
+  }
+  return unit === 'hours' ? duration * 60 : duration;
+};
+
+const minutesToLabel = (mins: number): string => {
+  const h24 = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h = h24 % 12 || 12;
+  return m === 0 ? `${h} ${ampm}` : `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+const michiganToday = (): Date => {
+  const now = getMichiganNow();
+  return new Date(now.year, now.month - 1, now.day);
+};
+
+const dateKeyOf = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const ZOOM_LEVELS = [1, 1.6, 2.4];
+const COLUMN_WIDTH = 210;
+const GUTTER_WIDTH = 76;
+const UNCATEGORISED_LABEL = 'No category';
+const VIEW_STATE_KEY = 'spaceScheduleViewState';
+
+interface ScheduleViewState {
+  categoryFilter?: string;
+  statusFilter?: string;
+  searchInput?: string;
+  hideEmptySpaces?: boolean;
+  zoomLevel?: number;
 }
 
-interface BookingCell {
-  booking: Booking;
-  rowSpan: number;
+const readViewState = (): ScheduleViewState => {
+  try {
+    const raw = sessionStorage.getItem(VIEW_STATE_KEY);
+    return raw ? (JSON.parse(raw) as ScheduleViewState) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeViewState = (state: ScheduleViewState): void => {
+  try {
+    sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(state));
+  } catch {
+    return;
+  }
+};
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'checked-in', label: 'Checked-in' },
+];
+
+const PACKAGE_COLORS = [
+  { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
+  { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+  { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+  { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+  { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
+  { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300' },
+  { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
+  { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300' },
+  { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300' },
+  { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-300' },
+  { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-300' },
+];
+
+const packageColorFor = (packageName: string) => {
+  let hash = 0;
+  for (let i = 0; i < packageName.length; i++) {
+    const char = packageName.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return PACKAGE_COLORS[Math.abs(hash) % PACKAGE_COLORS.length];
+};
+
+interface ScheduleColumn {
+  key: string;
+  name: string;
+  capacity?: number;
+  roomId?: number;
+  virtual: boolean;
 }
+
+interface PositionedBooking {
+  booking: Booking;
+  startMin: number;
+  endMin: number;
+  top: number;
+  height: number;
+  lane: number;
+  laneCount: number;
+  clipped: boolean;
+}
+
+const assignLanes = (list: PositionedBooking[]): void => {
+  list.sort((a, b) => a.top - b.top || b.height - a.height || a.booking.id - b.booking.id);
+  let clusterStart = 0;
+  let clusterMaxBottom = -1;
+  let laneEnds: number[] = [];
+  const finishCluster = (end: number) => {
+    const laneCount = Math.max(1, laneEnds.length);
+    for (let i = clusterStart; i < end; i++) list[i].laneCount = laneCount;
+  };
+  list.forEach((item, index) => {
+    if (index > 0 && item.top >= clusterMaxBottom) {
+      finishCluster(index);
+      clusterStart = index;
+      laneEnds = [];
+    }
+    let lane = laneEnds.findIndex(end => end <= item.top);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(0);
+    }
+    laneEnds[lane] = item.top + item.height;
+    item.lane = lane;
+    clusterMaxBottom = Math.max(clusterMaxBottom, item.top + item.height);
+  });
+  finishCluster(list.length);
+};
 
 const SpaceSchedule = () => {
   const { themeColor, fullColor } = useThemeColor();
   const { effectiveLocationId } = useLocationScope();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const savedViewState = useRef(readViewState()).current;
+  const [selectedDate, setSelectedDate] = useState(() => michiganToday());
   const [spaces, setSpaces] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true); // Only for first load
-  const [bookingsLoading, setBookingsLoading] = useState(false); // For date changes
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [timeInterval, setTimeInterval] = useState(15);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const spacesLoadedRef = useRef(false); // Track if spaces have been loaded
+  const [calendarMonth, setCalendarMonth] = useState(() => michiganToday());
+  const spacesLoadedRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const [categoryFilter, setCategoryFilter] = useState(savedViewState.categoryFilter ?? 'all');
+  const [statusFilter, setStatusFilter] = useState(savedViewState.statusFilter ?? 'all');
+  const [searchInput, setSearchInput] = useState(savedViewState.searchInput ?? '');
+  const [hideEmptySpaces, setHideEmptySpaces] = useState(savedViewState.hideEmptySpaces ?? true);
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const saved = savedViewState.zoomLevel;
+    return typeof saved === 'number' && Number.isInteger(saved) && saved >= 0 && saved < ZOOM_LEVELS.length ? saved : 1;
+  });
+
+  const [nowTick, setNowTick] = useState(() => getMichiganNow());
+  const [loadedDateKey, setLoadedDateKey] = useState('');
 
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
@@ -59,28 +207,23 @@ const SpaceSchedule = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  const timeSlots = useMemo(() => {
-    const slots: TimeSlot[] = [];
-    const startHour = 12; // 12 PM
-    const endHour = 22; // 10 PM
-    
-    for (let hour = startHour; hour <= endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += timeInterval) {
-        if (hour === endHour && minute > 0) break; // Stop at 10:00 PM
-        
-        const displayHour = hour > 12 ? hour - 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const timeString = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-        
-        slots.push({
-          time: timeString,
-          hour,
-          minute
-        });
-      }
-    }
-    return slots;
-  }, [timeInterval]);
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(getMichiganNow()), 60000);
+    const onVisible = () => {
+      if (!document.hidden) setNowTick(getMichiganNow());
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  useEffect(() => {
+    writeViewState({ categoryFilter, statusFilter, searchInput, hideEmptySpaces, zoomLevel });
+  }, [categoryFilter, statusFilter, searchInput, hideEmptySpaces, zoomLevel]);
+
+  const pxPerMinute = ZOOM_LEVELS[zoomLevel];
 
   const formatTime12Hour = (time: string): string => {
     const [hourStr, minuteStr] = time.split(':');
@@ -95,21 +238,10 @@ const SpaceSchedule = () => {
     const [hourStr, minuteStr] = startTime.split(':');
     let hour = parseInt(hourStr);
     let minute = parseInt(minuteStr);
-    
-    let durationInMinutes: number;
-    if (unit === 'hours and minutes') {
-      const hours = Math.floor(duration);
-      const mins = Math.round((duration % 1) * 60);
-      durationInMinutes = hours * 60 + mins;
-    } else {
-      durationInMinutes = unit === 'hours' ? duration * 60 : duration;
-    }
-    
-    minute += durationInMinutes;
+    minute += durationToMinutes(duration, unit);
     hour += Math.floor(minute / 60);
     minute = minute % 60;
     hour = hour % 24;
-    
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
@@ -176,27 +308,6 @@ const SpaceSchedule = () => {
     return map;
   }, [dayOffs, selectedDate, displaySpaces]);
 
-  const isSpaceSlotClosed = useCallback(
-    (spaceId: number, slotMinutes: number): boolean => {
-      const c = spaceClosures.get(spaceId);
-      if (!c) return false;
-      if (c.fullDay) return true;
-      return c.ranges.some(r => {
-        const toMin = (t: string) => {
-          const [h, m] = t.split(':').map(Number);
-          return h * 60 + m;
-        };
-        const s = r.time_start ? toMin(r.time_start) : null;
-        const e = r.time_end ? toMin(r.time_end) : null;
-        if (s !== null && e === null) return slotMinutes >= s;
-        if (s === null && e !== null) return slotMinutes < e;
-        if (s !== null && e !== null) return slotMinutes >= s && slotMinutes < e;
-        return false;
-      });
-    },
-    [spaceClosures]
-  );
-
   const getSpaceClosureLabel = useCallback(
     (spaceId: number): string | null => {
       const c = spaceClosures.get(spaceId);
@@ -214,21 +325,14 @@ const SpaceSchedule = () => {
   );
 
   const naturalSort = (a: Room, b: Room): number => {
-    const nameA = a.name;
-    const nameB = b.name;
-    
-    const chunksA = nameA.match(/(\d+|\D+)/g) || [];
-    const chunksB = nameB.match(/(\d+|\D+)/g) || [];
-    
+    const chunksA = a.name.match(/(\d+|\D+)/g) || [];
+    const chunksB = b.name.match(/(\d+|\D+)/g) || [];
     const maxLength = Math.max(chunksA.length, chunksB.length);
-    
     for (let i = 0; i < maxLength; i++) {
       const chunkA = chunksA[i] || '';
       const chunkB = chunksB[i] || '';
-      
       const isNumA = /^\d+$/.test(chunkA);
       const isNumB = /^\d+$/.test(chunkB);
-      
       if (isNumA && isNumB) {
         const diff = parseInt(chunkA) - parseInt(chunkB);
         if (diff !== 0) return diff;
@@ -237,17 +341,14 @@ const SpaceSchedule = () => {
         if (comparison !== 0) return comparison;
       }
     }
-    
     return 0;
   };
 
   const loadSpaces = useCallback(async () => {
-    if (spacesLoadedRef.current) return; // Already loaded
+    if (spacesLoadedRef.current) return;
     try {
       const user = getStoredUser();
-
       const hasCachedRooms = await roomCacheService.hasCachedData();
-      
       if (hasCachedRooms) {
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms) {
@@ -258,10 +359,9 @@ const SpaceSchedule = () => {
           return;
         }
       }
-      
       const spacesResponse = await roomService.getRooms({
         user_id: user?.id,
-        per_page: 100
+        per_page: 500
       });
       const fetchedSpaces = Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || [];
       await roomCacheService.cacheRooms(fetchedSpaces);
@@ -276,44 +376,28 @@ const SpaceSchedule = () => {
   const loadBookings = useCallback(async () => {
     try {
       setBookingsLoading(true);
-      
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = dateKeyOf(selectedDate);
 
-      let fetchedBookings: Booking[];
-      
       const hasCachedBookings = await bookingCacheService.hasCachedData();
-      
       if (hasCachedBookings) {
-        console.log('[SpaceSchedule] Cache exists, filtering for date:', dateStr);
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
           booking_date: dateStr,
           location_id: effectiveLocationId ?? undefined,
         });
-        console.log('[SpaceSchedule] Filtered bookings from cache:', cachedBookings?.length || 0);
-        fetchedBookings = (cachedBookings || []) as Booking[];
-        setBookings(fetchedBookings);
+        setBookings((cachedBookings || []) as Booking[]);
         bookingCacheService.syncInBackground();
       } else {
         const bookingsResponse = await bookingService.getBookings({
           booking_date: dateStr,
           user_id: getStoredUser()?.id,
           location_id: effectiveLocationId ?? undefined,
+          per_page: 100,
         });
-
-        fetchedBookings = bookingsResponse.data.bookings || [];
+        const fetchedBookings = bookingsResponse.data.bookings || [];
         setBookings(fetchedBookings);
-        await bookingCacheService.cacheBookings(fetchedBookings);
+        bookingCacheService.syncInBackground();
       }
-
-      if (fetchedBookings.length > 0 && fetchedBookings[0].package) {
-        const packageInterval = fetchedBookings[0].package.time_slot_interval;
-        if (packageInterval && packageInterval > 0) {
-          setTimeInterval(packageInterval);
-        }
-      }
+      setLoadedDateKey(dateStr);
     } catch (error) {
       console.error('Error loading bookings:', error);
     } finally {
@@ -327,7 +411,7 @@ const SpaceSchedule = () => {
       setInitialLoading(false);
     };
     init();
-  }, []); // Only run once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!initialLoading) {
@@ -368,7 +452,7 @@ const SpaceSchedule = () => {
   };
 
   const goToToday = () => {
-    const today = new Date();
+    const today = michiganToday();
     setSelectedDate(today);
     setCalendarMonth(today);
   };
@@ -393,24 +477,17 @@ const SpaceSchedule = () => {
   const getCalendarDays = (): (Date | null)[] => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
-    
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
     const daysInMonth = lastDay.getDate();
-    
     const startingDayOfWeek = firstDay.getDay();
-    
     const days: (Date | null)[] = [];
-    
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
-    
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
     }
-    
     return days;
   };
 
@@ -421,130 +498,281 @@ const SpaceSchedule = () => {
   };
 
   const isToday = (date: Date): boolean => {
-    return isSameDay(date, new Date());
+    return date.getFullYear() === nowTick.year &&
+           date.getMonth() === nowTick.month - 1 &&
+           date.getDate() === nowTick.day;
   };
 
-  const bookingsByRoom = useMemo(() => {
-    const map = new Map<number, Booking[]>();
-    for (const booking of bookings) {
-      if (booking.room_id && (booking.status === 'confirmed' || booking.status === 'checked-in' || booking.status === 'pending')) {
-        const roomBookings = map.get(booking.room_id) || [];
-        roomBookings.push(booking);
-        map.set(booking.room_id, roomBookings);
+  const isMichiganToday = isToday(selectedDate);
+  const nowMinutes = nowTick.hour * 60 + nowTick.minute;
+
+  const activeBookings = useMemo(
+    () => bookings.filter(b => b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending'),
+    [bookings]
+  );
+
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const b of activeBookings) {
+      const key = normalizeCategory(b.package?.category) || UNCATEGORISED_LABEL;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [activeBookings]);
+
+  const effectiveCategory = useMemo(
+    () => (categoryFilter !== 'all' && categoryOptions.some(o => o.value === categoryFilter) ? categoryFilter : 'all'),
+    [categoryFilter, categoryOptions]
+  );
+
+  const filteredBookings = useMemo(() => {
+    const term = searchInput.trim().toLowerCase();
+    return activeBookings.filter(b => {
+      if (effectiveCategory !== 'all' && (normalizeCategory(b.package?.category) || UNCATEGORISED_LABEL) !== effectiveCategory) return false;
+      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+      if (term) {
+        const haystack = `${b.guest_name || ''} ${b.reference_number || ''} ${b.package?.name || ''}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
       }
+      return true;
+    });
+  }, [activeBookings, effectiveCategory, statusFilter, searchInput]);
+
+  const knownRoomIds = useMemo(() => new Set(displaySpaces.map(s => s.id)), [displaySpaces]);
+
+  const columnKeyFor = useCallback(
+    (b: Booking): string => {
+      if (b.room_id && knownRoomIds.has(b.room_id)) return `room-${b.room_id}`;
+      return b.package_id ? `pkg-${b.package_id}` : 'unassigned';
+    },
+    [knownRoomIds]
+  );
+
+  const columns = useMemo<ScheduleColumn[]>(() => {
+    const roomBookingCount = new Map<number, number>();
+    for (const b of filteredBookings) {
+      if (b.room_id && knownRoomIds.has(b.room_id)) roomBookingCount.set(b.room_id, (roomBookingCount.get(b.room_id) || 0) + 1);
+    }
+    const roomColumns: ScheduleColumn[] = displaySpaces
+      .filter(space => !hideEmptySpaces || (roomBookingCount.get(space.id) || 0) > 0)
+      .map(space => ({ key: `room-${space.id}`, name: space.name, capacity: space.capacity, roomId: space.id, virtual: false }));
+    const virtualMap = new Map<string, ScheduleColumn>();
+    for (const b of filteredBookings) {
+      const key = columnKeyFor(b);
+      if (key.startsWith('room-')) continue;
+      if (!virtualMap.has(key)) {
+        virtualMap.set(key, { key, name: b.package?.name || 'Unassigned', virtual: true });
+      }
+    }
+    const virtualColumns = [...virtualMap.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    return [...roomColumns, ...virtualColumns];
+  }, [displaySpaces, filteredBookings, hideEmptySpaces, knownRoomIds, columnKeyFor]);
+
+  const roomBreaks = useMemo(() => {
+    const map = new Map<number, Array<{ start: number; end: number }>>();
+    for (const space of displaySpaces) {
+      if (!space.break_time?.length) continue;
+      const list: Array<{ start: number; end: number }> = [];
+      for (const brk of space.break_time) {
+        if (!brk.days.includes(currentDayName)) continue;
+        const start = timeToMinutes(brk.start_time);
+        const end = timeToMinutes(brk.end_time);
+        if (end > start) list.push({ start, end });
+      }
+      if (list.length) map.set(space.id, list);
     }
     return map;
-  }, [bookings]);
+  }, [displaySpaces, currentDayName]);
 
-  const cellDataCache = useMemo(() => {
-    const cache = new Map<string, BookingCell | null>();
-    const breakCache = new Map<string, { isStart: boolean; rowSpan: number; breakTime: BreakTime | null }>();
-    const isBreakCache = new Map<string, boolean>();
-    
-    for (const slot of timeSlots) {
-      for (const space of displaySpaces) {
-        const key = `${space.id}-${slot.hour}-${slot.minute}`;
-        
-        const spaceBookings = bookingsByRoom.get(space.id) || [];
-        let cellData: BookingCell | null = null;
-        
-        for (const booking of spaceBookings) {
-          const [bookingHour, bookingMinute] = booking.booking_time.split(':').map(Number);
-          
-          if (bookingHour === slot.hour && bookingMinute === slot.minute) {
-            let durationInMinutes: number;
-            if (booking.duration_unit === 'hours and minutes') {
-              const hours = Math.floor(booking.duration);
-              const mins = Math.round((booking.duration % 1) * 60);
-              durationInMinutes = hours * 60 + mins;
-            } else {
-              durationInMinutes = booking.duration_unit === 'hours' 
-                ? booking.duration * 60 
-                : booking.duration;
-            }
-            const interval = booking.package?.time_slot_interval || timeInterval;
-            const durationInSlots = Math.ceil(durationInMinutes / interval);
-            cellData = { booking, rowSpan: durationInSlots };
-            break;
-          }
+  const windowExtentRef = useRef<{ key: string; start: number; end: number } | null>(null);
 
-          const bookingStartMinutes = bookingHour * 60 + bookingMinute;
-          const slotMinutes = slot.hour * 60 + slot.minute;
-          let durationInMinutes: number;
-          if (booking.duration_unit === 'hours and minutes') {
-            const hours = Math.floor(booking.duration);
-            const mins = Math.round((booking.duration % 1) * 60);
-            durationInMinutes = hours * 60 + mins;
-          } else {
-            durationInMinutes = booking.duration_unit === 'hours' 
-              ? booking.duration * 60 
-              : booking.duration;
-          }
-          const bookingEndMinutes = bookingStartMinutes + durationInMinutes;
-          
-          if (slotMinutes > bookingStartMinutes && slotMinutes < bookingEndMinutes) {
-            cellData = { booking, rowSpan: 0 };
-            break;
-          }
-        }
-        cache.set(key, cellData);
-        
-        let isInBreak = false;
-        let breakStart: { isStart: boolean; rowSpan: number; breakTime: BreakTime | null } = { isStart: false, rowSpan: 0, breakTime: null };
-        
-        if (space.break_time && space.break_time.length > 0) {
-          const slotMinutes = slot.hour * 60 + slot.minute;
-          
-          for (const breakTime of space.break_time) {
-            if (!breakTime.days.includes(currentDayName)) continue;
-            
-            const [startHour, startMinute] = breakTime.start_time.split(':').map(Number);
-            const [endHour, endMinute] = breakTime.end_time.split(':').map(Number);
-            const breakStartMinutes = startHour * 60 + startMinute;
-            const breakEndMinutes = endHour * 60 + endMinute;
-            
-            if (slotMinutes >= breakStartMinutes && slotMinutes < breakEndMinutes) {
-              isInBreak = true;
-            }
-            
-            if (slotMinutes === breakStartMinutes) {
-              const breakDurationMinutes = breakEndMinutes - breakStartMinutes;
-              const rowSpan = Math.ceil(breakDurationMinutes / timeInterval);
-              breakStart = { isStart: true, rowSpan, breakTime };
-            }
-          }
-        }
-        
-        isBreakCache.set(key, isInBreak);
-        breakCache.set(key, breakStart);
+  const timeWindow = useMemo(() => {
+    let earliest = Infinity;
+    let latest = -Infinity;
+    for (const b of filteredBookings) {
+      const start = timeToMinutes(b.booking_time);
+      const end = start + Math.max(15, durationToMinutes(b.duration, b.duration_unit));
+      if (start < earliest) earliest = start;
+      if (end > latest) latest = end;
+    }
+    for (const [, breaks] of roomBreaks) {
+      for (const brk of breaks) {
+        if (brk.start < earliest) earliest = brk.start;
+        if (brk.end > latest) latest = brk.end;
       }
     }
-    
-    return { cache, breakCache, isBreakCache };
-  }, [timeSlots, displaySpaces, bookingsByRoom, currentDayName, timeInterval]);
+    for (const [, closure] of spaceClosures) {
+      if (closure.fullDay) continue;
+      for (const r of closure.ranges) {
+        if (r.time_start) {
+          const t = timeToMinutes(r.time_start);
+          if (t < earliest) earliest = t;
+          if (t > latest) latest = t;
+        }
+        if (r.time_end) {
+          const t = timeToMinutes(r.time_end);
+          if (t < earliest) earliest = t;
+          if (t > latest) latest = t;
+        }
+      }
+    }
+    if (!Number.isFinite(earliest) || !Number.isFinite(latest)) {
+      earliest = 10 * 60;
+      latest = 22 * 60;
+    }
+    if (isMichiganToday) {
+      if (nowMinutes < earliest) earliest = nowMinutes;
+      if (nowMinutes > latest) latest = nowMinutes;
+    }
+    let start = Math.max(0, Math.floor(earliest / 60) * 60 - 60);
+    let end = Math.min(24 * 60, Math.ceil(latest / 60) * 60 + 60);
+    const extentKey = `${dateKeyOf(selectedDate)}:${effectiveLocationId ?? 'all'}`;
+    const prev = windowExtentRef.current;
+    if (prev && prev.key === extentKey) {
+      start = Math.min(start, prev.start);
+      end = Math.max(end, prev.end);
+    }
+    windowExtentRef.current = { key: extentKey, start, end };
+    return { start, end, total: end - start };
+  }, [filteredBookings, roomBreaks, spaceClosures, isMichiganToday, nowMinutes, selectedDate, effectiveLocationId]);
 
-  const getCellData = useCallback((spaceId: number, slot: TimeSlot): BookingCell | null => {
-    return cellDataCache.cache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || null;
-  }, [cellDataCache]);
-
-  const getBreakStart = useCallback((spaceId: number, slot: TimeSlot) => {
-    return cellDataCache.breakCache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || { isStart: false, rowSpan: 0, breakTime: null };
-  }, [cellDataCache]);
-
-  const getIsBreak = useCallback((spaceId: number, slot: TimeSlot): boolean => {
-    return cellDataCache.isBreakCache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || false;
-  }, [cellDataCache]);
-
-  const visibleTimeSlots = useMemo(() => {
-    return timeSlots.filter(slot => {
-      return displaySpaces.some(space => {
-        const key = `${space.id}-${slot.hour}-${slot.minute}`;
-        const hasBooking = cellDataCache.cache.get(key) !== null;
-        const hasBreak = cellDataCache.isBreakCache.get(key) || false;
-        return hasBooking || hasBreak;
+  const positionedByColumn = useMemo(() => {
+    const map = new Map<string, PositionedBooking[]>();
+    for (const column of columns) map.set(column.key, []);
+    for (const b of filteredBookings) {
+      const key = columnKeyFor(b);
+      const list = map.get(key);
+      if (!list) continue;
+      const startMin = timeToMinutes(b.booking_time);
+      const rawEnd = startMin + Math.max(15, durationToMinutes(b.duration, b.duration_unit));
+      const endMin = Math.min(timeWindow.end, rawEnd);
+      list.push({
+        booking: b,
+        startMin,
+        endMin,
+        top: (startMin - timeWindow.start) * pxPerMinute,
+        height: Math.max(24, (endMin - startMin) * pxPerMinute - 2),
+        lane: 0,
+        laneCount: 1,
+        clipped: rawEnd > timeWindow.end,
       });
+    }
+    for (const list of map.values()) assignLanes(list);
+    return map;
+  }, [columns, filteredBookings, timeWindow, columnKeyFor, pxPerMinute]);
+
+  const hourMarks = useMemo(() => {
+    const marks: number[] = [];
+    for (let m = timeWindow.start; m <= timeWindow.end; m += 60) marks.push(m);
+    return marks;
+  }, [timeWindow]);
+
+  const daySummary = useMemo(() => {
+    const guests = filteredBookings.reduce((sum, b) => sum + (Number(b.participants) || 0), 0);
+    const unassigned = filteredBookings.filter(b => !b.room_id || !knownRoomIds.has(b.room_id)).length;
+    return { count: filteredBookings.length, guests, unassigned };
+  }, [filteredBookings, knownRoomIds]);
+
+  const nowLineTop = isMichiganToday && nowMinutes >= timeWindow.start && nowMinutes <= timeWindow.end
+    ? (nowMinutes - timeWindow.start) * pxPerMinute
+    : null;
+
+  const scrollToNow = () => {
+    if (nowLineTop === null || !scrollRef.current) return;
+    scrollRef.current.scrollTo({ top: Math.max(0, nowLineTop - scrollRef.current.clientHeight / 3), behavior: 'smooth' });
+  };
+
+  const pendingZoomAnchor = useRef<number | null>(null);
+
+  const changeZoom = (next: number) => {
+    if (next === zoomLevel || next < 0 || next >= ZOOM_LEVELS.length) return;
+    const el = scrollRef.current;
+    if (el) pendingZoomAnchor.current = (el.scrollTop + el.clientHeight / 2) / pxPerMinute;
+    setZoomLevel(next);
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    const anchor = pendingZoomAnchor.current;
+    pendingZoomAnchor.current = null;
+    if (!el || anchor === null) return;
+    el.scrollTop = Math.max(0, anchor * pxPerMinute - el.clientHeight / 2);
+  }, [pxPerMinute]);
+
+  const [weekCounts, setWeekCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cached = await bookingCacheService.getCachedBookings();
+        if (cancelled || !cached) return;
+        const counts: Record<string, number> = {};
+        for (const b of cached) {
+          if (effectiveLocationId && b.location_id !== effectiveLocationId) continue;
+          if (b.status !== 'confirmed' && b.status !== 'checked-in' && b.status !== 'pending') continue;
+          const key = (b.booking_date || '').split('T')[0];
+          counts[key] = (counts[key] || 0) + 1;
+        }
+        setWeekCounts(counts);
+      } catch {
+        return;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveLocationId, bookings]);
+
+  const weekDays = useMemo(() => {
+    const base = michiganToday();
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      return d;
     });
-  }, [timeSlots, displaySpaces, cellDataCache]);
+  }, [nowTick.year, nowTick.month, nowTick.day]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hasActiveFilters = effectiveCategory !== 'all' || statusFilter !== 'all' || searchInput.trim() !== '';
+
+  const clearFilters = () => {
+    setCategoryFilter('all');
+    setStatusFilter('all');
+    setSearchInput('');
+  };
+
+  const lastScrolledDay = useRef('');
+  useEffect(() => {
+    if (initialLoading || !scrollRef.current) return;
+    const dayKey = dateKeyOf(selectedDate);
+    if (loadedDateKey !== dayKey) return;
+    if (lastScrolledDay.current === dayKey) return;
+    lastScrolledDay.current = dayKey;
+    if (nowLineTop !== null) {
+      scrollRef.current.scrollTop = Math.max(0, nowLineTop - scrollRef.current.clientHeight / 3);
+    } else {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [selectedDate, initialLoading, loadedDateKey, filteredBookings.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      if (initialLoading || selectedBooking || showCalendar || showPaymentModal) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPreviousDay();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNextDay();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [initialLoading, selectedBooking, showCalendar, showPaymentModal, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (initialLoading) {
     return (
@@ -618,49 +846,187 @@ const SpaceSchedule = () => {
     }
   };
 
+  const renderBookingBlock = (item: PositionedBooking) => {
+    const { booking } = item;
+    const color = packageColorFor(booking.package?.name || '');
+    const laneWidth = 100 / item.laneCount;
+    const compact = item.height < 56;
+    const medium = item.height >= 56 && item.height < 100;
+    const timeLabel = `${formatTime12Hour(booking.booking_time)} – ${formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}`;
+    const inProgress = isMichiganToday && nowMinutes >= item.startMin && nowMinutes < item.endMin;
+    const needsCheckIn = inProgress && booking.status !== 'checked-in';
+    return (
+      <button
+        key={booking.id}
+        type="button"
+        onClick={() => setSelectedBooking(booking)}
+        className={`absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm hover:shadow-md hover:brightness-[0.98] transition overflow-hidden z-10 ${
+          needsCheckIn ? 'ring-2 ring-red-400' : inProgress ? 'ring-2 ring-emerald-400' : ''
+        }`}
+        style={{
+          top: item.top,
+          height: item.height,
+          left: `calc(${item.lane * laneWidth}% + 3px)`,
+          width: `calc(${laneWidth}% - 6px)`,
+        }}
+      >
+        <div className={`h-full flex flex-col ${compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
+          {compact ? (
+            <div className={`flex items-center gap-1.5 text-xs ${color.text} min-w-0`}>
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                booking.status === 'confirmed' ? 'bg-green-500' :
+                booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
+              }`} />
+              <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+              {item.laneCount === 1 && (
+                <span className="opacity-70 flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full text-white flex-shrink-0 ${
+                  booking.status === 'confirmed' ? 'bg-green-500' :
+                  booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
+                }`}>
+                  {booking.status}
+                </span>
+                <span className={`text-[10px] font-medium ${color.text} opacity-70 truncate`}>
+                  #{booking.reference_number?.slice(-6)}
+                </span>
+              </div>
+              <div className={`font-bold text-xs ${color.text} flex items-center gap-1.5`}>
+                {timeLabel}
+                {needsCheckIn && (
+                  <span className="flex items-center gap-0.5 px-1.5 py-px rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">
+                    <AlertCircle className="w-2.5 h-2.5" />
+                    Check in
+                  </span>
+                )}
+                {inProgress && !needsCheckIn && (
+                  <span className="px-1.5 py-px rounded-full bg-emerald-500 text-white text-[9px] font-bold uppercase">Now</span>
+                )}
+              </div>
+              <div className={`font-semibold text-sm ${color.text} truncate`}>{booking.guest_name || 'Walk-in'}</div>
+              {!medium && (
+                <>
+                  <div className={`text-xs ${color.text} opacity-80 truncate`}>{booking.package?.name || 'N/A'}</div>
+                  <div className={`text-xs ${color.text} opacity-70 flex items-center gap-1`}>
+                    <Users className="w-3 h-3" />
+                    {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
+                  </div>
+                  <div className={`mt-auto pt-1 flex items-center justify-between text-xs`}>
+                    <span className={`font-bold ${color.text}`}>${Number(booking.total_amount || 0).toFixed(2)}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      booking.payment_status === 'paid' ? 'bg-green-200/80 text-green-800' :
+                      booking.payment_status === 'partial' ? 'bg-yellow-200/80 text-yellow-800' :
+                      'bg-red-200/80 text-red-800'
+                    }`}>
+                      {booking.payment_status}
+                    </span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+        {item.clipped && (
+          <div className="absolute bottom-0 inset-x-0 border-b-2 border-dashed border-current opacity-60 flex justify-center pointer-events-none">
+            {item.height >= 56 && (
+              <span className={`text-[9px] font-semibold ${color.text} bg-white/70 rounded-t px-1`}>continues past midnight</span>
+            )}
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  const renderColumnBackground = (column: ScheduleColumn) => {
+    const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
+    const breaks = column.roomId ? roomBreaks.get(column.roomId) || [] : [];
+    return (
+      <>
+        {closure?.fullDay && (
+          <div className="absolute inset-0 bg-red-50/80 z-[5] flex items-start justify-center pt-8">
+            <span className="text-[10px] font-semibold text-red-500 bg-white/80 border border-red-200 rounded-full px-2 py-0.5">Closed all day</span>
+          </div>
+        )}
+        {!closure?.fullDay && closure?.ranges.map((r, i) => {
+          const start = Math.max(r.time_start ? timeToMinutes(r.time_start) : timeWindow.start, timeWindow.start);
+          const end = Math.min(r.time_end ? timeToMinutes(r.time_end) : timeWindow.end, timeWindow.end);
+          if (end <= start) return null;
+          return (
+            <div
+              key={`closure-${i}`}
+              className="absolute left-0.5 right-0.5 bg-red-50/90 border border-dashed border-red-200 rounded z-[5] flex items-center justify-center"
+              style={{ top: (start - timeWindow.start) * pxPerMinute, height: (end - start) * pxPerMinute }}
+            >
+              <span className="text-[10px] font-medium text-red-500">Closed</span>
+            </div>
+          );
+        })}
+        {breaks.map((brk, i) => (
+          <div
+            key={`break-${i}`}
+            className="absolute left-0.5 right-0.5 bg-gray-100 border-2 border-dashed border-gray-300 rounded z-[4] flex flex-col items-center justify-center"
+            style={{ top: (brk.start - timeWindow.start) * pxPerMinute, height: (brk.end - brk.start) * pxPerMinute }}
+          >
+            <Coffee className="w-4 h-4 text-gray-400" />
+            <span className="text-[10px] font-medium text-gray-500 mt-0.5">Break</span>
+          </div>
+        ))}
+      </>
+    );
+  };
+
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Space Schedule</h1>
-        <p className="text-gray-600">Daily space allocation and booking timeline</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Space Schedule</h1>
+          <p className="text-gray-600">Daily space allocation and booking timeline — all times shown in Michigan time</p>
+        </div>
+        <Link
+          to="/bookings/create"
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg bg-${fullColor} text-white text-sm font-semibold hover:opacity-90 transition shadow-sm`}
+        >
+          <Plus className="w-4 h-4" />
+          New Booking
+        </Link>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <StandardButton
-              variant="ghost"
-              size="sm"
-              icon={ChevronLeft}
-              onClick={goToPreviousDay}
-            >
-              {''}
-            </StandardButton>
-            
-            <div className="relative">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-stretch rounded-lg border border-gray-200">
               <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-${themeColor}-50 transition-colors`}
+                type="button"
+                onClick={goToPreviousDay}
+                aria-label="Previous day"
+                className="px-2.5 rounded-l-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition"
               >
-                <Calendar className={`w-5 h-5 text-${fullColor}`} />
-                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
-                  {selectedDate.toLocaleDateString('en-US', {
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </h2>
+                <ChevronLeft className="w-4 h-4" />
               </button>
+              <div className="relative border-x border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 transition"
+                >
+                  <Calendar className={`w-4 h-4 text-${fullColor}`} />
+                  <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                    {selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </button>
 
               {showCalendar && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-30"
+                  <div
+                    className="fixed inset-0 z-40"
                     onClick={() => setShowCalendar(false)}
                   />
-                  
-                  <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-40 animate-scale-in">
+
+                  <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-50 animate-scale-in">
                     <div className="flex items-center justify-between mb-4">
                       <button
                         onClick={goToPreviousMonth}
@@ -695,7 +1061,7 @@ const SpaceSchedule = () => {
 
                         const isSelected = isSameDay(day, selectedDate);
                         const isTodayDate = isToday(day);
-                        const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+                        const isPast = day < michiganToday();
 
                         return (
                           <button
@@ -703,8 +1069,8 @@ const SpaceSchedule = () => {
                             onClick={() => selectDate(day)}
                             className={`
                               aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all
-                              ${isSelected 
-                                ? `bg-${fullColor} text-white shadow-md` 
+                              ${isSelected
+                                ? `bg-${fullColor} text-white shadow-md`
                                 : isTodayDate
                                 ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
                                 : isPast
@@ -736,38 +1102,73 @@ const SpaceSchedule = () => {
                   </div>
                 </>
               )}
+              </div>
+              <button
+                type="button"
+                onClick={goToNextDay}
+                aria-label="Next day"
+                className="px-2.5 rounded-r-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
 
-            <StandardButton
-              variant="ghost"
-              size="sm"
-              icon={ChevronRight}
-              onClick={goToNextDay}
-            >
-              {''}
-            </StandardButton>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <StandardButton
-                variant="primary"
+            {isMichiganToday ? (
+              <span className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide rounded-full bg-${themeColor}-100 text-${fullColor}`}>
+                Today
+              </span>
+            ) : (
+              <button
+                type="button"
                 onClick={goToToday}
+                className={`px-3 py-1.5 text-sm font-semibold rounded-lg text-${fullColor} bg-${themeColor}-50 hover:bg-${themeColor}-100 transition`}
               >
                 Today
-              </StandardButton>
-              <div className={`absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm transition-opacity duration-300 ${bookingsLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
-              </div>
+              </button>
+            )}
+            {nowLineTop !== null && activeBookings.length > 0 && filteredBookings.length > 0 && (
+              <button
+                type="button"
+                onClick={scrollToNow}
+                title="Scroll to current time"
+                className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-500 bg-red-50 hover:bg-red-100 transition"
+              >
+                <LocateFixed className="w-3.5 h-3.5" />
+                {formatTime12Hour(`${nowTick.hour}:${String(nowTick.minute).padStart(2, '0')}`)}
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-4 text-sm text-gray-500">
+              <span>
+                <span className="font-semibold text-gray-900">{daySummary.count}</span> bookings
+              </span>
+              <span>
+                <span className="font-semibold text-gray-900">{daySummary.guests}</span> guests
+              </span>
+              {daySummary.unassigned > 0 && (
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">
+                  {daySummary.unassigned} no room
+                </span>
+              )}
             </div>
 
+            <button
+              type="button"
+              onClick={() => loadBookings()}
+              title="Refresh bookings"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            >
+              <RotateCw className={`w-4 h-4 ${bookingsLoading ? 'animate-spin' : ''}`} />
+            </button>
             <div className="relative group">
               <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
                 <Info className="w-5 h-5" />
               </button>
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                 <div className="text-xs font-semibold text-gray-800 mb-3">Legend</div>
-                
+
                 <div className="mb-3">
                   <div className="text-xs font-medium text-gray-600 mb-2">Booking Status</div>
                   <div className="space-y-2 text-xs">
@@ -780,244 +1181,284 @@ const SpaceSchedule = () => {
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-blue-500 text-white rounded-full text-[10px] font-semibold">Checked-in</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-gray-500 text-white rounded-full text-[10px] font-semibold">Completed</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-red-500 text-white rounded-full text-[10px] font-semibold">Cancelled</span>
-                    </div>
                   </div>
                 </div>
-                
+
                 <div className="pt-3 border-t border-gray-200">
                   <div className="text-xs font-medium text-gray-600 mb-2">Color Coding</div>
                   <p className="text-xs text-gray-500 mb-2">Each package has a unique color</p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-3 bg-gray-200 rounded border border-dashed border-gray-400 flex items-center justify-center">
                       <Coffee className="w-1.5 h-1.5 text-gray-500" />
                     </div>
                     <span className="text-gray-600 text-xs">Break Time</span>
                   </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-0.5 bg-red-500 rounded" />
+                    <span className="text-gray-600 text-xs">Current time (Michigan)</span>
+                  </div>
+                  <p className="text-xs text-gray-400">Tip: use ← → keys to move between days</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1">
+          {weekDays.map(day => {
+            const key = dateKeyOf(day);
+            const count = weekCounts[key] || 0;
+            const isSelected = isSameDay(day, selectedDate);
+            const isTodayChip = isToday(day);
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => selectDate(day)}
+                className={`flex flex-col items-center px-3 py-1.5 rounded-lg border text-xs transition flex-shrink-0 ${
+                  isSelected
+                    ? `border-${themeColor}-300 bg-${themeColor}-50 text-${fullColor} font-semibold`
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className={`uppercase tracking-wide text-[10px] ${isTodayChip && !isSelected ? `text-${fullColor} font-bold` : 'opacity-70'}`}>
+                  {isTodayChip ? 'Today' : day.toLocaleDateString('en-US', { weekday: 'short' })}
+                </span>
+                <span className="flex items-center gap-1 font-semibold text-sm">
+                  {day.getDate()}
+                  {count > 0 && (
+                    <span className={`px-1 rounded-full text-[10px] font-bold ${isSelected ? `bg-${themeColor}-100` : 'bg-gray-100 text-gray-500'}`}>
+                      {count}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex-1 min-w-[240px] [&>div]:mb-0">
+            <CategoryTabs
+              options={categoryOptions}
+              value={effectiveCategory}
+              onChange={setCategoryFilter}
+              totalCount={activeBookings.length}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                placeholder="Search bookings"
+                className="w-44 pl-8 pr-2.5 py-1.5 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {STATUS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setHideEmptySpaces(v => !v)}
+              aria-pressed={hideEmptySpaces}
+              title={hideEmptySpaces ? 'Show empty spaces' : 'Hide empty spaces'}
+              className={`p-2 rounded-lg border transition ${
+                hideEmptySpaces
+                  ? `border-${themeColor}-200 bg-${themeColor}-50 text-${fullColor}`
+                  : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              {hideEmptySpaces ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+            <div className="flex items-center rounded-lg border border-gray-200">
+              <button
+                type="button"
+                onClick={() => changeZoom(zoomLevel - 1)}
+                disabled={zoomLevel === 0}
+                title="Compact view"
+                className="p-2 rounded-l-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => changeZoom(zoomLevel + 1)}
+                disabled={zoomLevel === ZOOM_LEVELS.length - 1}
+                title="Expanded view"
+                className="p-2 rounded-r-lg border-l border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                title="Clear filters"
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        {bookings.length === 0 ? (
+        {activeBookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">
             <div className={`w-20 h-20 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
               <Calendar className={`w-10 h-10 text-${fullColor}`} />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Bookings Found</h3>
             <p className="text-gray-600 text-center max-w-md">
-              There are no bookings scheduled for {selectedDate.toLocaleDateString('en-US', { 
-                month: 'long', 
+              There are no bookings scheduled for {selectedDate.toLocaleDateString('en-US', {
+                month: 'long',
                 day: 'numeric',
                 year: 'numeric'
               })}. The schedule will appear here once bookings are made.
             </p>
+            {spaceClosures.size > 0 && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-lg">
+                {displaySpaces.filter(space => spaceClosures.has(space.id)).map(space => (
+                  <span key={space.id} className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
+                    {space.name}: {getSpaceClosureLabel(space.id)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : filteredBookings.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <Search className="w-10 h-10 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Matching Bookings</h3>
+            <p className="text-gray-600 text-center max-w-md mb-4">
+              {activeBookings.length} {activeBookings.length === 1 ? 'booking is' : 'bookings are'} scheduled this day, but none match the current filters.
+            </p>
+            <StandardButton variant="secondary" onClick={clearFilters}>
+              Clear filters
+            </StandardButton>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b-2 border-gray-200">
-                  <th className="sticky left-0 bg-gray-50 z-10 px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-200 w-24">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      Time
+          <div ref={scrollRef} className="overflow-auto max-h-[72vh] relative">
+            <div className="min-w-max">
+              <div className="sticky top-0 z-30 flex bg-gray-50 border-b-2 border-gray-200">
+                <div
+                  className="sticky left-0 z-40 bg-gray-50 border-r border-gray-200 flex items-center justify-center px-2 py-3"
+                  style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH }}
+                >
+                  <Clock className="w-4 h-4 text-gray-500" />
+                </div>
+                {columns.map(column => (
+                  <div
+                    key={column.key}
+                    className="px-4 py-3 text-center border-r border-gray-200"
+                    style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-sm font-semibold text-gray-700 truncate max-w-full">{column.name}</span>
+                      {column.virtual ? (
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                          No room assigned
+                        </span>
+                      ) : (
+                        <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          Max {column.capacity}
+                        </span>
+                      )}
+                      {column.roomId && spaceClosures.has(column.roomId) && (
+                        <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
+                          {getSpaceClosureLabel(column.roomId)}
+                        </span>
+                      )}
                     </div>
-                  </th>
-                  {displaySpaces.length === 0 ? (
-                    <th className="px-4 py-3 text-center text-gray-500" colSpan={100}>
-                      No spaces available
-                    </th>
-                  ) : (
-                    displaySpaces.map(space => (
-                      <th 
-                        key={space.id} 
-                        className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]"
-                      >
-                        <div className="flex flex-col items-center gap-1">
-                          <span>{space.name}</span>
-                          <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            Max {space.capacity}
-                          </span>
-                          {spaceClosures.has(space.id) && (
-                            <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
-                              {getSpaceClosureLabel(space.id)}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                    ))
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative flex">
+                <div
+                  className="sticky left-0 z-20 bg-white border-r border-gray-200"
+                  style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH, height: timeWindow.total * pxPerMinute }}
+                >
+                  {hourMarks.map(mark => (
+                    <div
+                      key={mark}
+                      className={`absolute right-2 text-xs font-medium text-gray-500 ${
+                        mark === timeWindow.start ? 'translate-y-0.5' : mark === timeWindow.end ? '-translate-y-full' : '-translate-y-1/2'
+                      }`}
+                      style={{ top: (mark - timeWindow.start) * pxPerMinute }}
+                    >
+                      {minutesToLabel(mark)}
+                    </div>
+                  ))}
+                  {nowLineTop !== null && activeBookings.length > 0 && filteredBookings.length > 0 && (
+                    <div
+                      className="absolute right-1 z-30 -translate-y-1/2 px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold whitespace-nowrap"
+                      style={{ top: nowLineTop }}
+                    >
+                      {formatTime12Hour(`${nowTick.hour}:${String(nowTick.minute).padStart(2, '0')}`)}
+                    </div>
                   )}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTimeSlots.map((slot, index) => (
-                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '60px' }}>
-                  <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
-                    {slot.time}
-                  </td>
-                  {displaySpaces.map(space => {
-                    const cellData = getCellData(space.id, slot);
-                    const breakTimeData = getBreakStart(space.id, slot);
-                    const isInBreak = getIsBreak(space.id, slot);
-                    
-                    if (cellData && cellData.rowSpan === 0) {
-                      return null;
-                    }
+                </div>
 
-                    if (isInBreak && !breakTimeData.isStart) {
-                      return null;
-                    }
+                <div className="relative flex" style={{ height: timeWindow.total * pxPerMinute }}>
+                  <div className="absolute inset-0 pointer-events-none">
+                    {hourMarks.map(mark => (
+                      <div key={mark}>
+                        <div
+                          className="absolute left-0 right-0 border-t border-gray-200"
+                          style={{ top: (mark - timeWindow.start) * pxPerMinute }}
+                        />
+                        {mark + 30 < timeWindow.end && (
+                          <div
+                            className="absolute left-0 right-0 border-t border-dashed border-gray-100"
+                            style={{ top: (mark + 30 - timeWindow.start) * pxPerMinute }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
-                    if (breakTimeData.isStart && breakTimeData.breakTime) {
-                      return (
-                        <td
-                          key={space.id}
-                          rowSpan={breakTimeData.rowSpan}
-                          className="px-2 py-2 border-r border-gray-200 bg-gray-100"
-                          style={{ verticalAlign: 'middle' }}
-                        >
-                          <div className="h-full min-h-full flex flex-col items-center justify-center p-2 bg-gray-200/50 rounded-lg border-2 border-dashed border-gray-300">
-                            <Coffee className="w-6 h-6 text-gray-500 mb-2" />
-                            <div className="font-semibold text-sm text-gray-700">Break Time</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {formatTime12Hour(breakTimeData.breakTime.start_time)} - {formatTime12Hour(breakTimeData.breakTime.end_time)}
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    }
+                  {columns.map(column => (
+                    <div
+                      key={column.key}
+                      className={`relative border-r border-gray-200 ${column.virtual ? 'bg-amber-50/20' : ''}`}
+                      style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+                    >
+                      {renderColumnBackground(column)}
+                      {(positionedByColumn.get(column.key) || []).map(renderBookingBlock)}
+                    </div>
+                  ))}
 
-                    if (cellData && cellData.rowSpan > 0) {
-                      const { booking, rowSpan } = cellData;
-                      const totalAmount = parseFloat(String(booking.total_amount));
-                      
-                      const packageColors = [
-                        { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
-                        { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
-                        { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
-                        { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
-                        { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
-                        { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' },
-                        { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200' },
-                        { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' },
-                        { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200' },
-                        { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-200' },
-                        { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-200' },
-                        { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200' },
-                      ];
-                      
-                      const getPackageNameHash = (packageName: string): number => {
-                        if (!packageName) return 0;
-                        let hash = 0;
-                        for (let i = 0; i < packageName.length; i++) {
-                          const char = packageName.charCodeAt(i);
-                          hash = ((hash << 5) - hash) + char;
-                          hash = hash & hash;
-                        }
-                        return Math.abs(hash);
-                      };
-                      
-                      const packageName = booking.package?.name || '';
-                      const colorIndex = getPackageNameHash(packageName) % packageColors.length;
-                      const packageColor = packageColors[colorIndex];
-                      
-                      return (
-                        <td
-                          key={space.id}
-                          rowSpan={rowSpan}
-                          className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition ${packageColor.bg}`}
-                          style={{ verticalAlign: 'top' }}
-                          onClick={() => setSelectedBooking(booking)}
-                        >
-                          <div className="h-full min-h-full flex flex-col p-2">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
-                                booking.status === 'confirmed' ? 'bg-green-500 text-white' :
-                                booking.status === 'pending' ? 'bg-yellow-500 text-white' :
-                                booking.status === 'checked-in' ? 'bg-blue-500 text-white' :
-                                booking.status === 'completed' ? 'bg-gray-500 text-white' :
-                                booking.status === 'cancelled' ? 'bg-red-500 text-white' :
-                                'bg-gray-400 text-white'
-                              }`}>
-                                {booking.status}
-                              </span>
-                              <span className={`text-[10px] font-medium ${packageColor.text} opacity-70`}>
-                                #{booking.reference_number?.slice(-6)}
-                              </span>
-                            </div>
-                            
-                            <div className={`font-bold text-sm ${packageColor.text} mb-1`}>
-                              {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}
-                            </div>
-
-                            <div className={`font-semibold text-sm ${packageColor.text} mb-1 line-clamp-1`}>
-                              {booking.guest_name || 'Walk-in'}
-                            </div>
-
-                            <div className={`text-xs ${packageColor.text} opacity-80 mb-1 line-clamp-1`}>
-                              {booking.package?.name || 'N/A'}
-                            </div>
-
-                            <div className={`text-xs ${packageColor.text} opacity-70 mb-1`}>
-                              <Users className="w-3 h-3 inline mr-1" />
-                              {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
-                            </div>
-
-                            <div className={`mt-auto pt-2 border-t ${packageColor.border} flex items-center justify-between text-xs`}>
-                              <span className={`font-bold ${packageColor.text}`}>
-                                ${totalAmount.toFixed(2)}
-                              </span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                booking.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
-                                booking.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                {booking.payment_status}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    }
-
-                    if (isSpaceSlotClosed(space.id, slot.hour * 60 + slot.minute)) {
-                      return (
-                        <td
-                          key={space.id}
-                          className="px-2 py-2 border-r border-gray-200 bg-red-50 text-center"
-                          style={{ height: '60px' }}
-                        >
-                          <span className="text-[10px] font-medium text-red-500">Closed</span>
-                        </td>
-                      );
-                    }
-
-                    return (
-                      <td
-                        key={space.id}
-                        className="px-2 py-2 border-r border-gray-200 text-center text-gray-400 text-xs hover:bg-blue-50 cursor-pointer transition"
-                        style={{ height: '60px' }}
-                      >
-                        —
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  {nowLineTop !== null && activeBookings.length > 0 && filteredBookings.length > 0 && (
+                    <div
+                      className="absolute left-0 right-0 z-20 pointer-events-none"
+                      style={{ top: nowLineTop }}
+                    >
+                      <div className="h-0.5 bg-red-500 shadow-[0_1px_3px_rgba(239,68,68,0.4)]" />
+                      <div className="absolute -top-[3px] left-0 w-2 h-2 rounded-full bg-red-500" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
+
 
       {selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedBooking(null)}>
