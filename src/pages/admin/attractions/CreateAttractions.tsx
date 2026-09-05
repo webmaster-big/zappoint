@@ -934,7 +934,7 @@ const CreateAttraction = () => {
               <StandardButton
                 variant="secondary"
                 size="lg"
-                onClick={() => navigate('/manage-attractions')}
+                onClick={() => navigate('/attractions')}
                 disabled={isSubmitting}
                 fullWidth
               >

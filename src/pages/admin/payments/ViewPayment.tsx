@@ -265,7 +265,7 @@ const ViewPayment: React.FC = () => {
             )}
             {isPurchase && payableData && (
               <Link
-                to={`/attraction-purchases/${payment.payable_id}`}
+                to={`/attractions/purchases/${payment.payable_id}`}
                 className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
               >
                 <Ticket className="h-4 w-4" />

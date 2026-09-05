@@ -1477,7 +1477,7 @@ const EditPackage: React.FC = () => {
                                 <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
                                     <p className="text-gray-500 mb-3 text-sm">No attractions available yet</p>
                                     <Link
-                                        to="/admin/attractions/create"
+                                        to="/attractions/create"
                                         className={`inline-flex items-center gap-2 bg-${fullColor} text-xs hover:bg-${themeColor}-900 text-white px-4 py-2 rounded-md transition`}
                                     >
                                         <Plus className="w-4 h-4" />

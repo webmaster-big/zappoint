@@ -1412,7 +1412,7 @@ const CreatePackage: React.FC = () => {
                         <p className="text-gray-500 mb-3 text-sm">No attractions available yet</p>
                         <StandardButton
                             type="button"
-                            onClick={() => navigate('/admin/attractions/create')}
+                            onClick={() => navigate('/attractions/create')}
                             variant="primary"
                             size="sm"
                             icon={Plus}

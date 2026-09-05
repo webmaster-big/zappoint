@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Calendar,
   AlertTriangle,
@@ -58,6 +58,7 @@ import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 
 const AttendantDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
    const [currentWeek, setCurrentWeek] = useState(new Date());
    const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -1262,7 +1263,7 @@ const AttendantDashboard: React.FC = () => {
                                    
                                    {bookingsForCell.length > 1 && (
                                      <StandardButton
-                                       onClick={() => console.log('View more:', bookingsForCell)}
+                                       onClick={() => navigate(`/bookings/${bookingsForCell[0].id}?from=dashboard`)}
                                        variant="ghost"
                                        size="sm"
                                        className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
@@ -1279,7 +1280,7 @@ const AttendantDashboard: React.FC = () => {
                                    
                                    {bookingsForCell.length === 1 && (
                                      <StandardButton
-                                       onClick={() => console.log('View booking:', bookingsForCell[0])}
+                                       onClick={() => navigate(`/bookings/${bookingsForCell[0].id}?from=dashboard`)}
                                        variant="ghost"
                                        size="sm"
                                        className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
@@ -2171,7 +2172,7 @@ const AttendantDashboard: React.FC = () => {
                </thead>
                <tbody className="divide-y divide-gray-100">
                  {filteredBookings.slice(0, 5).map((booking: any, index: number) => (
-                   <tr key={index} className="hover:bg-gray-50 cursor-pointer" onClick={() => console.log('View booking:', booking)}>
+                   <tr key={index} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/bookings/${booking.id}?from=dashboard`)}>
                      <td className="px-4 py-3">
                        <span className="text-sm font-medium text-gray-900">
                          {booking.reference_number || 'N/A'}

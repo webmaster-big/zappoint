@@ -524,7 +524,7 @@ const EditAttraction = () => {
           <StandardButton
             variant="primary"
             size="md"
-            onClick={() => navigate('/manage-attractions')}
+            onClick={() => navigate('/attractions')}
           >
             Back to Manage Attractions
           </StandardButton>
@@ -981,7 +981,7 @@ const EditAttraction = () => {
               <StandardButton
                 variant="secondary"
                 size="lg"
-                onClick={() => navigate('/manage-attractions')}
+                onClick={() => navigate('/attractions')}
                 disabled={isSubmitting}
                 fullWidth
               >
