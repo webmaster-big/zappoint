@@ -447,8 +447,8 @@ const CalendarView: React.FC = () => {
       return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     } else if (filters.view === 'range') {
       if (filters.dateRange.start && filters.dateRange.end) {
-        const start = new Date(filters.dateRange.start);
-        const end = new Date(filters.dateRange.end);
+        const start = parseLocalDate(filters.dateRange.start);
+        const end = parseLocalDate(filters.dateRange.end);
         return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
       }
       return 'Select Date Range';
@@ -920,19 +920,38 @@ const CalendarView: React.FC = () => {
       );
     }
     
-    const start = new Date(filters.dateRange.start);
-    const end = new Date(filters.dateRange.end);
-    const rangeBookings = filteredBookings.filter(pageFilter.showsBooking).sort((a, b) => {
-      const dateA = a.booking_date.split('T')[0];
-      const dateB = b.booking_date.split('T')[0];
-      if (dateA !== dateB) return dateA < dateB ? -1 : 1;
-      return timeToMinutes(a.booking_time) - timeToMinutes(b.booking_time);
-    });
-    
+    const startKey = filters.dateRange.start;
+    const endKey = filters.dateRange.end;
+
+    if (startKey > endKey) {
+      return (
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-gray-900">Start date is after end date</h3>
+          <p className="mt-2 text-gray-500">Swap the dates to see bookings in that range.</p>
+        </div>
+      );
+    }
+
+    const start = parseLocalDate(startKey);
+    const end = parseLocalDate(endKey);
+    const rangeBookings = filteredBookings
+      .filter(booking => {
+        const day = booking.booking_date.split('T')[0];
+        return day >= startKey && day <= endKey;
+      })
+      .filter(pageFilter.showsBooking)
+      .sort((a, b) => {
+        const dateA = a.booking_date.split('T')[0];
+        const dateB = b.booking_date.split('T')[0];
+        if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+        return timeToMinutes(a.booking_time) - timeToMinutes(b.booking_time);
+      });
+
     return (
       <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 h-full overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">
-          Bookings from {start.toLocaleDateString()} to {end.toLocaleDateString()}
+          Bookings from {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} to {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </h3>
         
         {rangeBookings.length === 0 ? (

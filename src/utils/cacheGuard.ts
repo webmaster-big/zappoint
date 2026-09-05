@@ -10,6 +10,7 @@ const METADATA_KEY_CANDIDATES = [
   '/api/attraction-purchases/metadata',
   '/api/customers/metadata',
   '/api/customer-data/metadata',
+  '/api/contacts/metadata',
   '/api/rooms/metadata',
   '/api/metrics/metadata',
   '/api/memberships/metadata',

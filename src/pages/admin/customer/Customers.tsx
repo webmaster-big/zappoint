@@ -31,6 +31,7 @@ import contactService, {
   type ContactFilters,
   type ContactStatistics
 } from '../../../services/ContactService';
+import contactCacheService from '../../../services/ContactCacheService';
 import { getStoredUser } from '../../../utils/storage';
 import {
   AdminDataTable,
@@ -111,7 +112,7 @@ const CustomerListing: React.FC = () => {
     { key: 'notes', label: 'Notes', type: 'text', apiField: 'notes' },
   ];
 
-  const loadContacts = useCallback(async () => {
+  const loadContacts = useCallback(async (forceRefresh = false) => {
     if (!currentUser?.company_id) return;
 
     try {
@@ -119,35 +120,25 @@ const CustomerListing: React.FC = () => {
 
       const baseFilters: ContactFilters = {
         company_id: currentUser.company_id,
-        per_page: 200,
-        sort_by: 'created_at',
-        sort_order: 'desc',
+        user_id: currentUser.id,
       };
 
       if (currentUser.location_id) {
         baseFilters.location_id = currentUser.location_id;
       }
 
-      let allContacts: Contact[] = [];
-      let page = 1;
-      let lastPage = 1;
+      const result = forceRefresh
+        ? await contactCacheService.forceRefresh(baseFilters)
+        : await contactCacheService.getContacts(baseFilters);
 
-      do {
-        const response = await contactService.getContacts({ ...baseFilters, page });
-        if (!response.success || !response.data) break;
-        allContacts = allContacts.concat(response.data.contacts);
-        lastPage = response.data.pagination.last_page;
-        page++;
-      } while (page <= lastPage);
-
-      setContacts(allContacts);
+      setContacts(result);
     } catch (error) {
       console.error('Error fetching contacts:', error);
     } finally {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [currentUser?.company_id, currentUser?.location_id]);
+  }, [currentUser?.company_id, currentUser?.location_id, currentUser?.id]);
 
   const fetchTags = useCallback(async () => {
     if (!currentUser?.company_id) return;
@@ -178,6 +169,31 @@ const CustomerListing: React.FC = () => {
   useEffect(() => {
     loadContacts();
   }, [loadContacts]);
+
+  useEffect(() => {
+    const unsubscribe = contactCacheService.onCacheUpdate((event: CustomEvent) => {
+      if (event.detail?.source === 'api' && Array.isArray(event.detail.contacts)) {
+        setContacts(event.detail.contacts as Contact[]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const contactsCacheReady = useRef(false);
+  useEffect(() => {
+    if (initialLoading) {
+      return;
+    }
+    if (!contactsCacheReady.current) {
+      contactsCacheReady.current = true;
+      return;
+    }
+    contactCacheService.cacheContacts(contacts, {
+      companyId: currentUser?.company_id,
+      locationId: currentUser?.location_id ?? undefined,
+      userId: currentUser?.id,
+    });
+  }, [contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTags();
@@ -232,7 +248,7 @@ const CustomerListing: React.FC = () => {
     try {
       const response = await contactService.deleteContact(contactId);
       if (response.success) {
-        loadContacts();
+        loadContacts(true);
         fetchStatistics();
       }
     } catch (error) {
@@ -443,7 +459,7 @@ const CustomerListing: React.FC = () => {
           tags: [],
           status: 'active'
         });
-        loadContacts();
+        loadContacts(true);
         fetchStatistics();
         fetchTags();
       }
@@ -1045,7 +1061,7 @@ const CustomerListing: React.FC = () => {
         setBulkAction('');
         setBulkTags([]);
         setShowBulkActionsModal(false);
-        loadContacts();
+        loadContacts(true);
         fetchTags();
         fetchStatistics();
       }
@@ -1180,7 +1196,7 @@ const CustomerListing: React.FC = () => {
         table={table}
         searchPlaceholder="Search customers..."
         onRefresh={() => {
-          loadContacts();
+          loadContacts(true);
           fetchStatistics();
           fetchTags();
         }}
