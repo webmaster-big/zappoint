@@ -698,9 +698,7 @@ const Bookings: React.FC = () => {
       setBookings(transformedBookings);
 
       if (allRawBookings.length > 0) {
-        bookingCacheService.cacheBookings(allRawBookings, { locationId: selectedLocation ?? undefined }).catch(err =>
-          console.warn('[Bookings] Background cache write failed:', err)
-        );
+        bookingCacheService.syncInBackground();
       }
     } catch (error) {
       console.error('Error loading bookings:', error);

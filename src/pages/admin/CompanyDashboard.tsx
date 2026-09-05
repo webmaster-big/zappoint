@@ -581,10 +581,7 @@ const CompanyDashboard: React.FC = () => {
         console.log('✅ [CompanyDashboard] Fetched', bookings.length, 'bookings from API');
         
         setAllBookings(bookings);
-        if (bookings.length > 0) {
-          await bookingCacheService.cacheBookings(bookings);
-          console.log('✅ [CompanyDashboard] Cache updated');
-        }
+        bookingCacheService.syncInBackground();
       } catch (error) {
         console.error('⚠️ [CompanyDashboard] Error loading bookings:', error);
       } finally {

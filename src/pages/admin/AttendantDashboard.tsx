@@ -148,10 +148,7 @@ const AttendantDashboard: React.FC = () => {
          console.log('✅ [AttendantDashboard] Fetched', bookings.length, 'bookings from API');
          
          setAllBookings(bookings);
-         if (bookings.length > 0) {
-           await bookingCacheService.cacheBookings(bookings, { locationId });
-           console.log('✅ [AttendantDashboard] Cache updated');
-         }
+         bookingCacheService.syncInBackground();
        } catch (error) {
          console.error('⚠️ [AttendantDashboard] Error loading bookings:', error);
        } finally {

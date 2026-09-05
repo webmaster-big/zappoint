@@ -137,18 +137,6 @@ const CalendarView: React.FC = () => {
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
       } else if (filters.view === 'range' && filters.dateRange.start && filters.dateRange.end) {
-        const hasCache = await bookingCacheService.hasCachedData();
-        
-        if (hasCache) {
-          const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
-            date_from: filters.dateRange.start,
-            date_to: filters.dateRange.end,
-          });
-          setBookings((cachedBookings || []) as Booking[]);
-          bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
-          return;
-        }
-        
         if (!silent && !initialLoading) setDataLoading(true);
         const response = await bookingService.getBookings({
           date_from: filters.dateRange.start,
@@ -156,10 +144,9 @@ const CalendarView: React.FC = () => {
           per_page: 1000,
           user_id: getStoredUser()?.id,
         });
-        
+
         if (response.success && response.data) {
           setBookings(response.data.bookings);
-          await bookingCacheService.cacheBookings(response.data.bookings);
         }
         return;
       }
@@ -186,7 +173,7 @@ const CalendarView: React.FC = () => {
         
         if (response.success && response.data) {
           setBookings(response.data.bookings);
-          await bookingCacheService.cacheBookings(response.data.bookings);
+          bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         } else {
           console.log('No bookings data in response');
           setBookings([]);

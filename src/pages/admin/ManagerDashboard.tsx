@@ -173,10 +173,7 @@ const LocationManagerDashboard: React.FC = () => {
         console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings from API');
         
         setAllBookings(bookings);
-        if (bookings.length > 0) {
-          await bookingCacheService.cacheBookings(bookings, { locationId });
-          console.log('✅ [ManagerDashboard] Cache updated');
-        }
+        bookingCacheService.syncInBackground();
       } catch (error) {
         console.error('⚠️ [ManagerDashboard] Error loading bookings:', error);
       } finally {

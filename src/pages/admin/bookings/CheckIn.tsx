@@ -87,7 +87,7 @@ const CheckIn: React.FC = () => {
       
       if (response.success && response.data) {
         setBookings(response.data.bookings);
-        await bookingCacheService.cacheBookings(response.data.bookings);
+        bookingCacheService.syncInBackground();
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
