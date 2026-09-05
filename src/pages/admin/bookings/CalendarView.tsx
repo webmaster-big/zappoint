@@ -87,10 +87,6 @@ const CalendarView: React.FC = () => {
   const [filters, setFilters] = useState<CalendarViewFilterOptions>({
     view: 'month',
     packages: [],
-    dateRange: {
-      start: '',
-      end: ''
-    },
     search: ''
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -136,19 +132,6 @@ const CalendarView: React.FC = () => {
         
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
-      } else if (filters.view === 'range' && filters.dateRange.start && filters.dateRange.end) {
-        if (!silent && !initialLoading) setDataLoading(true);
-        const response = await bookingService.getBookings({
-          date_from: filters.dateRange.start,
-          date_to: filters.dateRange.end,
-          per_page: 1000,
-          user_id: getStoredUser()?.id,
-        });
-
-        if (response.success && response.data) {
-          setBookings(response.data.bookings);
-        }
-        return;
       }
 
       const dateParams = {
@@ -187,7 +170,7 @@ const CalendarView: React.FC = () => {
       setInitialLoading(false);
       setDataLoading(false);
     }
-  }, [currentDate, filters.view, filters.dateRange]);
+  }, [currentDate, filters.view]);
 
   useEffect(() => {
     loadBookings();
@@ -210,10 +193,6 @@ const CalendarView: React.FC = () => {
       return `${year}-${month}-${day}`;
     };
 
-    if (filters.view === 'range') {
-      if (!filters.dateRange.start || !filters.dateRange.end) return null;
-      return { from: filters.dateRange.start, to: filters.dateRange.end };
-    }
 
     const startDate = new Date(currentDate);
     let endDate = new Date(currentDate);
@@ -230,7 +209,7 @@ const CalendarView: React.FC = () => {
     }
 
     return { from: formatKey(startDate), to: formatKey(endDate) };
-  }, [currentDate, filters.view, filters.dateRange]);
+  }, [currentDate, filters.view]);
 
   const loadExtras = useCallback(async () => {
     const range = getVisibleRange();
@@ -320,16 +299,6 @@ const CalendarView: React.FC = () => {
     }));
   };
 
-  const handleDateRangeChange = (key: 'start' | 'end', value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      dateRange: {
-        ...prev.dateRange,
-        [key]: value
-      }
-    }));
-  };
-
   const handlePackageToggle = (packageName: string) => {
     setFilters(prev => {
       const packages = prev.packages.includes(packageName)
@@ -344,10 +313,6 @@ const CalendarView: React.FC = () => {
     setFilters({
       view: 'month',
       packages: [],
-      dateRange: {
-        start: '',
-        end: ''
-      },
       search: ''
     });
   };
@@ -432,13 +397,6 @@ const CalendarView: React.FC = () => {
       return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     } else if (filters.view === 'month') {
       return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    } else if (filters.view === 'range') {
-      if (filters.dateRange.start && filters.dateRange.end) {
-        const start = parseLocalDate(filters.dateRange.start);
-        const end = parseLocalDate(filters.dateRange.end);
-        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-      }
-      return 'Select Date Range';
     }
   };
 
@@ -896,100 +854,6 @@ const CalendarView: React.FC = () => {
     );
   };
 
-  const renderRangeView = () => {
-    if (!filters.dateRange.start || !filters.dateRange.end) {
-      return (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">Select a date range</h3>
-          <p className="mt-2 text-gray-500">Choose a start and end date to view bookings in that range.</p>
-        </div>
-      );
-    }
-    
-    const startKey = filters.dateRange.start;
-    const endKey = filters.dateRange.end;
-
-    if (startKey > endKey) {
-      return (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">Start date is after end date</h3>
-          <p className="mt-2 text-gray-500">Swap the dates to see bookings in that range.</p>
-        </div>
-      );
-    }
-
-    const start = parseLocalDate(startKey);
-    const end = parseLocalDate(endKey);
-    const rangeBookings = filteredBookings
-      .filter(booking => {
-        const day = booking.booking_date.split('T')[0];
-        return day >= startKey && day <= endKey;
-      })
-      .filter(pageFilter.showsBooking)
-      .sort((a, b) => {
-        const dateA = a.booking_date.split('T')[0];
-        const dateB = b.booking_date.split('T')[0];
-        if (dateA !== dateB) return dateA < dateB ? -1 : 1;
-        return timeToMinutes(a.booking_time) - timeToMinutes(b.booking_time);
-      });
-
-    return (
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 h-full overflow-y-auto">
-        <h3 className="text-lg font-semibold mb-4">
-          Bookings from {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} to {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </h3>
-        
-        {rangeBookings.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            {pageFilter.isAll ? 'No bookings in this date range' : 'No bookings in the selected categories for this date range'}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {rangeBookings.map(booking => (
-              <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBooking(booking)}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
-                    <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
-                    <p className="text-sm text-gray-500">
-                      {parseLocalDate(booking.booking_date).toLocaleDateString()} at {formatTime12Hour(booking.booking_time)}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                      booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                      booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {booking.status}
-                    </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
-                      {booking.package?.name || 'Package'}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-2 text-sm space-y-1">
-                  <p>Participants: {booking.participants}</p>
-                  {booking.location ? (
-                    <p className="flex items-center text-gray-600">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {String((booking.location as { name?: string }).name || 'N/A')}
-                    </p>
-                  ) : null}
-                  <p>Ref: #{booking.reference_number}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const renderView = () => {
     switch (filters.view) {
       case 'day':
@@ -998,8 +862,6 @@ const CalendarView: React.FC = () => {
         return renderWeekView();
       case 'month':
         return renderMonthView();
-      case 'range':
-        return renderRangeView();
       default:
         return renderMonthView();
     }
@@ -1259,13 +1121,12 @@ const CalendarView: React.FC = () => {
             <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
               <select
                 value={filters.view}
-                onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month' | 'range')}
+                onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month')}
                 className={`border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-${fullColor}`}
               >
                 <option value="day">Day</option>
                 <option value="week">Week</option>
                 <option value="month">Month</option>
-                <option value="range">Date Range</option>
               </select>
               
               <div className="relative">
@@ -1353,28 +1214,6 @@ const CalendarView: React.FC = () => {
                 </div>
               </div>
               
-              {filters.view === 'range' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-2">Start Date</label>
-                    <input
-                      type="date"
-                      value={filters.dateRange.start}
-                      onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${fullColor}`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-2">End Date</label>
-                    <input
-                      type="date"
-                      value={filters.dateRange.end}
-                      onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${fullColor}`}
-                    />
-                  </div>
-                </>
-              )}
             </div>
             
             <div className="mt-6">

@@ -21,11 +21,7 @@ export interface CalendarViewBooking {
 }
 
 export interface CalendarViewFilterOptions {
-  view: 'day' | 'week' | 'month' | 'range';
+  view: 'day' | 'week' | 'month';
   packages: string[];
-  dateRange: {
-    start: string;
-    end: string;
-  };
   search: string;
 }
