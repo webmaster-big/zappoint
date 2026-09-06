@@ -42,7 +42,7 @@ class ContactCacheService {
     return await caches.open(CACHE_NAME);
   }
 
-  async cacheContacts(contacts: Contact[], metadata?: Partial<CacheMetadata>): Promise<void> {
+  async cacheContacts(contacts: Contact[], metadata?: Partial<CacheMetadata>, preserveTimestamp = false): Promise<void> {
     const cache = await this.getCache();
     if (!cache) return;
 
@@ -58,8 +58,14 @@ class ContactCacheService {
 
       await cache.put(CONTACTS_CACHE_KEY, response);
 
+      let lastUpdated = Date.now();
+      if (preserveTimestamp) {
+        const existing = await this.getCacheMetadata();
+        if (existing?.lastUpdated) lastUpdated = existing.lastUpdated;
+      }
+
       const fullMetadata: CacheMetadata = {
-        lastUpdated: Date.now(),
+        lastUpdated,
         totalRecords: contacts.length,
         ...metadata,
       };
@@ -184,14 +190,23 @@ class ContactCacheService {
     return this.syncPromise;
   }
 
+  private syncScheduled: boolean = false;
+
   syncInBackground(filters: ContactFilters): void {
-    if (this.isSyncing) return;
+    if (this.isSyncing || this.syncScheduled) return;
+    this.syncScheduled = true;
 
     setTimeout(async () => {
       try {
+        const metadata = await this.getCacheMetadata();
+        if (metadata && Date.now() - metadata.lastUpdated < 60 * 1000) {
+          return;
+        }
         await this.syncFromAPI(filters);
       } catch (error) {
         console.error('[ContactCacheService] Background sync failed:', error);
+      } finally {
+        this.syncScheduled = false;
       }
     }, 0);
   }

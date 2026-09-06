@@ -192,7 +192,7 @@ const CustomerListing: React.FC = () => {
       companyId: currentUser?.company_id,
       locationId: currentUser?.location_id ?? undefined,
       userId: currentUser?.id,
-    });
+    }, true);
   }, [contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

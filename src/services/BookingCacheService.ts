@@ -199,15 +199,24 @@ class BookingCacheService {
     return this.syncPromise;
   }
 
+  private syncScheduled: boolean = false;
+
   syncInBackground(filters?: BookingFilters): void {
-    if (this.isSyncing) return;
+    if (this.isSyncing || this.syncScheduled) return;
+    this.syncScheduled = true;
 
     setTimeout(async () => {
       try {
+        const metadata = await this.getCacheMetadata();
+        if (metadata && Date.now() - metadata.lastUpdated < 60 * 1000) {
+          return;
+        }
         await this.syncFromAPI(filters);
         console.log('[BookingCacheService] Background sync completed');
       } catch (error) {
         console.error('[BookingCacheService] Background sync failed:', error);
+      } finally {
+        this.syncScheduled = false;
       }
     }, 0);
   }
