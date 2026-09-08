@@ -18,7 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   Info
-} from 'lucide-react';
+, MessageSquare} from 'lucide-react';
 
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -766,13 +766,14 @@ const AttendantActivityLogs = () => {
         const activityLogs = data.data?.activity_logs || [];
         const pagination = data.data?.pagination || {};
         
-        const transformedLogs = activityLogs.map((log: { id?: number; user_id?: number; user?: { first_name?: string; last_name?: string; email?: string; role?: string }; action?: string; category?: string; entity_type?: string; entity_id?: number; metadata?: Record<string, unknown>; description?: string; created_at?: string }) => ({
+        const transformedLogs = activityLogs.map((log: { id?: number; user_id?: number; user?: { first_name?: string; last_name?: string; email?: string; role?: string }; action?: string; category?: string; entity_type?: string; entity_id?: number; metadata?: Record<string, unknown>; description?: string; reason?: string | null; actor_name?: string | null; actor_role?: string | null; created_at?: string }) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
           attendantId: log.user_id?.toString() || 'system',
-          attendantName: log.user?.first_name && log.user?.last_name 
-            ? `${log.user.first_name} ${log.user.last_name}` 
-            : log.user?.email || 'System',
+          attendantName: log.actor_name
+            || (log.user?.first_name && log.user?.last_name
+              ? `${log.user.first_name} ${log.user.last_name}`
+              : log.user?.email || 'System'),
           userType: log.user?.role || 'system',
           action: log.action || 'unknown',
           resourceType: log.category || log.entity_type || 'general',
@@ -781,6 +782,7 @@ const AttendantActivityLogs = () => {
           details: log.description || '',
           timestamp: log.created_at || new Date().toISOString(),
           severity: determineSeverity(log.action || ''),
+          reason: log.reason || undefined,
           metadata: log.metadata || {}
         }));
         
@@ -1538,6 +1540,16 @@ const AttendantActivityLogs = () => {
                       <p className="text-sm text-gray-700 mb-2 leading-relaxed">
                         {formatActivityDescription(log)}
                       </p>
+
+                      {log.reason && (
+                        <div className="mb-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                          <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                          <p className="text-sm text-gray-800">
+                            <span className="font-semibold text-amber-800">Reason: </span>
+                            {log.reason}
+                          </p>
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceTypeColors(log.resourceType)}`}>

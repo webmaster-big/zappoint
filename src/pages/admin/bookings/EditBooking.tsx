@@ -4,6 +4,8 @@ import { Calendar, Package, User, Home, MapPin, AlertCircle, ArrowLeft, Bell, Be
 import QRCode from 'qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import ChangeReasonModal from '../../../components/admin/bookings/ChangeReasonModal';
+import BookingChangeHistory from '../../../components/admin/bookings/BookingChangeHistory';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import packageService from '../../../services/PackageService';
@@ -38,6 +40,7 @@ interface DayOffWithTime {
 
 const EditBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const [showReasonPrompt, setShowReasonPrompt] = useState(false);
   const navigate = useNavigate();
   const isCompanyAdmin = getStoredUser()?.role === 'company_admin';
   const { id } = useParams<{ id: string }>();
@@ -750,13 +753,21 @@ const EditBooking: React.FC = () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Editing a booking is a guest-visible change, so it cannot be saved without a recorded
+  // reason. The form is validated first so staff are not asked for a reason on a doomed save.
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!originalBooking) {
       alert('Booking data not found');
       return;
     }
+
+    setShowReasonPrompt(true);
+  };
+
+  const performSubmit = async (changeReason: string) => {
+    if (!originalBooking) return;
 
     setSubmitting(true);
 
@@ -795,6 +806,7 @@ const EditBooking: React.FC = () => {
       const additionalAddons = buildAdditionalAddons();
 
       const response = await bookingService.updateBooking(Number(originalBooking.id), {
+        change_reason: changeReason,
         guest_name: formData.customerName,
         guest_email: formData.email,
         guest_phone: formData.phone,
@@ -844,11 +856,15 @@ const EditBooking: React.FC = () => {
       } else {
         alert('Failed to update booking. Please try again.');
         setSubmitting(false);
+        setShowReasonPrompt(false);
       }
     } catch (error) {
       console.error('Error updating booking:', error);
-      alert('Error updating booking. Please try again.');
+      const message = (error as { response?: { data?: { errors?: { change_reason?: string[] } } } })
+        ?.response?.data?.errors?.change_reason?.[0];
+      alert(message ?? 'Error updating booking. Please try again.');
       setSubmitting(false);
+      setShowReasonPrompt(false);
     }
   };
 
@@ -887,6 +903,7 @@ const EditBooking: React.FC = () => {
   }
 
   return (
+    <>
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
       <div className="flex-1 mx-auto">
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
@@ -1471,6 +1488,16 @@ const EditBooking: React.FC = () => {
               </StandardButton>
             </div>
           </form>
+
+          {originalBooking?.id && (
+            <div className="mt-8 border-t border-gray-200 pt-6">
+              <BookingChangeHistory
+                bookingId={Number(originalBooking.id)}
+                themeColor={themeColor}
+                fullColor={fullColor}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1766,6 +1793,19 @@ const EditBooking: React.FC = () => {
         </div>
       </div>
     </div>
+
+      <ChangeReasonModal
+        open={showReasonPrompt}
+        title="Why are you changing this booking?"
+        summary={originalBooking ? `Booking ${originalBooking.reference_number}` : undefined}
+        confirmLabel="Save booking"
+        submitting={submitting}
+        onCancel={() => setShowReasonPrompt(false)}
+        onConfirm={performSubmit}
+        themeColor={themeColor}
+        fullColor={fullColor}
+      />
+    </>
   );
 };
 

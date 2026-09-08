@@ -318,3 +318,15 @@ export function getUpcomingPackageSessions(
   
   return sessions.slice(0, count);
 }
+
+export function michiganToday(): Date {
+  const { year, month, day } = getMichiganNow();
+  return new Date(year, month - 1, day);
+}
+
+export function dateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

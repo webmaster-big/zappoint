@@ -46,6 +46,8 @@ export interface AttendantActivityLogsLog {
   id: string;
   attendantId: string;
   attendantName: string;
+  /** The required reason the employee gave for this change. */
+  reason?: string;
   userId?: string;
   userType?: string;
   action: string;

@@ -25,6 +25,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
+import BookingChangeHistory from '../../../components/admin/bookings/BookingChangeHistory';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 import { normalizeCategory } from '../../../utils/venueCategories';
@@ -684,6 +685,16 @@ const ViewBooking: React.FC = () => {
                 <span className="text-xs text-amber-600 font-medium bg-amber-100 px-2 py-0.5 rounded">Staff Only</span>
               </div>
               <p className="text-gray-700">{booking.internal_notes}</p>
+            </div>
+          )}
+
+          {booking.id && (
+            <div className="p-6 border-t border-gray-200">
+              <BookingChangeHistory
+                bookingId={Number(booking.id)}
+                themeColor={themeColor}
+                fullColor={fullColor}
+              />
             </div>
           )}
 

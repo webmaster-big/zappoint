@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { BookPackagePackage } from '../types/BookPackage.types';
 import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { changeReasonWasRequired, requestChangeReason } from '../utils/changeReasonPrompt';
 
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
@@ -38,6 +39,105 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Every employee-made booking change must carry a reason. The backend answers 422 with
+ * errors.change_reason when one is missing, and resolves that check BEFORE it mutates anything,
+ * so nothing has happened yet and retrying is safe.
+ *
+ * Prompting here means every admin surface that edits a booking gets the reason dialog without
+ * its own modal wiring. Surfaces that collect a reason up front (EditBooking) never hit this.
+ */
+const DESTRUCTIVE = /delete|cancel|force-delete|bulk-delete/i;
+
+api.interceptors.response.use(
+  response => response,
+  async (error) => {
+    const config = error?.config as (typeof error.config & { _reasonRetried?: boolean }) | undefined;
+
+    if (!config || config._reasonRetried || !changeReasonWasRequired(error)) {
+      return Promise.reject(error);
+    }
+
+    // If the caller already supplied a reason and the server still rejected it, do NOT open a
+    // second prompt: surfaces like EditBooking have their own modal open, and a prompt stacked
+    // behind it can never be answered, so the request would hang forever. Let the caller show
+    // the server's message instead.
+    if (requestAlreadyCarriedReason(config)) {
+      return Promise.reject(error);
+    }
+
+    const url = String(config.url ?? '');
+    const reason = await requestChangeReason({
+      summary: describeBookingRequest(config.method, url),
+      destructive: DESTRUCTIVE.test(url) || String(config.method).toLowerCase() === 'delete',
+    });
+
+    if (!reason) return Promise.reject(error);
+
+    config._reasonRetried = true;
+
+    // DELETE bodies are unreliable across proxies, so send it as a query param there; Laravel's
+    // $request->input() reads query and body alike.
+    if (String(config.method).toLowerCase() === 'delete') {
+      config.params = { ...(config.params ?? {}), change_reason: reason };
+    } else if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      // Spreading a FormData yields {}, which would silently drop the uploaded file and every
+      // other field. Append to it instead.
+      config.data.append('change_reason', reason);
+    } else {
+      let body = config.data;
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+        } catch {
+          body = {};
+        }
+      }
+      config.data = { ...(body ?? {}), change_reason: reason };
+    }
+
+    return api.request(config);
+  }
+);
+
+function requestAlreadyCarriedReason(config: { params?: unknown; data?: unknown }): boolean {
+  const params = config.params as Record<string, unknown> | undefined;
+  if (params && typeof params.change_reason === 'string' && params.change_reason.trim() !== '') return true;
+
+  const data = config.data;
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    const value = data.get('change_reason');
+    return typeof value === 'string' && value.trim() !== '';
+  }
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data) as Record<string, unknown>;
+      return typeof parsed?.change_reason === 'string' && parsed.change_reason.trim() !== '';
+    } catch {
+      return false;
+    }
+  }
+  const body = data as Record<string, unknown> | undefined;
+  return Boolean(body && typeof body.change_reason === 'string' && (body.change_reason as string).trim() !== '');
+}
+
+function describeBookingRequest(method: unknown, url: string): string {
+  const verb = String(method ?? '').toUpperCase();
+  if (/\/cancel$/.test(url)) return 'Cancelling this booking';
+  if (/bulk-delete$/.test(url)) return 'Deleting the selected bookings';
+  if (/force-delete$/.test(url)) return 'Permanently deleting this booking';
+  if (/bulk-restore$/.test(url)) return 'Restoring the selected bookings';
+  if (/\/restore$/.test(url)) return 'Restoring this booking';
+  if (/\/status$/.test(url)) return 'Changing this booking\'s status';
+  if (/\/payment-status$/.test(url)) return 'Changing this booking\'s payment status';
+  if (/\/internal-notes$/.test(url)) return 'Editing internal notes';
+  if (/\/location$/.test(url)) return 'Moving this booking to another location';
+  if (/\/complete$/.test(url)) return 'Marking this booking completed';
+  if (/check-in$/.test(url)) return 'Checking in this booking';
+  if (verb === 'DELETE') return 'Deleting this booking';
+  return 'Updating this booking';
+}
 
 export interface CreateBookingData {
   customer_id?: number;
@@ -124,7 +224,41 @@ export interface CreateBookingData {
   custom_fields?: { id: number; value: boolean }[];
 }
 
+export interface BookingChangeLogEntry {
+  id: number;
+  action: string;
+  category: string;
+  description: string;
+  reason: string | null;
+  employee_name: string;
+  employee_role: string | null;
+  changed_at: string | null;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  changed_fields: string[] | null;
+  ip_address: string | null;
+}
+
+export interface BookingChangeLogResponse {
+  success: boolean;
+  data: {
+    logs: BookingChangeLogEntry[];
+    pagination: { current_page: number; last_page: number; per_page: number; total: number };
+  };
+}
+
+export interface ChangeReasonOptionsResponse {
+  success: boolean;
+  data: {
+    presets: string[];
+    policy: 'off' | 'guest_visible' | 'all';
+    required_for_guest_visible: boolean;
+    required_for_internal: boolean;
+  };
+}
+
 export interface UpdateBookingData {
+  /** Why the employee made this change. Recorded in the immutable booking change log. */
+  change_reason?: string;
   customer_id?: number;
   guest_name?: string;
   guest_email?: string;
@@ -335,6 +469,16 @@ const bookingService = {
     return response.data;
   },
 
+  async getChangeLogs(id: number, perPage = 50): Promise<BookingChangeLogResponse> {
+    const response = await api.get(`/bookings/${id}/change-logs`, { params: { per_page: perPage } });
+    return response.data;
+  },
+
+  async getChangeReasonOptions(): Promise<ChangeReasonOptionsResponse> {
+    const response = await api.get('/bookings/change-reason-options');
+    return response.data;
+  },
+
   async getBookings(filters?: BookingFilters): Promise<PaginatedBookingResponse> {
     const params = new URLSearchParams();
     
@@ -370,13 +514,15 @@ const bookingService = {
     return response.data;
   },
 
-  async deleteBooking(id: number): Promise<{ success: boolean; message: string }> {
-    const response = await api.delete(`/bookings/${id}`);
+  async deleteBooking(id: number, changeReason?: string): Promise<{ success: boolean; message: string }> {
+    const response = await api.delete(`/bookings/${id}`, {
+      params: changeReason ? { change_reason: changeReason } : undefined,
+    });
     return response.data;
   },
 
-  async cancelBooking(id: number): Promise<BookingResponse> {
-    const response = await api.patch(`/bookings/${id}/cancel`);
+  async cancelBooking(id: number, changeReason?: string): Promise<BookingResponse> {
+    const response = await api.patch(`/bookings/${id}/cancel`, { change_reason: changeReason });
     return response.data;
   },
 
@@ -407,7 +553,7 @@ const bookingService = {
 
   async updateBookingLocation(
     id: number,
-    data: { location_id: number; room_id?: number | null; force?: boolean }
+    data: { location_id: number; room_id?: number | null; force?: boolean; change_reason?: string }
   ): Promise<BookingResponse & { conflict?: boolean; conflicts?: Array<{ type: string; message: string }>; had_conflict?: boolean }> {
     const response = await api.patch(`/bookings/${id}/location`, data);
     return response.data;
@@ -494,11 +640,11 @@ const bookingService = {
     return response.data;
   },
 
-  async bulkDelete(ids: number[]): Promise<{
+  async bulkDelete(ids: number[], changeReason?: string): Promise<{
     success: boolean;
     message: string;
   }> {
-    const response = await api.post('/bookings/bulk-delete', { ids });
+    const response = await api.post('/bookings/bulk-delete', { ids, change_reason: changeReason });
     return response.data;
   },
 

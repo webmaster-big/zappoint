@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
+import { matchesBookingSearch } from '../../../utils/bookingSearch';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -59,7 +61,7 @@ const dateKeyOf = (date: Date): string => {
 };
 
 const ZOOM_LEVELS = [1, 1.6, 2.4];
-const COLUMN_WIDTH = 210;
+const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
 const VIEW_STATE_KEY = 'spaceScheduleViewState';
@@ -474,6 +476,15 @@ const SpaceSchedule = () => {
     setShowCalendar(false);
   };
 
+  const openBookingFromSearch = (booking: Booking) => {
+    const bookingDate = parseLocalDate(booking.booking_date);
+    if (!Number.isNaN(bookingDate.getTime())) {
+      setSelectedDate(bookingDate);
+      setCalendarMonth(bookingDate);
+    }
+    setSelectedBooking(booking);
+  };
+
   const getCalendarDays = (): (Date | null)[] => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -532,10 +543,7 @@ const SpaceSchedule = () => {
     return activeBookings.filter(b => {
       if (effectiveCategory !== 'all' && (normalizeCategory(b.package?.category) || UNCATEGORISED_LABEL) !== effectiveCategory) return false;
       if (statusFilter !== 'all' && b.status !== statusFilter) return false;
-      if (term) {
-        const haystack = `${b.guest_name || ''} ${b.reference_number || ''} ${b.package?.name || ''}`.toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
+      if (term && !matchesBookingSearch(b, term)) return false;
       return true;
     });
   }, [activeBookings, effectiveCategory, statusFilter, searchInput]);
@@ -1247,14 +1255,22 @@ const SpaceSchedule = () => {
             />
           </div>
           <div className="flex items-center gap-1.5">
+            <CustomerSearch
+              locationId={effectiveLocationId}
+              onSelect={openBookingFromSearch}
+              placeholder="Find any booking"
+              className="w-52"
+              themeColor={themeColor}
+              fullColor={fullColor}
+            />
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 type="text"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
-                placeholder="Search bookings"
-                className="w-44 pl-8 pr-2.5 py-1.5 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Filter this day"
+                className="w-40 pl-8 pr-2.5 py-1.5 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
             <select

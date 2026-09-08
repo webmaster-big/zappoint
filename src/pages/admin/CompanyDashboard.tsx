@@ -42,12 +42,12 @@ import StandardButton from '../../components/ui/StandardButton';
 import Pagination from '../../components/ui/Pagination';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import InfoTooltip from '../../components/ui/InfoTooltip';
-import bookingService from '../../services/bookingService';
+import bookingService, { type Booking } from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import { metricsService, type TimeframeType, type DashboardMetrics } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
-import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime, michiganToday } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
@@ -65,14 +65,22 @@ import {
 } from '../../components/admin/calendar/ScheduledActivity';
 import { buildCalendarCategories, useCategoryFilter } from '../../components/admin/calendar/useCategoryFilter';
 import CalendarCategoryTabs from '../../components/admin/calendar/CategoryFilter';
+import CalendarDatePicker from '../../components/admin/calendar/CalendarDatePicker';
+import { fetchDayBookings } from '../../components/admin/calendar/fetchDayBookings';
+import { useHideEmptySpaces } from '../../components/admin/calendar/useDayScheduleView';
+import CustomerSearch from '../../components/admin/calendar/CustomerSearch';
+import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
+import { matchesBookingSearch } from '../../utils/bookingSearch';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
-  const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [currentDay, setCurrentDay] = useState(new Date());
-  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
+  const [currentWeek, setCurrentWeek] = useState(() => michiganToday());
+  const [currentMonth, setCurrentMonth] = useState(() => michiganToday());
+  const [currentDay, setCurrentDay] = useState(() => michiganToday());
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('day');
+  const [scheduleSearch, setScheduleSearch] = useState('');
+  const [hideEmptySpaces, setHideEmptySpaces] = useHideEmptySpaces('company_dashboard_hide_empty_spaces');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const selectedLocation: number | 'all' = effectiveLocationId === null ? 'all' : effectiveLocationId;
   const [calendarFilter, setCalendarFilter] = useState({
@@ -107,6 +115,8 @@ const CompanyDashboard: React.FC = () => {
   const [customDateTo, setCustomDateTo] = useState('');
   
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [dayLoading, setDayLoading] = useState(true);
   
   const [, setNewBookings] = useState<any[]>([]);
 
@@ -191,6 +201,31 @@ const CompanyDashboard: React.FC = () => {
 
   const weekDates = getWeekDates(currentWeek);
   
+  // Mutations (check-in, payment, notes) update `selectedBooking`, so mirror from THAT rather
+  // than from allBookings: allBookings is capped at the 100 newest booking_dates by the API, so
+  // a booking on any older day is absent from it and the grid would never repaint.
+  useEffect(() => {
+    if (calendarView !== 'day') return;
+    const fresh: any = selectedBooking;
+    if (!fresh?.id) return;
+
+    setDailyBookings(prev => {
+      if (prev.length === 0) return prev;
+      let touched = false;
+      const merged = prev.map((booking: any) => {
+        if (booking.id !== fresh.id) return booking;
+        const patch: any = {};
+        for (const key of ['status', 'payment_status', 'amount_paid', 'internal_notes', 'checked_in_at', 'checked_in_by_user']) {
+          if (fresh[key] !== undefined && fresh[key] !== booking[key]) patch[key] = fresh[key];
+        }
+        if (Object.keys(patch).length === 0) return booking;
+        touched = true;
+        return { ...booking, ...patch };
+      });
+      return touched ? merged : prev;
+    });
+  }, [selectedBooking, calendarView]);
+
   const goToPreviousDay = () => {
     const newDate = new Date(currentDay);
     newDate.setDate(newDate.getDate() - 1);
@@ -253,7 +288,11 @@ const CompanyDashboard: React.FC = () => {
   const monthDays = getMonthDays(currentMonth);
 
   useEffect(() => {
-    if (calendarView !== 'month' || allBookings.length === 0) return;
+    if (calendarView !== 'month') return;
+    if (allBookings.length === 0) {
+      setMonthlyBookings(prev => (prev.length === 0 ? prev : []));
+      return;
+    }
     
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -269,13 +308,48 @@ const CompanyDashboard: React.FC = () => {
     console.log('📅 [CompanyDashboard] Monthly bookings filtered:', monthly.length);
   }, [allBookings, currentMonth, calendarView]);
 
+  const searchedMonthlyBookings = useMemo(
+    () => monthlyBookings.filter((booking: any) => matchesBookingSearch(booking, scheduleSearch)),
+    [monthlyBookings, scheduleSearch]
+  );
+
   const getBookingsForDay = (date: Date) => {
-    return monthlyBookings
+    return searchedMonthlyBookings
       .filter(booking => {
         const bookingDate = parseLocalDate(booking.booking_date);
         return bookingDate.toDateString() === date.toDateString();
       })
       .sort((a, b) => (a.booking_time || '').localeCompare(b.booking_time || ''));
+  };
+
+  const locationNames = useMemo(
+    () => Object.fromEntries(scopeLocations.map(location => [location.id, location.name])) as Record<number, string>,
+    [scopeLocations]
+  );
+
+  const calendarDate =
+    calendarView === 'day' ? currentDay : calendarView === 'week' ? currentWeek : currentMonth;
+
+  const calendarLabel =
+    calendarView === 'day'
+      ? currentDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+      : calendarView === 'week'
+        ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} \u2013 ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+        : currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const jumpToDate = (date: Date) => {
+    setCurrentDay(date);
+    setCurrentWeek(date);
+    setCurrentMonth(date);
+  };
+
+  const openBookingFromSearch = (booking: Booking) => {
+    const bookingDate = parseLocalDate(booking.booking_date);
+    if (!Number.isNaN(bookingDate.getTime())) {
+      jumpToDate(bookingDate);
+      setCalendarView('day');
+    }
+    setSelectedBooking(booking);
   };
 
   const activeRange = useMemo(() => {
@@ -361,124 +435,37 @@ const CompanyDashboard: React.FC = () => {
 
   const sortedRooms = [...rooms].sort(naturalSort);
 
-  const generateTimeSlots = () => {
-    const slots: { time: string; slot: string }[] = [];
-    for (let hour = 8; hour <= 22; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        if (hour === 22 && minute > 0) break;
-        const slot = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        slots.push({ time: `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`, slot });
-      }
-    }
-    return slots;
-  };
-
-  const dailyTimeSlots = generateTimeSlots();
-
-  const shownDailyBookings = dailyBookings.filter(categoryFilter.showsBooking);
-
-  const unassignedBookings = shownDailyBookings.filter(b => !b.room_id);
-
-  const visibleTimeSlots = dailyTimeSlots.filter(slotObj => {
-    return shownDailyBookings.some(booking => {
-      const bookingTime = booking.booking_time?.substring(0, 5);
-      if (!bookingTime) return false;
-      const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
-      const slotMinutes = parseInt(slotObj.slot.split(':')[0]) * 60 + parseInt(slotObj.slot.split(':')[1]);
-      let durationMinutes = 60;
-      if (booking.duration && booking.duration_unit) {
-        if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
-        else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
-        else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
-      }
-      const endMinutes = startMinutes + durationMinutes;
-      return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-    });
-  });
-
-  const getBookingForSlot = (spaceId: number, slot: string) => {
-    return shownDailyBookings.find(booking => {
-      if (spaceId === 0) {
-        if (booking.room_id) return false; // Has a room, skip
-      } else {
-        if (booking.room_id !== spaceId) return false;
-      }
-      const bookingTime = booking.booking_time?.substring(0, 5);
-      return bookingTime === slot;
-    });
-  };
-
-  const isSlotOccupied = (spaceId: number, slot: string) => {
-    const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
-    return shownDailyBookings.some(booking => {
-      if (spaceId === 0) {
-        if (booking.room_id) return false; // Has a room, skip
-      } else {
-        if (booking.room_id !== spaceId) return false;
-      }
-      const bookingTime = booking.booking_time?.substring(0, 5);
-      if (!bookingTime) return false;
-      const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
-      let durationMinutes = 60;
-      if (booking.duration && booking.duration_unit) {
-        if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
-        else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
-        else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
-      }
-      const endMinutes = startMinutes + durationMinutes;
-      return slotMinutes > startMinutes && slotMinutes < endMinutes;
-    });
-  };
-
-  const getBookingRowSpan = (booking: any) => {
-    let durationMinutes = 60;
-    if (booking.duration && booking.duration_unit) {
-      if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
-      else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
-      else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
-    }
-    return Math.max(1, Math.ceil(durationMinutes / 15));
-  };
-
-  const formatTime12Hour = (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hour12 = hours % 12 || 12;
-    return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  const calculateEndTime = (startTime: string, duration: number, unit: string) => {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const durationMinutes = unit === 'hours' ? duration * 60 : duration;
-    const totalMinutes = hours * 60 + minutes + durationMinutes;
-    const endHours = Math.floor(totalMinutes / 60) % 24;
-    const endMins = totalMinutes % 60;
-    return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
-  };
+  const shownDailyBookings = dailyBookings
+    .filter(categoryFilter.showsBooking)
+    .filter((booking: any) => matchesBookingSearch(booking, scheduleSearch));
 
   useEffect(() => {
+    const scopeRooms = (list: Room[]) =>
+      effectiveLocationId ? list.filter(room => room.location_id === effectiveLocationId) : list;
+
     const fetchRooms = async () => {
+      setRoomsLoading(true);
       try {
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms && cachedRooms.length > 0) {
-          setRooms(cachedRooms);
+          setRooms(scopeRooms(cachedRooms));
           roomCacheService.syncInBackground();
           return;
         }
         const response = await roomService.getRooms({ per_page: 100 });
         const fetchedRooms = response.data.rooms || [];
-        setRooms(fetchedRooms);
+        setRooms(scopeRooms(fetchedRooms));
         if (fetchedRooms.length > 0) {
           await roomCacheService.cacheRooms(fetchedRooms);
         }
       } catch (error) {
         console.error('Error fetching spaces:', error);
+      } finally {
+        setRoomsLoading(false);
       }
     };
     fetchRooms();
-  }, []);
+  }, [effectiveLocationId]);
 
   const getTimeframeCutoffDate = (): Date | null => {
     const now = new Date();
@@ -538,23 +525,29 @@ const CompanyDashboard: React.FC = () => {
   }, [allBookings, metricsTimeframe, customDateFrom, customDateTo]);
 
   useEffect(() => {
-    if (calendarView !== 'day' || allBookings.length === 0) return;
-    
-    const year = currentDay.getFullYear();
-    const month = String(currentDay.getMonth() + 1).padStart(2, '0');
-    const day = String(currentDay.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    
-    const validStatuses = ['confirmed', 'pending', 'checked-in'];
-    const daily = allBookings.filter(booking => {
-      const bookingDatePart = booking.booking_date.split('T')[0];
-      const status = booking.status?.toLowerCase();
-      return bookingDatePart === dateStr && validStatuses.includes(status);
-    });
-    
-    setDailyBookings(daily);
-    console.log('📅 [CompanyDashboard] Daily bookings filtered for', dateStr, ':', daily.length);
-  }, [allBookings, currentDay, calendarView]);
+    if (calendarView !== 'day') return;
+
+    let cancelled = false;
+    const dateStr = formatDateKey(currentDay);
+
+    setDayLoading(true);
+    setDailyBookings(prev => (prev.length === 0 ? prev : []));
+    fetchDayBookings(dateStr, effectiveLocationId)
+      .then(list => {
+        if (!cancelled) setDailyBookings(list);
+      })
+      .catch(error => {
+        console.error('⚠️ [CompanyDashboard] Error loading the day schedule:', error);
+        if (!cancelled) setDailyBookings(prev => (prev.length === 0 ? prev : []));
+      })
+      .finally(() => {
+        if (!cancelled) setDayLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [calendarView, currentDay, effectiveLocationId]);
 
   useEffect(() => {
     const loadAllBookings = async () => {
@@ -689,7 +682,10 @@ const CompanyDashboard: React.FC = () => {
   }, [selectedLocation, metricsTimeframe, customDateFrom, customDateTo]);
 
   useEffect(() => {
-    if (allBookings.length === 0) return;
+    if (allBookings.length === 0) {
+      setWeeklyBookings(prev => (prev.length === 0 ? prev : []));
+      return;
+    }
     
     const weekStart = weekDates[0];
     const weekEnd = weekDates[6];
@@ -802,7 +798,7 @@ const CompanyDashboard: React.FC = () => {
     const bookingDate = parseLocalDate(booking.booking_date);
     const isInCurrentWeek = weekDates.some(date => date.toDateString() === bookingDate.toDateString());
     const matchesLocation = selectedLocation === 'all' || booking.location_id === selectedLocation;
-    return isInCurrentWeek && matchesLocation;
+    return isInCurrentWeek && matchesLocation && matchesBookingSearch(booking, scheduleSearch);
   });
 
   const allActivities = Array.from(new Set(weeklyBookings
@@ -1456,14 +1452,15 @@ const CompanyDashboard: React.FC = () => {
               icon={ChevronLeft}
               onClick={calendarView === 'day' ? goToPreviousDay : calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
             />
-            <span className="text-xs sm:text-sm font-medium text-gray-800 min-w-0 sm:min-w-[200px] text-center flex-1 sm:flex-none truncate">
-              {calendarView === 'day'
-                ? currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-                : calendarView === 'week' 
-                  ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
-                  : currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-              }
-            </span>
+            <CalendarDatePicker
+              value={calendarDate}
+              onChange={jumpToDate}
+              label={calendarLabel}
+              highlight={calendarView}
+              themeColor={themeColor}
+              fullColor={fullColor}
+              buttonClassName={`flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-800 hover:bg-${themeColor}-50 transition-colors min-w-0 sm:min-w-[220px] sm:flex-none`}
+            />
             <StandardButton 
               variant="secondary"
               size="sm"
@@ -1474,15 +1471,7 @@ const CompanyDashboard: React.FC = () => {
               variant="secondary" 
               size="sm" 
               className="ml-2"
-              onClick={() => {
-                if (calendarView === 'day') {
-                  setCurrentDay(new Date());
-                } else if (calendarView === 'week') {
-                  setCurrentWeek(new Date());
-                } else {
-                  setCurrentMonth(new Date());
-                }
-              }}
+              onClick={() => jumpToDate(michiganToday())}
             >
               Today
             </StandardButton>
@@ -1504,6 +1493,40 @@ const CompanyDashboard: React.FC = () => {
             </StandardButton>
             )}
           </div>
+        </div>
+
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <CustomerSearch
+            locationId={effectiveLocationId}
+            onSelect={openBookingFromSearch}
+            className="w-full sm:max-w-sm"
+            themeColor={themeColor}
+            fullColor={fullColor}
+          />
+          <input
+            type="search"
+            value={scheduleSearch}
+            onChange={event => setScheduleSearch(event.target.value)}
+            placeholder="Filter this view by name or phone"
+            aria-label="Filter the visible calendar by customer name or phone number"
+            className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 [&::-webkit-search-cancel-button]:appearance-none focus:border-${fullColor} focus:outline-none focus:ring-1 focus:ring-${fullColor} sm:max-w-xs`}
+          />
+          {calendarView === 'day' && (
+            <button
+              type="button"
+              onClick={() => setHideEmptySpaces(prev => !prev)}
+              aria-pressed={hideEmptySpaces}
+              title={hideEmptySpaces ? 'Show spaces with no bookings' : 'Hide spaces with no bookings'}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                hideEmptySpaces
+                  ? `border-${themeColor}-200 bg-${themeColor}-50 text-${fullColor}`
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {hideEmptySpaces ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <span className="hidden sm:inline">{hideEmptySpaces ? 'Empty spaces hidden' : 'All spaces shown'}</span>
+            </button>
+          )}
         </div>
 
         <CalendarCategoryTabs filter={categoryFilter} className="mb-4 md:mb-6" />
@@ -1784,188 +1807,25 @@ const CompanyDashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-800">
                 {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </h3>
-              <p className="text-sm text-gray-500">{shownDailyBookings.length} bookings across {sortedRooms.length} spaces</p>
+              <p className="text-sm text-gray-500">
+                {shownDailyBookings.length} booking{shownDailyBookings.length === 1 ? '' : 's'}
+              </p>
             </div>
-            
-            {sortedRooms.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <House className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>No spaces found for selected location</p>
-              </div>
-            ) : visibleTimeSlots.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}{categoryFilter.isAll ? '' : ' in the selected categories'}.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse min-w-[800px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b-2 border-gray-200">
-                      <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-200 w-24">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          Time
-                        </div>
-                      </th>
-                      {sortedRooms.map((room) => (
-                        <th key={room.id} className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]">
-                          <div className="flex flex-col items-center gap-1">
-                            <span>{room.name}</span>
-                            <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              Max {room.capacity || 'N/A'}
-                            </span>
-                          </div>
-                        </th>
-                      ))}
-                      {unassignedBookings.length > 0 && (
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 border-r border-gray-200 min-w-[200px] bg-amber-50">
-                          <div className="flex flex-col items-center gap-1">
-                            <span>⚠️ No Room</span>
-                            <span className="text-xs font-normal text-amber-600">
-                              {unassignedBookings.length} unassigned
-                            </span>
-                          </div>
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleTimeSlots.map((slotObj) => (
-                      <tr key={slotObj.slot} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '60px' }}>
-                        <td className="sticky left-0 z-10 bg-white px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
-                          {slotObj.time}
-                        </td>
-                        {sortedRooms.map((room) => {
-                          const booking = getBookingForSlot(room.id, slotObj.slot);
-                          const isOccupied = isSlotOccupied(room.id, slotObj.slot);
-                          
-                          if (isOccupied) return null; // Skip cells covered by rowSpan
-                          
-                          if (booking) {
-                            const rowSpan = getBookingRowSpan(booking);
-                            const startTime = booking.booking_time?.substring(0, 5) || '';
-                            const endTime = calculateEndTime(startTime, booking.duration || 1, booking.duration_unit || 'hours');
-                            const isNew = new Date(booking.created_at) > new Date(Date.now() - 48 * 60 * 60 * 1000);
-                            
-                            return (
-                              <td 
-                                key={room.id} 
-                                rowSpan={rowSpan}
-                                className="px-2 py-1 border-r border-gray-200 align-top"
-                              >
-                                <Link
-                                  to={`/bookings/${booking.id}?from=dashboard`}
-                                  className={`block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md ${
-                                    booking.status === 'confirmed' 
-                                      ? 'bg-green-100 border border-green-300 text-green-800'
-                                      : booking.status === 'pending'
-                                      ? 'bg-yellow-100 border border-yellow-300 text-yellow-800'
-                                      : booking.status === 'checked-in'
-                                      ? 'bg-blue-100 border border-blue-300 text-blue-800'
-                                      : booking.status === 'cancelled'
-                                      ? 'bg-red-100 border border-red-300 text-red-800'
-                                      : 'bg-gray-100 border border-gray-300 text-gray-800'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-semibold truncate">{booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}</span>
-                                    {isNew && (
-                                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-yellow-200 text-yellow-700 px-1 py-0.5 rounded">
-                                        <Sparkles size={8} />
-                                        NEW
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] opacity-75">
-                                    {formatTime12Hour(startTime)} - {formatTime12Hour(endTime)}
-                                  </div>
-                                  <div className="text-[10px] opacity-75 truncate mt-0.5">
-                                    {booking.package?.name || booking.attraction?.name || 'No package'}
-                                  </div>
-                                  <div className="mt-1">
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
-                                      booking.status === 'confirmed' ? 'bg-green-200' :
-                                      booking.status === 'pending' ? 'bg-yellow-200' :
-                                      booking.status === 'checked-in' ? 'bg-blue-200' :
-                                      'bg-gray-200'
-                                    }`}>
-                                      {booking.status}
-                                    </span>
-                                  </div>
-                                </Link>
-                              </td>
-                            );
-                          }
-                          
-                          return (
-                            <td key={room.id} className="px-2 py-2 border-r border-gray-200 text-center text-gray-300 hover:bg-blue-50 transition" style={{ height: '60px' }}>
-                              —
-                            </td>
-                          );
-                        })}
-                        {unassignedBookings.length > 0 && (() => {
-                          const booking = getBookingForSlot(0, slotObj.slot);
-                          const isOccupied = isSlotOccupied(0, slotObj.slot);
-                          
-                          if (isOccupied) return null;
-                          
-                          if (booking) {
-                            const rowSpan = getBookingRowSpan(booking);
-                            const startTime = booking.booking_time?.substring(0, 5) || '';
-                            const endTime = calculateEndTime(startTime, booking.duration || 1, booking.duration_unit || 'hours');
-                            const isNew = new Date(booking.created_at) > new Date(Date.now() - 48 * 60 * 60 * 1000);
-                            
-                            return (
-                              <td 
-                                key="unassigned" 
-                                rowSpan={rowSpan}
-                                className="px-2 py-1 border-r border-gray-200 align-top bg-amber-50"
-                              >
-                                <Link
-                                  to={`/bookings/${booking.id}?from=dashboard`}
-                                  className="block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md bg-amber-100 border border-amber-300 text-amber-800"
-                                >
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-semibold truncate">{booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}</span>
-                                    {isNew && (
-                                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-yellow-200 text-yellow-700 px-1 py-0.5 rounded">
-                                        <Sparkles size={8} />
-                                        NEW
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] opacity-75">
-                                    {formatTime12Hour(startTime)} - {formatTime12Hour(endTime)}
-                                  </div>
-                                  <div className="text-[10px] opacity-75 truncate mt-0.5">
-                                    {booking.package?.name || booking.attraction?.name || 'No package'}
-                                  </div>
-                                  <div className="text-[10px] text-amber-700 mt-0.5 font-medium">
-                                    ⚠️ No room assigned
-                                  </div>
-                                  <div className="mt-1">
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-200">
-                                      {booking.status}
-                                    </span>
-                                  </div>
-                                </Link>
-                              </td>
-                            );
-                          }
-                          
-                          return (
-                            <td key="unassigned" className="px-2 py-2 border-r border-gray-200 text-center text-amber-300 bg-amber-50/50" style={{ height: '60px' }}>
-                              —
-                            </td>
-                          );
-                        })()}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <DayScheduleGrid
+              date={currentDay}
+              rooms={sortedRooms}
+              bookings={shownDailyBookings}
+              hideEmptySpaces={hideEmptySpaces}
+              loading={roomsLoading || dayLoading}
+              locationNames={locationNames}
+              bare
+              onSelectBooking={setSelectedBooking}
+              themeColor={themeColor}
+              fullColor={fullColor}
+              emptyMessage={`No bookings for ${currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}${
+                scheduleSearch.trim() ? ` matching "${scheduleSearch.trim()}"` : categoryFilter.isAll ? '' : ' in the selected categories'
+              }.`}
+            />
           </div>
         )}
 

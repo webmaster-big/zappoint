@@ -35,6 +35,8 @@ import { AttractionScheduleCard, EventScheduleCard } from '../../../components/a
 import { buildCalendarCategories, useCategoryFilter } from '../../../components/admin/calendar/useCategoryFilter';
 import { CalendarCategoryTabs } from '../../../components/admin/calendar/CategoryFilter';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
+import { matchesBookingSearch } from '../../../utils/bookingSearch';
 import type { Booking } from '../../../services/bookingService';
 import type { EventPurchase } from '../../../types/event.types';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
@@ -271,15 +273,8 @@ const CalendarView: React.FC = () => {
       result = result.filter(booking => booking.location_id === effectiveLocationId);
     }
 
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(booking =>
-        (booking.guest_name?.toLowerCase().includes(searchTerm) ||
-        booking.guest_email?.toLowerCase().includes(searchTerm) ||
-        booking.guest_phone?.includes(searchTerm) ||
-        booking.reference_number.toLowerCase().includes(searchTerm) ||
-        booking.package?.name?.toLowerCase().includes(searchTerm))
-      );
+    if (filters.search.trim()) {
+      result = result.filter(booking => matchesBookingSearch(booking, filters.search));
     }
 
     if (filters.packages.length > 0) {
@@ -335,6 +330,16 @@ const CalendarView: React.FC = () => {
     const today = michiganToday();
     setCurrentDate(today);
     setPickerMonth(today);
+  };
+
+  const openBookingFromSearch = (booking: Booking) => {
+    const bookingDate = parseLocalDate(booking.booking_date);
+    if (!Number.isNaN(bookingDate.getTime())) {
+      setCurrentDate(bookingDate);
+      setPickerMonth(bookingDate);
+      setFilters(prev => ({ ...prev, view: 'day' }));
+    }
+    setSelectedBooking(booking);
   };
 
   const getPickerCalendarDays = (): (Date | null)[] => {
@@ -1119,6 +1124,13 @@ const CalendarView: React.FC = () => {
             </div>
             
             <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
+              <CustomerSearch
+                locationId={effectiveLocationId}
+                onSelect={openBookingFromSearch}
+                className="w-full sm:w-64"
+                themeColor={themeColor}
+                fullColor={fullColor}
+              />
               <select
                 value={filters.view}
                 onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month')}
@@ -1199,14 +1211,14 @@ const CalendarView: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
+                <label className="block text-sm font-medium text-gray-800 mb-2">Filter this view</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-gray-400" />
                   </div>
                   <input
                     type="text"
-                    placeholder="Search bookings..."
+                    placeholder="Name, phone, email or reference"
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
                     className={`pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-${fullColor}`}

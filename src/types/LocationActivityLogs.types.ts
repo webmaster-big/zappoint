@@ -285,6 +285,8 @@ export interface LocationActivityLogsActivityLog {
   resourceName?: string;
   details: string;
   metadata?: ActivityLogMetadata;
+  /** The required reason the employee gave for this change. */
+  reason?: string;
   timestamp: string;
   severity: 'info' | 'success' | 'warning' | 'error';
 }

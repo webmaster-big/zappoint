@@ -20,8 +20,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Info
-} from 'lucide-react';
+  Info, MessageSquare} from 'lucide-react';
 import StandardButton from '../../components/ui/StandardButton';
 import Pagination from '../../components/ui/Pagination';
 import type { 
@@ -631,7 +630,7 @@ const LocationActivityLogs = () => {
     if (metadataDetails.length > 0) {
       description += ` • ${metadataDetails.join(' • ')}`;
     }
-    
+
     if (log.details && log.details.length > 0 && !description.includes(log.details)) {
       description += ` • ${log.details}`;
     }
@@ -879,15 +878,21 @@ const LocationActivityLogs = () => {
           entity_id?: number;
           metadata?: Record<string, unknown>;
           description?: string;
+          reason?: string | null;
+          actor_name?: string | null;
+          actor_role?: string | null;
           created_at?: string;
         }
         
         let transformedLogs = activityLogs.map((log: ActivityLogRaw) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
-          userName: log.user?.first_name && log.user?.last_name 
-            ? `${log.user.first_name} ${log.user.last_name}` 
-            : log.user?.email || 'System',
+          // actor_name is the snapshot taken when the log was written, so an employee who has
+          // since been deleted is still attributable (user_id is ON DELETE SET NULL).
+          userName: log.actor_name
+            || (log.user?.first_name && log.user?.last_name
+              ? `${log.user.first_name} ${log.user.last_name}`
+              : log.user?.email || 'System'),
           userType: log.user?.role || 'system',
           userRole: log.user?.position || 'System',
           location: log.location?.name || (log.user?.role === 'company_admin' ? '' : 'Unknown'),
@@ -897,6 +902,7 @@ const LocationActivityLogs = () => {
           resourceName: log.metadata?.resource_name as string || log.entity_type || '',
           details: log.description || '',
           metadata: log.metadata || {},
+          reason: log.reason || undefined,
           timestamp: log.created_at || new Date().toISOString(),
           severity: determineSeverity(log.action || '')
         }));
@@ -1080,6 +1086,9 @@ const LocationActivityLogs = () => {
         entity_id?: number;
         metadata?: Record<string, unknown>;
         description?: string;
+        reason?: string | null;
+        actor_name?: string | null;
+        actor_role?: string | null;
         created_at?: string;
       }
       
@@ -1121,12 +1130,14 @@ const LocationActivityLogs = () => {
         resourceType: string;
         resourceName: string;
         details: string;
+        reason?: string;
         severity: string;
       }
       
       let transformedLogs: TransformedLog[] = allLogs.map((log: ActivityLogRawExport) => ({
         timestamp: log.created_at || new Date().toISOString(),
         location: log.location?.name || (log.user?.role === 'company_admin' ? 'All Locations' : 'Unknown'),
+        reason: log.reason || undefined,
         userName: log.user?.first_name && log.user?.last_name 
           ? `${log.user.first_name} ${log.user.last_name}` 
           : log.user?.email || 'System',
@@ -1149,8 +1160,12 @@ const LocationActivityLogs = () => {
         );
       }
 
+      // Fields are quoted: descriptions and reasons are free text and routinely contain commas,
+      // which silently shifted every later column in the old unquoted export.
+      const csvCell = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
       const csvContent = [
-        ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
+        ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Reason', 'Severity'],
         ...transformedLogs.map(log => [
           new Date(log.timestamp).toLocaleString(),
           log.location,
@@ -1160,9 +1175,10 @@ const LocationActivityLogs = () => {
           log.resourceType,
           log.resourceName || '',
           log.details,
+          log.reason || '',
           log.severity
         ])
-      ].map(row => row.join(',')).join('\n');
+      ].map(row => row.map(csvCell).join(',')).join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
@@ -1853,6 +1869,16 @@ const LocationActivityLogs = () => {
                       <p className="text-sm text-gray-700 mb-2 leading-relaxed">
                         {formatActivityDescription(log)}
                       </p>
+
+                      {log.reason && (
+                        <div className="mb-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                          <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                          <p className="text-sm text-gray-800">
+                            <span className="font-semibold text-amber-800">Reason: </span>
+                            {log.reason}
+                          </p>
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceTypeColors(log.resourceType)}`}>
