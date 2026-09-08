@@ -84,6 +84,7 @@ const OnsitePurchaseEvent = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const eventsPerPage = 6;
@@ -268,22 +269,40 @@ const OnsitePurchaseEvent = () => {
   };
 
   useEffect(() => {
+    setAuthorizeApiLoginId('');
+    setAuthorizeClientKey('');
+    setAuthorizeLocationId(null);
+
     if (paymentMethod !== 'authorize.net') return;
+
+    const locationId = event?.location_id ? Number(event.location_id) : null;
+    if (!locationId) return;
+
+    let cancelled = false;
+
     const initializeAuthorizeNet = async () => {
       try {
-        const locationId = event?.location_id || 1;
         const response = await getAuthorizeNetPublicKey(locationId);
+        if (cancelled) return;
+
         if (response && response.api_login_id) {
           setAuthorizeApiLoginId(response.api_login_id);
           setAuthorizeClientKey(response.client_key || response.api_login_id);
+          setAuthorizeLocationId(locationId);
           setAuthorizeEnvironment((response.environment || 'sandbox') as 'sandbox' | 'production');
           await loadAcceptJS((response.environment || 'sandbox') as 'sandbox' | 'production');
         }
-      } catch {
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load Authorize.Net settings:', error);
       }
     };
     initializeAuthorizeNet();
-  }, [event, paymentMethod]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [event?.location_id, paymentMethod]);
 
   const clearCustomer = () => {
     setSelectedCustomerId(null);
@@ -442,6 +461,11 @@ const OnsitePurchaseEvent = () => {
         isSubmittingRef.current = false;
         return;
       }
+      if (!event?.location_id || authorizeLocationId !== Number(event.location_id)) {
+        setPaymentError('Payment system is still loading for this location. Please wait a moment and try again.');
+        isSubmittingRef.current = false;
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -504,7 +528,7 @@ const OnsitePurchaseEvent = () => {
           phone: guestPhone || '',
         };
         const paymentData = {
-          location_id: event!.location_id || 1,
+          location_id: Number(event!.location_id),
           amount: total,
           order_id: `E${event!.id}-${Date.now().toString().slice(-8)}`,
           description: `Event Purchase: ${event!.name}`,
@@ -563,7 +587,7 @@ const OnsitePurchaseEvent = () => {
             currency: 'USD',
             method: 'cash',
             status: 'completed' as const,
-            location_id: event!.location_id || 1,
+            location_id: Number(event!.location_id),
             notes: `Payment for event purchase: ${event!.name}`,
           });
         } catch {

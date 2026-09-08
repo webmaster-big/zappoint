@@ -221,6 +221,7 @@ const BookPackage: React.FC = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState("");
   const [authorizeClientKey, setAuthorizeClientKey] = useState("");
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
   
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
@@ -493,28 +494,45 @@ const BookPackage: React.FC = () => {
   }, []);
   
   useEffect(() => {
+    let cancelled = false;
+    const locationId = pkg?.location_id ?? null;
+
     const initializeAuthorizeNet = async () => {
+      setAuthorizeApiLoginId('');
+      setAuthorizeClientKey('');
+      setAuthorizeLocationId(null);
+
+      if (!locationId) {
+        return;
+      }
+
       try {
-        const locationId = pkg?.location_id || 1;
-        
         const response = await getAuthorizeNetPublicKey(locationId);
-        
+        if (cancelled) return;
+
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
-        
+
         if (apiLoginId) {
           setAuthorizeApiLoginId(apiLoginId);
-          setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
+          setAuthorizeClientKey(clientKey || apiLoginId);
+          setAuthorizeLocationId(locationId);
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
-          
+
           await loadAcceptJS(environment as 'sandbox' | 'production');
         }
-      } catch {
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load Authorize.Net settings:', error);
       }
     };
-    
+
     initializeAuthorizeNet();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pkg?.location_id]);
 
   useEffect(() => {
@@ -1221,6 +1239,12 @@ const BookPackage: React.FC = () => {
       isSubmittingRef.current = false;
       return;
     }
+
+    if (!pkg?.location_id || authorizeLocationId !== pkg.location_id) {
+      setPaymentError('Payment system is still loading for this location. Please wait a moment and try again.');
+      isSubmittingRef.current = false;
+      return;
+    }
     
     setIsProcessingPayment(true);
     setPaymentError('');
@@ -1285,7 +1309,7 @@ const BookPackage: React.FC = () => {
         guest_email: form.email,
         guest_phone: form.phone,
         customer_id: customerId || undefined,
-        location_id: pkg.location_id || 1,
+        location_id: pkg.location_id,
         package_id: pkg.id,
         room_id: selectedRoomId || undefined,
         type: 'package' as const,
@@ -1360,7 +1384,7 @@ const BookPackage: React.FC = () => {
       }
       
       const paymentData = {
-        location_id: pkg.location_id || 1,
+        location_id: pkg.location_id,
         amount: amountToPay,
         order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
         description: `Package Booking: ${pkg.name}`,

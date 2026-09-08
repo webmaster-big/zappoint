@@ -189,6 +189,7 @@ const PurchaseEvent = () => {
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
 
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
@@ -335,11 +336,20 @@ const PurchaseEvent = () => {
   }, [guestEmail]);
 
   useEffect(() => {
+    let cancelled = false;
+    const locationId = event?.location_id ? Number(event.location_id) : null;
+
     const initializeAuthorizeNet = async () => {
-      if (!event) return;
+      setAuthorizeApiLoginId('');
+      setAuthorizeClientKey('');
+      setAuthorizeLocationId(null);
+
+      if (!locationId) return;
+
       try {
-        const locationId = event.location_id || 1;
         const response = await getAuthorizeNetPublicKey(locationId);
+        if (cancelled) return;
+
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
@@ -347,14 +357,21 @@ const PurchaseEvent = () => {
         if (apiLoginId) {
           setAuthorizeApiLoginId(apiLoginId);
           setAuthorizeClientKey(clientKey || apiLoginId);
+          setAuthorizeLocationId(locationId);
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
           await loadAcceptJS(environment as 'sandbox' | 'production');
         }
-      } catch {
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load Authorize.Net settings:', error);
       }
     };
     initializeAuthorizeNet();
-  }, [event]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [event?.location_id]);
 
   useEffect(() => {
     if (!event) {
@@ -830,6 +847,11 @@ const PurchaseEvent = () => {
     }
     if (cardRequired && !authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
+      isSubmittingRef.current = false;
+      return;
+    }
+    if (cardRequired && (!event?.location_id || authorizeLocationId !== Number(event.location_id))) {
+      setPaymentError('Payment system is still loading for this location. Please wait a moment and try again.');
       isSubmittingRef.current = false;
       return;
     }

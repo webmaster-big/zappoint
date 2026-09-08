@@ -107,6 +107,7 @@ const ManualBooking: React.FC = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
 
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
@@ -239,27 +240,41 @@ const ManualBooking: React.FC = () => {
   }, [effectiveLocationId]);
 
   useEffect(() => {
+    let cancelled = false;
+    const locationId = pkg?.location_id || effectiveLocationId || currentUser?.location_id || null;
+
     const loadAuthorizeNetSettings = async () => {
+      setAuthorizeApiLoginId('');
+      setAuthorizeClientKey('');
+      setAuthorizeLocationId(null);
+
+      if (!locationId) {
+        return;
+      }
+
       try {
-        setAuthorizeApiLoginId('');
-        const locationId = pkg?.location_id || effectiveLocationId || currentUser?.location_id || 1;
         const settings = await getAuthorizeNetPublicKey(locationId);
+        if (cancelled) return;
+
         if (settings && settings.api_login_id) {
           setAuthorizeApiLoginId(settings.api_login_id);
           setAuthorizeClientKey(settings.client_key || settings.api_login_id);
+          setAuthorizeLocationId(locationId);
           const env = (settings.environment || 'sandbox') as 'sandbox' | 'production';
           setAuthorizeEnvironment(env);
           await loadAcceptJS(env);
-        } else {
-          setAuthorizeApiLoginId('');
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Failed to load Authorize.Net settings:', error);
-        setAuthorizeApiLoginId('');
       }
     };
 
     loadAuthorizeNetSettings();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pkg?.location_id, effectiveLocationId, currentUser?.location_id]);
 
   useEffect(() => {
@@ -907,7 +922,12 @@ const ManualBooking: React.FC = () => {
         finalDurationUnit = 'hours';
       }
       
-      const locationId = pkg?.location_id || effectiveLocationId || user?.location_id || 1;
+      const locationId = pkg?.location_id || effectiveLocationId || user?.location_id || null;
+
+      if (!locationId) {
+        setToast({ message: 'Please select a location before creating this booking.', type: 'error' });
+        return;
+      }
 
       const isCardPayment = form.paymentMethod === 'authorize.net';
       const chargeAmount = finalAmountPaid;
@@ -915,6 +935,10 @@ const ManualBooking: React.FC = () => {
       if (isCardPayment) {
         if (!authorizeApiLoginId) {
           setToast({ message: 'Card payments are not configured for this location. Please choose another payment method.', type: 'error' });
+          return;
+        }
+        if (authorizeLocationId !== locationId) {
+          setToast({ message: 'Payment system is still loading for this location. Please wait a moment and try again.', type: 'error' });
           return;
         }
         if (!(chargeAmount > 0)) {

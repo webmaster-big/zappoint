@@ -205,6 +205,7 @@ const PurchaseAttraction = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -661,30 +662,46 @@ const PurchaseAttraction = () => {
   }, [attractionId]);
 
   useEffect(() => {
+    let cancelled = false;
+    const locationId = attraction?.locationId ? Number(attraction.locationId) : null;
+
     const initializeAuthorizeNet = async () => {
-      if (!attraction) return;
-      
+      setAuthorizeApiLoginId('');
+      setAuthorizeClientKey('');
+      setAuthorizeLocationId(null);
+
+      if (!locationId) {
+        return;
+      }
+
       try {
-        const locationId = attraction.locationId || 1;
-        
         const response = await getAuthorizeNetPublicKey(locationId);
-        
+        if (cancelled) return;
+
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
-        
+
         if (apiLoginId) {
           setAuthorizeApiLoginId(apiLoginId);
-          setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
+          setAuthorizeClientKey(clientKey || apiLoginId);
+          setAuthorizeLocationId(locationId);
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
-          
+
           await loadAcceptJS(environment as 'sandbox' | 'production');
         }
-      } catch {
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load Authorize.Net settings:', error);
       }
     };
+
     initializeAuthorizeNet();
-  }, [attraction]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attraction?.locationId]);
 
   useEffect(() => {
     const searchCustomer = async () => {
@@ -1013,6 +1030,11 @@ const PurchaseAttraction = () => {
       isSubmittingRef.current = false;
       return;
     }
+    if (cardEntryRequired && (!attraction?.locationId || authorizeLocationId !== Number(attraction.locationId))) {
+      setPaymentError('Payment system is still loading for this location. Please wait a moment and try again.');
+      isSubmittingRef.current = false;
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -1070,7 +1092,7 @@ const PurchaseAttraction = () => {
         currency: 'USD',
         method: 'authorize.net',
         payment_method: 'authorize.net' as 'in-store' | 'paylater' | 'authorize.net',
-        location_id: attraction.locationId || 1,
+        location_id: Number(attraction.locationId),
         purchase_date: new Date().toISOString().split('T')[0],
         scheduled_date: scheduledDate || undefined,
         scheduled_time: scheduledTime || undefined,
@@ -1229,7 +1251,7 @@ const PurchaseAttraction = () => {
       }
 
       const paymentData = {
-        location_id: attraction.locationId || 1,
+        location_id: Number(attraction.locationId),
         amount: giftCard ? serverDue : totalAmount,
         order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`,
         description: `Attraction Purchase: ${attraction.name}`,

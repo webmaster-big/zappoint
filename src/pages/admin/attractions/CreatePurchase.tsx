@@ -91,6 +91,7 @@ const CreatePurchase = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
@@ -292,42 +293,59 @@ const CreatePurchase = () => {
     return () => clearTimeout(timeoutId);
   }, [customerInfo.email]);
 
+  const rawGatewayLocationId = orderLines[0]?.locationId
+    ?? selectedAttraction?.locationId
+    ?? selectedEvent?.location_id
+    ?? selectedLocation
+    ?? null;
+  const gatewayLocationId = rawGatewayLocationId === null || rawGatewayLocationId === undefined
+    ? null
+    : Number(rawGatewayLocationId);
+
   useEffect(() => {
     if (paymentMethod !== 'authorize.net') {
       return;
     }
 
-    const gatewayLocationId = orderLines[0]?.locationId
-      ?? selectedAttraction?.locationId
-      ?? (selectedEvent ? Number(selectedEvent.location_id) : null)
-      ?? selectedLocation
-      ?? null;
+    setAuthorizeApiLoginId('');
+    setAuthorizeClientKey('');
+    setAuthorizeLocationId(null);
 
     if (!gatewayLocationId) {
       return;
     }
 
+    let cancelled = false;
+
     const initializeAuthorizeNet = async () => {
       try {
         const response = await getAuthorizeNetPublicKey(gatewayLocationId);
+        if (cancelled) return;
+
         if (response && response.api_login_id) {
           setAuthorizeApiLoginId(response.api_login_id);
           setAuthorizeClientKey(response.client_key || response.api_login_id);
+          setAuthorizeLocationId(gatewayLocationId);
           setAuthorizeEnvironment((response.environment || 'sandbox') as 'sandbox' | 'production');
           setShowNoAuthAccountModal(false);
-          
+
           await loadAcceptJS((response.environment || 'sandbox') as 'sandbox' | 'production');
         } else {
           setShowNoAuthAccountModal(true);
         }
       } catch (error: any) {
+        if (cancelled) return;
         if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
           setShowNoAuthAccountModal(true);
         }
       }
     };
     initializeAuthorizeNet();
-  }, [selectedAttraction, selectedEvent, orderLines, selectedLocation, paymentMethod]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gatewayLocationId, paymentMethod]);
 
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -546,7 +564,7 @@ const CreatePurchase = () => {
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
-  const orderLocationId = orderLines[0]?.locationId ?? selectedAttraction?.locationId ?? selectedEvent?.location_id ?? selectedLocation ?? null;
+  const orderLocationId = gatewayLocationId;
 
   const buildCurrentLine = (): CartItem | null => {
     if (itemTab === 'events') {
@@ -821,6 +839,11 @@ const CreatePurchase = () => {
         isSubmittingRef.current = false;
         return;
       }
+      if (!orderLocationId || authorizeLocationId !== Number(orderLocationId)) {
+        setPaymentError('Payment system is still loading for this location. Please wait a moment and try again.');
+        isSubmittingRef.current = false;
+        return;
+      }
     }
 
     try {
@@ -950,7 +973,7 @@ const CreatePurchase = () => {
         ...(paymentMethod === 'in-store' ? {
           status: 'confirmed' as const,
         } : {}),
-        location_id: selectedAttraction.locationId || 1,
+        location_id: Number(selectedAttraction.locationId),
         purchase_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
         scheduled_date: scheduledDate || undefined,
         scheduled_time: scheduledTime || undefined,
@@ -991,7 +1014,7 @@ const CreatePurchase = () => {
         }
         
         const paymentData = {
-          location_id: selectedAttraction.locationId || 1,
+          location_id: Number(selectedAttraction.locationId),
           amount: totalAmount,
           order_id: `A${selectedAttraction.id}-${Date.now().toString().slice(-8)}`,
           description: `Attraction Purchase: ${selectedAttraction.name}`,
@@ -1060,7 +1083,7 @@ const CreatePurchase = () => {
             currency: 'USD',
             method: 'cash' as const,
             status: 'completed' as const,
-            location_id: selectedAttraction.locationId || 1,
+            location_id: Number(selectedAttraction.locationId),
             notes: `Payment for attraction purchase: ${selectedAttraction.name}`,
           };
           

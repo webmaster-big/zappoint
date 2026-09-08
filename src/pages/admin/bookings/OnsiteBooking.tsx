@@ -121,6 +121,11 @@ const OnsiteBooking: React.FC = () => {
   const selectedLocation = effectiveLocationId;
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
+  const gatewayLocationId = selectedPackage?.location_id
+    ?? selectedPackage?.location?.id
+    ?? selectedLocation
+    ?? currentUser?.location_id
+    ?? null;
   const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
   const [customFieldAnswers, setCustomFieldAnswers] = useState<Record<number, boolean>>({});
   const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
@@ -145,6 +150,7 @@ const OnsiteBooking: React.FC = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeLocationId, setAuthorizeLocationId] = useState<number | null>(null);
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -426,6 +432,7 @@ const OnsiteBooking: React.FC = () => {
             partialPaymentFixed: pkg.partial_payment_fixed || 0,
             has_guest_of_honor: pkg.has_guest_of_honor || false,
             customerNotes: pkg.customer_notes || '',
+            location_id: pkg.location_id ?? pkg.location?.id,
             location: pkg.location || undefined
           }));
           
@@ -518,6 +525,7 @@ const OnsiteBooking: React.FC = () => {
             partialPaymentFixed: pkg.partial_payment_fixed || 0,
             has_guest_of_honor: pkg.has_guest_of_honor || false,
             customerNotes: pkg.customer_notes || '',
+            location_id: pkg.location_id ?? pkg.location?.id,
             location: pkg.location || undefined
             };
           });
@@ -546,32 +554,52 @@ const OnsiteBooking: React.FC = () => {
   }, [selectedLocation]);
   
   useEffect(() => {
+    let cancelled = false;
+
+    const clearCredentials = () => {
+      setAuthorizeApiLoginId('');
+      setAuthorizeClientKey('');
+      setAuthorizeLocationId(null);
+    };
+
     const loadAuthorizeNetSettings = async () => {
+      clearCredentials();
+
+      if (!gatewayLocationId) {
+        return;
+      }
+
       try {
-        const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
-        const locationId = user.location_id || 1;
-        const settings = await getAuthorizeNetPublicKey(locationId);
+        const settings = await getAuthorizeNetPublicKey(gatewayLocationId);
+        if (cancelled) return;
+
         if (settings && settings.api_login_id) {
           setAuthorizeApiLoginId(settings.api_login_id);
           setAuthorizeClientKey(settings.client_key || settings.api_login_id);
+          setAuthorizeLocationId(gatewayLocationId);
+          setShowNoAuthAccountModal(false);
           const env = (settings.environment || 'sandbox') as 'sandbox' | 'production';
           setAuthorizeEnvironment(env);
-          
+
           await loadAcceptJS(env);
-          console.log('✅ Accept.js loaded successfully for environment:', env);
         } else {
           setShowNoAuthAccountModal(true);
         }
       } catch (error: any) {
+        if (cancelled) return;
         console.error('Failed to load Authorize.Net settings:', error);
         if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
           setShowNoAuthAccountModal(true);
         }
       }
     };
-    
+
     loadAuthorizeNetSettings();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gatewayLocationId]);
 
   const getWeekOfMonth = (date: Date): number => {
     const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -1259,6 +1287,11 @@ const OnsiteBooking: React.FC = () => {
         isSubmittingRef.current = false;
         return;
       }
+      if (!gatewayLocationId || authorizeLocationId !== gatewayLocationId) {
+        setPaymentError('Payment system is still loading this location. Please wait a moment and try again.');
+        isSubmittingRef.current = false;
+        return;
+      }
     }
     
     try {
@@ -1362,7 +1395,14 @@ const OnsiteBooking: React.FC = () => {
       const currentUser = getStoredUser();
       const createdBy = currentUser?.id;
       
-      const resolvedLocationId = selectedLocation || currentUser?.location_id || 1;
+      const resolvedLocationId = gatewayLocationId;
+      if (!resolvedLocationId) {
+        setToast({ message: 'Please select a specific location in the sidebar before creating this booking.', type: 'error' });
+        setPaymentError('Please select a specific location in the sidebar before creating this booking.');
+        setSubmitting(false);
+        isSubmittingRef.current = false;
+        return;
+      }
       const bookingData_request: ExtendedBookingData = {
         guest_name: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
         guest_email: bookingData.customer.email,
