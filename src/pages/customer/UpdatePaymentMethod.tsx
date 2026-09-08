@@ -12,7 +12,6 @@ import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
 import { loadAcceptJS, tokenizeCard } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
-import locationService from '../../services/LocationService';
 import type { Membership } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
 import StandardButton from '../../components/ui/StandardButton';
@@ -74,6 +73,8 @@ const UpdatePaymentMethod = () => {
 
   const [apiLoginId, setApiLoginId] = useState('');
   const [clientKey, setClientKey] = useState('');
+  const [gatewayLocationId, setGatewayLocationId] = useState<number | null>(null);
+  const [gatewayError, setGatewayError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<{
@@ -96,21 +97,25 @@ const UpdatePaymentMethod = () => {
         const m = await membershipCache.getMine();
         setMembership(m);
         if (m) {
-          try {
-            const locs = await locationService.getLocations({ is_active: true, per_page: 100 });
-            const loc = m.home_location_id
-              ? (locs.data ?? []).find((l) => l.id === m.home_location_id) ?? (locs.data ?? [])[0]
-              : (locs.data ?? [])[0];
-            if (loc) {
-              const res = await getAuthorizeNetPublicKey(loc.id);
+          const chargeLocationId = m.plan?.billing_account_id ? null : (m.home_location_id ?? null);
+          if (m.plan?.billing_account_id) {
+            setGatewayError('Your plan bills through a central account. Please contact us to update your card.');
+          } else if (!chargeLocationId) {
+            setGatewayError('Your membership does not have a home location set, so we cannot update the card here. Please contact us and we will sort it out.');
+          } else {
+            try {
+              const res = await getAuthorizeNetPublicKey(chargeLocationId);
               if (res?.api_login_id) {
                 setApiLoginId(res.api_login_id);
                 setClientKey(res.client_key || res.api_login_id);
+                setGatewayLocationId(chargeLocationId);
                 await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
+              } else {
+                setGatewayError('Card payment is not set up for your home location yet. Please contact us and we will sort it out.');
               }
+            } catch {
+              setGatewayError('Card payment is not set up for your home location yet. Please contact us and we will sort it out.');
             }
-          } catch {
-            // Auth.Net may not be configured — continue without it
           }
         }
       } catch (e: unknown) {
@@ -133,8 +138,11 @@ const UpdatePaymentMethod = () => {
     return [m, fullYear];
   }, [expiry]);
 
+  const gatewayReady = !!apiLoginId && gatewayLocationId !== null;
+
   const canSubmit =
     !!membership &&
+    gatewayReady &&
     cardDigits.length >= 13 &&
     expiry.includes('/') &&
     cvc.length >= 3;
@@ -165,8 +173,8 @@ const UpdatePaymentMethod = () => {
   const handleSubmit = async () => {
     if (!canSubmit || !membership) return;
     if (!validatePayment()) return;
-    if (!apiLoginId) {
-      show('Payment system not ready. Try again in a moment.', 'error');
+    if (!gatewayReady) {
+      show(gatewayError || 'Payment system not ready. Try again in a moment.', 'error');
       return;
     }
     setSubmitting(true);
@@ -371,6 +379,9 @@ const UpdatePaymentMethod = () => {
           </div>
 
           <div className="px-5 py-4">
+            {gatewayError && (
+              <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{gatewayError}</p>
+            )}
             <StandardButton
               variant="primary"
               size="lg"

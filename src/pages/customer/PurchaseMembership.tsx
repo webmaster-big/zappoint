@@ -111,6 +111,8 @@ const PurchaseMembership = () => {
 
   const [apiLoginId, setApiLoginId] = useState('');
   const [clientKey, setClientKey] = useState('');
+  const [gatewayLocationId, setGatewayLocationId] = useState<number | null>(null);
+  const [gatewayError, setGatewayError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<{
@@ -167,21 +169,6 @@ const PurchaseMembership = () => {
     [locations, homeLocationName],
   );
 
-  useEffect(() => {
-    if (!homeLocationId) return;
-    (async () => {
-      try {
-        const res = await getAuthorizeNetPublicKey(homeLocationId);
-        if (res?.api_login_id) {
-          setApiLoginId(res.api_login_id);
-          setClientKey(res.client_key || res.api_login_id);
-          await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
-        }
-      } catch {
-      }
-    })();
-  }, [homeLocationId]);
-
   const selectedPlan = useMemo(() => plans.find((p) => p.id === selectedPlanId) || null, [plans, selectedPlanId]);
 
   const [expMonth, expYear] = useMemo(() => {
@@ -198,6 +185,52 @@ const PurchaseMembership = () => {
   const isUpgrade = !!existingMembership;
   const currentPlanId = existingMembership?.membership_plan_id ?? existingMembership?.plan?.id ?? null;
   const isCurrentPlan = !!selectedPlanId && selectedPlanId === currentPlanId;
+
+  const billingPlan = isUpgrade ? (existingMembership?.plan ?? null) : selectedPlan;
+  const routesThroughPlanAccount = !!billingPlan?.billing_account_id;
+
+  const chargeLocationId = useMemo(() => {
+    if (routesThroughPlanAccount) return null;
+    if (isUpgrade) return existingMembership?.home_location_id ?? null;
+    return homeLocationId;
+  }, [routesThroughPlanAccount, isUpgrade, existingMembership, homeLocationId]);
+
+  useEffect(() => {
+    setApiLoginId('');
+    setClientKey('');
+    setGatewayLocationId(null);
+    setGatewayError('');
+
+    if (!chargeLocationId) {
+      if (routesThroughPlanAccount) {
+        setGatewayError('This plan bills through a central account. Please contact us to complete this payment.');
+      } else if (isUpgrade) {
+        setGatewayError('Your membership does not have a home location set, so we cannot take payment here. Please contact us and we will sort it out.');
+      }
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getAuthorizeNetPublicKey(chargeLocationId);
+        if (cancelled) return;
+        if (res?.api_login_id) {
+          setApiLoginId(res.api_login_id);
+          setClientKey(res.client_key || res.api_login_id);
+          setGatewayLocationId(chargeLocationId);
+          await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
+        } else {
+          setGatewayError('Card payment is not set up for this location yet. Please choose another, or visit us in store.');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to load Authorize.Net settings:', error);
+        setGatewayError('Card payment is not set up for this location yet. Please choose another, or visit us in store.');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [chargeLocationId, routesThroughPlanAccount, isUpgrade]);
 
   const currentPrice = existingMembership
     ? parseFloat(String(existingMembership.billing_amount ?? existingMembership.plan?.price ?? 0))
@@ -262,13 +295,20 @@ const PurchaseMembership = () => {
     !!homeLocationId &&
     (isUpgrade || termsAccepted) &&
     (isUpgrade || recurringAuthorized) &&
-    (!paymentRequired || (cardDigits.length >= 13 && expiry.includes('/') && cvc.length >= 3));
+    (!paymentRequired || (
+      cardDigits.length >= 13 && expiry.includes('/') && cvc.length >= 3 &&
+      !!chargeLocationId && gatewayLocationId === chargeLocationId
+    ));
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedPlan) return;
     if (!validatePayment()) return;
     if (paymentRequired && !apiLoginId) {
       show('Payment system not ready. Try again in a moment.', 'error');
+      return;
+    }
+    if (paymentRequired && (!chargeLocationId || gatewayLocationId !== chargeLocationId)) {
+      show(gatewayError || 'Payment system is still loading for this location. Try again in a moment.', 'error');
       return;
     }
     setSubmitting(true);
@@ -429,6 +469,7 @@ const PurchaseMembership = () => {
 
             <div className="md:col-span-3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
+              {!isUpgrade && (
               <div className="px-5 pt-5 pb-4 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
                   <MapPin className={`w-4 h-4 text-${themeColor}-600`} /> Home Location
@@ -457,6 +498,7 @@ const PurchaseMembership = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {paymentRequired ? (
               <div className="px-5 py-4 border-b border-gray-100">
@@ -664,6 +706,12 @@ const PurchaseMembership = () => {
                 {isCurrentPlan && (
                   <div className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
                     <AlertCircle size={12} /> You already have this plan.
+                  </div>
+                )}
+
+                {paymentRequired && gatewayError && (
+                  <div className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {gatewayError}
                   </div>
                 )}
 
