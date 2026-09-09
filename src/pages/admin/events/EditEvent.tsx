@@ -24,6 +24,7 @@ const EditEvent = () => {
 
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [eventLocationName, setEventLocationName] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -104,6 +105,7 @@ const EditEvent = () => {
     setFeatures(event.features || []);
     setIsActive(event.is_active ?? true);
     setSelectedLocation(event.location_id?.toString() || '');
+    setEventLocationName((event as { location?: { name?: string } }).location?.name || '');
 
     if (event.add_ons_order && event.add_ons_order.length > 0) {
       setSelectedAddOnIds(event.add_ons_order);
@@ -261,7 +263,7 @@ const EditEvent = () => {
     setIsSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
-        location_id: parseInt(selectedLocation) || currentUser?.location_id,
+        location_id: parseInt(selectedLocation) || undefined,
         name: name.trim(),
         description: description.trim() || undefined,
         date_type: dateType,
@@ -324,6 +326,19 @@ const EditEvent = () => {
         <div className="mb-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Edit Event</h2>
           <p className="text-sm text-gray-500 mt-2">Update event details</p>
+        </div>
+
+        <div className={`mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-4 py-3 ${selectedLocation ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+          <MapPin className={`w-4 h-4 shrink-0 ${selectedLocation ? `text-${fullColor}` : 'text-amber-700'}`} />
+          <span className="text-sm text-neutral-700">Location:</span>
+          <span className="text-sm font-semibold text-neutral-900">
+            {locations.find(l => String(l.id) === selectedLocation)?.name
+              || eventLocationName
+              || (selectedLocation ? `Location #${selectedLocation}` : 'none set')}
+          </span>
+          <span className="text-xs text-neutral-500 basis-full sm:basis-auto sm:ml-2">
+            Add-ons below come from this location only.
+          </span>
         </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" autoComplete="off">

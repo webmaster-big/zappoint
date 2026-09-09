@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
-import { Info, Plus, Calendar, Clock, Gift, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText, MapPin } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import {
     attractionService,
@@ -61,7 +61,8 @@ const EditPackage: React.FC = () => {
     const [schedulesLoaded, setSchedulesLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
-    const [packageLocationId, setPackageLocationId] = useState<number>(1);
+    const [packageLocationId, setPackageLocationId] = useState<number | null>(null);
+    const [packageLocationName, setPackageLocationName] = useState<string>('');
     
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]);
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
@@ -139,8 +140,17 @@ const EditPackage: React.FC = () => {
                     return;
                 }
 
-                const locId: number = pkg.location_id ?? 1;
+                const locId: number | null = pkg.location_id ?? null;
                 setPackageLocationId(locId);
+                setPackageLocationName(
+                    (pkg as { location?: { name?: string } }).location?.name || ''
+                );
+
+                if (locId === null) {
+                    console.error('Package has no location_id; not loading spaces/add-ons/attractions');
+                    setLoading(false);
+                    return;
+                }
 
                 const scopeParams = {
                     user_id: getStoredUser()?.id,
@@ -536,10 +546,16 @@ const EditPackage: React.FC = () => {
     const handleAddOption = async (type: string, value: string, _code?: string, extra?: string) => {
         if (!value.trim()) return;
 
+        const creationLocationId = packageLocationId;
+
         try {
             switch(type) {
                 case 'addon':
                     if (!addOns.some(a => a.name === value)) {
+                        if (!creationLocationId) {
+                            showToast('This package has no location yet. Reload before adding spaces or add-ons.', 'error');
+                            return;
+                        }
                         const priceValue = parseFloat(extra || '0');
                         
                         if (isNaN(priceValue) || priceValue < 0) {
@@ -550,7 +566,7 @@ const EditPackage: React.FC = () => {
                         const price = Number(priceValue.toFixed(2)); // Ensure 2 decimal places
                         
                         const createdAddOn = await addOnService.createAddOn({
-                            location_id: packageLocationId,
+                            location_id: creationLocationId,
                             name: value,
                             price,
                             description: '',
@@ -578,8 +594,12 @@ const EditPackage: React.FC = () => {
                     break;
                 case 'room':
                     if (!rooms.some(r => r.name === value)) {
+                        if (!creationLocationId) {
+                            showToast('This package has no location yet. Reload before adding spaces or add-ons.', 'error');
+                            return;
+                        }
                         const createdRoom = await roomService.createRoom({
-                            location_id: packageLocationId,
+                            location_id: creationLocationId,
                             name: value,
                             capacity: 20,
                             is_available: true
@@ -691,6 +711,12 @@ const EditPackage: React.FC = () => {
             showToast(`Advance booking time must be shorter than the booking window (${bookingWindowDays} days = ${bookingWindowDays * 24} hours), or no date could ever be booked.`, "error");
             return;
         }
+
+        if (!packageLocationId) {
+            showToast("This package has no location yet. Reload the page before saving.", "error");
+            return;
+        }
+
 
         if (form.pricingType === 'per_person' && (!minParticipants || !maxParticipants)) {
             showToast(`Per-${(form.participantLabel.trim() || 'player').toLowerCase()} pricing needs both minimum and maximum ${(form.participantLabel.trim() || 'player').toLowerCase()}s`, "error");
@@ -873,6 +899,19 @@ const EditPackage: React.FC = () => {
                             <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Edit Package</h2>
                             <p className="text-sm text-gray-500 mt-1">Update the details of your package deal.</p>
                         </div>
+                    </div>
+
+                    <div className={`mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-4 py-3 ${packageLocationId ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                        <MapPin className={`w-4 h-4 shrink-0 ${packageLocationId ? `text-${fullColor}` : 'text-amber-700'}`} />
+                        <span className="text-sm text-neutral-700">Location:</span>
+                        <span className="text-sm font-semibold text-neutral-900">
+                            {packageLocationName || (packageLocationId ? `Location #${packageLocationId}` : 'none set')}
+                        </span>
+                        <span className="text-xs text-neutral-500 basis-full sm:basis-auto sm:ml-2">
+                            {packageLocationId
+                                ? 'Spaces, add-ons and attractions below come from this location only. A package cannot be moved between locations - create it at the other location instead.'
+                                : 'This package has no location, so its spaces, add-ons and attractions cannot be loaded. Set a location on it before editing.'}
+                        </span>
                     </div>
                     
                     <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
@@ -1501,10 +1540,10 @@ const EditPackage: React.FC = () => {
                             )}
                         </div>
                         
-                        <div className={form.pricingType === 'per_person' ? 'hidden' : undefined}>
+                        <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
-                                    <Home className={`w-5 h-5 text-${themeColor}-600`} /> Rooms
+                                    <Home className={`w-5 h-5 text-${themeColor}-600`} /> Spaces
                                 </h3>
                                 {rooms.length > 0 && (
                                     <StandardButton
@@ -1522,6 +1561,8 @@ const EditPackage: React.FC = () => {
                                     </StandardButton>
                                 )}
                             </div>
+                            <p className="mb-1 text-sm text-neutral-600">This package belongs to <span className="font-semibold">{packageLocationName || `location #${packageLocationId ?? '—'}`}</span>. Only that location’s spaces can be selected.</p>
+                            <p className="mb-4 text-sm text-neutral-500">Optional. Leave empty for no space limit. Choose one space to run one session at a time, or several to run that many sessions in parallel — slot times follow each space’s booking interval.</p>
                             {(() => {
                                 const groupedRooms = rooms.reduce((acc, room) => {
                                     const group = room.area_group || 'Ungrouped';
@@ -1705,7 +1746,7 @@ const EditPackage: React.FC = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setForm(prev => ({ ...prev, pricingType: 'per_person', rooms: [] }))}
+                                    onClick={() => setForm(prev => ({ ...prev, pricingType: 'per_person' }))}
                                     className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${form.pricingType === 'per_person' ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
                                 >
                                     Per {(form.participantLabel.trim() || 'Player').toLowerCase()}

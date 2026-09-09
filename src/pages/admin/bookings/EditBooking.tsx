@@ -10,6 +10,7 @@ import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import packageService from '../../../services/PackageService';
 import type { Package as PackageType } from '../../../services/PackageService';
+import { packagePriceForParticipants, participantLabelFor } from '../../../utils/packagePricing';
 import roomService from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
@@ -780,11 +781,13 @@ const EditBooking: React.FC = () => {
       const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
 
       if (isPackageChanged || isParticipantsChanged || feesChanged || addOnsChanged) {
-        const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
-        const minParticipants = packageDetails?.min_participants || 1;
-        const pricePerAdditional = Number(packageDetails?.price_per_additional || 0);
-        const additionalCount = Math.max(0, formData.participants - minParticipants);
-        const packagePrice = basePackagePrice + (additionalCount * pricePerAdditional);
+        const packagePrice = packagePriceForParticipants({
+          pricingType: packageDetails?.pricing_type,
+          price: packageDetails?.price ?? 0,
+          minParticipants: packageDetails?.min_participants,
+          pricePerAdditional: packageDetails?.price_per_additional,
+          participants: formData.participants,
+        });
 
         const attractionsTotal = isPackageChanged
           ? 0
@@ -1655,12 +1658,23 @@ const EditBooking: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">
                     Package
-                    {packageDetails?.min_participants && packageDetails.min_participants > 1 && (
+                    {packageDetails?.pricing_type === 'per_person' ? (
+                      <span className="text-xs text-gray-400 ml-1">
+                        ({formData.participants} × ${Number(packageDetails.price).toFixed(2)} per {participantLabelFor(packageDetails.participant_label)})
+                      </span>
+                    ) : packageDetails?.min_participants && packageDetails.min_participants > 1 ? (
                       <span className="text-xs text-gray-400 ml-1">(up to {packageDetails.min_participants} people)</span>
-                    )}
+                    ) : null}
                   </span>
                   <span className="font-medium text-gray-900">
-                    ${packageDetails ? Number(packageDetails.price).toFixed(2) : '0.00'}
+                    ${(packageDetails?.pricing_type === 'per_person'
+                      ? packagePriceForParticipants({
+                          pricingType: 'per_person',
+                          price: packageDetails?.price ?? 0,
+                          participants: formData.participants,
+                        })
+                      : Number(packageDetails?.price ?? 0)
+                    ).toFixed(2)}
                   </span>
                 </div>
                 
@@ -1705,12 +1719,19 @@ const EditBooking: React.FC = () => {
                 )}
                 
                 {(() => {
+                  const isPerPlayer = packageDetails?.pricing_type === 'per_person';
                   const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
                   const minParticipants = packageDetails?.min_participants || 1;
                   const pricePerAdditional = Number(packageDetails?.price_per_additional || 0);
                   const additionalCount = Math.max(0, formData.participants - minParticipants);
-                  const additionalParticipantCost = additionalCount * pricePerAdditional;
-                  const packagePrice = basePackagePrice + additionalParticipantCost;
+                  const additionalParticipantCost = isPerPlayer ? 0 : additionalCount * pricePerAdditional;
+                  const packagePrice = packagePriceForParticipants({
+                    pricingType: packageDetails?.pricing_type,
+                    price: basePackagePrice,
+                    minParticipants,
+                    pricePerAdditional,
+                    participants: formData.participants,
+                  });
                   
                   const attractionsTotal = formData.packageId !== originalBooking?.package_id
                     ? 0
@@ -1740,7 +1761,7 @@ const EditBooking: React.FC = () => {
                   
                   return (
                     <>
-                      {additionalCount > 0 && pricePerAdditional > 0 && (
+                      {!isPerPlayer && additionalCount > 0 && pricePerAdditional > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">
                             +{additionalCount} extra participant{additionalCount > 1 ? 's' : ''} × ${pricePerAdditional.toFixed(2)}

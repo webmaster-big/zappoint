@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square, Filter, RefreshCcw, Link } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square, Filter, RefreshCcw, Link, MapPin } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
@@ -405,7 +405,12 @@ const ManageAddons = () => {
           }
           locationId = modalLocationId;
         } else {
-          locationId = currentUser?.location_id || 1;
+          if (!currentUser?.location_id) {
+            showToast('Your account has no location assigned, so an add-on cannot be created', 'error');
+            setActionLoading(false);
+            return;
+          }
+          locationId = currentUser.location_id;
         }
 
         const createPayload: CreateAddOnData = {
@@ -594,7 +599,13 @@ const ManageAddons = () => {
         return;
       }
 
-      const targetLocationId = importLocationId || currentUser?.location_id || 1;
+      const soleLocationId = locations.length === 1 ? locations[0].id : null;
+      const targetLocationId = importLocationId ?? currentUser?.location_id ?? soleLocationId ?? null;
+
+      if (!targetLocationId) {
+        showToast('Choose the location to import these add-ons into first', 'error');
+        return;
+      }
 
       let successCount = 0;
       let failCount = 0;
@@ -907,6 +918,18 @@ const ManageAddons = () => {
               </h2>
               
               <form onSubmit={handleSubmit} className="space-y-5">
+                {!isCompanyAdmin && (
+                  <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${(editingAddon?.location?.id ?? currentUser?.location_id) ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                    <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${(editingAddon?.location?.id ?? currentUser?.location_id) ? `text-${fullColor}` : 'text-amber-700'}`} />
+                    <p className="text-sm text-neutral-700">
+                      {editingAddon ? 'Belongs to ' : 'Creating at '}
+                      <span className="font-semibold text-neutral-900">
+                        {(editingAddon ? editingAddon.location?.name : currentUser?.location_name) || 'no location assigned'}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
                 {isCompanyAdmin && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

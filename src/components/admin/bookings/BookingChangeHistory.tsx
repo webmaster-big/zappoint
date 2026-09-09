@@ -84,8 +84,18 @@ const BookingChangeHistory: React.FC<BookingChangeHistoryProps> = ({
     try {
       const res = await bookingService.getChangeLogs(bookingId);
       setLogs(res?.data?.logs ?? []);
-    } catch {
-      setError('Could not load the change history.');
+    } catch (err) {
+      const res = (err as { response?: { status?: number; data?: { message?: string } } })?.response;
+      const status = res?.status;
+      setError(
+        status === 403
+          ? 'Your account does not have access to the change history. It is staff-only, and the account must be linked to a company.'
+          : status === 404
+            ? 'The change history endpoint is not available on this server yet.'
+            : status
+              ? `Could not load the change history (${status}${res?.data?.message ? `: ${res.data.message}` : ''}).`
+              : 'Could not load the change history. The request did not reach the server.'
+      );
       setLogs([]);
     } finally {
       setLoading(false);

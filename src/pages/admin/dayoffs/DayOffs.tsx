@@ -250,10 +250,19 @@ const DayOffs: React.FC = () => {
             return;
         }
 
+        const locationId = isCompanyAdmin ? modalLocationId : (currentUser?.location_id ?? null);
+
+        if (!locationId) {
+            showToast(
+                isCompanyAdmin
+                    ? 'Select which location this closure applies to first'
+                    : 'Your account has no location assigned, so a closure cannot be created',
+                'error'
+            );
+            return;
+        }
+
         try {
-            const locationId = isCompanyAdmin && modalLocationId
-                ? modalLocationId
-                : (currentUser?.location_id || 1);
 
             let package_ids: number[] | null = null;
             let room_ids: number[] | null = null;
@@ -815,9 +824,18 @@ const DayOffs: React.FC = () => {
 
         const sortedDates = Array.from(bulkSelectedDates).sort();
 
-        const locationId = isCompanyAdmin && modalLocationId 
-            ? modalLocationId 
-            : (currentUser?.location_id || 1);
+        const locationId = isCompanyAdmin ? modalLocationId : (currentUser?.location_id ?? null);
+
+        if (!locationId) {
+            setBulkCreating(false);
+            setToast({
+                message: isCompanyAdmin
+                    ? 'Select which location these closures apply to first'
+                    : 'Your account has no location assigned, so closures cannot be created',
+                type: 'error',
+            });
+            return;
+        }
 
         let package_ids: number[] | null = null;
         let room_ids: number[] | null = null;
@@ -1450,6 +1468,15 @@ const DayOffs: React.FC = () => {
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Day Off</h2>
                             
                             <form onSubmit={handleCreateDayOff} className="space-y-4">
+                                {!isCompanyAdmin && (
+                                    <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${currentUser?.location_id ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                                        <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${currentUser?.location_id ? `text-${fullColor}` : 'text-amber-700'}`} />
+                                        <p className="text-sm text-neutral-700">
+                                            Closing <span className="font-semibold text-neutral-900">{currentUser?.location_name || 'no location assigned'}</span>
+                                        </p>
+                                    </div>
+                                )}
+
                                 {isCompanyAdmin && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2295,6 +2322,15 @@ const DayOffs: React.FC = () => {
                         </div>
 
                         <div className="p-6">
+                                {!isCompanyAdmin && (
+                                    <div className={`mb-4 flex items-start gap-2 rounded-lg border px-3 py-2 ${currentUser?.location_id ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                                        <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${currentUser?.location_id ? `text-${fullColor}` : 'text-amber-700'}`} />
+                                        <p className="text-sm text-neutral-700">
+                                            Closing <span className="font-semibold text-neutral-900">{currentUser?.location_name || 'no location assigned'}</span>
+                                        </p>
+                                    </div>
+                                )}
+
                                 {isCompanyAdmin && (
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>

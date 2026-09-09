@@ -11,7 +11,7 @@ import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { categoryService, addOnService } from '../../../services';
 import { addOnCacheService } from '../../../services/AddOnCacheService';
 import type { Category } from '../../../services/CategoryService';
-import { Plus, Trash2, Info, Tag, Calendar, Clock, GripVertical, X } from 'lucide-react';
+import { Plus, Trash2, Info, Tag, Calendar, Clock, GripVertical, X, MapPin } from 'lucide-react';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 import CallToBookNotice from '../../../components/admin/CallToBookNotice';
@@ -72,6 +72,7 @@ const EditAttraction = () => {
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
   const [attractionLocationId, setAttractionLocationId] = useState<number | null>(null);
+  const [attractionLocationName, setAttractionLocationName] = useState<string>('');
 
   const handleAddOnDragStart = (index: number) => {
     setDraggedAddOnIndex(index);
@@ -118,6 +119,9 @@ const EditAttraction = () => {
         if (attraction.location_id != null) {
           setAttractionLocationId(attraction.location_id);
         }
+        setAttractionLocationName(
+          (attraction as { location?: { name?: string } }).location?.name || ''
+        );
 
         setFormData({
           name: attraction.name || '',
@@ -377,7 +381,7 @@ const EditAttraction = () => {
       setIsSubmitting(true);
 
       const attractionData: UpdateAttractionData = {
-        location_id: getStoredUser()?.location_id || undefined,
+        location_id: attractionLocationId ?? undefined,
         name: formData.name,
         description: formData.description,
         price: Number(formData.price),
@@ -540,6 +544,17 @@ const EditAttraction = () => {
           <div className="mb-6">
             <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Edit Attraction</h2>
             <p className="text-sm text-gray-500 mt-2">Update attraction details and settings</p>
+          </div>
+
+          <div className={`mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-4 py-3 ${attractionLocationId ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+            <MapPin className={`w-4 h-4 shrink-0 ${attractionLocationId ? `text-${fullColor}` : 'text-amber-700'}`} />
+            <span className="text-sm text-neutral-700">Location:</span>
+            <span className="text-sm font-semibold text-neutral-900">
+              {attractionLocationName || (attractionLocationId ? `Location #${attractionLocationId}` : 'none set')}
+            </span>
+            <span className="text-xs text-neutral-500 basis-full sm:basis-auto sm:ml-2">
+              Add-ons below come from this location only. An attraction cannot be moved between locations.
+            </span>
           </div>
           
           <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">

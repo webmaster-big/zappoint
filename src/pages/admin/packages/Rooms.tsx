@@ -59,6 +59,16 @@ const Rooms: React.FC = () => {
     const selectedLocationId = effectiveLocationId;
     const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
+    const locationNameFor = (locationId?: number | null): string => {
+        if (!locationId) return '';
+        const match = locations.find(l => Number(l.id) === Number(locationId));
+        if (match?.name) return match.name;
+        if (Number(currentUser?.location_id) === Number(locationId) && currentUser?.location_name) {
+            return currentUser.location_name;
+        }
+        return `Location #${locationId}`;
+    };
+
     const [formData, setFormData] = useState({
         name: '',
         capacity: '',
@@ -305,8 +315,19 @@ const Rooms: React.FC = () => {
     const handleCreateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
         
+        const locationId = isCompanyAdmin ? modalLocationId : (currentUser?.location_id ?? null);
+
+        if (!locationId) {
+            showToast(
+                isCompanyAdmin
+                    ? 'Please select a location for this space first'
+                    : 'Your account has no location assigned, so a space cannot be created',
+                'error'
+            );
+            return;
+        }
+
         try {
-            const locationId = isCompanyAdmin && modalLocationId ? modalLocationId : 1;
             
             if (creationMode === 'single') {
                 const createResponse = await roomService.createRoom({
@@ -469,7 +490,8 @@ const Rooms: React.FC = () => {
         }
 
         try {
-            const response = await roomService.updateBookingIntervalByAreaGroup(selectedAreaGroup, interval);
+            const areaGroupLocationId = isCompanyAdmin ? selectedLocationId : (currentUser?.location_id ?? null);
+            const response = await roomService.updateBookingIntervalByAreaGroup(selectedAreaGroup, interval, areaGroupLocationId);
             showToast(response.message || `Booking interval updated for area group "${selectedAreaGroup}"`, 'success');
             setShowAreaGroupModal(false);
             setSelectedAreaGroup('');
@@ -850,6 +872,15 @@ const Rooms: React.FC = () => {
                             </div>
 
                             <form onSubmit={handleCreateRoom} className="space-y-4">
+                                {!isCompanyAdmin && (
+                                    <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${currentUser?.location_id ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                                        <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${currentUser?.location_id ? `text-${fullColor}` : 'text-amber-700'}`} />
+                                        <p className="text-sm text-neutral-700">
+                                            Creating at <span className="font-semibold text-neutral-900">{locationNameFor(currentUser?.location_id) || 'no location assigned'}</span>
+                                        </p>
+                                    </div>
+                                )}
+
                                 {isCompanyAdmin && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1384,6 +1415,14 @@ const Rooms: React.FC = () => {
                         <div className="p-6 overflow-y-auto flex-1">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Space</h2>
                             <form onSubmit={handleUpdateRoom} className="space-y-4">
+                                <div className={`flex items-start gap-2 rounded-lg border border-${themeColor}-200 bg-${themeColor}-50 px-3 py-2`}>
+                                    <MapPin className={`w-4 h-4 mt-0.5 shrink-0 text-${fullColor}`} />
+                                    <p className="text-sm text-neutral-700">
+                                        Belongs to <span className="font-semibold text-neutral-900">{locationNameFor(selectedRoom.location_id)}</span>
+                                        <span className="block text-xs text-neutral-500">A space cannot be moved between locations.</span>
+                                    </p>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Space Name *
@@ -1626,8 +1665,17 @@ const Rooms: React.FC = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-semibold text-gray-900">Area Group Settings</h2>
-                                    <p className="text-sm text-gray-500">Update booking interval for all rooms in an area group</p>
+                                    <p className="text-sm text-gray-500">Update booking interval for all spaces in an area group</p>
                                 </div>
+                            </div>
+
+                            <div className={`mb-4 flex items-start gap-2 rounded-lg border px-3 py-2 ${(isCompanyAdmin ? selectedLocationId : currentUser?.location_id) ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                                <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${(isCompanyAdmin ? selectedLocationId : currentUser?.location_id) ? `text-${fullColor}` : 'text-amber-700'}`} />
+                                <p className="text-sm text-neutral-700">
+                                    {isCompanyAdmin && !selectedLocationId
+                                        ? 'Applies to every location in your company - area group names repeat across venues. Pick a location in the sidebar to narrow it.'
+                                        : <>Applies to <span className="font-semibold text-neutral-900">{locationNameFor(isCompanyAdmin ? selectedLocationId : currentUser?.location_id)}</span> only.</>}
+                                </p>
                             </div>
 
                             <div className="space-y-4">

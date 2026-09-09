@@ -335,7 +335,13 @@ const Packages: React.FC = () => {
       }
 
       const currentUser = getStoredUser();
-      const targetLocationId = importLocationId || currentUser?.location_id || 1;
+      const soleLocationId = allLocations.length === 1 ? allLocations[0].id : null;
+      const targetLocationId = importLocationId ?? currentUser?.location_id ?? soleLocationId ?? null;
+
+      if (!targetLocationId) {
+        alert('Choose the location to import these packages into first.');
+        return;
+      }
 
       const packagesForImport = parsedData.map(pkg => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -448,6 +454,7 @@ const Packages: React.FC = () => {
 
       const response = await packageService.getPackage(packageToDuplicate.id);
       const original = response.data;
+      const sameLocation = Number(original.location_id) === Number(duplicateTargetLocationId);
 
       const duplicateData: CreatePackageData = {
         location_id: duplicateTargetLocationId,
@@ -459,6 +466,12 @@ const Packages: React.FC = () => {
         price: original.price,
         price_per_additional: original.price_per_additional,
         max_participants: original.max_participants,
+        pricing_type: original.pricing_type,
+        min_participants: original.min_participants ?? undefined,
+        participant_label: original.participant_label,
+        max_tickets_per_slot: original.max_tickets_per_slot,
+        display_label: original.display_label,
+        display_order: original.display_order,
         duration: original.duration,
         duration_unit: original.duration_unit,
         price_per_additional_30min: original.price_per_additional_30min,
@@ -477,9 +490,9 @@ const Packages: React.FC = () => {
         invitation_download_link: original.invitation_download_link,
         booking_window_days: original.booking_window_days,
         min_booking_notice_hours: original.min_booking_notice_hours,
-        attraction_ids: original.attractions?.map(a => a.id),
-        room_ids: original.rooms?.map(r => r.id),
-        addon_ids: original.add_ons?.map(a => a.id),
+        attraction_ids: sameLocation ? original.attractions?.map(a => a.id) : [],
+        room_ids: sameLocation ? original.rooms?.map(r => r.id) : [],
+        addon_ids: sameLocation ? original.add_ons?.map(a => a.id) : [],
       };
 
       const createResponse = await packageService.createPackage(duplicateData);
@@ -488,7 +501,10 @@ const Packages: React.FC = () => {
         await packageCacheService.addPackageToCache(createResponse.data);
         setPackages(prev => [createResponse.data, ...prev]);
         const targetName = allLocations.find(l => l.id === duplicateTargetLocationId)?.name || '';
-        alert(`"${original.name}" duplicated successfully${targetName ? ` to ${targetName}` : ''}!`);
+        alert(
+          `"${original.name}" duplicated successfully${targetName ? ` to ${targetName}` : ''}!` +
+          (sameLocation ? '' : '\n\nSpaces, add-ons and attractions were not copied - they belong to the original location. Pick that location\u2019s own ones on the copy.')
+        );
       }
     } catch (error) {
       console.error('Error duplicating package:', error);
@@ -1270,6 +1286,13 @@ const Packages: React.FC = () => {
               ) : (
                 <p className="text-sm text-gray-600 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
                   {allLocations[0]?.name || 'Current location'}
+                </p>
+              )}
+              {duplicateTargetLocationId !== null
+                && Number(duplicateTargetLocationId) !== Number(packageToDuplicate.location_id) && (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Spaces, add-ons and attractions belong to a location, so the copy starts with none of them.
+                  Everything else - pricing, schedules, images - is copied. Pick that location&rsquo;s own spaces on the copy.
                 </p>
               )}
             </div>

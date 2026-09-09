@@ -814,7 +814,13 @@ const ManageAttractions = () => {
       }
 
       const storedUser = getStoredUser();
-      const targetLocationId = importLocationId || storedUser?.location_id || 1;
+      const soleLocationId = scopeLocations.length === 1 ? scopeLocations[0].id : null;
+      const targetLocationId = importLocationId ?? storedUser?.location_id ?? soleLocationId ?? null;
+
+      if (!targetLocationId) {
+        setToast({ message: 'Choose the location to import these attractions into first.', type: 'error' });
+        return;
+      }
 
       const attractionsToImport = parsedData.map((attraction: AttractionRow) => ({
         location_id: targetLocationId,

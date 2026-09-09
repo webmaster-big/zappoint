@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
 import LocationSelector from '../../../components/admin/LocationSelector';
-import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Home, Trash2, X, GripVertical, FileText } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Home, Trash2, X, GripVertical, FileText, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import {
@@ -444,10 +444,16 @@ const CreatePackage: React.FC = () => {
     const handleAddOption = async (type: string, value: string, _code?: string, extra?: string) => {
         if (!value.trim()) return;
 
+        const creationLocationId = selectedLocation ?? effectiveLocationId;
+
         try {
             switch(type) {
                 case 'addon':
                     if (!addOns.some(a => a.name === value)) {
+                        if (!creationLocationId) {
+                            showToast('Choose a location first, then add new spaces or add-ons.', 'error');
+                            return;
+                        }
                         const priceValue = parseFloat(extra || '0');
                         
                         if (isNaN(priceValue) || priceValue < 0) {
@@ -455,10 +461,12 @@ const CreatePackage: React.FC = () => {
                             return;
                         }
                         
+
+                        
                         const price = Number(priceValue.toFixed(2)); // Ensure 2 decimal places
                         
                         const created = await addOnService.createAddOn({
-                            location_id: selectedLocation ?? effectiveLocationId ?? 1,
+                            location_id: creationLocationId,
                             name: value,
                             price,
                             description: '',
@@ -486,8 +494,12 @@ const CreatePackage: React.FC = () => {
                     break;
                 case 'room':
                     if (!rooms.some(r => r.name === value)) {
+                        if (!creationLocationId) {
+                            showToast('Choose a location first, then add new spaces or add-ons.', 'error');
+                            return;
+                        }
                         const created = await roomService.createRoom({
-                            location_id: selectedLocation ?? effectiveLocationId ?? 1,
+                            location_id: creationLocationId,
                             name: value,
                             capacity: 20,
                             is_available: true
@@ -780,6 +792,21 @@ const CreatePackage: React.FC = () => {
                         </div>
                         
                         <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
+                            {!isCompanyAdmin && (
+                                <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-4 py-3 ${selectedLocation ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
+                                    <MapPin className={`w-4 h-4 shrink-0 ${selectedLocation ? `text-${fullColor}` : 'text-amber-700'}`} />
+                                    <span className="text-sm text-neutral-700">Creating this package at:</span>
+                                    <span className="text-sm font-semibold text-neutral-900">
+                                        {currentUser?.location_name || (selectedLocation ? `Location #${selectedLocation}` : 'no location assigned')}
+                                    </span>
+                                    <span className="text-xs text-neutral-500 basis-full sm:basis-auto sm:ml-2">
+                                        {selectedLocation
+                                            ? 'Only this location\u2019s spaces, add-ons and attractions can be attached.'
+                                            : 'Your account has no location, so this package cannot be created. Ask an admin to assign you one.'}
+                                    </span>
+                                </div>
+                            )}
+
                             {isCompanyAdmin && (
                                 <div>
                                     <LocationSelector
@@ -1436,12 +1463,12 @@ const CreatePackage: React.FC = () => {
                     </div>
                 )}
             </div>                            {/* SPACE Section */}
-                            <div className={form.pricingType === 'per_person' ? 'hidden' : undefined}>
+                            <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
-                                        <Home className="w-5 h-5 text-primary" /> Space
+                                        <Home className="w-5 h-5 text-primary" /> Spaces
                                         <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                            Assign specific Spaces where this package can be booked
+                                            Assign the Spaces this package can be booked into. Works with both Base price and Per player pricing.
                                         </span>
                                     </h3>
                                     <StandardButton
@@ -1459,6 +1486,7 @@ const CreatePackage: React.FC = () => {
                                         {form.rooms.length === rooms.length ? 'Deselect All' : 'Select All'}
                                     </StandardButton>
                                 </div>
+                                <p className="mb-4 text-sm text-neutral-500">Optional. Leave empty for no space limit. Choose one space to run one session at a time, or several to run that many sessions in parallel — slot times follow each space’s booking interval.</p>
                                 {(() => {
                                     const groupedRooms = rooms.reduce((acc, room) => {
                                         const group = room.area_group || 'Ungrouped';
@@ -1639,7 +1667,7 @@ const CreatePackage: React.FC = () => {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setForm(prev => ({ ...prev, pricingType: 'per_person', rooms: [] }))}
+                                        onClick={() => setForm(prev => ({ ...prev, pricingType: 'per_person' }))}
                                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${form.pricingType === 'per_person' ? `bg-white shadow text-${themeColor}-700` : 'text-gray-500 hover:text-gray-700'}`}
                                     >
                                         Per {(form.participantLabel.trim() || 'Player').toLowerCase()}

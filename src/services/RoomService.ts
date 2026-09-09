@@ -117,9 +117,10 @@ class RoomService {
     return response.data;
   }
 
-  async updateBookingIntervalByAreaGroup(areaGroup: string, bookingInterval: number): Promise<ApiResponse<{ updated_count: number }>> {
+  async updateBookingIntervalByAreaGroup(areaGroup: string, bookingInterval: number, locationId?: number | null): Promise<ApiResponse<{ updated_count: number }>> {
     const response = await api.patch(`/rooms/area-group/${encodeURIComponent(areaGroup)}/update-booking-interval`, {
-      booking_interval: bookingInterval
+      booking_interval: bookingInterval,
+      ...(locationId ? { location_id: locationId } : {})
     });
     return response.data;
   }
