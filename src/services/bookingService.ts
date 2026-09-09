@@ -696,6 +696,19 @@ const bookingService = {
     return response.data;
   },
 
+  async rollbackBooking(id: number): Promise<'force-deleted' | 'soft-deleted'> {
+    try {
+      await api.delete(`/bookings/${id}/force-delete`);
+      return 'force-deleted';
+    } catch (forceErr) {
+      console.error('Force delete failed after payment failure, falling back to soft delete', forceErr);
+    }
+    await api.delete(`/bookings/${id}`, {
+      params: { change_reason: 'Payment failed - automatic rollback' },
+    });
+    return 'soft-deleted';
+  },
+
   async bulkRestore(ids: number[]): Promise<{
     success: boolean;
     message: string;

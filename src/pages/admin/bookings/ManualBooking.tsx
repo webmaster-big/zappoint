@@ -22,6 +22,7 @@ import { getStoredUser, getImageUrl, formatTimeTo12Hour } from '../../../utils/s
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { derivePaymentStatus } from '../../../types/Bookings.types';
 import { feeSupportService } from '../../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -846,7 +847,10 @@ const ManualBooking: React.FC = () => {
       
       const user = getStoredUser();
       const calculatedTotal = calculateTotal();
-      const feeTotal = feeBreakdown ? feeBreakdown.total : calculatedTotal;
+      const freshFeeTotal = pkg
+        ? await resolveFeeTotal('package', pkg.id, calculatedTotal, pkg.location_id || undefined)
+        : null;
+      const feeTotal = freshFeeTotal !== null ? freshFeeTotal : calculatedTotal;
       const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : feeTotal;
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
       
@@ -1083,7 +1087,7 @@ const ManualBooking: React.FC = () => {
 
           if (!paymentResult.success) {
             try {
-              await bookingService.forceDeleteBooking(bookingId);
+              await bookingService.rollbackBooking(bookingId);
               await bookingCacheService.removeBookingFromCache(bookingId);
             } catch (deleteErr) {
               console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
@@ -1107,7 +1111,7 @@ const ManualBooking: React.FC = () => {
           console.log('✅ Card payment charged:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           try {
-            await bookingService.forceDeleteBooking(bookingId);
+            await bookingService.rollbackBooking(bookingId);
             await bookingCacheService.removeBookingFromCache(bookingId);
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete booking after payment error:', deleteErr);

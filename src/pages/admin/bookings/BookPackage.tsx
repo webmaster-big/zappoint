@@ -38,6 +38,7 @@ import { globalNoteService, type GlobalNote } from '../../../services/GlobalNote
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
 import { feeSupportService } from '../../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -1250,7 +1251,11 @@ const BookPackage: React.FC = () => {
     setPaymentError('');
     
     try {
-      const amountToPay = partialAmount > 0 ? partialAmount : finalTotal;
+      const freshFeeTotal = pkg ? await resolveFeeTotal('package', pkg.id, subtotal, pkg.location_id || undefined) : null;
+      const submitFinalTotal = freshFeeTotal !== null
+        ? Math.max(0, freshFeeTotal - specialPricingDiscount - promoDiscount - giftCardDiscount - membershipDiscount)
+        : finalTotal;
+      const amountToPay = partialAmount > 0 ? partialAmount : submitFinalTotal;
       
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
@@ -1318,7 +1323,7 @@ const BookPackage: React.FC = () => {
         participants,
         duration: pkg.duration,
         duration_unit: pkg.duration_unit,
-        total_amount: finalTotal + promoDiscount + giftCardDiscount,
+        total_amount: submitFinalTotal + promoDiscount + giftCardDiscount,
         amount_paid: amountToPay,
         payment_method: 'authorize.net' as const,
         send_email: false,
@@ -1375,7 +1380,7 @@ const BookPackage: React.FC = () => {
       } catch {
         console.error('❌ QR generation failed, force deleting booking:', bookingId);
         try {
-          await bookingService.forceDeleteBooking(bookingId);
+          await bookingService.rollbackBooking(bookingId);
           console.log('🗑️ Booking force deleted due to QR generation failure');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after QR failure:', deleteErr);
@@ -1409,7 +1414,7 @@ const BookPackage: React.FC = () => {
       } catch (paymentErr) {
         console.error('❌ Payment processing error, force deleting booking:', bookingId);
         try {
-          await bookingService.forceDeleteBooking(bookingId);
+          await bookingService.rollbackBooking(bookingId);
           console.log('🗑️ Booking force deleted due to payment processing error');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
@@ -1420,7 +1425,7 @@ const BookPackage: React.FC = () => {
       if (!paymentResponse.success) {
         console.error('❌ Payment failed, force deleting booking:', bookingId);
         try {
-          await bookingService.forceDeleteBooking(bookingId);
+          await bookingService.rollbackBooking(bookingId);
           console.log('🗑️ Booking force deleted due to payment failure');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
@@ -1441,6 +1446,9 @@ const BookPackage: React.FC = () => {
     } catch (err: any) {
       const userFriendlyMessage = getPaymentErrorMessage(err);
       setPaymentError(userFriendlyMessage);
+      setTimeout(() => {
+        document.querySelector('[data-payment-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 0);
     } finally {
       setIsProcessingPayment(false);
       isSubmittingRef.current = false;
@@ -2790,7 +2798,7 @@ const BookPackage: React.FC = () => {
                   </div>
                   
                   {paymentError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-start gap-2">
+                    <div data-payment-error className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-start gap-2">
                       <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
                       </svg>

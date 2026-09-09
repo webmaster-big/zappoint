@@ -54,6 +54,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
 import { feeSupportService } from '../../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -1041,7 +1042,13 @@ const PurchaseAttraction = () => {
       setIsProcessingPayment(true);
       setPaymentError('');
 
-      const totalAmount = total;
+      const freshFeeTotal = attraction
+        ? await resolveFeeTotal('attraction', Number(attraction.id), calculateTotal(), attraction.locationId ? Number(attraction.locationId) : undefined)
+        : null;
+      const submitTotalBeforeMembership = freshFeeTotal !== null
+        ? freshFeeTotal - specialPricingDiscount
+        : totalBeforeMembership;
+      const totalAmount = Math.max(0, submitTotalBeforeMembership - membershipDiscount);
 
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
@@ -1103,7 +1110,7 @@ const PurchaseAttraction = () => {
         applied_discounts: (() => {
           const items = [
             ...buildAppliedDiscounts(specialPricingBreakdown),
-            ...buildMembershipDiscount(membershipBenefits, totalBeforeMembership, attractionItemName),
+            ...buildMembershipDiscount(membershipBenefits, submitTotalBeforeMembership, attractionItemName),
           ];
           return items.length > 0 ? items : null;
         })(),

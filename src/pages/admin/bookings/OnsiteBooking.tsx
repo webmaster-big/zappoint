@@ -21,6 +21,7 @@ import customerService from '../../../services/CustomerService';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
+import { packagePriceForParticipants, participantLabelFor } from '../../../utils/packagePricing';
 
 interface DayOffWithTime {
   date: Date;
@@ -36,6 +37,7 @@ import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
 import { feeSupportService } from '../../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
@@ -1367,7 +1369,9 @@ const OnsiteBooking: React.FC = () => {
         })
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
-      const totalAmount = feeBreakdown ? feeBreakdown.total : (calculateTotal() + promoDiscount + giftDiscount);
+      const submitBasePrice = calculateTotal();
+      const freshFeeTotal = await resolveFeeTotal('package', selectedPackage.id, submitBasePrice, selectedLocation || undefined);
+      const totalAmount = freshFeeTotal !== null ? freshFeeTotal : (submitBasePrice + promoDiscount + giftDiscount);
       const netTotal = Math.max(0, totalAmount - promoDiscount - giftDiscount);
       const partialAmount = calculatePartialAmount();
       let amountPaid = netTotal;
@@ -1532,7 +1536,7 @@ const OnsiteBooking: React.FC = () => {
           if (!paymentResult.success) {
             console.error('❌ Payment failed, force deleting booking:', bookingId);
             try {
-              await bookingService.forceDeleteBooking(bookingId);
+              await bookingService.rollbackBooking(bookingId);
               await bookingCacheService.removeBookingFromCache(bookingId);
               console.log('🗑️ Booking force deleted due to payment failure');
             } catch (deleteErr) {
@@ -1560,7 +1564,7 @@ const OnsiteBooking: React.FC = () => {
           
           if (createdBookingIdForCleanup) {
             try {
-              await bookingService.forceDeleteBooking(createdBookingIdForCleanup);
+              await bookingService.rollbackBooking(createdBookingIdForCleanup);
               await bookingCacheService.removeBookingFromCache(createdBookingIdForCleanup);
               console.log('🗑️ Booking force deleted due to payment processing error');
             } catch (deleteErr) {
@@ -1806,15 +1810,27 @@ const OnsiteBooking: React.FC = () => {
                 <div className="bg-gray-50 rounded-lg p-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-medium text-gray-800">Base Package</span>
+                      <span className="font-medium text-gray-800">
+                        {selectedPackage.pricingType === 'per_person' ? 'Players' : 'Base Package'}
+                      </span>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {selectedPackage.name}
                       </p>
                       <p className="text-xs text-gray-400">
-                        Covers up to {selectedPackage.minParticipants || 1} participant{(selectedPackage.minParticipants || 1) > 1 ? 's' : ''}
+                        {selectedPackage.pricingType === 'per_person'
+                          ? `${bookingData.participants} \u00d7 $${selectedPackage.price.toFixed(2)} per ${participantLabelFor(selectedPackage.participantLabel)}`
+                          : `Covers up to ${selectedPackage.minParticipants || 1} participant${(selectedPackage.minParticipants || 1) > 1 ? 's' : ''}`}
                       </p>
                     </div>
-                    <span className="font-semibold text-gray-900">${selectedPackage.price.toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900">
+                      ${packagePriceForParticipants({
+                        pricingType: selectedPackage.pricingType,
+                        price: selectedPackage.price,
+                        minParticipants: selectedPackage.minParticipants,
+                        pricePerAdditional: 0,
+                        participants: bookingData.participants,
+                      }).toFixed(2)}
+                    </span>
                   </div>
                 </div>
                 

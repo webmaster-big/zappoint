@@ -28,6 +28,7 @@ import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { feeSupportService } from '../../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -482,7 +483,12 @@ const OnsitePurchaseEvent = () => {
         };
       });
 
-      const total = calculateTotal();
+      const freshFeeTotal = event
+        ? await resolveFeeTotal('event', event.id, calculateBaseTotal(), event.location_id || undefined)
+        : null;
+      const total = freshFeeTotal !== null
+        ? Math.max(0, freshFeeTotal - specialPricingDiscount)
+        : calculateTotal();
 
       const purchaseRes = await eventPurchaseService.createPurchase({
         event_id: event!.id,

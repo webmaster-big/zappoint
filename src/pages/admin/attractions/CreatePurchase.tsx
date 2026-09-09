@@ -33,6 +33,7 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
 import { feeSupportService } from '../../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -937,7 +938,10 @@ const CreatePurchase = () => {
         return;
       }
 
-      const totalAmount = finalTotal;
+      const freshFeeTotal = selectedAttraction
+        ? await resolveFeeTotal('attraction', Number(selectedAttraction.id), calculateTotal(), (selectedAttraction.locationId ? Number(selectedAttraction.locationId) : (selectedLocation ?? undefined)))
+        : null;
+      const totalAmount = freshFeeTotal !== null ? Math.max(0, freshFeeTotal - specialPricingDiscount) : finalTotal;
       let transactionId: string | undefined;
       
       const isCardPayment = paymentMethod === 'authorize.net';

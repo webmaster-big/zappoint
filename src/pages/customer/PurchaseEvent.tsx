@@ -45,6 +45,7 @@ import type { FeeBreakdown } from '../../types/FeeSupport.types';
 import { buildAppliedFees } from '../../utils/fees';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../utils/discounts';
 import { feeSupportService } from '../../services/FeeSupportService';
+import { resolveFeeTotal } from '../../utils/feeTotal';
 import { specialPricingService } from '../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../types/SpecialPricing.types';
 import type { Event, EventAddOn } from '../../types/event.types';
@@ -983,6 +984,21 @@ const PurchaseEvent = () => {
       let response;
       try {
         setNextTrackingId();
+        const submitBasePrice = event
+          ? (parseFloat(event.price) * quantity) +
+            Object.entries(selectedAddOns).reduce((sum, [id, qty]) => {
+              const addon = event.add_ons?.find(a => a.id === parseInt(id));
+              return sum + (addon ? parseFloat(addon.price) * qty : 0);
+            }, 0)
+          : 0;
+        const freshFeeTotal = event
+          ? await resolveFeeTotal('event', event.id, submitBasePrice, event.location_id)
+          : null;
+        const submitTotalBeforeMembership = freshFeeTotal !== null
+          ? freshFeeTotal - specialPricingDiscount
+          : totalBeforeMembership;
+        const submitTotalAmount = Math.max(0, submitTotalBeforeMembership - membershipDiscount);
+
         response = await eventPurchaseService.createPurchase({
           event_id: parseInt(eventId!),
           customer_id: selectedCustomerId || customerData?.id || undefined,
@@ -995,7 +1011,7 @@ const PurchaseEvent = () => {
           purchase_date: selectedDate,
           purchase_time: selectedTime,
           quantity,
-          total_amount: totalAmount,
+          total_amount: submitTotalAmount,
           amount_paid: 0,
           gift_card_code: giftCard?.code ?? undefined,
           discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
@@ -1009,7 +1025,7 @@ const PurchaseEvent = () => {
           applied_discounts: (() => {
             const items = [
               ...buildAppliedDiscounts(specialPricingBreakdown),
-              ...buildMembershipDiscount(membershipBenefits, totalBeforeMembership, eventItemName),
+              ...buildMembershipDiscount(membershipBenefits, submitTotalBeforeMembership, eventItemName),
             ];
             return items.length > 0 ? items : undefined;
           })(),
