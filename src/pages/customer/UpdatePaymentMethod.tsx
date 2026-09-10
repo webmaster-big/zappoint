@@ -11,7 +11,6 @@ import {
 import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
 import { loadAcceptJS, tokenizeCard } from '../../services/PaymentService';
-import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import type { Membership } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
 import StandardButton from '../../components/ui/StandardButton';
@@ -97,25 +96,19 @@ const UpdatePaymentMethod = () => {
         const m = await membershipCache.getMine();
         setMembership(m);
         if (m) {
-          const chargeLocationId = m.plan?.billing_account_id ? null : (m.home_location_id ?? null);
-          if (m.plan?.billing_account_id) {
-            setGatewayError('Your plan bills through a central account. Please contact us to update your card.');
-          } else if (!chargeLocationId) {
-            setGatewayError('Your membership does not have a home location set, so we cannot update the card here. Please contact us and we will sort it out.');
-          } else {
-            try {
-              const res = await getAuthorizeNetPublicKey(chargeLocationId);
-              if (res?.api_login_id) {
-                setApiLoginId(res.api_login_id);
-                setClientKey(res.client_key || res.api_login_id);
-                setGatewayLocationId(chargeLocationId);
-                await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
-              } else {
-                setGatewayError('Card payment is not set up for your home location yet. Please contact us and we will sort it out.');
-              }
-            } catch {
-              setGatewayError('Card payment is not set up for your home location yet. Please contact us and we will sort it out.');
+          try {
+            const res = await membershipService.gatewayKey({ membership_id: m.id });
+            if (res?.api_login_id) {
+              setApiLoginId(res.api_login_id);
+              setClientKey(res.client_key || res.api_login_id);
+              setGatewayLocationId(m.id);
+              await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
+            } else {
+              setGatewayError(res?.message || 'Card payment is not set up for your membership yet. Please contact us.');
             }
+          } catch (err) {
+            const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            setGatewayError(message || 'Card payment is not set up for your membership yet. Please contact us.');
           }
         }
       } catch (e: unknown) {

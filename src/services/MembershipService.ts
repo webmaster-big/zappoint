@@ -113,6 +113,24 @@ async function getMembership(id: number): Promise<Membership> {
   return unwrap<Membership>(res.data);
 }
 
+export interface MembershipGatewayKey {
+  success: boolean;
+  api_login_id?: string;
+  client_key?: string;
+  environment?: 'sandbox' | 'production';
+  account_id?: number;
+  message?: string;
+}
+
+async function gatewayKey(params: {
+  plan_id?: number;
+  membership_id?: number;
+  home_location_id?: number;
+}): Promise<MembershipGatewayKey> {
+  const res = await api.get('/memberships/gateway-key', { params });
+  return res.data as MembershipGatewayKey;
+}
+
 async function myMembership(): Promise<Membership | null> {
   const res = await api.get('/memberships/me');
   const payload = unwrap<Membership | null>(res.data);
@@ -307,6 +325,7 @@ export const membershipService = {
   listMemberships,
   getMembership,
   myMembership,
+  gatewayKey,
   myMemberships,
   purchaseMembership,
   createMembership,

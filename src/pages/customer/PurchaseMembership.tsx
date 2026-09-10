@@ -16,7 +16,6 @@ import {
 import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
 import { loadAcceptJS, tokenizeCard } from '../../services/PaymentService';
-import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import locationService from '../../services/LocationService';
 import type { Membership, MembershipPlan, MembershipPlanBenefit } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
@@ -111,7 +110,7 @@ const PurchaseMembership = () => {
 
   const [apiLoginId, setApiLoginId] = useState('');
   const [clientKey, setClientKey] = useState('');
-  const [gatewayLocationId, setGatewayLocationId] = useState<number | null>(null);
+  const [gatewayKeyFor, setGatewayKeyFor] = useState('');
   const [gatewayError, setGatewayError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -186,51 +185,48 @@ const PurchaseMembership = () => {
   const currentPlanId = existingMembership?.membership_plan_id ?? existingMembership?.plan?.id ?? null;
   const isCurrentPlan = !!selectedPlanId && selectedPlanId === currentPlanId;
 
-  const billingPlan = isUpgrade ? (existingMembership?.plan ?? null) : selectedPlan;
-  const routesThroughPlanAccount = !!billingPlan?.billing_account_id;
+  const gatewayRequest = useMemo(() => {
+    if (isUpgrade && existingMembership) return { membership_id: existingMembership.id };
+    if (selectedPlan) {
+      return homeLocationId
+        ? { plan_id: selectedPlan.id, home_location_id: homeLocationId }
+        : { plan_id: selectedPlan.id };
+    }
+    return null;
+  }, [isUpgrade, existingMembership, selectedPlan, homeLocationId]);
 
-  const chargeLocationId = useMemo(() => {
-    if (routesThroughPlanAccount) return null;
-    if (isUpgrade) return existingMembership?.home_location_id ?? null;
-    return homeLocationId;
-  }, [routesThroughPlanAccount, isUpgrade, existingMembership, homeLocationId]);
+  const gatewaySignature = gatewayRequest ? JSON.stringify(gatewayRequest) : '';
 
   useEffect(() => {
     setApiLoginId('');
     setClientKey('');
-    setGatewayLocationId(null);
+    setGatewayKeyFor('');
     setGatewayError('');
 
-    if (!chargeLocationId) {
-      if (routesThroughPlanAccount) {
-        setGatewayError('This plan bills through a central account. Please contact us to complete this payment.');
-      } else if (isUpgrade) {
-        setGatewayError('Your membership does not have a home location set, so we cannot take payment here. Please contact us and we will sort it out.');
-      }
-      return;
-    }
+    if (!gatewaySignature) return;
 
     let cancelled = false;
     (async () => {
       try {
-        const res = await getAuthorizeNetPublicKey(chargeLocationId);
+        const res = await membershipService.gatewayKey(JSON.parse(gatewaySignature));
         if (cancelled) return;
         if (res?.api_login_id) {
           setApiLoginId(res.api_login_id);
           setClientKey(res.client_key || res.api_login_id);
-          setGatewayLocationId(chargeLocationId);
+          setGatewayKeyFor(gatewaySignature);
           await loadAcceptJS((res.environment as 'sandbox' | 'production') || 'sandbox');
         } else {
-          setGatewayError('Card payment is not set up for this location yet. Please choose another, or visit us in store.');
+          setGatewayError(res?.message || 'Card payment is not set up for this membership yet. Please contact us.');
         }
       } catch (error) {
         if (cancelled) return;
         console.error('Failed to load Authorize.Net settings:', error);
-        setGatewayError('Card payment is not set up for this location yet. Please choose another, or visit us in store.');
+        const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setGatewayError(message || 'Card payment is not set up for this membership yet. Please contact us.');
       }
     })();
     return () => { cancelled = true; };
-  }, [chargeLocationId, routesThroughPlanAccount, isUpgrade]);
+  }, [gatewaySignature]);
 
   const currentPrice = existingMembership
     ? parseFloat(String(existingMembership.billing_amount ?? existingMembership.plan?.price ?? 0))
@@ -297,7 +293,7 @@ const PurchaseMembership = () => {
     (isUpgrade || recurringAuthorized) &&
     (!paymentRequired || (
       cardDigits.length >= 13 && expiry.includes('/') && cvc.length >= 3 &&
-      !!chargeLocationId && gatewayLocationId === chargeLocationId
+      !!gatewaySignature && gatewayKeyFor === gatewaySignature
     ));
 
   const handleSubmit = async () => {
@@ -307,7 +303,7 @@ const PurchaseMembership = () => {
       show('Payment system not ready. Try again in a moment.', 'error');
       return;
     }
-    if (paymentRequired && (!chargeLocationId || gatewayLocationId !== chargeLocationId)) {
+    if (paymentRequired && (!gatewaySignature || gatewayKeyFor !== gatewaySignature)) {
       show(gatewayError || 'Payment system is still loading for this location. Try again in a moment.', 'error');
       return;
     }

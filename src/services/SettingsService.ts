@@ -68,12 +68,22 @@ export const getAuthorizeNetPublicKey = async (locationId: number): Promise<Sett
   return response.data;
 };
 
-export const debugAuthorizeNetCredentials = async (locationId: number): Promise<any> => {
-  const response = await api.get<any>(`/authorize-net/debug/${locationId}`);
-  console.log('🔍 === AUTHORIZE.NET DEBUG INFO ===');
-  console.log('Location ID:', locationId);
-  console.log('Response:', response.data);
-  console.log('===================================');
+export interface AuthorizeNetConnectionTest {
+  success: boolean;
+  message?: string;
+  environment?: string;
+  tested_at?: string;
+  merchant_name?: string;
+  gateway_id?: string;
+  errors?: { code: string; text: string }[];
+}
+
+export const debugAuthorizeNetCredentials = async (
+  locationId: number
+): Promise<AuthorizeNetConnectionTest> => {
+  const response = await api.post<AuthorizeNetConnectionTest>(
+    `/authorize-net/test-connection/${locationId}`
+  );
   return response.data;
 };
 

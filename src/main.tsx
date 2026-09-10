@@ -9,18 +9,34 @@ import { debugAuthorizeNetCredentials } from './services/SettingsService'
 
 setupAnalytics();
 
-(window as any).debugAuthorizeNet = async (locationId: number = 1) => {
+declare global {
+  interface Window {
+    debugAuthorizeNet?: (locationId: number) => Promise<unknown>;
+  }
+}
+
+window.debugAuthorizeNet = async (locationId: number) => {
+  if (!locationId) {
+    console.error('Pass a location id, e.g. debugAuthorizeNet(11)');
+    return null;
+  }
   try {
-    console.log('🔍 Fetching Authorize.Net debug info for location:', locationId);
     const result = await debugAuthorizeNetCredentials(locationId);
-    console.table(result);
+    console.table({
+      location_id: locationId,
+      merchant_name: result?.merchant_name ?? '(none)',
+      gateway_id: result?.gateway_id ?? '(none)',
+      environment: result?.environment ?? '(none)',
+      message: result?.message ?? '',
+    });
     return result;
-  } catch (error: any) {
-    console.error('❌ Debug failed:', error.response?.data || error.message);
+  } catch (error) {
+    const err = error as { response?: { data?: unknown }; message?: string };
+    console.error('Authorize.Net check failed:', err.response?.data ?? err.message);
     return null;
   }
 };
-console.log('💡 TIP: Run debugAuthorizeNet(locationId) in console to check Authorize.Net credentials');
+console.log('TIP: debugAuthorizeNet(locationId) shows which Authorize.Net merchant a location charges through');
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
