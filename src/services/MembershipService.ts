@@ -187,6 +187,15 @@ async function updatePaymentMethod(
     payment_method_label: string;
     payment_profile_token?: string;
     opaque_data?: { dataDescriptor: string; dataValue: string };
+    billing?: {
+      first_name?: string;
+      last_name?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      country?: string;
+    };
   }
 ): Promise<Membership> {
   const res = await api.patch(`/memberships/${id}/payment-method`, payload);

@@ -181,9 +181,14 @@ const UpdatePaymentMethod = () => {
       const label = nameOnCard
         ? `${nameOnCard} · Card ending ${last4}`
         : `Card ending ${last4}`;
+      const nameParts = nameOnCard.trim().split(/\s+/);
       await membershipService.updatePaymentMethod(membership.id, {
         payment_method_label: label,
         opaque_data: { dataDescriptor: opaque.dataDescriptor, dataValue: opaque.dataValue },
+        billing: {
+          first_name: nameParts[0] || undefined,
+          last_name: nameParts.slice(1).join(' ') || undefined,
+        },
       });
       showSuccess('Payment method updated!');
       await membershipCache.invalidate('mine');
