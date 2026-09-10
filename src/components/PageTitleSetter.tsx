@@ -7,6 +7,7 @@ const titles: Record<string, string> = {
   '/bookings': 'Bookings',
   '/bookings/calendar': 'Calendar View',
   '/bookings/create': 'Create Booking',
+  '/check-in': 'Check-In / Waivers',
   '/bookings/check-in': 'Check-in',
   '/packages': 'Packages',
   '/packages/create': 'Create Package',

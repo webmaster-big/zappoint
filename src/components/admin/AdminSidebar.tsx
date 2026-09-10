@@ -82,13 +82,12 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Create Attractions': 'Add new attractions to your offerings',
     'Manage Purchases': 'View and manage attraction purchases',
     'Create Purchase': 'Add a new purchase for attractions',
-    'Check-in Scanner': 'Scan QR codes to check in attraction tickets',
     'Calendar View': 'See all bookings in a calendar format',
     'Space Schedule': 'Daily space allocation and booking timeline',
     'Bookings': 'Manage existing bookings and reservations',
     'Manage Bookings': 'View and edit all bookings',
     'Create Bookings': 'Create new bookings for customers',
-    'Check-in with QR Scanner': 'Scan QR codes for customer check-ins',
+    'Check-In / Waivers': 'Scan any booking, ticket, membership or waiver code — or find a guest by name',
     'Packages': 'View and manage package offerings',
     'Manage Packages': 'View and edit all packages',
     'Create Package': 'Create new package deals',
@@ -149,7 +148,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
       { label: 'Bookings', href: '/bookings', icon: Dot },
       { label: 'Location Requests', href: '/location-change-requests', icon: Dot },
       { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-      { label: 'Check-in with QR Scanner', href: '/bookings/check-in', icon: Dot }
     ]},
     { label: 'Packages', icon: Package, items: [
       { label: 'Packages', href: '/packages', icon: Dot },
@@ -164,7 +162,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     { label: 'Memberships', icon: IdCard, items: [
       { label: 'Memberships', href: '/memberships', icon: Dot },
       { label: 'Plans', href: '/memberships/plans', icon: Dot },
-      { label: 'Check-In', href: '/memberships/check-in', icon: Dot },
       { label: 'Reports', href: '/memberships/reports', icon: Dot }
     ]},
   ];
@@ -175,12 +172,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     case 'attendant':
       roleNavigation = [
         { label: 'Dashboard', icon: Home, href: '/attendant/dashboard', section: 'General' },
+        { label: 'Check-In / Waivers', icon: ScanLine, href: '/check-in', section: 'General' },
         { label: 'Attractions', icon: Ticket, section: 'Attractions', items: [
           { label: 'Manage Attractions', href: '/attractions', icon: List },
           { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine },
           { label: 'Bulk Orders', href: '/orders', icon: ShoppingCart }
         ]},
         { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
@@ -195,7 +192,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Bookings', href: '/bookings', icon: List },
           { label: 'Location Requests', href: '/location-change-requests', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
@@ -229,7 +225,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
           { label: 'Plans', href: '/memberships/plans', icon: Package },
-          { label: 'Check-In', href: '/memberships/check-in', icon: ScanLine },
           { label: 'Reports', href: '/memberships/reports', icon: BarChart3 }
         ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
@@ -248,12 +243,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     case 'location_manager':
       roleNavigation = [
         { label: 'Dashboard', icon: Home, href: '/manager/dashboard', section: 'General' },
+        { label: 'Check-In / Waivers', icon: ScanLine, href: '/check-in', section: 'General' },
         { label: 'Attractions', icon: Ticket, section: 'Attractions', items: [
           { label: 'Manage Attractions', href: '/attractions', icon: List },
           { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine },
           { label: 'Bulk Orders', href: '/orders', icon: ShoppingCart }
         ]},
         { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
@@ -268,7 +263,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Bookings', href: '/bookings', icon: List },
           { label: 'Location Requests', href: '/location-change-requests', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
@@ -307,7 +301,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
           { label: 'Plans', href: '/memberships/plans', icon: Package },
-          { label: 'Check-In', href: '/memberships/check-in', icon: ScanLine },
           { label: 'Reports', href: '/memberships/reports', icon: BarChart3 }
         ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
@@ -337,12 +330,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     case 'company_admin':
       roleNavigation = [
         { label: 'Dashboard', icon: Home, href: '/company/dashboard', section: 'General' },
+        { label: 'Check-In / Waivers', icon: ScanLine, href: '/check-in', section: 'General' },
         { label: 'Attractions', icon: Ticket, section: 'Attractions', items: [
           { label: 'Manage Attractions', href: '/attractions', icon: List },
           { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine },
           { label: 'Bulk Orders', href: '/orders', icon: ShoppingCart }
         ]},
         { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
@@ -357,7 +350,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Bookings', href: '/bookings', icon: List },
           { label: 'Location Requests', href: '/location-change-requests', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
-          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
@@ -396,7 +388,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
           { label: 'Memberships', href: '/memberships', icon: List },
           { label: 'Plans', href: '/memberships/plans', icon: Package },
-          { label: 'Check-In', href: '/memberships/check-in', icon: ScanLine },
           { label: 'Reports', href: '/memberships/reports', icon: BarChart3 }
         ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [

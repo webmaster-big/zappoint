@@ -52,6 +52,7 @@ import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { getStoredUser } from '../../utils/storage';
+import { useQuickActions } from '../../hooks/useQuickActions';
 import { useLocationScope } from '../../contexts/LocationContext';
 import {
   useScheduledExtras,
@@ -885,16 +886,18 @@ const CompanyDashboard: React.FC = () => {
 
   const groupedBookings = groupBookingsByTimeAndDay();
 
-  const quickActions = [
+  const allQuickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
     { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
-    { title: 'Check-in', icon: Activity, link: '/bookings/check-in' },
+    { title: 'Check-In / Waivers', icon: Activity, link: '/check-in' },
     { title: 'Packages', icon: PackageIcon, link: '/packages' },
     { title: 'Attractions', icon: MapPin, link: '/attractions' },
     { title: 'Customers', icon: Users, link: '/customers' },
     { title: 'Analytics', icon: BarChart3, link: '/admin/analytics' },
     { title: 'Locations', icon: Building, link: '/admin/activity' },
   ];
+
+  const { visible: quickActions, hidden: hiddenQuickActions, toggle: toggleQuickAction, isAdmin: canEditQuickActions } = useQuickActions(allQuickActions);
 
   const statusColors = {
     Confirmed: 'bg-emerald-100 text-emerald-800',
@@ -1912,6 +1915,29 @@ const CompanyDashboard: React.FC = () => {
         <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <Activity className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
         </h2>
+        {canEditQuickActions && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500 mr-1">Shown to staff:</span>
+            {allQuickActions.map((a) => {
+              const shown = !hiddenQuickActions.includes(a.title);
+              return (
+                <button
+                  key={`qa-toggle-${a.title}`}
+                  type="button"
+                  onClick={() => void toggleQuickAction(a.title)}
+                  className={`text-xs px-2 py-1 rounded-full border transition ${
+                    shown
+                      ? 'bg-white border-gray-300 text-gray-700'
+                      : 'bg-gray-100 border-gray-200 text-gray-400 line-through'
+                  }`}
+                  title={shown ? `Hide ${a.title} from staff` : `Show ${a.title} to staff`}
+                >
+                  {a.title}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
           {quickActions.map((action, index) => {
             const Icon = action.icon;

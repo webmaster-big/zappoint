@@ -17,6 +17,7 @@ import type {
   WaiverMinor,
   ConnectedWaiver,
   EntityWaiverSummary,
+  ScannedWaiver,
   KioskActivity,
   WaiverAdRecord,
   WaiverAdSettings,
@@ -173,6 +174,9 @@ const waiverService = {
     id: number,
   ): Promise<ApiResponse<{ waivers: ConnectedWaiver[]; summary: EntityWaiverSummary }>> =>
     (await api.get('/waivers/for', { params: { type, id } })).data,
+
+  scan: async (code: string): Promise<ApiResponse<ScannedWaiver>> =>
+    (await api.post('/waivers/scan', { code })).data,
 
   checkIn: async (id: number): Promise<ApiResponse<Waiver>> =>
     (await api.post(`/waivers/${id}/check-in`, {})).data,

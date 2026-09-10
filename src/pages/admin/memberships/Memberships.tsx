@@ -912,7 +912,7 @@ const Memberships = () => {
           <ActionMenu
             items={[
               { label: 'Plans', icon: CreditCard, onClick: () => navigate('/memberships/plans') },
-              { label: 'Check-In', icon: CalendarCheck, onClick: () => navigate('/memberships/check-in') },
+              { label: 'Check-In', icon: CalendarCheck, onClick: () => navigate('/check-in') },
               { label: 'Reports', icon: BarChart3, onClick: () => navigate('/memberships/reports') },
             ]}
           />

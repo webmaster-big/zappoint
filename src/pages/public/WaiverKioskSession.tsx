@@ -19,6 +19,7 @@ const WaiverKioskSession = () => {
   const [formKey, setFormKey] = useState(0);
   const [completedAd, setCompletedAd] = useState<KioskAd | null>(null);
   const [completedWaiverId, setCompletedWaiverId] = useState<number | null>(null);
+  const [completedWaiverRef, setCompletedWaiverRef] = useState<string | null>(null);
   const [adDismissed, setAdDismissed] = useState(false);
   const [signerFirstName, setSignerFirstName] = useState<string | undefined>(undefined);
 
@@ -75,6 +76,7 @@ const WaiverKioskSession = () => {
       const res = await waiverService.submit(token, data, { kiosk: true });
       setCompletedAd(res?.data?.ad ?? null);
       setCompletedWaiverId(res?.data?.id ?? null);
+      setCompletedWaiverRef(res?.data?.reference_number ?? null);
       setSignerFirstName(data.adult_first_name);
       setDone(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -93,14 +95,15 @@ const WaiverKioskSession = () => {
     return (
       <>
         <WaiverSuccess />
-        {completedAd && !adDismissed && (
+        {(completedAd || completedWaiverRef) && !adDismissed && (
           <WaiverSuccessModal
             signerFirstName={signerFirstName}
             locationId={null}
-            autoCloseSeconds={2 + completedAd.display_seconds}
+            autoCloseSeconds={completedAd ? 2 + completedAd.display_seconds : 25}
             onStartNext={() => setAdDismissed(true)}
             ad={completedAd}
             waiverId={completedWaiverId}
+            waiverReference={completedWaiverRef}
             nextLabel="Done"
             closingText="Closing"
           />

@@ -30,6 +30,7 @@ interface Props {
   onStartNext: () => void;
   ad?: KioskAd | null;
   waiverId?: number | null;
+  waiverReference?: string | null;
   nextLabel?: string;
   closingText?: string;
 }
@@ -201,7 +202,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   };
 };
 
-const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, ad = null, waiverId = null, nextLabel = 'Start Next Waiver', closingText = 'Returning to the start screen' }: Props) => {
+const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, ad = null, waiverId = null, waiverReference = null, nextLabel = 'Start Next Waiver', closingText = 'Returning to the start screen' }: Props) => {
   const [takeaway, setTakeaway] = useState<Takeaway | null>(null);
   const [beatDone, setBeatDone] = useState(false);
   const [handingOver, setHandingOver] = useState(false);
@@ -365,6 +366,17 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
               Your waiver is signed and saved{takeaway?.locationName ? ` at ${takeaway.locationName}` : ''}.
             </p>
 
+            {waiverReference && (
+              <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="bg-white p-2 rounded-lg border border-gray-200 inline-block">
+                  <QRCodeSVG value={waiverReference} size={104} level="M" />
+                </div>
+                <p className="text-sm font-semibold text-gray-900 mt-3">Show this at the front desk</p>
+                <p className="text-xs text-gray-500 mt-1">Staff can scan it to check you in.</p>
+                <p className="text-[11px] font-mono tracking-wider text-gray-400 mt-2">{waiverReference}</p>
+              </div>
+            )}
+
             {beatDone && !hasTakeaway && (
               <button
                 onClick={onStartNext}
@@ -386,6 +398,21 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
                 Waiver signed{signerFirstName ? ` — thanks, ${signerFirstName}` : ''}
               </p>
             </div>
+
+            {waiverReference && (
+              <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-3.5 mt-4">
+                <div className="bg-white p-1.5 rounded-lg border border-gray-200 shrink-0">
+                  <QRCodeSVG value={waiverReference} size={72} level="M" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Show this at the front desk</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Staff can scan it to check you in.
+                  </p>
+                  <p className="text-[11px] font-mono tracking-wider text-gray-400 mt-1">{waiverReference}</p>
+                </div>
+              </div>
+            )}
 
             <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-3">
               While you&rsquo;re here

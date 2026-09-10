@@ -25,6 +25,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { convertTo12Hour } from '../../../utils/timeFormat';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import { resolveScannedCode, KIND_LABELS } from '../../../utils/scanCode';
 
 interface ScanResult {
   purchaseId: number;
@@ -137,26 +138,34 @@ const AttractionCheckIn = () => {
     try {
       await stopScanning();
 
-      let purchaseId: number;
-      
-      try {
-        const qrData = JSON.parse(decodedText);
+      const resolution = resolveScannedCode(decodedText);
 
-        if (qrData.type === 'ticket_order' && qrData.id) {
-          await handleOrderScan(Number(qrData.id));
-          setProcessing(false);
-          return;
-        }
-
-        purchaseId = qrData.purchaseId || qrData.purchase_id || qrData.id;
-      } catch {
-        const idMatch = decodedText.match(/\d+/);
-        if (idMatch) {
-          purchaseId = parseInt(idMatch[0]);
-        } else {
-          throw new Error('Invalid QR code format');
-        }
+      if (!resolution.ok) {
+        setToast({ message: 'Code not recognised. Try again, or look the guest up by name.', type: 'error' });
+        setProcessing(false);
+        await startScanning();
+        return;
       }
+
+      const scanned = resolution.code;
+
+      if (scanned.kind === 'ticket_order' && scanned.id) {
+        await handleOrderScan(scanned.id);
+        setProcessing(false);
+        return;
+      }
+
+      if (scanned.kind !== 'attraction_purchase' || !scanned.id) {
+        setToast({
+          message: `That is a ${KIND_LABELS[scanned.kind].toLowerCase()} code, not an attraction ticket.`,
+          type: 'error',
+        });
+        setProcessing(false);
+        await startScanning();
+        return;
+      }
+
+      const purchaseId: number = scanned.id;
 
       const authToken = getAuthToken();
       console.log('🔐 Auth Token:', authToken ? 'Present' : 'Missing');

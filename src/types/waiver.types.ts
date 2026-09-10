@@ -95,6 +95,7 @@ export type WaiverTemplatePayload = Partial<Omit<WaiverTemplate, 'id' | 'company
 
 export interface Waiver {
   id: number;
+  reference_number?: string | null;
   status: WaiverStatus;
   selected_date: string;
   adult_first_name?: string | null;
@@ -430,6 +431,7 @@ export interface WaiverPeriodSummary {
 }
 
 export interface WaiverSearchFilters {
+  search?: string;
   date?: string;
   all?: boolean | number;
   /** Company admins pass the sidebar's selected location so Records matches the dashboard. */
@@ -477,4 +479,27 @@ export interface WaiverAdSettings {
   ads_enabled: boolean;
   ads_rotation_mode: 'random' | 'ordered';
   ads_display_seconds: number;
+}
+
+export interface ScannedWaiverMinor {
+  id: number;
+  name: string;
+}
+
+export interface ScannedWaiver {
+  id: number;
+  reference_number: string | null;
+  status: string;
+  is_signed: boolean;
+  checked_in_at: string | null;
+  adult_name: string;
+  adult_email: string | null;
+  adult_phone: string | null;
+  selected_date: string | null;
+  template_title: string | null;
+  location_id: number | null;
+  location_name: string | null;
+  minors_count: number;
+  minors: ScannedWaiverMinor[];
+  linked_to: { type: 'booking' | 'attraction_purchase' | 'event'; id: number } | null;
 }

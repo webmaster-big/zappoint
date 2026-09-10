@@ -104,6 +104,11 @@ class EventPurchaseService {
     return response.data;
   }
 
+  async verifyByReference(reference: string): Promise<ApiResponse<ScannedEventTicket>> {
+    const response = await api.get(`/event-purchases/verify/${encodeURIComponent(reference)}`);
+    return response.data;
+  }
+
   async updateStatus(id: number, status: string): Promise<ApiResponse<EventPurchase>> {
     const response = await api.patch(`/event-purchases/${id}/status`, { status });
     return response.data;
@@ -134,6 +139,28 @@ class EventPurchaseService {
     const response = await api.post('/event-purchases/bulk-restore', { ids });
     return response.data;
   }
+}
+
+export interface ScannedEventTicket {
+  id: number;
+  reference_number: string;
+  status: string;
+  checked_in_at: string | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  quantity: number;
+  purchase_date: string | null;
+  purchase_time: string | null;
+  total_amount: number;
+  amount_paid: number;
+  payment_method: string | null;
+  payment_status: string | null;
+  notes: string | null;
+  event_name: string | null;
+  location_id: number | null;
+  location_name: string | null;
+  ticket_order_id: number | null;
 }
 
 export const eventPurchaseService = new EventPurchaseService();

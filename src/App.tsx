@@ -36,7 +36,6 @@ import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 import TicketOrders from "./pages/admin/orders/TicketOrders";
 import TicketOrderDetails from "./pages/admin/orders/TicketOrderDetails";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
-import AttractionCheckIn from "./pages/admin/attractions/AttractionCheckIn";
 import Payments from "./pages/admin/payments/Payments";
 import ViewPayment from "./pages/admin/payments/ViewPayment";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
@@ -133,7 +132,6 @@ import UpdatePaymentMethod from "./pages/customer/UpdatePaymentMethod";
 import MembershipPlans from "./pages/admin/memberships/MembershipPlans";
 import Memberships from "./pages/admin/memberships/Memberships";
 import MembershipDetails from "./pages/admin/memberships/MembershipDetails";
-import MembershipCheckIn from "./pages/admin/memberships/MembershipCheckIn";
 import MembershipReports from "./pages/admin/memberships/MembershipReports";
 import PhotoKiosk from "./pages/public/PhotoKiosk";
 import PhotoSlideshow from "./pages/public/PhotoSlideshow";
@@ -242,7 +240,7 @@ function App() {
           <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
           <Route path="/attractions/purchases/:id/edit" element={<EditPurchase />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
-          <Route path="/attractions/check-in" element={<AttractionCheckIn />} />
+          <Route path="/attractions/check-in" element={<Navigate to="/check-in" replace />} />
           
           <Route path="/events" element={<Events />} />
           <Route path="/events/create" element={<CreateEvent />} />
@@ -296,7 +294,8 @@ function App() {
           <Route path="/bookings/space-schedule" element={<SpaceSchedule />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
           <Route path="/bookings/manual" element={<ManualBooking />} />
-          <Route path="/bookings/check-in" element={<CheckIn />} />
+          <Route path="/check-in" element={<CheckIn />} />
+          <Route path="/bookings/check-in" element={<Navigate to="/check-in" replace />} />
           
           <Route path="/payments/:id" element={<ViewPayment />} />
           
@@ -307,7 +306,7 @@ function App() {
 
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/memberships/plans" element={<MembershipPlans />} />
-          <Route path="/memberships/check-in" element={<MembershipCheckIn />} />
+          <Route path="/memberships/check-in" element={<Navigate to="/check-in" replace />} />
           <Route path="/memberships/reports" element={<MembershipReports />} />
           <Route path="/memberships/:id" element={<MembershipDetails />} />
           

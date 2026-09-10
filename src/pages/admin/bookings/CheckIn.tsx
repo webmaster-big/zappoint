@@ -18,7 +18,9 @@ import {
   Users,
   Package as PackageIcon,
   Eye,
-  Home
+  Home,
+  FileSignature,
+  ScanLine
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -29,8 +31,18 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
-import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import waiverService from '../../../services/waiverService';
+import type { ScannedWaiver, Waiver } from '../../../types/waiver.types';
+import { resolveScannedCode, KIND_LABELS } from '../../../utils/scanCode';
+import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
+import ticketOrderService, { type TicketOrder } from '../../../services/TicketOrderService';
+import membershipService from '../../../services/MembershipService';
+import eventPurchaseService, { type ScannedEventTicket } from '../../../services/EventPurchaseService';
+import type { EventPurchase } from '../../../types/event.types';
+import type { MembershipScanResponse } from '../../../types/Membership.types';
+import { useLocationScope } from '../../../contexts/LocationContext';
 
 interface ScanResult {
   bookingId: number;
@@ -38,6 +50,25 @@ interface ScanResult {
   success: boolean;
   message: string;
 }
+
+interface DetailProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  wide?: boolean;
+}
+
+const Detail: React.FC<DetailProps> = ({ icon: Icon, label, value, wide = false }) => (
+  <div className={`flex items-center gap-3${wide ? ' md:col-span-2' : ''}`}>
+    <div className="p-2 bg-gray-200 rounded-lg shrink-0">
+      <Icon className="h-5 w-5 text-gray-700" />
+    </div>
+    <div className="min-w-0">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="font-medium text-gray-800 break-words">{value}</p>
+    </div>
+  </div>
+);
 
 const CheckIn: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -61,7 +92,27 @@ const CheckIn: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
+  const { effectiveLocationId } = useLocationScope();
+  const [scannedTicket, setScannedTicket] = useState<AttractionPurchase | null>(null);
+  const [scannedOrder, setScannedOrder] = useState<TicketOrder | null>(null);
+  const [scannedMembership, setScannedMembership] = useState<MembershipScanResponse | null>(null);
+  const [scannedEvent, setScannedEvent] = useState<ScannedEventTicket | null>(null);
+  const [entityBusy, setEntityBusy] = useState(false);
+  const [guestQuery, setGuestQuery] = useState('');
+  const [guestSearching, setGuestSearching] = useState(false);
+  const [guestBookings, setGuestBookings] = useState<Booking[]>([]);
+  const [guestWaivers, setGuestWaivers] = useState<Waiver[]>([]);
+  const [guestTickets, setGuestTickets] = useState<AttractionPurchase[]>([]);
+  const [guestOrders, setGuestOrders] = useState<TicketOrder[]>([]);
+  const [guestEvents, setGuestEvents] = useState<EventPurchase[]>([]);
+  const [guestSearched, setGuestSearched] = useState(false);
+  const [scannedWaiver, setScannedWaiver] = useState<ScannedWaiver | null>(null);
+  const [showWaiverModal, setShowWaiverModal] = useState(false);
+  const [waiverProcessing, setWaiverProcessing] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const reArmOnModalClose = useRef(false);
+  const cameraWasRunning = useRef(false);
+  const processingRef = useRef(false);
 
   const loadBookings = useCallback(async () => {
     try {
@@ -165,6 +216,7 @@ const CheckIn: React.FC = () => {
       };
 
       setScanning(true);
+      cameraWasRunning.current = true;
 
       await scannerRef.current.start(
         { facingMode: "environment" },
@@ -175,6 +227,7 @@ const CheckIn: React.FC = () => {
 
     } catch (err) {
       console.error('Error starting scanner:', err);
+      cameraWasRunning.current = false;
       setError('Failed to start camera. Please check permissions and try again. Note: Mobile devices work better for scanning.');
       setToast({ message: 'Camera error - Try using a mobile device', type: 'error' });
       setScanning(false);
@@ -206,28 +259,330 @@ const CheckIn: React.FC = () => {
     }
   };
 
+  const runGuestSearch = async () => {
+    const term = guestQuery.trim();
+    if (term.length < 2) {
+      setToast({ message: 'Type at least 2 characters to search.', type: 'info' });
+      return;
+    }
+    setGuestSearching(true);
+    setGuestSearched(true);
+    try {
+      const [bookingRes, waiverRes, ticketRes, orderRes, eventRes] = await Promise.allSettled([
+        bookingService.getBookings({ search: term, per_page: 25, user_id: getStoredUser()?.id }),
+        waiverService.list({ search: term, per_page: 25, all: true }),
+        attractionPurchaseService.getPurchases({ search: term, per_page: 25 }),
+        ticketOrderService.list({ search: term, per_page: 25 }),
+        eventPurchaseService.getPurchases({ search: term, per_page: 25 }),
+      ]);
+
+      setGuestBookings(
+        bookingRes.status === 'fulfilled' && bookingRes.value?.success
+          ? (bookingRes.value.data?.bookings ?? [])
+          : [],
+      );
+      setGuestWaivers(
+        waiverRes.status === 'fulfilled' ? (waiverRes.value?.data?.waivers ?? []) : [],
+      );
+      setGuestTickets(
+        ticketRes.status === 'fulfilled' && ticketRes.value?.success
+          ? (ticketRes.value.data?.purchases ?? [])
+          : [],
+      );
+      setGuestOrders(
+        orderRes.status === 'fulfilled' ? (orderRes.value?.orders ?? []) : [],
+      );
+      setGuestEvents(
+        eventRes.status === 'fulfilled' && eventRes.value?.success
+          ? (eventRes.value.data ?? [])
+          : [],
+      );
+    } catch {
+      setToast({ message: 'Search failed. Try again.', type: 'error' });
+    } finally {
+      setGuestSearching(false);
+    }
+  };
+
+  const openGuestBooking = (booking: Booking) => {
+    reArmOnModalClose.current = false;
+    setVerifiedBooking(booking);
+    setShowVerificationModal(true);
+  };
+
+  const openGuestWaiver = async (waiver: Waiver) => {
+    if (!waiver.reference_number) {
+      setToast({ message: 'That waiver has no reference yet.', type: 'error' });
+      return;
+    }
+    try {
+      const res = await waiverService.scan(waiver.reference_number);
+      if (res.success && res.data) {
+        setScannedWaiver(res.data);
+        setShowWaiverModal(true);
+      } else {
+        setToast({ message: 'Could not open that waiver.', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Could not open that waiver.', type: 'error' });
+    }
+  };
+
+  const checkInLocationId = effectiveLocationId ?? getStoredUser()?.location_id ?? null;
+
+  const closeEntityPanels = async () => {
+    setScannedTicket(null);
+    setScannedOrder(null);
+    setScannedMembership(null);
+    setScannedEvent(null);
+    if (cameraWasRunning.current) await startScanning();
+  };
+
+  const handleTicketScan = async (id: number) => {
+    try {
+      const res = await attractionPurchaseService.verifyPurchase(id);
+      if (!res.success || !res.data) {
+        setToast({ message: 'Ticket not found.', type: 'error' });
+        setProcessing(false);
+        if (cameraWasRunning.current) await startScanning();
+        return;
+      }
+      setScannedTicket(res.data);
+      setProcessing(false);
+    } catch {
+      setToast({ message: 'Ticket not found.', type: 'error' });
+      setProcessing(false);
+      if (cameraWasRunning.current) await startScanning();
+    }
+  };
+
+  const handleOrderScan = async (id: number) => {
+    try {
+      const order = await ticketOrderService.get(id);
+      setScannedOrder(order);
+      setProcessing(false);
+    } catch {
+      setToast({ message: 'Order not found.', type: 'error' });
+      setProcessing(false);
+      if (cameraWasRunning.current) await startScanning();
+    }
+  };
+
+  const handleMembershipScan = async (token: string) => {
+    if (!checkInLocationId) {
+      setToast({ message: 'Pick a location in the sidebar before checking in members.', type: 'error' });
+      setProcessing(false);
+      if (cameraWasRunning.current) await startScanning();
+      return;
+    }
+    try {
+      const res = await membershipService.scanMembershipQr(token, checkInLocationId);
+      setScannedMembership(res);
+      setProcessing(false);
+    } catch {
+      setToast({ message: 'Membership not found.', type: 'error' });
+      setProcessing(false);
+      if (cameraWasRunning.current) await startScanning();
+    }
+  };
+
+  const handleEventScan = async (reference: string) => {
+    try {
+      const res = await eventPurchaseService.verifyByReference(reference);
+      if (!res.success || !res.data) {
+        setToast({ message: 'No event ticket found for that code.', type: 'error' });
+        setProcessing(false);
+        if (cameraWasRunning.current) await startScanning();
+        return;
+      }
+      setScannedEvent(res.data);
+      setProcessing(false);
+    } catch {
+      setToast({ message: 'No event ticket found for that code.', type: 'error' });
+      setProcessing(false);
+      if (cameraWasRunning.current) await startScanning();
+    }
+  };
+
+  const confirmEventCheckIn = async () => {
+    if (!scannedEvent) return;
+    if (scannedEvent.ticket_order_id) {
+      setToast({ message: 'This ticket belongs to a bulk order — scan the order instead.', type: 'error' });
+      return;
+    }
+    try {
+      setEntityBusy(true);
+      await eventPurchaseService.updateStatus(scannedEvent.id, 'checked-in');
+      setToast({ message: 'Event ticket checked in', type: 'success' });
+      await closeEntityPanels();
+    } catch {
+      setToast({ message: 'Could not check in that event ticket.', type: 'error' });
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
+  const confirmTicketCheckIn = async () => {
+    if (!scannedTicket) return;
+    try {
+      setEntityBusy(true);
+      const res = await attractionPurchaseService.checkInPurchase(scannedTicket.id, getStoredUser()?.id);
+      if (res.success) {
+        setToast({ message: 'Ticket checked in', type: 'success' });
+        await closeEntityPanels();
+      } else {
+        setToast({ message: res.message || 'Could not check in that ticket.', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Could not check in that ticket.', type: 'error' });
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
+  const confirmOrderCheckIn = async () => {
+    if (!scannedOrder) return;
+    try {
+      setEntityBusy(true);
+      const res = await ticketOrderService.checkIn(scannedOrder.id);
+      setToast({
+        message: `${res.checked_in} ticket(s) checked in` + (res.skipped?.length ? `, ${res.skipped.length} skipped` : ''),
+        type: 'success',
+      });
+      await closeEntityPanels();
+    } catch {
+      setToast({ message: 'Could not check in that order.', type: 'error' });
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
+  const confirmMembershipCheckIn = async () => {
+    if (!scannedMembership || !checkInLocationId) return;
+    try {
+      setEntityBusy(true);
+      await membershipService.checkInMembership(scannedMembership.membership.id, {
+        result: scannedMembership.eligibility?.eligible ? 'allowed' : 'override',
+        location_id: checkInLocationId,
+      });
+      setToast({ message: 'Member checked in', type: 'success' });
+      await closeEntityPanels();
+    } catch {
+      setToast({ message: 'Could not check in that member.', type: 'error' });
+    } finally {
+      setEntityBusy(false);
+    }
+  };
+
+  const handleWaiverScan = async (reference: string) => {
+    try {
+      const response = await waiverService.scan(reference);
+
+      if (!response.success || !response.data) {
+        setToast({ message: 'No waiver found for that code.', type: 'error' });
+        setProcessing(false);
+        if (cameraWasRunning.current) await startScanning();
+        return;
+      }
+
+      setScannedWaiver(response.data);
+      setShowWaiverModal(true);
+      setProcessing(false);
+    } catch {
+      setToast({ message: 'No waiver found for that code.', type: 'error' });
+      setProcessing(false);
+      if (cameraWasRunning.current) await startScanning();
+    }
+  };
+
+  const confirmWaiverCheckIn = async () => {
+    if (!scannedWaiver) return;
+
+    try {
+      setWaiverProcessing(true);
+      const response = await waiverService.checkIn(scannedWaiver.id);
+
+      if (response.success) {
+        setToast({ message: `${scannedWaiver.adult_name} checked in`, type: 'success' });
+        setShowWaiverModal(false);
+        setScannedWaiver(null);
+        if (cameraWasRunning.current) await startScanning();
+      } else {
+        setToast({ message: response.message || 'Could not check in that waiver.', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Could not check in that waiver.', type: 'error' });
+    } finally {
+      setWaiverProcessing(false);
+    }
+  };
+
+  const closeWaiverModal = async () => {
+    setShowWaiverModal(false);
+    setScannedWaiver(null);
+    if (cameraWasRunning.current) await startScanning();
+  };
+
   const onScanSuccess = async (decodedText: string) => {
-    if (processing) return;
+    if (processingRef.current) return;
+    processingRef.current = true;
 
     setProcessing(true);
-    
+
     try {
       await stopScanning();
 
-      let referenceNumber: string;
-      let bookingId: number | undefined;
-      
-      try {
-        const qrData = JSON.parse(decodedText);
-        bookingId = qrData.bookingId || qrData.booking_id || qrData.id;
-        referenceNumber = qrData.reference_number || qrData.referenceNumber;
-      } catch {
-        referenceNumber = decodedText.trim();
-        console.log('Scanned reference number:', referenceNumber);
+      const resolution = resolveScannedCode(decodedText);
+
+      if (!resolution.ok) {
+        setToast({ message: 'Code not recognised. Try again, or find the guest by name below.', type: 'error' });
+        setProcessing(false);
+        if (cameraWasRunning.current) await startScanning();
+        return;
       }
 
+      const scanned = resolution.code;
+
+      if (scanned.kind === 'waiver' && scanned.reference) {
+        await handleWaiverScan(scanned.reference);
+        return;
+      }
+
+      if (scanned.kind === 'attraction_purchase' && scanned.id) {
+        await handleTicketScan(scanned.id);
+        return;
+      }
+
+      if (scanned.kind === 'ticket_order' && scanned.id) {
+        await handleOrderScan(scanned.id);
+        return;
+      }
+
+      if (scanned.kind === 'membership' && scanned.token) {
+        await handleMembershipScan(scanned.token);
+        return;
+      }
+
+      if (scanned.kind === 'event_purchase' && scanned.reference) {
+        await handleEventScan(scanned.reference);
+        return;
+      }
+
+      if (scanned.kind !== 'booking') {
+        setToast({
+          message: `${KIND_LABELS[scanned.kind]} codes can't be checked in here yet.`,
+          type: 'error',
+        });
+        setProcessing(false);
+        if (cameraWasRunning.current) await startScanning();
+        return;
+      }
+
+      const referenceNumber = scanned.reference;
+      const bookingId = scanned.id;
+
       let booking: Booking | undefined;
-      
+
       if (referenceNumber) {
         booking = bookings.find(b => b.reference_number === referenceNumber);
         
@@ -249,9 +604,9 @@ const CheckIn: React.FC = () => {
       }
 
       if (!booking) {
-        setToast({ message: `Invalid QR code - Booking "${referenceNumber}" not found`, type: 'error' });
+        setToast({ message: `No booking found for ${referenceNumber ?? `#${bookingId}`}`, type: 'error' });
         setProcessing(false);
-        await startScanning();
+        if (cameraWasRunning.current) await startScanning();
         return;
       }
 
@@ -264,7 +619,9 @@ const CheckIn: React.FC = () => {
         });
         setVerifiedBooking(booking);
         setShowVerificationModal(true);
-        setToast({ message: 'Already checked in', type: 'error' });
+        setToast({ message: 'Already checked in', type: 'info' });
+        setProcessing(false);
+        reArmOnModalClose.current = cameraWasRunning.current;
         return;
       }
 
@@ -277,7 +634,9 @@ const CheckIn: React.FC = () => {
         });
         setVerifiedBooking(booking);
         setShowVerificationModal(true);
-        setToast({ message: 'Booking completed', type: 'error' });
+        setToast({ message: 'Booking completed', type: 'info' });
+        setProcessing(false);
+        reArmOnModalClose.current = cameraWasRunning.current;
         return;
       }
 
@@ -291,19 +650,23 @@ const CheckIn: React.FC = () => {
         setVerifiedBooking(booking);
         setShowVerificationModal(true);
         setToast({ message: 'Booking cancelled', type: 'error' });
+        setProcessing(false);
+        reArmOnModalClose.current = cameraWasRunning.current;
         return;
       }
 
       setVerifiedBooking(booking);
       setShowVerificationModal(true);
+      reArmOnModalClose.current = cameraWasRunning.current;
       setToast({ message: 'Booking verified - Please confirm check-in', type: 'info' });
 
     } catch (err) {
       console.error('Error processing scan:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to process QR code';
       setToast({ message: errorMessage, type: 'error' });
-      await startScanning();
+      if (cameraWasRunning.current) await startScanning();
     } finally {
+      processingRef.current = false;
       setProcessing(false);
     }
   };
@@ -321,6 +684,7 @@ const CheckIn: React.FC = () => {
         scannerRef.current = new Html5Qrcode('qr-reader');
       }
 
+      cameraWasRunning.current = false;
       const result = await scannerRef.current.scanFile(file, false);
       await onScanSuccess(result);
       
@@ -363,6 +727,10 @@ const CheckIn: React.FC = () => {
         setShowVerificationModal(false);
         setVerifiedBooking(null);
         loadBookings();
+        if (reArmOnModalClose.current) {
+          reArmOnModalClose.current = false;
+          void startScanning();
+        }
       } else {
         setToast({ message: 'Check-in failed. Please try again.', type: 'error' });
       }
@@ -377,6 +745,11 @@ const CheckIn: React.FC = () => {
   const handleCancelCheckIn = () => {
     setShowVerificationModal(false);
     setVerifiedBooking(null);
+    setScanResult(null);
+    if (reArmOnModalClose.current) {
+      reArmOnModalClose.current = false;
+      void startScanning();
+    }
   };
 
   const handleCheckIn = async (booking: Booking) => {
@@ -581,10 +954,13 @@ const CheckIn: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Camera className="h-6 w-6" />
-            Package Booking Check-In
+            <ScanLine className="h-6 w-6" />
+            Check-In / Waivers
           </h1>
-          <p className="text-gray-600 mt-1">Scan QR codes or manually check in customers for their package bookings</p>
+          <p className="text-gray-600 mt-1">
+            One place to check anyone in &mdash; scan a booking, attraction ticket, bulk order, membership or waiver
+            code, or find the guest by name.
+          </p>
           
           <div className="mt-3 flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <Smartphone className="h-5 w-5 text-blue-600 flex-shrink-0" />
@@ -735,12 +1111,12 @@ const CheckIn: React.FC = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-800 mb-2">
                 <Search className="inline mr-2 h-4 w-4" />
-                Search Bookings
+                Filter today&rsquo;s bookings
               </label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search by name, email, phone, reference, or package..."
+                  placeholder="Narrow the list below by name, email, phone or reference..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={`w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
@@ -749,6 +1125,168 @@ const CheckIn: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 sm:p-5 mb-4">
+          <label className="block text-sm font-medium text-gray-800 mb-2">
+            <Search className="inline mr-2 h-4 w-4" />
+            No ticket or QR? Find the guest
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              placeholder="Name, phone or email — any date, any location"
+              value={guestQuery}
+              onChange={(e) => setGuestQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void runGuestSearch(); }}
+              className={`flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+            />
+            <StandardButton
+              variant="primary"
+              icon={Search}
+              onClick={() => void runGuestSearch()}
+              disabled={guestSearching}
+              loading={guestSearching}
+            >
+              {guestSearching ? 'Searching...' : 'Search'}
+            </StandardButton>
+          </div>
+
+          {guestSearched && !guestSearching && (
+            <div className="mt-4 space-y-4">
+              {guestBookings.length === 0 && guestWaivers.length === 0 && guestTickets.length === 0 && guestOrders.length === 0 && guestEvents.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  Nothing found for &ldquo;{guestQuery}&rdquo;. Try a surname, or the last few digits of a phone number.
+                </p>
+              )}
+
+              {guestBookings.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Bookings ({guestBookings.length})
+                  </p>
+                  <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                    {guestBookings.map((b) => (
+                      <li key={`gb-${b.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {b.guest_name || 'Guest'}
+                          </p>
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            {b.reference_number} &middot; {formatDateLong(b.booking_date)} &middot; {b.status}
+                          </p>
+                        </div>
+                        <StandardButton variant="secondary" size="sm" onClick={() => openGuestBooking(b)}>
+                          Open
+                        </StandardButton>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {guestTickets.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Attraction tickets ({guestTickets.length})
+                  </p>
+                  <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                    {guestTickets.map((t) => (
+                      <li key={`gt-${t.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{t.guest_name || 'Guest'}</p>
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            #{t.id} &middot; {t.attraction?.name ?? 'Attraction'} &middot; {t.status}
+                          </p>
+                        </div>
+                        <StandardButton variant="secondary" size="sm" onClick={() => { reArmOnModalClose.current = false; setScannedTicket(t); }}>
+                          Open
+                        </StandardButton>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {guestOrders.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Bulk orders ({guestOrders.length})
+                  </p>
+                  <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                    {guestOrders.map((o) => (
+                      <li key={`go-${o.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {o.customer_name || 'Guest'}
+                          </p>
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            {o.reference_number} &middot; {o.status}
+                          </p>
+                        </div>
+                        <StandardButton variant="secondary" size="sm" onClick={() => { reArmOnModalClose.current = false; setScannedOrder(o); }}>
+                          Open
+                        </StandardButton>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {guestEvents.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Event tickets ({guestEvents.length})
+                  </p>
+                  <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                    {guestEvents.map((ev) => (
+                      <li key={`ge-${ev.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{ev.guest_name || 'Guest'}</p>
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            {ev.reference_number} &middot; {formatDateLong(ev.purchase_date)} &middot; {ev.status}
+                          </p>
+                        </div>
+                        <StandardButton
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => { reArmOnModalClose.current = false; void handleEventScan(ev.reference_number); }}
+                        >
+                          Open
+                        </StandardButton>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {guestWaivers.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Waivers ({guestWaivers.length})
+                  </p>
+                  <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                    {guestWaivers.map((w) => (
+                      <li key={`gw-${w.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {[w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || 'Signer'}
+                          </p>
+                          <p className="text-xs text-gray-500 font-mono truncate">
+                            {w.reference_number || `#${w.id}`} &middot; {formatDateLong(w.selected_date)}
+                            {w.checked_in_at ? ' · checked in' : ''}
+                          </p>
+                        </div>
+                        <StandardButton variant="secondary" size="sm" onClick={() => void openGuestWaiver(w)}>
+                          Open
+                        </StandardButton>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
@@ -1362,7 +1900,7 @@ const CheckIn: React.FC = () => {
                       <p className="text-xs sm:text-sm text-green-600">This booking has been checked in.</p>
                       {selectedBooking.checked_in_at && (
                         <p className="text-xs text-green-600 mt-1">
-                          Check-in time: {new Date(selectedBooking.checked_in_at).toLocaleString()}
+                          Check-in time: {formatDateTimeET(selectedBooking.checked_in_at)}
                         </p>
                       )}
                       {selectedBooking.checked_in_by_user && (
@@ -1889,6 +2427,261 @@ const CheckIn: React.FC = () => {
           </div>
         )}
       </div>
+
+      {(scannedTicket || scannedOrder || scannedMembership || scannedEvent) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                  {scannedMembership
+                    ? <User className={`w-5 h-5 text-${fullColor}`} />
+                    : <Ticket className={`w-5 h-5 text-${fullColor}`} />}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {scannedMembership ? 'Membership' : scannedOrder ? 'Bulk Order' : scannedEvent ? 'Event Ticket' : 'Attraction Ticket'}
+                  </h3>
+                  <p className="text-xs font-mono text-gray-500">
+                    {scannedOrder?.reference_number
+                      ?? scannedEvent?.reference_number
+                      ?? (scannedMembership ? `#${scannedMembership.membership.id}` : `#${scannedTicket?.id}`)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeEntityPanels}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {scannedTicket && (
+                <>
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold text-gray-800">Ticket Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Detail icon={Ticket} label="Purchase" value={`#${scannedTicket.id}`} />
+                      <Detail icon={User} label="Guest" value={scannedTicket.guest_name || 'Guest'} />
+                      <Detail icon={PackageIcon} label="Attraction" value={scannedTicket.attraction?.name ?? '—'} wide />
+                      <Detail icon={Calendar} label="Scheduled" value={scannedTicket.scheduled_date ? `${formatDateLong(scannedTicket.scheduled_date)}${scannedTicket.scheduled_time ? ` at ${convertTo12Hour(scannedTicket.scheduled_time)}` : ''}` : formatDateLong(scannedTicket.purchase_date)} />
+                      <Detail icon={Users} label="Tickets" value={String(scannedTicket.quantity ?? 1)} />
+                      <Detail icon={DollarSign} label="Total" value={`$${Number(scannedTicket.total_amount ?? 0).toFixed(2)}`} />
+                      <Detail icon={DollarSign} label="Paid" value={`$${Number(scannedTicket.amount_paid ?? 0).toFixed(2)}`} />
+                      <Detail icon={AlertCircle} label="Status" value={scannedTicket.status} />
+                      <Detail icon={User} label="Email" value={scannedTicket.guest_email || '—'} />
+                      <Detail icon={Smartphone} label="Phone" value={scannedTicket.guest_phone || '—'} />
+                    </div>
+                  </div>
+                  <WaiverConnectionPanel type="attraction_purchase" id={scannedTicket.id} title="Waivers" />
+                </>
+              )}
+
+              {scannedOrder && (
+                <>
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold text-gray-800">Order Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Detail icon={Ticket} label="Reference" value={scannedOrder.reference_number} />
+                      <Detail icon={User} label="Customer" value={scannedOrder.customer_name || 'Guest'} />
+                      <Detail icon={AlertCircle} label="Status" value={scannedOrder.status} />
+                      <Detail icon={Home} label="Location" value={scannedOrder.location_name ?? '—'} />
+                      <Detail icon={User} label="Email" value={scannedOrder.customer_email || '—'} />
+                      <Detail icon={Smartphone} label="Phone" value={scannedOrder.customer_phone || '—'} />
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <p className="text-sm text-blue-800">
+                      Checking in admits every fully-paid ticket on this order. Unpaid lines, and any already in,
+                      are reported as skipped.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {scannedEvent && (
+                <>
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold text-gray-800">Event Ticket Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Detail icon={Ticket} label="Reference" value={scannedEvent.reference_number} />
+                      <Detail icon={User} label="Guest" value={scannedEvent.guest_name || 'Guest'} />
+                      <Detail icon={PackageIcon} label="Event" value={scannedEvent.event_name ?? '—'} wide />
+                      <Detail icon={Calendar} label="Date & Time" value={`${formatDateLong(scannedEvent.purchase_date)}${scannedEvent.purchase_time ? ` at ${convertTo12Hour(scannedEvent.purchase_time)}` : ''}`} />
+                      <Detail icon={Users} label="Tickets" value={String(scannedEvent.quantity)} />
+                      <Detail icon={DollarSign} label="Total" value={`$${Number(scannedEvent.total_amount ?? 0).toFixed(2)}`} />
+                      <Detail icon={DollarSign} label="Paid" value={`$${Number(scannedEvent.amount_paid ?? 0).toFixed(2)}`} />
+                      <Detail icon={AlertCircle} label="Status" value={scannedEvent.status} />
+                      <Detail icon={Home} label="Location" value={scannedEvent.location_name ?? '—'} />
+                      <Detail icon={User} label="Email" value={scannedEvent.guest_email || '—'} />
+                      <Detail icon={Smartphone} label="Phone" value={scannedEvent.guest_phone || '—'} />
+                      {scannedEvent.notes && <Detail icon={AlertCircle} label="Notes" value={scannedEvent.notes} wide />}
+                    </div>
+                  </div>
+                  {scannedEvent.checked_in_at && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-emerald-800">Already checked in {formatDateTimeET(scannedEvent.checked_in_at)}.</p>
+                    </div>
+                  )}
+                  {scannedEvent.ticket_order_id && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-amber-800">
+                        This ticket is part of a bulk order. Scan the order so every ticket stays in sync.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {scannedMembership && (
+                <>
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold text-gray-800">Membership Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Detail icon={User} label="Member" value={scannedMembership.membership.holder_name || 'Member'} />
+                      <Detail icon={AlertCircle} label="Status" value={scannedMembership.membership.status} />
+                      <Detail icon={Users} label="Visits today" value={String(scannedMembership.visits_today)} />
+                      <Detail icon={CheckCircle} label="Eligible" value={scannedMembership.eligibility?.eligible ? 'Yes' : 'No'} />
+                      <Detail icon={Clock} label="Used this term" value={String(scannedMembership.membership.visits_used_this_term ?? 0)} />
+                      <Detail icon={Clock} label="Remaining" value={scannedMembership.membership.visits_remaining == null ? 'Unlimited' : String(scannedMembership.membership.visits_remaining)} />
+                      <Detail icon={Calendar} label="Term ends" value={formatDateLong(scannedMembership.membership.current_term_end)} />
+                      <Detail icon={Calendar} label="Last visit" value={scannedMembership.membership.last_visit_at ? formatDateTimeET(scannedMembership.membership.last_visit_at) : '—'} />
+                    </div>
+                  </div>
+                  {!scannedMembership.eligibility?.eligible && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-amber-800">
+                        {scannedMembership.eligibility?.reason
+                          || 'This membership is not currently eligible. Checking in records an override.'}
+                      </p>
+                    </div>
+                  )}
+                  {scannedMembership.photo_required && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                      <Camera className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-blue-800">This plan requires a member photo on file.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-200">
+              <StandardButton variant="secondary" onClick={closeEntityPanels}>Close</StandardButton>
+              <StandardButton
+                variant="primary"
+                icon={CheckCircle}
+                onClick={scannedMembership ? confirmMembershipCheckIn : scannedOrder ? confirmOrderCheckIn : scannedEvent ? confirmEventCheckIn : confirmTicketCheckIn}
+                disabled={entityBusy}
+                loading={entityBusy}
+              >
+                {entityBusy ? 'Checking in...' : 'Check In'}
+              </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWaiverModal && scannedWaiver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                  <FileSignature className={`w-5 h-5 text-${fullColor}`} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Waiver</h3>
+                  <p className="text-xs font-mono text-gray-500">{scannedWaiver.reference_number}</p>
+                </div>
+              </div>
+              <button
+                onClick={closeWaiverModal}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Signed by</p>
+                <p className="text-base font-medium text-gray-900">{scannedWaiver.adult_name}</p>
+                {scannedWaiver.template_title && (
+                  <p className="text-sm text-gray-500">{scannedWaiver.template_title}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Visit date</p>
+                  <p className="text-sm text-gray-900">{formatDateLong(scannedWaiver.selected_date)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Location</p>
+                  <p className="text-sm text-gray-900">{scannedWaiver.location_name ?? '—'}</p>
+                </div>
+              </div>
+
+              {scannedWaiver.minors_count > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Minors covered ({scannedWaiver.minors_count})
+                  </p>
+                  <ul className="text-sm text-gray-900 space-y-0.5">
+                    {scannedWaiver.minors.map(minor => (
+                      <li key={minor.id}>{minor.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {!scannedWaiver.is_signed && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <p className="text-sm text-amber-800">
+                    This waiver has not been signed yet, so it cannot be checked in.
+                  </p>
+                </div>
+              )}
+
+              {scannedWaiver.checked_in_at && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <p className="text-sm text-emerald-800">
+                    Already checked in {formatDateTimeET(scannedWaiver.checked_in_at)}.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-200">
+              <StandardButton variant="secondary" onClick={closeWaiverModal}>
+                Close
+              </StandardButton>
+              {scannedWaiver.is_signed && !scannedWaiver.checked_in_at && (
+                <StandardButton
+                  variant="primary"
+                  icon={CheckCircle}
+                  onClick={confirmWaiverCheckIn}
+                  disabled={waiverProcessing}
+                  loading={waiverProcessing}
+                >
+                  {waiverProcessing ? 'Checking in...' : 'Check In Waiver'}
+                </StandardButton>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-up">

@@ -47,6 +47,7 @@ const WaiverKiosk = () => {
   const [completed, setCompleted] = useState<WaiverSubmission | null>(null);
   const [completedAd, setCompletedAd] = useState<KioskAd | null>(null);
   const [completedWaiverId, setCompletedWaiverId] = useState<number | null>(null);
+  const [completedWaiverRef, setCompletedWaiverRef] = useState<string | null>(null);
   const [phase, setPhase] = useState<'start' | 'lookup' | 'returning' | 'form'>('start');
   const [profile, setProfile] = useState<WaiverProfileRecord | null>(null);
   const [returning, setReturning] = useState<WaiverReturningSelection | null>(null);
@@ -95,6 +96,7 @@ const WaiverKiosk = () => {
     setCompleted(null);
     setCompletedAd(null);
     setCompletedWaiverId(null);
+    setCompletedWaiverRef(null);
     setProfile(null);
     setReturning(null);
     setLookupToken(null);
@@ -153,6 +155,7 @@ const WaiverKiosk = () => {
       const ad: KioskAd | null = res?.data?.ad ?? null;
       setCompletedAd(ad);
       setCompletedWaiverId(res?.data?.id ?? null);
+      setCompletedWaiverRef(res?.data?.reference_number ?? null);
       setJustCompleted(true);
       const holdSeconds = ad ? 2 + ad.display_seconds : SUCCESS_HOLD_SECONDS;
       completeTimer.current = setTimeout(resetForm, (holdSeconds + 90) * 1000);
@@ -273,6 +276,7 @@ const WaiverKiosk = () => {
           onStartNext={resetForm}
           ad={completedAd}
           waiverId={completedWaiverId}
+          waiverReference={completedWaiverRef}
         />
       )}
     </WaiverShell>

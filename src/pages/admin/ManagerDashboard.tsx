@@ -36,6 +36,7 @@ import InfoTooltip from '../../components/ui/InfoTooltip';
 import StandardButton from '../../components/ui/StandardButton';
 import Pagination from '../../components/ui/Pagination';
 import { getStoredUser } from '../../utils/storage';
+import { useQuickActions } from '../../hooks/useQuickActions';
 import bookingService, { type Booking } from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
@@ -722,16 +723,18 @@ const LocationManagerDashboard: React.FC = () => {
     },
   ];
 
-  const quickActions = [
+  const allQuickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
     { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
-    { title: 'Check-in', icon: CheckCircle, link: '/bookings/check-in' },
+    { title: 'Check-In / Waivers', icon: CheckCircle, link: '/check-in' },
     { title: 'Packages', icon: Package, link: '/packages' },
     { title: 'Attractions', icon: Ticket, link: '/attractions' },
     { title: 'Attendants', icon: Users, link: '/manager/attendants' },
     { title: 'Analytics', icon: TrendingUp, link: '/manager/analytics' },
     { title: 'Payments', icon: DollarSign, link: '/manager/payments' },
   ];
+
+  const { visible: quickActions, hidden: hiddenQuickActions, toggle: toggleQuickAction, isAdmin: canEditQuickActions } = useQuickActions(allQuickActions);
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -920,6 +923,29 @@ const LocationManagerDashboard: React.FC = () => {
         <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <Zap className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
         </h2>
+        {canEditQuickActions && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500 mr-1">Shown to staff:</span>
+            {allQuickActions.map((a) => {
+              const shown = !hiddenQuickActions.includes(a.title);
+              return (
+                <button
+                  key={`qa-toggle-${a.title}`}
+                  type="button"
+                  onClick={() => void toggleQuickAction(a.title)}
+                  className={`text-xs px-2 py-1 rounded-full border transition ${
+                    shown
+                      ? 'bg-white border-gray-300 text-gray-700'
+                      : 'bg-gray-100 border-gray-200 text-gray-400 line-through'
+                  }`}
+                  title={shown ? `Hide ${a.title} from staff` : `Show ${a.title} to staff`}
+                >
+                  {a.title}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
           {quickActions.map((action, index) => {
             const Icon = action.icon;

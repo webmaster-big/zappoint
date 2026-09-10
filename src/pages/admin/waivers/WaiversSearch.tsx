@@ -451,6 +451,7 @@ const WaiversSearch = () => {
     filterDefs,
     searchFields: (w) => [
       w.id,
+      w.reference_number,
       adultName(w),
       w.adult_email,
       w.adult_phone,
