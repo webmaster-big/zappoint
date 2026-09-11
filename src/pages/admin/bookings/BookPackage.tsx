@@ -1146,6 +1146,13 @@ const BookPackage: React.FC = () => {
 
   const partialAmount = calculatePartialAmount();
 
+  const amountDueNow = paymentType === 'full'
+    ? finalTotal
+    : paymentType === 'custom'
+      ? Math.min(customPaymentAmount, finalTotal)
+      : partialAmount > 0 ? partialAmount : finalTotal;
+  const remainingBalance = Math.max(0, finalTotal - amountDueNow);
+
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
@@ -1713,18 +1720,12 @@ const BookPackage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Amount Paid:</span>
-                  <span className="font-medium text-green-600">${(
-                    paymentType === 'full' ? finalTotal : 
-                    paymentType === 'custom' ? Math.min(customPaymentAmount, finalTotal) : 
-                    partialAmount
-                  ).toFixed(2)}</span>
+                  <span className="font-medium text-green-600">${amountDueNow.toFixed(2)}</span>
                 </div>
-                {(paymentType === 'partial' || (paymentType === 'custom' && customPaymentAmount < finalTotal)) && (
+                {remainingBalance > 0 && (
                   <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
-                    <span className="font-medium text-orange-600">${(
-                      paymentType === 'custom' ? finalTotal - customPaymentAmount : finalTotal - partialAmount
-                    ).toFixed(2)}</span>
+                    <span className="font-medium text-orange-600">${remainingBalance.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
@@ -2934,7 +2935,7 @@ const BookPackage: React.FC = () => {
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                         </svg>
-                        Pay ${partialAmount > 0 ? partialAmount.toFixed(2) : total.toFixed(2)}
+                        Pay ${amountDueNow.toFixed(2)}
                       </>
                     )}
                   </StandardButton>
