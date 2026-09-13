@@ -64,6 +64,7 @@ import { parseLocalDate, convertTo12Hour, formatDurationDisplay, formatLocalDate
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
+import { resolvePaymentState } from '../../types/Bookings.types';
 
 const AttendantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -777,10 +778,13 @@ const AttendantDashboard: React.FC = () => {
        });
 
        const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
-       const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+       const newPaymentStatus = resolvePaymentState({
+         payment_status: selectedBooking.payment_status,
+         amount_paid: newAmountPaid,
+         total_amount: selectedBooking.total_amount,
+       }).state;
        const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
          amount_paid: newAmountPaid,
-         payment_status: newPaymentStatus,
          status: 'confirmed',
        });
 
@@ -1420,10 +1424,8 @@ const AttendantDashboard: React.FC = () => {
                                <div className="font-semibold text-gray-900">
                                  ${parseFloat(booking.total_amount || 0).toFixed(2)}
                                </div>
-                               <div className={`text-xs mt-1 ${
-                                 booking.payment_status === 'paid' ? 'text-emerald-600' : 'text-amber-600'
-                               }`}>
-                                 {booking.payment_status}
+                               <div className={`text-xs mt-1 ${resolvePaymentState(booking).amountClass}`}>
+                                 {resolvePaymentState(booking).label}
                                </div>
                              </div>
                            </div>
@@ -1586,12 +1588,8 @@ const AttendantDashboard: React.FC = () => {
                      </div>
                      <div className="flex justify-between items-center">
                        <span className="text-sm text-gray-600">Payment Status</span>
-                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                         selectedBooking.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800'
-                           : selectedBooking.payment_status === 'partial' ? 'bg-amber-100 text-amber-800'
-                           : 'bg-rose-100 text-rose-800'
-                       }`}>
-                         {selectedBooking.payment_status ? selectedBooking.payment_status.charAt(0).toUpperCase() + selectedBooking.payment_status.slice(1) : 'Pending'}
+                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${resolvePaymentState(selectedBooking).pillClass}`}>
+                         {resolvePaymentState(selectedBooking).label}
                        </span>
                      </div>
                      {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
@@ -2106,10 +2104,8 @@ const AttendantDashboard: React.FC = () => {
                        </span>
                      </td>
                      <td className="px-4 py-3">
-                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                         getPaymentColor(booking.payment_status || 'N/A')
-                       }`}>
-                         {booking.payment_status ? booking.payment_status.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'N/A'}
+                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${resolvePaymentState(booking).pillClass}`}>
+                         {resolvePaymentState(booking).label}
                        </span>
                      </td>
                      <td className="px-4 py-3">

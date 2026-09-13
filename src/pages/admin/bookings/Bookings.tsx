@@ -41,7 +41,8 @@ import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
-import { derivePaymentStatus, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
+import { resolvePaymentState, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
+import type { BookingRepriceIntent } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
@@ -112,7 +113,7 @@ const Bookings: React.FC = () => {
       status: booking.status as BookingsPageBooking['status'],
       totalAmount,
       amountPaid,
-      paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
+      paymentStatus: resolvePaymentState(booking).state,
       createdAt: booking.created_at,
       paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
       attractions: booking.attractions?.map((attr: any) => ({
@@ -465,14 +466,6 @@ const Bookings: React.FC = () => {
     paylater: 'bg-orange-100 text-orange-800'
   };
 
-  const paymentStatusColors = {
-    paid: 'bg-green-100 text-green-800',
-    partial: 'bg-yellow-100 text-yellow-800',
-    pending: 'bg-gray-100 text-gray-800',
-    refunded: 'bg-purple-100 text-purple-800',
-    voided: 'bg-red-100 text-red-800'
-  };
-
   const metrics = [
     {
       title: 'Total Bookings',
@@ -768,7 +761,7 @@ const Bookings: React.FC = () => {
               status: booking.status as BookingsPageBooking['status'],
               totalAmount,
               amountPaid,
-              paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
+              paymentStatus: resolvePaymentState(booking).state,
               createdAt: booking.created_at,
               paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1192,8 +1185,15 @@ const Bookings: React.FC = () => {
     
     setSavingPackage(true);
     try {
+      const repriced = await fetchRepricedFields(Number(selectedBookingForEdit.id), { package_id: pkg.id });
+      if (!repriced) {
+        alert('Could not reprice this booking for the new package. No change was made.');
+        return;
+      }
+
       const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
-        package_id: pkg.id
+        package_id: pkg.id,
+        ...repriced
       });
       
       if (response.success || response.data) {
@@ -1396,8 +1396,15 @@ const Bookings: React.FC = () => {
     
     setSavingDate(true);
     try {
+      const repriced = await fetchRepricedFields(Number(selectedBookingForEdit.id), { booking_date: dateValue });
+      if (!repriced) {
+        alert('Could not reprice this booking for the new date. No change was made.');
+        return;
+      }
+
       const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
-        booking_date: dateValue
+        booking_date: dateValue,
+        ...repriced
       });
       
       if (response.success || response.data) {
@@ -1865,6 +1872,20 @@ const Bookings: React.FC = () => {
     }
   };
 
+  const fetchRepricedFields = async (bookingId: number, intent: BookingRepriceIntent) => {
+    try {
+      const res = await bookingService.repriceBooking(bookingId, intent);
+      if (!res.success || !res.data) return null;
+      return {
+        total_amount: res.data.total_amount,
+        discount_amount: res.data.discount_amount,
+        applied_fees: res.data.persist_fees.length > 0 ? res.data.persist_fees : null,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const saveEdit = async () => {
     if (!editingCell) return;
 
@@ -1894,9 +1915,28 @@ const Bookings: React.FC = () => {
         updateValue = null;
       }
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         [fieldConfig.apiField]: updateValue,
       };
+
+      let repricedTotal: number | null = null;
+
+      if (fieldConfig.apiField === 'participants') {
+        const quoteRes = await bookingService.repriceBooking(Number(editingCell.bookingId), {
+          participants: Number(updateValue),
+        });
+        if (!quoteRes.success || !quoteRes.data) {
+          alert('Could not reprice this booking. The participant count was not changed.');
+          setSavingCell(null);
+          setEditingCell(null);
+          setEditValue('');
+          return;
+        }
+        repricedTotal = quoteRes.data.total_amount;
+        payload.total_amount = quoteRes.data.total_amount;
+        payload.discount_amount = quoteRes.data.discount_amount;
+        payload.applied_fees = quoteRes.data.persist_fees.length > 0 ? quoteRes.data.persist_fees : null;
+      }
 
       const response = await bookingService.updateBooking(Number(editingCell.bookingId), payload);
 
@@ -1924,6 +1964,14 @@ const Bookings: React.FC = () => {
                 updates.phone = editValue;
               } else if (editingCell.field === 'participants') {
                 updates.participants = Number(editValue) || 0;
+                if (repricedTotal !== null) {
+                  updates.totalAmount = repricedTotal;
+                  updates.paymentStatus = resolvePaymentState({
+                    payment_status: b.paymentStatus,
+                    amount_paid: b.amountPaid,
+                    total_amount: repricedTotal,
+                  }).state;
+                }
               } else if (editingCell.field === 'totalAmount') {
                 updates.totalAmount = Number(editValue) || 0;
               } else if (editingCell.field === 'amountPaid') {
@@ -2206,8 +2254,8 @@ const Bookings: React.FC = () => {
       case 'paymentStatus':
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
-            <span className={`text-xs font-medium px-2 py-1 rounded-full ${paymentStatusColors[(booking.paymentStatus || 'pending') as keyof typeof paymentStatusColors]}`}>
-              {(booking.paymentStatus || 'pending').charAt(0).toUpperCase() + (booking.paymentStatus || 'pending').slice(1)}
+            <span className={`text-xs font-medium px-2 py-1 rounded-full ${resolvePaymentState({ payment_status: booking.paymentStatus, amount_paid: booking.amountPaid, total_amount: booking.totalAmount }).pillClass}`}>
+              {resolvePaymentState({ payment_status: booking.paymentStatus, amount_paid: booking.amountPaid, total_amount: booking.totalAmount }).label}
             </span>
           </td>
         );
@@ -2771,7 +2819,7 @@ const Bookings: React.FC = () => {
       booking.duration && booking.duration_unit ? formatDurationDisplay(booking.duration, booking.duration_unit) : '',
       booking.status || '',
       booking.payment_method || '',
-      booking.payment_status || derivePaymentStatus(Number(booking.amount_paid || 0), Number(booking.total_amount || 0)),
+      resolvePaymentState(booking).state,
       booking.transaction_id || '',
       booking.total_amount || 0,
       booking.amount_paid || 0,
@@ -2859,7 +2907,6 @@ const Bookings: React.FC = () => {
 
       const updateResponse = await bookingService.updateBooking(Number(selectedBookingForPayment.id), {
         amount_paid: newAmountPaid,
-        payment_status: newPaymentStatus,
         status: 'confirmed', // Set status to confirmed when payment is made
       });
 

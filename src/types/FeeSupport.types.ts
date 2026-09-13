@@ -9,6 +9,7 @@ export interface FeeSupport {
   fee_application_type: 'additive' | 'inclusive';
   entity_ids: number[];
   entity_type: 'package' | 'attraction' | 'event' | 'membership';
+  applies_to_all?: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -25,6 +26,7 @@ export interface FeeSupportFormData {
   fee_application_type: 'additive' | 'inclusive';
   entity_ids: number[];
   entity_type: 'package' | 'attraction' | 'event' | 'membership';
+  applies_to_all: boolean;
   is_active: boolean;
 }
 

@@ -72,6 +72,7 @@ import { useHideEmptySpaces } from '../../components/admin/calendar/useDaySchedu
 import CustomerSearch from '../../components/admin/calendar/CustomerSearch';
 import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
+import { resolvePaymentState } from '../../types/Bookings.types';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -907,13 +908,6 @@ const CompanyDashboard: React.FC = () => {
     'Checked-in': 'bg-green-100 text-green-800',
   };
 
-  const paymentColors = {
-    Paid: 'bg-emerald-100 text-emerald-800',
-    Partial: 'bg-amber-100 text-amber-800',
-    Refunded: 'bg-rose-100 text-rose-800',
-    Pending: 'bg-amber-100 text-amber-800',
-  };
-
   const filteredBookings = allBookings.filter(booking => {
     const statusMatch = selectedStatus === 'all' || booking.status.toLowerCase() === selectedStatus.toLowerCase();
     const locationMatch = selectedLocation === 'all' || booking.location_id === selectedLocation;
@@ -1015,10 +1009,13 @@ const CompanyDashboard: React.FC = () => {
       });
 
       const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
-      const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+      const newPaymentStatus = resolvePaymentState({
+        payment_status: selectedBooking.payment_status,
+        amount_paid: newAmountPaid,
+        total_amount: selectedBooking.total_amount,
+      }).state;
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        payment_status: newPaymentStatus,
         status: 'confirmed',
       });
 
@@ -2021,21 +2018,7 @@ const CompanyDashboard: React.FC = () => {
                 const activityName = booking.attraction?.name || booking.package?.name || '-';
                 const locationName = booking.location?.name || '-';
                 
-                const totalAmount = parseFloat(String(booking.total_amount || 0));
-                const amountPaid = parseFloat(String(booking.amount_paid || 0));
-                let paymentStatus = booking.payment_status || 'pending';
-                
-                if (totalAmount > 0) {
-                  if (amountPaid >= totalAmount) {
-                    paymentStatus = 'paid';
-                  } else if (amountPaid > 0) {
-                    paymentStatus = 'partial';
-                  } else {
-                    paymentStatus = 'pending';
-                  }
-                }
-                
-                const displayPaymentStatus = paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1);
+                const paymentState = resolvePaymentState(booking);
                 const bookingStatus = booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
                 
                 return (
@@ -2071,8 +2054,8 @@ const CompanyDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${paymentColors[displayPaymentStatus as keyof typeof paymentColors]}`}>
-                        {displayPaymentStatus}
+                      <span className={`text-xs px-2 py-1 rounded-full ${paymentState.pillClass}`}>
+                        {paymentState.label}
                       </span>
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
@@ -2571,14 +2554,8 @@ const CompanyDashboard: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Payment Status</span>
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      selectedBooking.payment_status === 'paid'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : selectedBooking.payment_status === 'partial'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {selectedBooking.payment_status ? selectedBooking.payment_status.charAt(0).toUpperCase() + selectedBooking.payment_status.slice(1) : 'Pending'}
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${resolvePaymentState(selectedBooking).pillClass}`}>
+                      {resolvePaymentState(selectedBooking).label}
                     </span>
                   </div>
                   {selectedBooking.payment_method && (

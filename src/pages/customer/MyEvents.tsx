@@ -21,6 +21,7 @@ import { getImageUrl } from '../../utils/storage';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 import type { EventPurchase } from '../../types/event.types';
+import { resolvePaymentState } from '../../types/Bookings.types';
 
 const MyEvents = () => {
   const [purchases, setPurchases] = useState<EventPurchase[]>([]);
@@ -323,8 +324,8 @@ const MyEvents = () => {
                               <DollarSign size={13} className="text-emerald-500" />
                               {parseFloat(String(purchase.total_amount)).toFixed(2)}
                             </span>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(purchase.payment_status)}`}>
-                              {purchase.payment_status}
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${resolvePaymentState(purchase).pillClass}`}>
+                              {resolvePaymentState(purchase).label}
                             </span>
                           </div>
                         </div>
@@ -384,8 +385,8 @@ const MyEvents = () => {
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-500">Payment</span>
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(purchase.payment_status)}`}>
-                                  {purchase.payment_status}
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${resolvePaymentState(purchase).pillClass}`}>
+                                  {resolvePaymentState(purchase).label}
                                 </span>
                               </div>
                               {purchase.special_requests && (
@@ -523,8 +524,8 @@ const MyEvents = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Payment Status</span>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(selectedPurchase.payment_status)}`}>
-                    {selectedPurchase.payment_status}
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${resolvePaymentState(selectedPurchase).pillClass}`}>
+                    {resolvePaymentState(selectedPurchase).label}
                   </span>
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between">

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { BookPackagePackage } from '../types/BookPackage.types';
+import type { BookingQuote, BookingRepriceIntent } from '../types/Bookings.types';
 import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { changeReasonWasRequired, requestChangeReason } from '../utils/changeReasonPrompt';
@@ -511,6 +512,11 @@ const bookingService = {
 
   async updateBooking(id: number, data: UpdateBookingData): Promise<BookingResponse> {
     const response = await api.put(`/bookings/${id}`, data);
+    return response.data;
+  },
+
+  async repriceBooking(id: number, intent: BookingRepriceIntent): Promise<{ success: boolean; data?: BookingQuote; message?: string }> {
+    const response = await api.post(`/bookings/${id}/reprice`, intent);
     return response.data;
   },
 

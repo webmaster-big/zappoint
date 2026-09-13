@@ -33,6 +33,7 @@ import {
   useAdminTable,
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 interface DisplayPurchase {
   id: string;
@@ -340,16 +341,8 @@ const EventPurchases = () => {
       sortValue: p => p.paymentStatus || '',
       exportValue: p => p.paymentStatus,
       render: p => (
-        <span className={`whitespace-nowrap text-xs font-medium px-2 py-1 rounded-full ${
-          p.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-          p.paymentStatus === 'partial' ? 'bg-orange-100 text-orange-800' :
-          p.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {p.paymentStatus === 'paid' ? 'Paid' :
-           p.paymentStatus === 'partial' ? 'Partial' :
-           p.paymentStatus === 'pending' ? 'Pending' :
-           p.paymentStatus || 'N/A'}
+        <span className={`whitespace-nowrap text-xs font-medium px-2 py-1 rounded-full ${resolvePaymentState({ payment_status: p.paymentStatus, amount_paid: p.amountPaid, total_amount: p.totalAmount }).pillClass}`}>
+          {resolvePaymentState({ payment_status: p.paymentStatus, amount_paid: p.amountPaid, total_amount: p.totalAmount }).label}
         </span>
       ),
     },

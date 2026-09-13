@@ -18,6 +18,7 @@ import { formatDurationDisplay, getMichiganNow } from '../../../utils/timeFormat
 import { normalizeCategory } from '../../../utils/venueCategories';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
@@ -833,10 +834,13 @@ const SpaceSchedule = () => {
       });
 
       const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
-      const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+      const newPaymentStatus = resolvePaymentState({
+        payment_status: selectedBooking.payment_status,
+        amount_paid: newAmountPaid,
+        total_amount: selectedBooking.total_amount,
+      }).state;
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        payment_status: newPaymentStatus,
         status: 'confirmed',
       });
 
@@ -925,12 +929,8 @@ const SpaceSchedule = () => {
                   </div>
                   <div className={`mt-auto pt-1 flex items-center justify-between text-xs`}>
                     <span className={`font-bold ${color.text}`}>${Number(booking.total_amount || 0).toFixed(2)}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                      booking.payment_status === 'paid' ? 'bg-green-200/80 text-green-800' :
-                      booking.payment_status === 'partial' ? 'bg-yellow-200/80 text-yellow-800' :
-                      'bg-red-200/80 text-red-800'
-                    }`}>
-                      {booking.payment_status}
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${resolvePaymentState(booking).pillClass}`}>
+                      {resolvePaymentState(booking).label}
                     </span>
                   </div>
                 </>
@@ -1625,12 +1625,8 @@ const SpaceSchedule = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Payment Status</span>
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      selectedBooking.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-                      selectedBooking.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedBooking.payment_status}
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${resolvePaymentState(selectedBooking).pillClass}`}>
+                      {resolvePaymentState(selectedBooking).label}
                     </span>
                   </div>
                   <div className="pt-3 border-t border-gray-200">

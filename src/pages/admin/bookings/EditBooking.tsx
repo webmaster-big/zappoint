@@ -11,6 +11,7 @@ import { bookingCacheService } from '../../../services/BookingCacheService';
 import packageService from '../../../services/PackageService';
 import type { Package as PackageType } from '../../../services/PackageService';
 import { packagePriceForParticipants, participantLabelFor } from '../../../utils/packagePricing';
+import { resolvePaymentState, type BookingQuote } from '../../../types/Bookings.types';
 import roomService from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
@@ -22,7 +23,6 @@ import DatePicker from '../../../components/ui/DatePicker';
 import EmailInput from '../../../components/ui/EmailInput';
 import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
-import type { AppliedDiscount } from '../../../utils/discounts';
 import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns } from '../../../utils/addOnQuantity';
 
 const parseLocalDate = (isoDateString: string): Date => {
@@ -109,7 +109,9 @@ const EditBooking: React.FC = () => {
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
-  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
+  const [quote, setQuote] = useState<BookingQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
 
   const loadPackagesAndRoomsForLocation = useCallback(async (locationId: number) => {
@@ -243,10 +245,6 @@ const EditBooking: React.FC = () => {
           setAppliedFees(bookingData.applied_fees);
         }
 
-        if ((bookingData as any).applied_discounts && Array.isArray((bookingData as any).applied_discounts)) {
-          setAppliedDiscounts((bookingData as any).applied_discounts);
-        }
-        
         setLoading(false);
 
         const locationId = bookingData.location_id;
@@ -550,19 +548,6 @@ const EditBooking: React.FC = () => {
     });
   };
 
-  const computeAddonsTotal = useCallback((addons: { [id: number]: number }, participants: number) => {
-    return Object.entries(addons).reduce((sum, [id, quantity]) => {
-      const addonId = parseInt(id);
-      const addOn = availableAddOns.find((a: any) => a.id === addonId);
-      if (!addOn) return sum;
-      const price = getAddOnUnitPrice(addonId, addOn);
-      const lineTotal = addOn.pricing_type === 'per_person'
-        ? price * quantity * participants
-        : price * quantity;
-      return sum + lineTotal;
-    }, 0);
-  }, [availableAddOns, getAddOnUnitPrice]);
-
   const buildAdditionalAddons = useCallback(() => {
     return Object.entries(selectedAddOns)
       .filter(([, quantity]) => quantity > 0)
@@ -594,6 +579,47 @@ const EditBooking: React.FC = () => {
         .join(',');
     return norm(originalMap) !== norm(selectedAddOns);
   }, [originalBooking, selectedAddOns]);
+
+  useEffect(() => {
+    if (!originalBooking?.id || !formData.packageId) return;
+
+    let cancelled = false;
+    setQuoteLoading(true);
+
+    const handle = window.setTimeout(async () => {
+      const packageChanged = formData.packageId !== originalBooking.package_id;
+      try {
+        const res = await bookingService.repriceBooking(Number(originalBooking.id), {
+          participants: formData.participants,
+          package_id: formData.packageId,
+          booking_date: formData.date || undefined,
+          location_id: formData.locationId || undefined,
+          additional_addons: buildAdditionalAddons().map(({ addon_id, quantity }) => ({ addon_id, quantity })),
+          ...(packageChanged ? { additional_attractions: [] } : {}),
+        });
+        if (cancelled) return;
+        if (res.success && res.data) {
+          setQuote(res.data);
+          setQuoteError(null);
+        } else {
+          setQuote(null);
+          setQuoteError(res.message || 'Could not price this booking.');
+        }
+      } catch {
+        if (!cancelled) {
+          setQuote(null);
+          setQuoteError('Could not reach the pricing service. Refresh before saving.');
+        }
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [originalBooking, formData.participants, formData.packageId, formData.date, formData.locationId, buildAdditionalAddons]);
 
   const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? packageDetails?.min_participants ?? 1));
 
@@ -773,39 +799,7 @@ const EditBooking: React.FC = () => {
     setSubmitting(true);
 
     try {
-      let updatedTotal: number | undefined = undefined;
       const isPackageChanged = formData.packageId !== originalBooking.package_id;
-      const isParticipantsChanged = formData.participants !== originalBooking.participants;
-
-      const originalFees = originalBooking.applied_fees || [];
-      const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
-
-      if (isPackageChanged || isParticipantsChanged || feesChanged || addOnsChanged) {
-        const packagePrice = packagePriceForParticipants({
-          pricingType: packageDetails?.pricing_type,
-          price: packageDetails?.price ?? 0,
-          minParticipants: packageDetails?.min_participants,
-          pricePerAdditional: packageDetails?.price_per_additional,
-          participants: formData.participants,
-        });
-
-        const attractionsTotal = isPackageChanged
-          ? 0
-          : (originalBooking.attractions || []).reduce((sum, attr) => {
-              const price = Number(attr.pivot?.price_at_booking || 0);
-              const qty = Number(attr.pivot?.quantity || 1);
-              return sum + (price * qty);
-            }, 0);
-
-        const addonsTotal = computeAddonsTotal(selectedAddOns, formData.participants);
-
-        const additiveFeeTotal = appliedFees
-          .filter(f => f.fee_application_type === 'additive')
-          .reduce((sum, f) => sum + f.fee_amount, 0);
-
-        updatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
-      }
-
       const additionalAddons = buildAdditionalAddons();
 
       const response = await bookingService.updateBooking(Number(originalBooking.id), {
@@ -823,12 +817,13 @@ const EditBooking: React.FC = () => {
         notes: formData.notes,
         internal_notes: formData.internalNotes,
         send_notification: formData.sendNotification,
-        applied_fees: appliedFees.length > 0 ? appliedFees : null,
-        applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
-        discount_amount: originalBooking.discount_amount ? Number(originalBooking.discount_amount) : undefined,
         ...(addOnsChanged && { additional_addons: additionalAddons }),
         ...(isPackageChanged && { additional_attractions: [] }),
-        ...(updatedTotal !== undefined && { total_amount: updatedTotal, amount_paid: originalAmountPaid }),
+        ...(quote && {
+          total_amount: quote.total_amount,
+          discount_amount: quote.discount_amount,
+          applied_fees: quote.persist_fees.length > 0 ? quote.persist_fees : null,
+        }),
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
@@ -1484,10 +1479,10 @@ const EditBooking: React.FC = () => {
                 size="lg"
                 icon={Save}
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || quoteLoading || quoteError !== null}
                 loading={submitting}
               >
-                {submitting ? 'Saving...' : 'Save Changes'}
+                {submitting ? 'Saving...' : quoteLoading ? 'Pricing...' : 'Save Changes'}
               </StandardButton>
             </div>
           </form>
@@ -1583,74 +1578,25 @@ const EditBooking: React.FC = () => {
 
             <div>
               <p className="text-sm text-gray-500 mb-3">Applied Fees</p>
-              <div className="space-y-3 mb-4">
-                {appliedFees.map((fee, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400 font-medium">Fee #{index + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => setAppliedFees(appliedFees.filter((_, i) => i !== index))}
-                        className="text-red-400 hover:text-red-600 text-xs font-medium"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Fee name"
-                      value={fee.fee_name}
-                      onChange={(e) => {
-                        const updated = [...appliedFees];
-                        updated[index] = { ...updated[index], fee_name: e.target.value };
-                        setAppliedFees(updated);
-                      }}
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={fee.fee_amount}
-                          onChange={(e) => {
-                            const updated = [...appliedFees];
-                            updated[index] = { ...updated[index], fee_amount: parseFloat(e.target.value) || 0 };
-                            setAppliedFees(updated);
-                          }}
-                          className="w-full border border-gray-300 rounded pl-6 pr-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      <select
-                        value={fee.fee_application_type}
-                        onChange={(e) => {
-                          const updated = [...appliedFees];
-                          updated[index] = { ...updated[index], fee_application_type: e.target.value as 'additive' | 'inclusive' };
-                          setAppliedFees(updated);
-                        }}
-                        className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="additive">Additive</option>
-                        <option value="inclusive">Inclusive</option>
-                      </select>
-                    </div>
+              <div className="space-y-2 mb-4">
+                {(quote ? quote.fees : appliedFees).length === 0 && (
+                  <p className="text-xs text-gray-400">No fees configured for this package.</p>
+                )}
+                {(quote ? quote.fees : appliedFees).map((fee, index) => (
+                  <div key={`${fee.fee_name}-${index}`} className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                    <span className="text-sm text-gray-700">
+                      {fee.fee_name}
+                      {(fee as { fee_label?: string }).fee_label ? (
+                        <span className="ml-1 text-xs text-gray-400">({(fee as { fee_label?: string }).fee_label})</span>
+                      ) : null}
+                      <span className="ml-1 text-xs text-gray-400">{fee.fee_application_type}</span>
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">${Number(fee.fee_amount).toFixed(2)}</span>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setAppliedFees([...appliedFees, { fee_name: '', fee_amount: 0, fee_application_type: 'additive' }])}
-                  className={`text-xs text-${fullColor} hover:underline`}
-                >
-                  + Add Fee
-                </button>
-                {appliedFees.length > 0 && (
-                  <div className="text-xs text-gray-500 text-right">
-                    Additive Fees: ${appliedFees.filter(f => f.fee_application_type === 'additive').reduce((sum, f) => sum + f.fee_amount, 0).toFixed(2)}
-                  </div>
-                )}
+                <p className="text-xs text-gray-400">
+                  Fees come from this location's fee settings and recalculate with the participant count.
+                </p>
               </div>
 
               <p className="text-sm text-gray-500 mb-3">Payment Breakdown</p>
@@ -1720,91 +1666,95 @@ const EditBooking: React.FC = () => {
                 
                 {(() => {
                   const isPerPlayer = packageDetails?.pricing_type === 'per_person';
-                  const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
                   const minParticipants = packageDetails?.min_participants || 1;
                   const pricePerAdditional = Number(packageDetails?.price_per_additional || 0);
                   const additionalCount = Math.max(0, formData.participants - minParticipants);
                   const additionalParticipantCost = isPerPlayer ? 0 : additionalCount * pricePerAdditional;
-                  const packagePrice = packagePriceForParticipants({
-                    pricingType: packageDetails?.pricing_type,
-                    price: basePackagePrice,
-                    minParticipants,
-                    pricePerAdditional,
-                    participants: formData.participants,
+
+                  const storedTotal = Number(originalBooking?.total_amount || 0);
+                  const total = quote ? quote.total_amount : storedTotal;
+                  const paid = quote ? quote.amount_paid : originalAmountPaid;
+                  const discount = quote ? quote.discount_amount : Number(originalBooking?.discount_amount || 0);
+                  const totalChanged = quote ? Math.abs(quote.total_amount - storedTotal) > 0.005 : false;
+
+                  const paymentState = resolvePaymentState({
+                    payment_status: quote ? quote.payment_status : originalBooking?.payment_status,
+                    amount_paid: paid,
+                    total_amount: total,
                   });
-                  
-                  const attractionsTotal = formData.packageId !== originalBooking?.package_id
-                    ? 0
-                    : (originalBooking?.attractions || []).reduce((sum, attr) => {
-                        const price = Number(attr.pivot?.price_at_booking || 0);
-                        const qty = Number(attr.pivot?.quantity || 1);
-                        return sum + (price * qty);
-                      }, 0);
 
-                  const addonsTotal = computeAddonsTotal(selectedAddOns, formData.participants);
-
-                  const originalTotal = Number(originalBooking?.total_amount || 0);
-
-                  const additiveFeeTotal = appliedFees
-                    .filter(f => f.fee_application_type === 'additive')
-                    .reduce((sum, f) => sum + f.fee_amount, 0);
-
-                  const isPackageChanged = formData.packageId !== originalBooking?.package_id;
-                  const isParticipantsChanged = formData.participants !== originalBooking?.participants;
-                  const originalFees = originalBooking?.applied_fees || [];
-                  const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
-                  const needsRecalc = isPackageChanged || isParticipantsChanged || feesChanged || addOnsChanged;
-                  
-                  const calculatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
-                  const displayTotal = needsRecalc ? calculatedTotal : originalTotal;
-                  const balance = displayTotal - originalAmountPaid;
-                  
                   return (
                     <>
+                      {quoteError && (
+                        <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                          {quoteError}
+                        </div>
+                      )}
+
+                      {quote && quote.pricing_consistent === false && (
+                        <div className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                          This booking's stored total predates the current pricing rules. Only the change you make
+                          here is applied to it, so the original agreed price is preserved.
+                        </div>
+                      )}
+
                       {!isPerPlayer && additionalCount > 0 && pricePerAdditional > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">
-                            +{additionalCount} extra participant{additionalCount > 1 ? 's' : ''} × ${pricePerAdditional.toFixed(2)}
+                            +{additionalCount} extra participant{additionalCount > 1 ? 's' : ''} &times; ${pricePerAdditional.toFixed(2)}
                           </span>
                           <span className="text-gray-900">${additionalParticipantCost.toFixed(2)}</span>
                         </div>
                       )}
 
-                      {additiveFeeTotal > 0 && (
+                      {quote && quote.subtotal > 0 && (
                         <div className="flex justify-between pt-2 border-t border-gray-100">
-                          <span className="text-sm text-gray-600">Additive Fees</span>
-                          <span className="font-medium text-gray-900">${additiveFeeTotal.toFixed(2)}</span>
+                          <span className="text-sm text-gray-600">Subtotal</span>
+                          <span className="font-medium text-gray-900">${quote.subtotal.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {quote && quote.fees.map((fee, index) => (
+                        <div key={`${fee.fee_name}-${index}`} className="flex justify-between">
+                          <span className="text-sm text-gray-600">
+                            {fee.fee_name}
+                            {fee.fee_label && <span className="ml-1 text-xs text-gray-400">({fee.fee_label})</span>}
+                          </span>
+                          <span className="font-medium text-gray-900">${Number(fee.fee_amount).toFixed(2)}</span>
+                        </div>
+                      ))}
+
+                      {discount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Discount</span>
+                          <span className="font-medium text-green-600">-${discount.toFixed(2)}</span>
                         </div>
                       )}
 
                       <div className="flex justify-between pt-3 border-t border-gray-200">
                         <span className="text-sm font-semibold text-gray-900">Total Amount</span>
                         <span className="font-bold text-gray-900">
-                          ${displayTotal.toFixed(2)}
-                          {needsRecalc && (
-                            <span className="text-xs text-orange-600 ml-1">(Updated)</span>
-                          )}
+                          ${total.toFixed(2)}
+                          {quoteLoading && <span className="ml-1 text-xs text-gray-400">(updating...)</span>}
+                          {!quoteLoading && totalChanged && <span className="ml-1 text-xs text-orange-600">(Updated)</span>}
                         </span>
                       </div>
-                      
+
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Amount Paid</span>
-                        <span className="font-semibold text-green-600">${originalAmountPaid.toFixed(2)}</span>
+                        <span className="font-semibold text-green-600">${paid.toFixed(2)}</span>
                       </div>
-                      
-                      {balance > 0 && (
-                        <div className="flex justify-between pt-2 border-t border-gray-100">
-                          <span className="text-sm font-medium text-red-700">Balance Due</span>
-                          <span className="font-bold text-red-600">${balance.toFixed(2)}</span>
-                        </div>
-                      )}
-                      
-                      {balance <= 0 && (
-                        <div className="flex justify-between pt-2 border-t border-gray-100">
-                          <span className="text-sm font-medium text-green-700">Payment Status</span>
-                          <span className="font-bold text-green-600">Fully Paid</span>
-                        </div>
-                      )}
+
+                      <div className="flex justify-between pt-2 border-t border-gray-100">
+                        <span className={`text-sm font-medium ${paymentState.isSettled ? 'text-green-700' : 'text-red-700'}`}>
+                          {paymentState.balanceLabel}
+                        </span>
+                        <span className={`font-bold ${paymentState.amountClass}`}>
+                          {paymentState.isSettled && paymentState.balance >= -0.005
+                            ? paymentState.label
+                            : `$${Math.abs(paymentState.balance).toFixed(2)}`}
+                        </span>
+                      </div>
                     </>
                   );
                 })()}

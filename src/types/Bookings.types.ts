@@ -148,8 +148,145 @@ export const DEFAULT_COLUMN_ORDER: BookingsColumnKey[] = [
   'updatedAt'
 ];
 
-export const derivePaymentStatus = (amountPaid: number, totalAmount: number): 'paid' | 'partial' | 'pending' => {
-  if (amountPaid <= 0) return 'pending';
-  if (amountPaid >= totalAmount) return 'paid';
-  return 'partial';
+export interface BookingRepriceIntent {
+  participants?: number;
+  package_id?: number | null;
+  booking_date?: string;
+  location_id?: number;
+  additional_addons?: { addon_id: number; quantity: number }[];
+  additional_attractions?: { attraction_id: number; quantity: number }[];
+}
+
+export interface BookingQuoteFee {
+  fee_name: string;
+  fee_label?: string;
+  fee_amount: number;
+  fee_calculation_type?: 'fixed' | 'percentage';
+  fee_application_type: 'additive' | 'inclusive';
+}
+
+export interface BookingQuoteLine {
+  type: 'package' | 'addon' | 'attraction';
+  id: number;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+}
+
+export interface BookingQuote {
+  subtotal: number;
+  lines: BookingQuoteLine[];
+  fees: BookingQuoteFee[];
+  persist_fees: BookingQuoteFee[];
+  additive_fees: number;
+  special_pricing_discount: number;
+  membership_discount: number;
+  redeemed_credit: number;
+  discount_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  remaining_balance: number;
+  payment_status: string;
+  delta?: number;
+  pricing_consistent?: boolean;
+}
+
+export type PaymentState = 'paid' | 'partial' | 'pending' | 'refunded' | 'voided';
+
+export interface PaymentStateView {
+  state: PaymentState;
+  label: string;
+  isTerminal: boolean;
+  isSettled: boolean;
+  total: number;
+  amountPaid: number;
+  balance: number;
+  balanceLabel: string;
+  pillClass: string;
+  amountClass: string;
+}
+
+const PAYMENT_EPSILON = 0.005;
+const TERMINAL_PAYMENT_STATES: PaymentState[] = ['refunded', 'voided'];
+
+const toCents = (value: number | string | null | undefined): number => {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
 };
+
+export const resolvePaymentState = (input: {
+  payment_status?: string | null;
+  amount_paid?: number | string | null;
+  total_amount?: number | string | null;
+}): PaymentStateView => {
+  const total = toCents(input.total_amount);
+  const amountPaid = toCents(input.amount_paid);
+  const balance = Math.round((total - amountPaid) * 100) / 100;
+  const stored = (input.payment_status || '').toLowerCase() as PaymentState;
+  const amountsKnown = input.total_amount !== undefined && input.total_amount !== null
+    && input.amount_paid !== undefined && input.amount_paid !== null;
+
+  if (!amountsKnown && !TERMINAL_PAYMENT_STATES.includes(stored)) {
+    const settled = stored === 'paid';
+    return {
+      state: stored || 'pending',
+      label: settled ? 'Paid in Full' : stored === 'partial' ? 'Partially Paid' : 'Unpaid',
+      isTerminal: false,
+      isSettled: settled,
+      total,
+      amountPaid,
+      balance,
+      balanceLabel: settled ? 'Paid in Full' : 'Balance Due',
+      pillClass: settled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
+      amountClass: settled ? 'text-green-600' : 'text-red-600',
+    };
+  }
+
+  if (TERMINAL_PAYMENT_STATES.includes(stored)) {
+    return {
+      state: stored,
+      label: stored === 'refunded' ? 'Refunded' : 'Voided',
+      isTerminal: true,
+      isSettled: true,
+      total,
+      amountPaid,
+      balance,
+      balanceLabel: stored === 'refunded' ? 'Refunded' : 'Voided',
+      pillClass: 'bg-slate-100 text-slate-700',
+      amountClass: 'text-slate-600',
+    };
+  }
+
+  if (balance <= PAYMENT_EPSILON) {
+    return {
+      state: 'paid',
+      label: 'Paid in Full',
+      isTerminal: false,
+      isSettled: true,
+      total,
+      amountPaid,
+      balance,
+      balanceLabel: balance < -PAYMENT_EPSILON ? 'Credit Due' : 'Paid in Full',
+      pillClass: 'bg-green-100 text-green-800',
+      amountClass: 'text-green-600',
+    };
+  }
+
+  const state: PaymentState = amountPaid > 0 ? 'partial' : 'pending';
+
+  return {
+    state,
+    label: state === 'partial' ? 'Partially Paid' : 'Unpaid',
+    isTerminal: false,
+    isSettled: false,
+    total,
+    amountPaid,
+    balance,
+    balanceLabel: 'Balance Due',
+    pillClass: 'bg-red-100 text-red-800',
+    amountClass: 'text-red-600',
+  };
+};
+
+export const derivePaymentStatus = (amountPaid: number, totalAmount: number): 'paid' | 'partial' | 'pending' =>
+  resolvePaymentState({ amount_paid: amountPaid, total_amount: totalAmount }).state as 'paid' | 'partial' | 'pending';

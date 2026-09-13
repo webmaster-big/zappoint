@@ -65,6 +65,7 @@ import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDate
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
+import { resolvePaymentState } from '../../types/Bookings.types';
 
 const LocationManagerDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -752,16 +753,6 @@ const LocationManagerDashboard: React.FC = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getPaymentColor = (payment: string) => {
-    const colors: Record<string, string> = {
-      paid: 'bg-emerald-100 text-emerald-800',
-      partial: 'bg-amber-100 text-amber-800',
-      refunded: 'bg-rose-100 text-rose-800',
-      pending: 'bg-amber-100 text-amber-800',
-    };
-    return colors[payment?.toLowerCase()] || 'bg-gray-100 text-gray-800';
-  };
-
   const filteredBookings = selectedStatus === 'all' 
     ? allBookings 
     : allBookings.filter(booking => booking.status.toLowerCase() === selectedStatus.toLowerCase());
@@ -814,10 +805,13 @@ const LocationManagerDashboard: React.FC = () => {
       });
 
       const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
-      const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+      const newPaymentStatus = resolvePaymentState({
+        payment_status: selectedBooking.payment_status,
+        amount_paid: newAmountPaid,
+        total_amount: selectedBooking.total_amount,
+      }).state;
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        payment_status: newPaymentStatus,
         status: 'confirmed',
       });
 
@@ -1572,19 +1566,7 @@ const LocationManagerDashboard: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {currentBookings.map(booking => {
-                  const totalAmount = parseFloat(String(booking.total_amount || 0));
-                  const amountPaid = parseFloat(String(booking.amount_paid || 0));
-                  let actualPaymentStatus = booking.payment_status || 'pending';
-                  
-                  if (totalAmount > 0) {
-                    if (amountPaid >= totalAmount) {
-                      actualPaymentStatus = 'paid';
-                    } else if (amountPaid > 0) {
-                      actualPaymentStatus = 'partial';
-                    } else {
-                      actualPaymentStatus = 'pending';
-                    }
-                  }
+                  const paymentState = resolvePaymentState(booking);
                   
                   return (
                   <tr key={booking.id} className="hover:bg-gray-50">
@@ -1620,12 +1602,12 @@ const LocationManagerDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={getPaymentColor(actualPaymentStatus) + ' px-2 py-1 text-xs font-medium rounded-full capitalize'}>
-                        {actualPaymentStatus}
+                      <span className={paymentState.pillClass + ' px-2 py-1 text-xs font-medium rounded-full'}>
+                        {paymentState.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium">${totalAmount.toFixed(2)}</td>
-                    <td className="px-4 py-3 font-medium">${amountPaid.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-medium">${paymentState.total.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-medium">${paymentState.amountPaid.toFixed(2)}</td>
                   </tr>
                   );
                 })}
@@ -2118,14 +2100,8 @@ const LocationManagerDashboard: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Payment Status</span>
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      selectedBooking.payment_status === 'Paid' || selectedBooking.payment_status === 'paid'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : selectedBooking.payment_status === 'Partial' || selectedBooking.payment_status === 'partial'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {selectedBooking.payment_status}
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${resolvePaymentState(selectedBooking).pillClass}`}>
+                      {resolvePaymentState(selectedBooking).label}
                     </span>
                   </div>
                   {selectedBooking.payment_method && (

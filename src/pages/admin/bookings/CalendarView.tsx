@@ -45,6 +45,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, parseLocalDate, getMichiganNow } from '../../../utils/timeFormat';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 const michiganToday = (): Date => {
   const now = getMichiganNow();
@@ -925,10 +926,13 @@ const CalendarView: React.FC = () => {
       });
 
       const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
-      const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+      const newPaymentStatus = resolvePaymentState({
+        payment_status: selectedBooking.payment_status,
+        amount_paid: newAmountPaid,
+        total_amount: selectedBooking.total_amount,
+      }).state;
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        payment_status: newPaymentStatus,
         status: 'confirmed',
       });
 
@@ -1430,9 +1434,7 @@ const CalendarView: React.FC = () => {
                                       <span className="capitalize">{booking.payment_method || 'N/A'}</span>
                                     </div>
                                     <div className="text-right">
-                                      <div className={`text-sm font-medium ${
-                                        booking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
-                                      }`}>
+                                      <div className={`text-sm font-medium ${resolvePaymentState(booking).amountClass}`}>
                                         ${Number(booking.total_amount).toFixed(2)}
                                       </div>
                                       {booking.payment_status === 'partial' && (
@@ -1757,14 +1759,12 @@ const CalendarView: React.FC = () => {
                     
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Amount Paid</span>
-                      <span className={`text-sm font-medium ${
-                        selectedBooking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
-                      }`}>
+                      <span className={`text-sm font-medium ${resolvePaymentState(selectedBooking).amountClass}`}>
                         ${Number(selectedBooking.amount_paid).toFixed(2)}
                       </span>
                     </div>
                     
-                    {selectedBooking.payment_status === 'partial' && (
+                    {!resolvePaymentState(selectedBooking).isSettled && (
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Balance Due</span>
                         <span className="text-sm font-medium text-red-600">
@@ -1775,10 +1775,8 @@ const CalendarView: React.FC = () => {
                     
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Payment Status</span>
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                        selectedBooking.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {selectedBooking.payment_status === 'paid' ? 'Fully Paid' : 'Partial Payment'}
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${resolvePaymentState(selectedBooking).pillClass}`}>
+                        {resolvePaymentState(selectedBooking).label}
                       </span>
                     </div>
                   </div>

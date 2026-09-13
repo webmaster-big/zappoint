@@ -29,6 +29,7 @@ import BookingChangeHistory from '../../../components/admin/bookings/BookingChan
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -185,14 +186,6 @@ const ViewBooking: React.FC = () => {
     link.download = `booking-qrcode-${booking.reference_number}.png`;
     link.href = qrCodeData;
     link.click();
-  };
-
-  const paymentStatusColors = {
-    paid: 'bg-green-100 text-green-800',
-    partial: 'bg-yellow-100 text-yellow-800',
-    pending: 'bg-gray-100 text-gray-800',
-    refunded: 'bg-purple-100 text-purple-800',
-    voided: 'bg-red-100 text-red-800'
   };
 
   return (
@@ -443,17 +436,48 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
-              {Number(booking.total_amount) - Number(booking.amount_paid) > 0 && (
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 bg-red-100 rounded-lg`}>
-                    <DollarSign className={`h-5 w-5 text-red-600`} />
+              {(() => {
+                const paymentState = resolvePaymentState(booking);
+                if (paymentState.isTerminal) {
+                  return (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">{paymentState.balanceLabel}</p>
+                        <p className="font-medium text-slate-600 text-2xl">${paymentState.amountPaid.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  );
+                }
+                if (paymentState.isSettled) {
+                  return (
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">{paymentState.balanceLabel}</p>
+                        <p className="font-medium text-green-600 text-2xl">
+                          {paymentState.balance < -0.005 ? `$${Math.abs(paymentState.balance).toFixed(2)}` : 'Paid in Full'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Remaining Balance</p>
+                      <p className="font-medium text-red-600 text-2xl">${paymentState.balance.toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Remaining Balance</p>
-                    <p className="font-medium text-red-600 text-2xl">${(Number(booking.total_amount) - Number(booking.amount_paid)).toFixed(2)}</p>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {booking.discount_amount && Number(booking.discount_amount) > 0 && (
                 <div className="flex items-start gap-3">
@@ -525,8 +549,8 @@ const ViewBooking: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Payment Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${paymentStatusColors[booking.payment_status]}`}>
-                    {booking.payment_status.charAt(0).toUpperCase() + booking.payment_status.slice(1)}
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${resolvePaymentState(booking).pillClass}`}>
+                    {resolvePaymentState(booking).label}
                   </span>
                 </div>
               </div>

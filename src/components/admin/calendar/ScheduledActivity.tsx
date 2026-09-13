@@ -5,6 +5,7 @@ import attractionPurchaseService, { type AttractionPurchase } from '../../../ser
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
 import { getStoredUser } from '../../../utils/storage';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 export interface ScheduledRange {
   from: string;
@@ -456,7 +457,7 @@ export const EventScheduleCard: React.FC<{ purchase: EventPurchase }> = ({ purch
           )}
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <DetailRow label="Payment Method"><span className="capitalize">{p.payment_method || 'N/A'}</span></DetailRow>
-            <DetailRow label="Payment Status"><span className="capitalize">{p.payment_status || 'N/A'}</span></DetailRow>
+            <DetailRow label="Payment Status"><span className={`font-medium ${resolvePaymentState(p).amountClass}`}>{resolvePaymentState(p).label}</span></DetailRow>
             <div className="flex justify-between items-center pt-2 border-t border-gray-200">
               <span className="font-medium text-gray-900">Total Amount</span>
               <span className="font-semibold text-gray-900 text-lg">${Number(p.total_amount).toFixed(2)}</span>

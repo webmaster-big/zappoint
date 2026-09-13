@@ -30,6 +30,7 @@ import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 import { AppliedFeesDisplay } from '../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../components/AppliedDiscountsDisplay';
+import { resolvePaymentState } from '../../types/Bookings.types';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -395,8 +396,8 @@ const CustomerReservations = () => {
                               <DollarSign size={13} className="text-emerald-500" />
                               {typeof booking.total_amount === 'string' ? parseFloat(booking.total_amount).toFixed(2) : booking.total_amount.toFixed(2)}
                             </span>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(booking.payment_status)}`}>
-                              {booking.payment_status}
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${resolvePaymentState(booking).pillClass}`}>
+                              {resolvePaymentState(booking).label}
                             </span>
                           </div>
                         </div>
@@ -451,8 +452,8 @@ const CustomerReservations = () => {
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-500">Payment</span>
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusColor(booking.payment_status)}`}>
-                                  {booking.payment_status}
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${resolvePaymentState(booking).pillClass}`}>
+                                  {resolvePaymentState(booking).label}
                                 </span>
                               </div>
                             </div>
@@ -635,12 +636,27 @@ const CustomerReservations = () => {
                       <span className="text-gray-500">Paid</span>
                       <span className="font-medium text-gray-800">${typeof selectedBooking.amount_paid === 'string' ? parseFloat(selectedBooking.amount_paid).toFixed(2) : selectedBooking.amount_paid.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500">Payment Status</span>
-                      <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${getStatusColor(selectedBooking.payment_status)}`}>
-                        {selectedBooking.payment_status}
-                      </span>
-                    </div>
+                    {(() => {
+                      const paymentState = resolvePaymentState(selectedBooking);
+                      return (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">{paymentState.balanceLabel}</span>
+                            <span className={`font-semibold ${paymentState.amountClass}`}>
+                              {paymentState.isSettled && paymentState.balance >= -0.005
+                                ? paymentState.label
+                                : `$${Math.abs(paymentState.balance).toFixed(2)}`}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-500">Payment Status</span>
+                            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${paymentState.pillClass}`}>
+                              {paymentState.label}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="pt-2.5 border-t border-gray-200">
                         <AppliedFeesDisplay appliedFees={selectedBooking.applied_fees} />

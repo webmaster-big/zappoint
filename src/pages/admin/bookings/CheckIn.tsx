@@ -43,6 +43,7 @@ import eventPurchaseService, { type ScannedEventTicket } from '../../../services
 import type { EventPurchase } from '../../../types/event.types';
 import type { MembershipScanResponse } from '../../../types/Membership.types';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 interface ScanResult {
   bookingId: number;
@@ -861,11 +862,8 @@ const CheckIn: React.FC = () => {
       }
 
       const newAmountPaid = Number(selectedBookingForPayment.amount_paid || 0) + amount;
-      const newPaymentStatus = newAmountPaid >= Number(selectedBookingForPayment.total_amount) ? 'paid' : 'partial';
-
       const updateResponse = await bookingService.updateBooking(selectedBookingForPayment.id, {
         amount_paid: newAmountPaid,
-        payment_status: newPaymentStatus,
         status: 'confirmed', // Set status to confirmed when payment is made
       });
 
@@ -1599,31 +1597,13 @@ const CheckIn: React.FC = () => {
                     )}
 
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        verifiedBooking.payment_status === 'paid'
-                          ? 'bg-green-100' 
-                          : verifiedBooking.payment_status === 'partial'
-                          ? 'bg-yellow-100'
-                          : 'bg-gray-100'
-                      }`}>
-                        <DollarSign className={`h-5 w-5 ${
-                          verifiedBooking.payment_status === 'paid'
-                            ? 'text-green-600' 
-                            : verifiedBooking.payment_status === 'partial'
-                            ? 'text-yellow-600'
-                            : 'text-gray-600'
-                        }`} />
+                      <div className={`p-2 rounded-lg ${resolvePaymentState(verifiedBooking).isSettled ? 'bg-green-100' : 'bg-red-100'}`}>
+                        <DollarSign className={`h-5 w-5 ${resolvePaymentState(verifiedBooking).amountClass}`} />
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Payment Status</p>
-                        <p className={`font-semibold capitalize ${
-                          verifiedBooking.payment_status === 'paid'
-                            ? 'text-green-600' 
-                            : verifiedBooking.payment_status === 'partial'
-                            ? 'text-yellow-600'
-                            : 'text-gray-600'
-                        }`}>
-                          {verifiedBooking.payment_status}
+                        <p className={`font-semibold ${resolvePaymentState(verifiedBooking).amountClass}`}>
+                          {resolvePaymentState(verifiedBooking).label}
                         </p>
                       </div>
                     </div>
@@ -2067,31 +2047,13 @@ const CheckIn: React.FC = () => {
                     )}
 
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        selectedBooking.payment_status === 'paid'
-                          ? 'bg-green-100' 
-                          : selectedBooking.payment_status === 'partial'
-                          ? 'bg-yellow-100'
-                          : 'bg-gray-100'
-                      }`}>
-                        <DollarSign className={`h-5 w-5 ${
-                          selectedBooking.payment_status === 'paid'
-                            ? 'text-green-600' 
-                            : selectedBooking.payment_status === 'partial'
-                            ? 'text-yellow-600'
-                            : 'text-gray-600'
-                        }`} />
+                      <div className={`p-2 rounded-lg ${resolvePaymentState(selectedBooking).isSettled ? 'bg-green-100' : 'bg-red-100'}`}>
+                        <DollarSign className={`h-5 w-5 ${resolvePaymentState(selectedBooking).amountClass}`} />
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Payment Status</p>
-                        <p className={`font-semibold capitalize ${
-                          selectedBooking.payment_status === 'paid'
-                            ? 'text-green-600' 
-                            : selectedBooking.payment_status === 'partial'
-                            ? 'text-yellow-600'
-                            : 'text-gray-600'
-                        }`}>
-                          {selectedBooking.payment_status}
+                        <p className={`font-semibold ${resolvePaymentState(selectedBooking).amountClass}`}>
+                          {resolvePaymentState(selectedBooking).label}
                         </p>
                       </div>
                     </div>

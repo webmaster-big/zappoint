@@ -78,6 +78,7 @@ const FeeSupports: React.FC = () => {
     fee_application_type: 'additive',
     entity_ids: [],
     entity_type: initialEntityType !== 'all' ? initialEntityType : 'package',
+    applies_to_all: false,
     is_active: true,
   });
 
@@ -276,9 +277,11 @@ const FeeSupports: React.FC = () => {
       label: 'Entities',
       group: 'Applies To',
       sortable: true,
-      sortValue: fs => fs.entity_ids?.length || 0,
-      exportValue: fs => fs.entity_ids?.length || 0,
-      render: fs => <span className="text-xs text-gray-500">{fs.entity_ids?.length || 0} item(s)</span>,
+      sortValue: fs => (fs.applies_to_all ? Number.MAX_SAFE_INTEGER : fs.entity_ids?.length || 0),
+      exportValue: fs => (fs.applies_to_all ? 'All' : fs.entity_ids?.length || 0),
+      render: fs => fs.applies_to_all
+        ? <span className="text-xs font-medium text-green-700">All</span>
+        : <span className="text-xs text-gray-500">{fs.entity_ids?.length || 0} item(s)</span>,
     },
     {
       key: 'location',
@@ -475,6 +478,7 @@ const FeeSupports: React.FC = () => {
       fee_calculation_type: 'fixed',
       fee_application_type: 'additive',
       entity_ids: [],
+      applies_to_all: false,
       entity_type: initialEntityType !== 'all' ? initialEntityType : 'package',
       is_active: true,
     });
@@ -491,6 +495,7 @@ const FeeSupports: React.FC = () => {
       fee_calculation_type: fs.fee_calculation_type,
       fee_application_type: fs.fee_application_type,
       entity_ids: fs.entity_ids || [],
+      applies_to_all: fs.applies_to_all ?? false,
       entity_type: fs.entity_type,
       is_active: fs.is_active,
     });
@@ -545,8 +550,8 @@ const FeeSupports: React.FC = () => {
       setToast({ message: 'Percentage fee cannot exceed 100%', type: 'error' });
       return;
     }
-    if (form.entity_ids.length === 0) {
-      setToast({ message: 'Please select at least one entity', type: 'error' });
+    if (!form.applies_to_all && form.entity_ids.length === 0) {
+      setToast({ message: 'Please select at least one entity, or apply the fee to all of them', type: 'error' });
       return;
     }
 
@@ -822,11 +827,31 @@ const FeeSupports: React.FC = () => {
                   </div>
 
                   <div className="mt-4">
+                    <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 mb-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.applies_to_all}
+                        onChange={e => setForm(prev => ({ ...prev, applies_to_all: e.target.checked }))}
+                        className="mt-0.5 rounded border-gray-300"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-gray-800">Apply to all {entityNoun.toLowerCase()}</span>
+                        <span className="block text-xs text-gray-500">
+                          Covers every current and future {entityNoun.toLowerCase().replace(/s$/, '')} automatically, so new ones are never missed.
+                        </span>
+                      </span>
+                    </label>
+
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-gray-700">
-                        Select {entityNoun} <span className="text-red-500">*</span>
+                        Select {entityNoun} {!form.applies_to_all && <span className="text-red-500">*</span>}
                       </label>
-                      <button type="button" onClick={toggleSelectAllEntities} className={`text-xs text-${fullColor} hover:underline font-medium`}>
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllEntities}
+                        disabled={form.applies_to_all}
+                        className={`text-xs text-${fullColor} hover:underline font-medium disabled:opacity-40 disabled:no-underline`}
+                      >
                         {form.entity_ids.length === entities.length ? 'Deselect All' : 'Select All'}
                       </button>
                     </div>

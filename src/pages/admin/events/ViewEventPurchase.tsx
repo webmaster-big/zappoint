@@ -26,6 +26,7 @@ import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDis
 import type { EventPurchase } from '../../../types/event.types';
 import { getStoredUser } from '../../../utils/storage';
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 const ViewEventPurchase = () => {
   const { id } = useParams<{ id: string }>();
@@ -70,12 +71,6 @@ const ViewEventPurchase = () => {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     completed: { color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle, label: 'Completed' },
     cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Cancelled' },
-  };
-
-  const paymentStatusConfig: Record<string, { color: string; label: string }> = {
-    paid: { color: 'bg-green-100 text-green-800', label: 'Paid' },
-    partial: { color: 'bg-orange-100 text-orange-800', label: 'Partial' },
-    pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
   };
 
   useEffect(() => {
@@ -350,8 +345,8 @@ const ViewEventPurchase = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Payment Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${paymentStatusConfig[purchase.payment_status]?.color || 'bg-gray-100 text-gray-800'}`}>
-                    {paymentStatusConfig[purchase.payment_status]?.label || purchase.payment_status}
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${resolvePaymentState(purchase).pillClass}`}>
+                    {resolvePaymentState(purchase).label}
                   </span>
                 </div>
               </div>

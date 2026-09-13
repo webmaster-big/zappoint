@@ -4,6 +4,7 @@ import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 import { customerNameOf } from '../../../utils/bookingSearch';
 import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeFormat';
+import { resolvePaymentState } from '../../../types/Bookings.types';
 
 const SLOT_MINUTES = 15;
 const ROW_HEIGHT = 44;
@@ -438,13 +439,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[0.65rem]">
                               <span className="truncate capitalize text-gray-500">{booking.status}</span>
                               <span
-                                className={`font-semibold ${
-                                  booking.payment_status === 'paid'
-                                    ? 'text-green-700'
-                                    : booking.payment_status === 'partial'
-                                      ? 'text-yellow-700'
-                                      : 'text-red-700'
-                                }`}
+                                className={`font-semibold ${resolvePaymentState(booking).amountClass}`}
                               >
                                 ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
                               </span>
