@@ -13,6 +13,8 @@ import { membershipCache } from '../services/MembershipCacheService';
 import Toast from '../components/ui/Toast';
 import { useCart } from '../contexts/CartContext';
 import { ShoppingCart } from 'lucide-react';
+import BrandLogo from '../components/ui/BrandLogo';
+import { useStorefrontBrand } from '../hooks/useStorefrontBrand';
 
 interface CustomerUser {
   id: number;
@@ -26,6 +28,7 @@ interface CustomerUser {
 const CustomerLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const brand = useStorefrontBrand();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [customerUser, setCustomerUser] = useState<CustomerUser | null>(null);
@@ -121,7 +124,7 @@ const CustomerLayout = () => {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <LoadingSpinner size="medium" />
+          <LoadingSpinner size="medium" logoSrc={brand.logoPath} />
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
@@ -134,12 +137,9 @@ const CustomerLayout = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
-              <img 
-                src="/Zap-Zone.png" 
-                alt="ZapZone Logo" 
-                className="w-28 h-10 sm:w-32 sm:h-12 md:w-36 md:h-14 object-contain"
-                style={{ maxWidth: '140px', height: 'auto' }}
-              />
+              <Link to={brand.homeHref} aria-label={`${brand.name} home`} className="inline-flex items-center">
+                <BrandLogo src={brand.logoPath} alt={`${brand.name} logo`} size="md" />
+              </Link>
             </div>
             
             <div className="hidden lg:flex items-center space-x-6 lg:ml-auto">

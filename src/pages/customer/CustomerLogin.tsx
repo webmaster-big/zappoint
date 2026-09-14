@@ -4,6 +4,9 @@ import { Eye, EyeOff } from 'lucide-react';
 import EmailInput from '../../components/ui/EmailInput';
 import type { LoginFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
+import { useCompanyBrand } from '../../hooks/useCompanyBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 const carouselSlides = [
   {
@@ -42,6 +45,7 @@ const GoogleIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 );
 
 const CustomerLogin = () => {
+  const brandLogoSrc = getImageUrl(useCompanyBrand().logoPath) || DEFAULT_LOGO_SRC;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get('next') || searchParams.get('redirect') || '/';
@@ -133,14 +137,14 @@ const CustomerLogin = () => {
             Back
           </Link>
           <div className="ml-auto">
-            <img src="/Zap-Zone.png" alt="Zap Zone" className="h-6 object-contain" />
+            <img src={brandLogoSrc} alt="Zap Zone" className="h-6 object-contain" />
           </div>
         </div>
 
         <div className="flex-1 flex items-center justify-center px-6 sm:px-10 lg:px-12 overflow-hidden">
           <div className="w-full max-w-sm">
             <Link to="/" className="hidden lg:inline-block mb-4">
-              <img src="/Zap-Zone.png" alt="Zap Zone" className="h-8 object-contain" />
+              <img src={brandLogoSrc} alt="Zap Zone" className="h-8 object-contain" />
             </Link>
 
             <h1 className="text-xl font-bold text-gray-900 mb-0.5">Log in to your Account</h1>

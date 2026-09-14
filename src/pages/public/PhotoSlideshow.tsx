@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { Lock, PauseCircle, ShieldAlert, WifiOff } from 'lucide-react';
 import photoService, { clearDeviceToken, readDeviceToken } from '../../services/PhotoService';
 import type { SlideshowFeed } from '../../types/photo.types';
+import { useLocationBrand } from '../../hooks/useLocationBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 const POLL_MS = 10000;
 
@@ -11,6 +14,9 @@ const PhotoSlideshow = () => {
   const locationId = Number(locationParam);
 
   const [feed, setFeed] = useState<SlideshowFeed | null>(null);
+  const slideshowBrand = useLocationBrand(feed?.location_logo_path, feed?.location_name);
+  const brandLogoSrc = getImageUrl(slideshowBrand.logoPath) || DEFAULT_LOGO_SRC;
+  const brandName = slideshowBrand.name;
   const [locked, setLocked] = useState(true);
   const [booting, setBooting] = useState(true);
   const [passcode, setPasscode] = useState('');
@@ -215,8 +221,8 @@ const PhotoSlideshow = () => {
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
             <img
-              src="/Zap-Zone.png"
-              alt="Zap Zone"
+              src={brandLogoSrc}
+              alt={brandName}
               className="mx-auto w-64 sm:w-80 object-contain mb-6"
             />
             <p className="text-xl sm:text-2xl text-zinc-300">{feed?.location_name}</p>
@@ -226,7 +232,7 @@ const PhotoSlideshow = () => {
       )}
 
       <div className="absolute top-5 left-6 flex items-center gap-3">
-        <img src="/Zap-Zone.png" alt="Zap Zone" className="h-9 sm:h-11 w-auto object-contain drop-shadow" />
+        <img src={brandLogoSrc} alt={brandName} className="h-9 sm:h-11 w-auto object-contain drop-shadow" />
         {paused && (
           <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-3 py-1 text-xs">
             <PauseCircle className="w-3.5 h-3.5" />

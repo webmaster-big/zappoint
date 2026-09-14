@@ -1098,6 +1098,7 @@ const ManageAttendants = () => {
             setStoredUser({ ...storedUser, location_name: updated.name }, true);
           }
         }}
+        onLogoChanged={(updated) => setLocationInfo(updated)}
       />
     </div>
   );

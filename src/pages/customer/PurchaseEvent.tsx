@@ -63,6 +63,7 @@ import customFieldService, {
 import { generateOrderQRCode } from '../../utils/qrcode';
 import { convertTo12Hour } from '../../utils/timeFormat';
 import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
+import { useStorefrontBrand } from '../../hooks/useStorefrontBrand';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
@@ -145,6 +146,7 @@ const getPaymentErrorMessage = (error: any): string => {
 
 
 const PurchaseEvent = () => {
+  const brand = useStorefrontBrand();
   const { eventId: rawEventId, slug } = useParams<{ eventId?: string; slug?: string }>();
   const cart = useCartSafe();
   const orderMode = !slug && !rawEventId && (cart?.items.length ?? 0) > 0;
@@ -1128,7 +1130,7 @@ const PurchaseEvent = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="medium" />
+        <LoadingSpinner size="medium" logoSrc={brand.logoPath} />
       </div>
     );
   }

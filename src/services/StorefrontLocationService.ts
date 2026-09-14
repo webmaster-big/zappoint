@@ -12,6 +12,7 @@ export interface StorefrontLocation {
   zip_code?: string | null;
   phone?: string | null;
   email?: string | null;
+  logo_path?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   /** False when the slug was derived here because the server had none to give. */
@@ -59,6 +60,7 @@ const toStorefrontLocation = (value: unknown): StorefrontLocation | null => {
     state: asText(row.state),
     zip_code: asText(row.zip_code),
     phone: asText(row.phone),
+    logo_path: asText(row.logo_path),
     latitude: asCoordinate(row.latitude, 90),
     longitude: asCoordinate(row.longitude, 180),
   };

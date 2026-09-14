@@ -4,6 +4,9 @@ import { Eye, EyeOff } from 'lucide-react';
 import EmailInput from '../../components/ui/EmailInput';
 import type { RegisterFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
+import { useCompanyBrand } from '../../hooks/useCompanyBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' }, { code: 'CA', name: 'Canada' }, { code: 'GB', name: 'United Kingdom' },
@@ -82,6 +85,7 @@ const GoogleIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 );
 
 const CustomerRegister = () => {
+  const brandLogoSrc = getImageUrl(useCompanyBrand().logoPath) || DEFAULT_LOGO_SRC;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get('next') || searchParams.get('redirect') || '';
@@ -190,14 +194,14 @@ const CustomerRegister = () => {
             Back
           </Link>
           <div className="ml-auto">
-            <img src="/Zap-Zone.png" alt="Zap Zone" className="h-6 object-contain" />
+            <img src={brandLogoSrc} alt="Zap Zone" className="h-6 object-contain" />
           </div>
         </div>
 
         <div className="flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-10 overflow-y-auto">
           <div className="w-full max-w-md py-5 lg:py-6">
             <Link to="/" className="hidden lg:inline-block mb-5">
-              <img src="/Zap-Zone.png" alt="Zap Zone" className="h-8 object-contain" />
+              <img src={brandLogoSrc} alt="Zap Zone" className="h-8 object-contain" />
             </Link>
 
             <h1 className="text-xl font-bold text-gray-900 mb-0.5">Create your Account</h1>

@@ -1,9 +1,14 @@
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
+import { useCompanyBrand } from '../../hooks/useCompanyBrand';
+
 interface LoadingSpinnerProps {
   fullScreen?: boolean;
   size?: 'small' | 'medium' | 'large';
   message?: string;
   showProgress?: boolean;
   progress?: number;
+  logoSrc?: string | null;
 }
 
 export default function LoadingSpinner({ 
@@ -11,8 +16,11 @@ export default function LoadingSpinner({
   size = 'medium',
   message,
   showProgress = false,
-  progress = 0
+  progress = 0,
+  logoSrc
 }: LoadingSpinnerProps) {
+  const company = useCompanyBrand();
+  const resolvedLogo = getImageUrl(logoSrc || company.logoPath) || DEFAULT_LOGO_SRC;
   const sizeClasses = {
     small: { width: '100px', height: '100px' },
     medium: { width: '140px', height: '140px' },
@@ -23,7 +31,7 @@ export default function LoadingSpinner({
     <div className="flex flex-col items-center justify-center gap-4">
       <div className="loader-container">
         <img 
-          src="/Zap-Zone.png" 
+          src={resolvedLogo}
           alt="Loading..." 
           className="logo-bounce"
           style={{ width: sizeClasses[size].width, height: sizeClasses[size].height }}

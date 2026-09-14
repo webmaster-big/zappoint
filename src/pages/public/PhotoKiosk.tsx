@@ -5,6 +5,9 @@ import { Camera, CheckCircle2, Info, Lock, RefreshCcw, ShieldAlert } from 'lucid
 import photoService, { clearDeviceToken, readDeviceToken } from '../../services/PhotoService';
 import { usePhotoCamera } from '../../hooks/usePhotoCamera';
 import type { KioskContext, KioskSessionHandle } from '../../types/photo.types';
+import { useLocationBrand } from '../../hooks/useLocationBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 type Screen = 'locked' | 'welcome' | 'camera' | 'preview' | 'qr' | 'disabled';
 
@@ -35,6 +38,9 @@ const PhotoKiosk = () => {
 
   const [screen, setScreen] = useState<Screen>('locked');
   const [context, setContext] = useState<KioskContext | null>(null);
+  const kioskBrand = useLocationBrand(context?.location?.logo_path, context?.location?.name);
+  const brandLogoSrc = getImageUrl(kioskBrand.logoPath) || DEFAULT_LOGO_SRC;
+  const brandName = kioskBrand.name;
   const [passcode, setPasscode] = useState('');
   const [lockError, setLockError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
@@ -335,7 +341,7 @@ const PhotoKiosk = () => {
       <div className="min-h-dvh flex flex-col">
         <header className="flex items-center justify-between px-6 sm:px-10 pt-6">
           <div>
-            <img src="/Zap-Zone.png" alt="Zap Zone" className="h-10 sm:h-12 w-auto object-contain" />
+            <img src={brandLogoSrc} alt={brandName} className="h-10 sm:h-12 w-auto object-contain" />
             {context && (
               <p className="mt-1 text-xs sm:text-sm uppercase tracking-[0.2em] text-zinc-400">{venueLine}</p>
             )}

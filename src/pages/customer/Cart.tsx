@@ -29,10 +29,12 @@ import { convertTo12Hour } from '../../utils/timeFormat';
 import ScheduleCalendar from '../../components/ui/ScheduleCalendar';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SiteFooter from '../../components/customer/SiteFooter';
+import { useStorefrontBrand } from '../../hooks/useStorefrontBrand';
 
 const money = (value: number) => `$${value.toFixed(2)}`;
 
 const Cart = () => {
+  const brand = useStorefrontBrand();
   const { items, ticketCount, updateQuantity, updateItem, removeItem, clear } = useCart();
   const navigate = useNavigate();
 
@@ -261,7 +263,7 @@ const Cart = () => {
                         <div className="mt-3 border border-gray-100 rounded-xl p-3 bg-gray-50/50">
                           {availability === undefined ? (
                             <div className="py-6 flex justify-center">
-                              <LoadingSpinner size="small" />
+                              <LoadingSpinner size="small" logoSrc={brand.logoPath} />
                             </div>
                           ) : availability.length === 0 ? (
                             <p className="text-xs text-gray-500 py-2">
@@ -339,7 +341,7 @@ const Cart = () => {
 
               {quoting && (
                 <div className="py-6 flex justify-center">
-                  <LoadingSpinner size="small" />
+                  <LoadingSpinner size="small" logoSrc={brand.logoPath} />
                 </div>
               )}
 

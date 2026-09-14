@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { X, Building2, Save, CheckCircle } from 'lucide-react';
 import StandardButton from '../../ui/StandardButton';
 import EmailInput from '../../ui/EmailInput';
+import LogoUploadField from '../../ui/LogoUploadField';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { publishLocationLogo } from '../../../hooks/useLocationLogo';
 import { locationService } from '../../../services/LocationService';
 import type { Location, UpdateLocationData } from '../../../services/LocationService';
 
@@ -11,6 +13,7 @@ interface EditLocationModalProps {
   onClose: () => void;
   location: Location | null;
   onUpdated?: (location: Location) => void;
+  onLogoChanged?: (location: Location) => void;
   elevated?: boolean;
 }
 
@@ -20,13 +23,14 @@ const PHONE_RE = /^[\d\s\-\+\(\)\.]{7,20}$/;
 // Matches the server's slug rule, so a bad URL is caught before the round trip
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = false }: EditLocationModalProps) => {
+const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged, elevated = false }: EditLocationModalProps) => {
   const { themeColor } = useThemeColor();
   const [form, setForm] = useState<UpdateLocationData>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [success, setSuccess] = useState(false);
+  const [logoPath, setLogoPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !location) return;
@@ -42,10 +46,23 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
       phone: location.phone ?? '',
       email: location.email ?? '',
     });
+    setLogoPath(location.logo_path ?? null);
     setError(null);
     setFieldErrors({});
     setSuccess(false);
   }, [isOpen, location]);
+
+  const saveLogo = async (next: string | null) => {
+    if (!location) return;
+    const res = await locationService.updateLocationLogo(location.id, next);
+    if (!res.success || !res.data) {
+      throw new Error(res.message || 'The logo could not be saved.');
+    }
+    const savedPath = res.data.logo_path ?? null;
+    setLogoPath(savedPath);
+    publishLocationLogo(location.id, savedPath);
+    onLogoChanged?.(res.data);
+  };
 
   const update = <K extends keyof UpdateLocationData>(key: K, value: UpdateLocationData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -187,6 +204,14 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, elevated = fa
               {error}
             </div>
           )}
+
+          <LogoUploadField
+            label="Location Logo"
+            value={logoPath}
+            onUpload={saveLogo}
+            onRemove={() => saveLogo(null)}
+            disabled={submitting}
+          />
 
           {/* Name */}
           <div>

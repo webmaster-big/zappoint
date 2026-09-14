@@ -3,10 +3,14 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { API_BASE_URL } from "../../utils/storage";
 import EmailInput from "../../components/ui/EmailInput";
+import { useCompanyBrand } from '../../hooks/useCompanyBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 type UserRole = 'company_admin' | 'location_manager' | 'attendant';
 
 export default function Register() {
+  const brandLogoSrc = getImageUrl(useCompanyBrand().logoPath) || DEFAULT_LOGO_SRC;
   const [searchParams] = useSearchParams();
   
   const token = searchParams.get('token');
@@ -387,7 +391,7 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 py-4 sm:py-8">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-4 sm:p-6 border border-zinc-100 m-3">
         <div className="flex justify-center mb-4">
-          <img src="/Zap-Zone.png" alt="Zap Zone" className="w-1/3" />
+          <img src={brandLogoSrc} alt="Zap Zone" className="w-1/3" />
         </div>
 
         {tokenValid === null && (

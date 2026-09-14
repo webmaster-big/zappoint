@@ -93,3 +93,6 @@ export const useLocationScope = () => {
   if (!ctx) throw new Error('useLocationScope must be used within a LocationProvider');
   return ctx;
 };
+
+export const useOptionalLocationScope = (): LocationContextType | null =>
+  useContext(LocationContext) ?? null;

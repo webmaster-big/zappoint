@@ -1,15 +1,27 @@
+import { Link } from 'react-router-dom';
+import BrandLogo from '../ui/BrandLogo';
+import { useStorefrontBrand } from '../../hooks/useStorefrontBrand';
+
 interface SiteFooterProps {
   showLocations?: boolean;
 }
 
-const SiteFooter: React.FC<SiteFooterProps> = ({ showLocations = true }) => (
+const SiteFooter: React.FC<SiteFooterProps> = ({ showLocations = true }) => {
+  const brand = useStorefrontBrand();
+
+  return (
   <footer className="bg-gradient-to-b from-blue-900 to-blue-950 text-white py-14 md:py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className={`grid grid-cols-1 gap-8 md:gap-10 mb-10 md:mb-12 ${showLocations ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-2'}`}>
         <div className="lg:col-span-1 text-center md:text-left">
-          <a href="https://bestingames.com/ypsilanti/" target="_blank" rel="noopener noreferrer" className="inline-block">
-            <img src="/Zap-Zone.png" alt="Zap Zone Logo" className="w-40 md:w-48 mb-4 md:mb-5 hover:opacity-80 transition"/>
-          </a>
+          <Link to={brand.homeHref} aria-label={`${brand.name} home`} className="inline-block mb-4 md:mb-5">
+            <BrandLogo
+              src={brand.logoPath}
+              alt={`${brand.name} logo`}
+              size="xl"
+              className="hover:opacity-80 transition"
+            />
+          </Link>
           <p className="text-sm md:text-base text-blue-200 leading-relaxed mb-4">
             The Longest Laser Tag Marathon and The Largest Laser Tag Winner Stays on Tournament
           </p>
@@ -75,6 +87,7 @@ const SiteFooter: React.FC<SiteFooterProps> = ({ showLocations = true }) => (
       </div>
     </div>
   </footer>
-);
+  );
+};
 
 export default SiteFooter;

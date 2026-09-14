@@ -32,6 +32,9 @@ import CallToBookModal from '../../components/customer/CallToBookModal';
 import { attractionIsCallToBook, packageIsCallToBook, eventIsCallToBook, itemCallToBookAt } from '../../utils/callToBook';
 import { findLocationBySlug } from '../../services/StorefrontLocationService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import { useStorefrontBrand } from '../../hooks/useStorefrontBrand';
+import { getImageUrl as assetUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import SiteFooter from '../../components/customer/SiteFooter';
 import NotFound from '../NotFound';
 // import MembershipCarousel from '../../components/customer/MembershipCarousel';
@@ -118,6 +121,8 @@ const EntertainmentLandingPage = () => {
     [storefrontLocations, locationSlug],
   );
   const isSingleLocationPage = Boolean(locationSlug);
+  const brand = useStorefrontBrand();
+  const brandLogoSrc = assetUrl(brand.logoPath) || DEFAULT_LOGO_SRC;
 
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
   const [searchQuery, setSearchQuery] = useState('');
@@ -795,7 +800,7 @@ const EntertainmentLandingPage = () => {
     if (!storefrontLoaded) {
       return (
         <div className="min-h-[60vh] flex items-center justify-center">
-          <LoadingSpinner size="medium" />
+          <LoadingSpinner size="medium" logoSrc={brand.logoPath} />
         </div>
       );
     }
@@ -1383,7 +1388,7 @@ const EntertainmentLandingPage = () => {
             </div>
             {dataLoading ? (
               <div className="flex flex-col items-center justify-center py-16">
-                <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+                <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
                 <p className="text-gray-400 text-xs mt-3">Loading packages...</p>
               </div>
             ) : sec.items.length === 0 ? (
@@ -1535,7 +1540,7 @@ const EntertainmentLandingPage = () => {
 
             {dataLoading ? (
               <div className="flex flex-col items-center justify-center py-16">
-                <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+                <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
                 <p className="text-gray-400 text-xs mt-3">Loading attractions...</p>
               </div>
             ) : shownAttractions.length === 0 ? (
@@ -1687,7 +1692,7 @@ const EntertainmentLandingPage = () => {
 
           {dataLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+              <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
               <p className="text-gray-400 text-xs mt-3">Loading events...</p>
             </div>
           ) : filteredEvents.length === 0 ? (

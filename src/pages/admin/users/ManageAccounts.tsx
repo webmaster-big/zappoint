@@ -1092,6 +1092,9 @@ const ManageAccounts = () => {
           setLocationsData((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
           setEditLocationTarget(null);
         }}
+        onLogoChanged={(updated) => {
+          setLocationsData((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+        }}
       />
     </div>
   );

@@ -61,6 +61,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLocationScope, LOCATION_SCOPE_ENABLED } from '../../contexts/LocationContext';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import { useLocationLogo } from '../../hooks/useLocationLogo';
+import BrandLogo from '../ui/BrandLogo';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
 import { findLocationById } from '../../services/StorefrontLocationService';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
@@ -463,7 +465,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
-  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const brandLogo = useLocationLogo();
+  const brandLogoRef = useRef<string | null>(brandLogo);
+  brandLogoRef.current = brandLogo;
   const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string; fragmentId?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -534,44 +538,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       pendingScrollRef.current = scrollTop;
     }
   };
-
-  useEffect(() => {
-    const loadCompanyLogo = () => {
-      const storedLogo = localStorage.getItem('company_logo_path');
-      if (storedLogo) {
-        setCompanyLogo(storedLogo);
-        return;
-      }
-      
-      const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
-      if (user.company_id) {
-        const cachedCompany = localStorage.getItem(`company_${user.company_id}`);
-        if (cachedCompany) {
-          const companyData = JSON.parse(cachedCompany);
-          if (companyData.logo_path) {
-            setCompanyLogo(companyData.logo_path);
-            localStorage.setItem('company_logo_path', companyData.logo_path);
-          }
-        }
-      }
-    };
-    
-    loadCompanyLogo();
-    
-    const handleLogoUpdate = (event: CustomEvent<{ logoPath: string }>) => {
-      if (event.detail?.logoPath) {
-        setCompanyLogo(event.detail.logoPath);
-      }
-    };
-    
-    window.addEventListener('zapzone_company_logo_updated', handleLogoUpdate as EventListener);
-    window.addEventListener('storage', loadCompanyLogo);
-    
-    return () => {
-      window.removeEventListener('zapzone_company_logo_updated', handleLogoUpdate as EventListener);
-      window.removeEventListener('storage', loadCompanyLogo);
-    };
-  }, []);
 
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const isStreamConnectedRef = useRef<boolean>(false);
@@ -784,7 +750,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(notification.title, {
             body: notification.message,
-            icon: '/Zap-Zone.png',
+            icon: getImageUrl(brandLogoRef.current) || '/Zap-Zone.png',
             tag: notification.id
           });
         }
@@ -1247,22 +1213,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         <div className="flex flex-col h-full" style={{ overflow: 'visible' }}>
           <div className="relative flex items-center justify-center p-4 border-b border-gray-200 transition-all duration-300">
             <div className="flex items-center justify-center w-full transition-all duration-300">
-              {companyLogo ? (
-                <img 
-                  src={getImageUrl(companyLogo)}
-                  alt="Company Logo" 
-                  className={`object-contain transition-all duration-300 ${isMinimized ? 'w-10 h-10' : 'max-h-12 max-w-[80%]'}`}
-                  onError={(e) => {
-                    console.error('Company logo failed to load, falling back to default');
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-              ) : null}
-              <img 
-                src="/Zap-Zone.png" 
-                alt="Logo" 
-                className={`object-contain transition-all duration-300 ${isMinimized ? 'w-10 h-10' : 'w-3/5'} ${companyLogo ? 'hidden' : ''}`}
+              <BrandLogo
+                src={brandLogo}
+                alt="Location logo"
+                size={isMinimized ? 'xs' : 'md'}
+                className="transition-all duration-300"
               />
             </div>
             

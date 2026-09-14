@@ -38,6 +38,7 @@ export interface Location {
   geocoded_at?: string | null;
   phone?: string;
   email?: string;
+  logo_path?: string | null;
   capacity?: number;
   operating_hours?: string;
   is_active: boolean;
@@ -66,6 +67,7 @@ export interface CreateLocationData {
   longitude?: number | null;
   phone?: string;
   email?: string;
+  logo_path?: string | null;
   capacity?: number;
   operating_hours?: string;
   timezone?: string;
@@ -103,6 +105,11 @@ class LocationService {
 
   async updateLocation(id: number, data: UpdateLocationData): Promise<ApiResponse<Location>> {
     const response = await api.put(`/locations/${id}`, data);
+    return response.data;
+  }
+
+  async updateLocationLogo(id: number, logoPath: string | null): Promise<ApiResponse<Location>> {
+    const response = await api.patch(`/locations/${id}/logo`, { logo_path: logoPath });
     return response.data;
   }
 

@@ -3,8 +3,12 @@ import { API_BASE_URL } from "../../utils/storage";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import EmailInput from "../../components/ui/EmailInput";
+import { useCompanyBrand } from '../../hooks/useCompanyBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 export default function Login() {
+  const brandLogoSrc = getImageUrl(useCompanyBrand().logoPath) || DEFAULT_LOGO_SRC;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -146,7 +150,7 @@ export default function Login() {
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-zinc-100 m-3">
         <div className="flex justify-center mb-8 pt-2">
-          <img src="/Zap-Zone.png" alt="Logo" className="w-2/4" />
+          <img src={brandLogoSrc} alt="Logo" className="w-2/4" />
         </div>
 
         <div className="mb-8">

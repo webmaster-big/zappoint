@@ -4,12 +4,18 @@ import { Clock, Download, ImageOff, Lock } from 'lucide-react';
 import EmailInput from '../../components/ui/EmailInput';
 import photoService from '../../services/PhotoService';
 import type { CustomerPhotoPage } from '../../types/photo.types';
+import { useLocationBrand } from '../../hooks/useLocationBrand';
+import { getImageUrl } from '../../utils/storage';
+import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 
 type FieldErrors = Partial<Record<'name' | 'email' | 'phone', string>>;
 
 const CustomerPhotos = () => {
   const { accessToken } = useParams<{ accessToken: string }>();
   const [page, setPage] = useState<CustomerPhotoPage | null>(null);
+  const photoBrand = useLocationBrand(page?.location_logo_path, page?.location_name);
+  const brandLogoSrc = getImageUrl(photoBrand.logoPath) || DEFAULT_LOGO_SRC;
+  const brandName = photoBrand.name;
   const [state, setState] = useState<'loading' | 'ready' | 'expired' | 'removed' | 'unknown'>('loading');
   const [gonePhotoMessage, setGonePhotoMessage] = useState<string | null>(null);
 
@@ -164,7 +170,7 @@ const CustomerPhotos = () => {
   return (
     <div className="min-h-dvh bg-zinc-950 text-white">
       <header className="px-6 py-6 max-w-3xl mx-auto">
-        <img src="/Zap-Zone.png" alt="Zap Zone" className="h-10 w-auto object-contain" />
+        <img src={brandLogoSrc} alt={brandName} className="h-10 w-auto object-contain" />
         {page.location_name && (
           <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-400">{page.location_name}</p>
         )}

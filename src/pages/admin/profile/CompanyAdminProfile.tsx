@@ -19,9 +19,11 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { API_BASE_URL, getStoredUser, setStoredUser, getImageUrl } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
+import LocationLogosSection from '../../../components/admin/LocationLogosSection';
 import EmailInput from '../../../components/ui/EmailInput';
 import type { CompanyAdminProfileData } from '../../../types/CompanyAdminProfile.types';
 import { getAuthToken } from '../../../services';
+import { LOGO_FILE_HINT, LOGO_FIT_HINT, LOGO_SIZE_HINT } from '../../../utils/logo';
 
 const CompanyAdminProfile = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -917,8 +919,10 @@ const CompanyAdminProfile = () => {
                       )}
                     </div>
                     <div className="text-sm text-gray-500">
-                      <p>Upload your company logo</p>
-                      <p className="text-xs">Max size: 20MB. Supported: PNG, JPG, JPEG</p>
+                      <p>Used wherever a location has no logo of its own.</p>
+                      <p className="text-xs mt-1 text-gray-600">{LOGO_SIZE_HINT}</p>
+                      <p className="text-xs mt-1">{LOGO_FIT_HINT}</p>
+                      <p className="text-xs mt-1 text-gray-400">{LOGO_FILE_HINT}</p>
                     </div>
                   </div>
                 </div>
@@ -1092,6 +1096,10 @@ const CompanyAdminProfile = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-200">
+                <LocationLogosSection />
               </div>
             </div>
           )}

@@ -304,7 +304,7 @@ export interface PhotoTemplatesResponse {
 }
 
 export interface KioskContext {
-  location: { id: number; name: string; city: string | null; state: string | null; timezone: string };
+  location: { id: number; name: string; city: string | null; state: string | null; logo_path?: string | null; timezone: string };
   business_name: string;
   local_time: string;
   operating_day: string;
@@ -343,6 +343,7 @@ export interface KioskAcceptResult {
 
 export interface SlideshowFeed {
   location_name: string;
+  location_logo_path?: string | null;
   business_name: string;
   queue_id: number;
   operating_day: string | null;
@@ -357,6 +358,7 @@ export interface QrResolution {
   mode: 'direct' | 'contact_required';
   access_token: string;
   location_name: string | null;
+  location_logo_path?: string | null;
   photo_count: number;
   source: PhotoSessionSource;
 }
@@ -364,6 +366,7 @@ export interface QrResolution {
 export interface CustomerPhotoPage {
   state: 'ready' | 'contact_required';
   location_name: string | null;
+  location_logo_path?: string | null;
   business_name: string | null;
   source?: PhotoSessionSource;
   greeting_name?: string | null;
