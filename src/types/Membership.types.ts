@@ -317,6 +317,9 @@ export interface Membership {
   photo_by_user_id?: number | null;
 
   payment_method_label?: string | null;
+  card_last_four?: string | null;
+  card_type?: string | null;
+  card_label?: string | null;
   payment_profile_token?: string | null;
   recurring_billing_authorized: boolean;
   terms_accepted: boolean;

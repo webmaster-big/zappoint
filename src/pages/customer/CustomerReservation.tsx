@@ -31,6 +31,7 @@ import Pagination from '../../components/ui/Pagination';
 import { AppliedFeesDisplay } from '../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../components/AppliedDiscountsDisplay';
 import { resolvePaymentState } from '../../types/Bookings.types';
+import { cardFromPayments } from '../../utils/cardLabel';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -655,6 +656,16 @@ const CustomerReservations = () => {
                             </span>
                           </div>
                         </>
+                      );
+                    })()}
+                    {(() => {
+                      const card = cardFromPayments(selectedBooking.payments);
+                      if (!card) return null;
+                      return (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500">Card Used</span>
+                          <span className="font-medium text-gray-800">{card.label}</span>
+                        </div>
                       );
                     })()}
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (

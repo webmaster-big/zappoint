@@ -9,6 +9,7 @@ import {
   Lock,
 } from 'lucide-react';
 import membershipService from '../../services/MembershipService';
+import { normalizeCardBrand } from '../../utils/cardLabel';
 import { membershipCache } from '../../services/MembershipCacheService';
 import { loadAcceptJS, tokenizeCard } from '../../services/PaymentService';
 import type { Membership } from '../../types/Membership.types';
@@ -178,12 +179,15 @@ const UpdatePaymentMethod = () => {
         clientKey,
       );
       const last4 = cardDigits.slice(-4);
+      const brand = normalizeCardBrand(cardType) ?? 'Card';
       const label = nameOnCard
-        ? `${nameOnCard} · Card ending ${last4}`
-        : `Card ending ${last4}`;
+        ? `${nameOnCard} · ${brand} ending in ${last4}`
+        : `${brand} ending in ${last4}`;
       const nameParts = nameOnCard.trim().split(/\s+/);
       await membershipService.updatePaymentMethod(membership.id, {
         payment_method_label: label,
+        card_last_four: last4,
+        card_type: cardType ?? undefined,
         opaque_data: { dataDescriptor: opaque.dataDescriptor, dataValue: opaque.dataValue },
         billing: {
           first_name: nameParts[0] || undefined,

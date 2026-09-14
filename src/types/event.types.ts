@@ -1,3 +1,4 @@
+import type { CardBearingPayment } from '../utils/cardLabel';
 
 export interface Event {
   id: number;
@@ -37,6 +38,7 @@ export interface EventAddOn {
 }
 
 export interface EventPurchase {
+  payments?: CardBearingPayment[] | null;
   id: number;
   reference_number: string;
   event_id: number;

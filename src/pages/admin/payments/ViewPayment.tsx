@@ -20,6 +20,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getPayment, canRefund, canVoid, canManualRefund, deletePayment } from '../../../services/PaymentService';
 import type { Payment } from '../../../types/Payment.types';
 import type { PaymentsPagePayment } from '../../../types/Payments.types';
+import { formatCardLabel } from '../../../utils/cardLabel';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { getImageUrl } from '../../../utils/storage';
@@ -104,6 +105,8 @@ const ViewPayment: React.FC = () => {
     customerEmail: p.customer?.email || p.booking?.guest_email || undefined,
     signature_image: p.signature_image,
     terms_accepted: p.terms_accepted,
+    card_last_four: p.card_last_four,
+    card_type: p.card_type,
   });
 
   const handleRefundComplete = () => {
@@ -363,6 +366,19 @@ const ViewPayment: React.FC = () => {
                   <p className="font-medium text-gray-900">{methodLabels[payment.method] || payment.method}</p>
                 </div>
               </div>
+
+              {formatCardLabel(payment.card_type, payment.card_last_four) && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                    <CreditCard className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Card Used</p>
+                    <p className="font-medium text-gray-900">{formatCardLabel(payment.card_type, payment.card_last_four)}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Ask the guest to confirm the last four digits.</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>

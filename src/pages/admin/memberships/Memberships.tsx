@@ -19,6 +19,7 @@ import { membershipCache } from '../../../services/MembershipCacheService';
 import locationService from '../../../services/LocationService';
 import type { Location } from '../../../services/LocationService';
 import type { Membership, MembershipPlan, MembershipStatus } from '../../../types/Membership.types';
+import { formatCardLabel } from '../../../utils/cardLabel';
 import { loadAcceptJS, tokenizeCard } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import Toast from '../../../components/ui/Toast';
@@ -60,6 +61,8 @@ const memberDisplayName = (m: Membership): string =>
 
 const paymentTypeLabel = (m: Membership): string => {
   if (m.is_comped) return 'Comped';
+  const card = formatCardLabel(m.card_type, m.card_last_four);
+  if (card) return card;
   if (m.payment_method_label) return m.payment_method_label;
   return m.recurring_billing_authorized ? 'Card (recurring)' : 'Cash / external';
 };

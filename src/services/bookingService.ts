@@ -1,3 +1,4 @@
+import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import type { BookPackagePackage } from '../types/BookPackage.types';
 import type { BookingQuote, BookingRepriceIntent } from '../types/Bookings.types';
@@ -417,7 +418,7 @@ export interface Booking {
       price_at_booking: string | number;
     };
   }>;
-  payments?: unknown[];
+  payments?: CardBearingPayment[] | null;
   applied_fees?: Array<{
     fee_name: string;
     fee_amount: number;

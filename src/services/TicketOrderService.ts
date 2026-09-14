@@ -1,3 +1,4 @@
+import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
@@ -110,6 +111,7 @@ export interface OrderLine {
 }
 
 export interface TicketOrder {
+  payments?: CardBearingPayment[] | null;
   id: number;
   reference_number: string;
   status: string;

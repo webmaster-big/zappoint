@@ -18,6 +18,7 @@ import {
   Download,
 } from 'lucide-react';
 import { attractionPurchaseService } from '../../services/AttractionPurchaseService';
+import { cardFromPayments } from '../../utils/cardLabel';
 import type { AttractionPurchase } from '../../services/AttractionPurchaseService';
 import { getImageUrl } from '../../utils/storage';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../utils/qrcode';
@@ -585,6 +586,16 @@ const MyAttractions = () => {
                   <span className="text-gray-500">Payment Method</span>
                   <span className="text-gray-800 capitalize">{selectedPurchase.payment_method?.replace(/[_-]/g, ' ') || '-'}</span>
                 </div>
+                {(() => {
+                  const card = cardFromPayments(selectedPurchase.payments);
+                  if (!card) return null;
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Card Used</span>
+                      <span className="text-gray-800">{card.label}</span>
+                    </div>
+                  );
+                })()}
                 {selectedPurchase.checked_in_at && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Checked In</span>

@@ -32,6 +32,9 @@ export interface PaymentsPagePayment {
   guestName?: string;
   signature_image?: string | null;
   terms_accepted?: boolean | null;
+  card_last_four?: string | null;
+  card_type?: string | null;
+  card_label?: string | null;
 }
 
 export interface PaymentsFilterOptions {

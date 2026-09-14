@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import ticketOrderService, { type TicketOrder, type OrderLine } from '../../../services/TicketOrderService';
 import { getPayments, createPayment } from '../../../services/PaymentService';
+import { cardFromPayments, formatCardLabel } from '../../../utils/cardLabel';
 import { PAYMENT_TYPE, type Payment } from '../../../types/Payment.types';
 import LoadingSpinner from '../../../components/ui/LoadingSpinner';
 import Toast from '../../../components/ui/Toast';
@@ -279,6 +280,23 @@ const TicketOrderDetails = () => {
                 </div>
               </div>
 
+              {(() => {
+                const card = cardFromPayments(payments);
+                if (!card) return null;
+                return (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 bg-${themeBg}-100 rounded-lg`}>
+                      <CreditCard className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Card Used</p>
+                      <p className="font-medium text-gray-900">{card.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Ask the guest to confirm the last four digits.</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeBg}-100 rounded-lg`}>
                   <Ticket className={`h-5 w-5 text-${fullColor}`} />
@@ -436,6 +454,9 @@ const TicketOrderDetails = () => {
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${p.status === 'completed' ? 'bg-green-100 text-green-800' : p.status === 'refunded' || p.status === 'voided' ? 'bg-purple-100 text-purple-800' : 'bg-yellow-100 text-yellow-800'}`}>
                       {p.status}
                     </span>
+                    {formatCardLabel(p.card_type, p.card_last_four) && (
+                      <span className="text-xs text-gray-600">{formatCardLabel(p.card_type, p.card_last_four)}</span>
+                    )}
                     {p.transaction_id && <span className="text-xs text-gray-500 font-mono truncate">{p.transaction_id}</span>}
                     <span className="text-xs text-gray-500 ml-auto">{new Date(p.created_at).toLocaleString()}</span>
                   </div>

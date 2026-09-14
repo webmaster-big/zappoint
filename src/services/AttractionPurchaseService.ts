@@ -1,3 +1,4 @@
+import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
@@ -38,6 +39,7 @@ api.interceptors.request.use(
 );
 
 export interface AttractionPurchase {
+  payments?: CardBearingPayment[] | null;
   id: number;
   attraction_id: number;
   ticket_order_id?: number | null;

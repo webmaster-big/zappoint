@@ -20,6 +20,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { normalizeCategory } from '../../../utils/venueCategories';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase } from '../../../types/AttractionPurchases.types';
+import { cardFromPayments } from '../../../utils/cardLabel';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { attractionPurchaseCacheService } from '../../../services/AttractionPurchaseCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -127,6 +128,7 @@ const ManagePurchases = () => {
       amountPaid: Number(purchase.amount_paid || 0),
       createdAt: purchase.created_at,
       paymentMethod: purchase.payment_method as string,
+      cardLabel: cardFromPayments(purchase.payments)?.label ?? null,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: normalizeCategory(purchase.attraction?.category),
       locationId: purchase.location_id,
@@ -353,7 +355,12 @@ const ManagePurchases = () => {
       sortable: true,
       sortValue: p => p.paymentMethod || '',
       exportValue: p => p.paymentMethod,
-      render: p => <span className="capitalize whitespace-nowrap text-sm text-gray-900">{(p.paymentMethod || '').replace('_', ' ')}</span>,
+      render: p => (
+        <div className="flex flex-col">
+          <span className="capitalize whitespace-nowrap text-sm text-gray-900">{(p.paymentMethod || '').replace('_', ' ')}</span>
+          {p.cardLabel && <span className="whitespace-nowrap text-xs text-gray-500">{p.cardLabel}</span>}
+        </div>
+      ),
     },
     {
       key: 'purchaseDate',
@@ -687,6 +694,7 @@ const ManagePurchases = () => {
       createdAt: purchase.created_at,
       deletedAt: purchase.deleted_at,
       paymentMethod: purchase.payment_method as string,
+      cardLabel: cardFromPayments(purchase.payments)?.label ?? null,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: normalizeCategory(purchase.attraction?.category),
       locationId: purchase.location_id,

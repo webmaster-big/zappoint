@@ -22,6 +22,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import membershipService from '../../../services/MembershipService';
+import { formatCardLabel } from '../../../utils/cardLabel';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import type { Membership, MembershipPayment, MembershipBenefitRedemption } from '../../../types/Membership.types';
 import { getImageUrl, getStoredUser } from '../../../utils/storage';
@@ -626,7 +627,7 @@ const MembershipDetails = () => {
             <CreditCard className={`w-4 h-4 text-${themeColor}-600`} /> Payment Method
             <InfoTooltip content="Update the display label for the saved payment method on file. This is informational — it does not charge the card." />
           </h3>
-          <p className="text-xs text-gray-500 mb-2">Current: <span className="text-gray-700 font-medium">{m.payment_method_label || '— none on file'}</span></p>
+          <p className="text-xs text-gray-500 mb-2">Current: <span className="text-gray-700 font-medium">{formatCardLabel(m.card_type, m.card_last_four) ?? m.payment_method_label ?? '— none on file'}</span></p>
           <div className="flex gap-2">
             <input
               value={pmLabel}

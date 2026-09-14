@@ -15,6 +15,7 @@ export interface AttractionPurchasesPurchase {
   createdAt: string;
   paymentMethod: string;
   duration: string;
+  cardLabel?: string | null;
   activity: string;
   locationId?: number;
   scheduledDate?: string | null;

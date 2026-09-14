@@ -185,6 +185,8 @@ async function updatePaymentMethod(
   id: number,
   payload: {
     payment_method_label: string;
+    card_last_four?: string;
+    card_type?: string;
     payment_profile_token?: string;
     opaque_data?: { dataDescriptor: string; dataValue: string };
     billing?: {

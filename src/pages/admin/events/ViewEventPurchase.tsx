@@ -19,6 +19,7 @@ import {
 import { formatLocalDateTime, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { eventPurchaseService } from '../../../services/EventPurchaseService';
+import { cardFromPayments } from '../../../utils/cardLabel';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
@@ -338,6 +339,23 @@ const ViewEventPurchase = () => {
                   </p>
                 </div>
               </div>
+
+              {(() => {
+                const card = cardFromPayments(purchase.payments);
+                if (!card) return null;
+                return (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 ${iconBg} rounded-lg`}>
+                      <CreditCard className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Card Used</p>
+                      <p className="font-medium text-gray-900">{card.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Ask the guest to confirm the last four digits.</p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex items-start gap-3">
                 <div className={`p-2 ${iconBg} rounded-lg`}>

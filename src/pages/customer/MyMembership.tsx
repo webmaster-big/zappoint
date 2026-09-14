@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import membershipService from '../../services/MembershipService';
+import { formatCardLabel } from '../../utils/cardLabel';
 import { membershipCache } from '../../services/MembershipCacheService';
 import type { Membership, MembershipBenefitRedemption, MembershipPlanBenefit, MembershipBenefitType } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
@@ -634,10 +635,10 @@ const MyMembership = () => {
               </button>
             </div>
             <div className="px-6 py-4">
-              {membership.payment_method_label ? (
+              {(formatCardLabel(membership.card_type, membership.card_last_four) ?? membership.payment_method_label) ? (
                 <p className="text-sm text-gray-700 flex items-center gap-2">
                   <CreditCard size={14} className="text-gray-400" />
-                  {membership.payment_method_label}
+                  {formatCardLabel(membership.card_type, membership.card_last_four) ?? membership.payment_method_label}
                 </p>
               ) : (
                 <p className="text-sm text-gray-400 italic">No payment method saved</p>

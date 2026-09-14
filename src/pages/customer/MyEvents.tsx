@@ -17,6 +17,7 @@ import {
   Users,
   } from 'lucide-react';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
+import { cardFromPayments } from '../../utils/cardLabel';
 import { getImageUrl } from '../../utils/storage';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
@@ -522,6 +523,16 @@ const MyEvents = () => {
                   <span className="text-gray-500">Payment Method</span>
                   <span className="text-gray-800 capitalize">{selectedPurchase.payment_method?.replace('_', ' ') || '-'}</span>
                 </div>
+                {(() => {
+                  const card = cardFromPayments(selectedPurchase.payments);
+                  if (!card) return null;
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Card Used</span>
+                      <span className="text-gray-800">{card.label}</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between">
                   <span className="text-gray-500">Payment Status</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${resolvePaymentState(selectedPurchase).pillClass}`}>

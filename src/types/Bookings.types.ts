@@ -21,6 +21,7 @@ export interface BookingsPageBooking {
   updatedAt?: string;
   paymentMethod: string;
   transactionId?: string;
+  cardLabel?: string | null;
   attractions?: { name: string; quantity: number }[];
   addOns?: { name: string; quantity: number }[];
   duration?: string;

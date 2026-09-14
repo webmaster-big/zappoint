@@ -12,6 +12,7 @@ import {
   MapPin,
   Home,
   CheckCircle,
+  CreditCard,
   AlertCircle,
   ArrowLeft,
   Pencil,
@@ -30,6 +31,7 @@ import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDis
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 import { normalizeCategory } from '../../../utils/venueCategories';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { cardFromPayments, formatCardLabel } from '../../../utils/cardLabel';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -113,8 +115,10 @@ const ViewBooking: React.FC = () => {
           // row, base64 image column included, so it must stay the exception.
           const missingAnswers =
             (bookingData as { custom_field_responses?: unknown }).custom_field_responses === undefined;
+          const missingPayments =
+            (bookingData as { payments?: unknown }).payments === undefined;
 
-          if (!cameFromShowEndpoint && missingAnswers && id) {
+          if (!cameFromShowEndpoint && (missingAnswers || missingPayments) && id) {
             bookingService
               .getBookingById(Number(id))
               .then(fresh => { if (fresh.success && fresh.data) setBooking(fresh.data); })
@@ -543,6 +547,23 @@ const ViewBooking: React.FC = () => {
                 </div>
               )}
 
+              {(() => {
+                const card = cardFromPayments(booking.payments);
+                if (!card) return null;
+                return (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
+                      <CreditCard className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Card Used</p>
+                      <p className="font-medium text-gray-900">{card.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Ask the guest to confirm the last four digits.</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <CheckCircle className={`h-5 w-5 text-${fullColor}`} />
@@ -556,11 +577,11 @@ const ViewBooking: React.FC = () => {
               </div>
             </div>
 
-            {(booking as any).payments && (booking as any).payments.length > 0 && (
+            {booking.payments && booking.payments.length > 0 && (
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
                 <div className="space-y-3">
-                  {(booking as any).payments.map((payment: any, index: number) => (
+                  {booking.payments.map((payment, index: number) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 ${payment.status === 'completed' ? 'bg-green-100' : 'bg-gray-100'} rounded-lg`}>
@@ -571,8 +592,14 @@ const ViewBooking: React.FC = () => {
                           <p className="text-sm text-gray-600">
                             {payment.method ? payment.method.replace('_', ' ').charAt(0).toUpperCase() + payment.method.slice(1).replace('_', ' ') : 'N/A'}
                             {' • '}
-                            {formatLocalDateTime(payment.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {payment.created_at ? formatLocalDateTime(payment.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                           </p>
+                          {formatCardLabel(payment.card_type, payment.card_last_four) && (
+                            <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                              <CreditCard className="h-3 w-3 text-gray-400" />
+                              {formatCardLabel(payment.card_type, payment.card_last_four)}
+                            </p>
+                          )}
                           {payment.notes && (
                             <p className="text-xs text-gray-500 mt-1">{payment.notes}</p>
                           )}
@@ -583,7 +610,7 @@ const ViewBooking: React.FC = () => {
                         payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                        {payment.status ? payment.status.charAt(0).toUpperCase() + payment.status.slice(1) : 'Unknown'}
                       </span>
                     </div>
                   ))}

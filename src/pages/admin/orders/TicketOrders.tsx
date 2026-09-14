@@ -13,6 +13,7 @@ import {
   Plus,
 } from 'lucide-react';
 import ticketOrderService, { type TicketOrder } from '../../../services/TicketOrderService';
+import { cardFromPayments } from '../../../utils/cardLabel';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -45,6 +46,7 @@ interface DisplayOrder {
   paid: number;
   balance: number;
   method: string;
+  cardLabel?: string | null;
   status: string;
   allCheckedIn: boolean;
 }
@@ -87,6 +89,7 @@ const TicketOrders = () => {
       paid: o.amount_paid,
       balance: o.remaining_balance,
       method: o.payment_method === 'authorize.net' ? 'Authorize.Net' : (o.payment_method ?? 'N/A'),
+      cardLabel: cardFromPayments(o.payments)?.label ?? null,
       status: o.status,
       allCheckedIn: o.lines.length > 0 && o.lines.every(l => l.checked_in_at),
     }));
@@ -239,7 +242,12 @@ const TicketOrders = () => {
       sortable: true,
       sortValue: o => o.method,
       exportValue: o => o.method,
-      render: o => <span className="whitespace-nowrap text-sm text-gray-700 capitalize">{o.method}</span>,
+      render: o => (
+        <div className="flex flex-col">
+          <span className="whitespace-nowrap text-sm text-gray-700 capitalize">{o.method}</span>
+          {o.cardLabel && <span className="whitespace-nowrap text-xs text-gray-500">{o.cardLabel}</span>}
+        </div>
+      ),
     },
     {
       key: 'status',

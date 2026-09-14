@@ -10,6 +10,7 @@ import {
   Ticket,
   Calendar,
   DollarSign,
+  CreditCard,
   AlertCircle,
   Smartphone,
   X,
@@ -44,6 +45,7 @@ import type { EventPurchase } from '../../../types/event.types';
 import type { MembershipScanResponse } from '../../../types/Membership.types';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { cardFromPayments } from '../../../utils/cardLabel';
 
 interface ScanResult {
   bookingId: number;
@@ -1596,6 +1598,23 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
+                    {(() => {
+                      const card = cardFromPayments(verifiedBooking.payments);
+                      if (!card) return null;
+                      return (
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                            <CreditCard className={`h-5 w-5 text-${fullColor}`} />
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Card Used</p>
+                            <p className="font-medium text-gray-800">{card.label}</p>
+                            <p className="text-[11px] text-gray-500">Ask the guest to confirm the last four digits.</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${resolvePaymentState(verifiedBooking).isSettled ? 'bg-green-100' : 'bg-red-100'}`}>
                         <DollarSign className={`h-5 w-5 ${resolvePaymentState(verifiedBooking).amountClass}`} />
@@ -2045,6 +2064,23 @@ const CheckIn: React.FC = () => {
                         </div>
                       </div>
                     )}
+
+                    {(() => {
+                      const card = cardFromPayments(selectedBooking.payments);
+                      if (!card) return null;
+                      return (
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                            <CreditCard className={`h-5 w-5 text-${fullColor}`} />
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Card Used</p>
+                            <p className="font-medium text-gray-800">{card.label}</p>
+                            <p className="text-[11px] text-gray-500">Ask the guest to confirm the last four digits.</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${resolvePaymentState(selectedBooking).isSettled ? 'bg-green-100' : 'bg-red-100'}`}>

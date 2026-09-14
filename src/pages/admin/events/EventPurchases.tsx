@@ -19,6 +19,7 @@ import { convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { eventPurchaseService } from '../../../services/EventPurchaseService';
+import { cardFromPayments } from '../../../utils/cardLabel';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -49,6 +50,7 @@ interface DisplayPurchase {
   totalAmount: number;
   amountPaid: number;
   paymentMethod: string;
+  cardLabel?: string | null;
   paymentStatus: string;
   purchaseDate: string;
   purchaseTime: string;
@@ -152,6 +154,7 @@ const EventPurchases = () => {
       totalAmount: Number(purchase.total_amount),
       amountPaid: Number(purchase.amount_paid),
       paymentMethod: purchase.payment_method || 'N/A',
+      cardLabel: cardFromPayments(purchase.payments)?.label ?? null,
       paymentStatus: purchase.payment_status,
       purchaseDate: purchase.purchase_date,
       purchaseTime: purchase.purchase_time,
@@ -328,9 +331,12 @@ const EventPurchases = () => {
       sortValue: p => p.paymentMethod || '',
       exportValue: p => p.paymentMethod,
       render: p => (
-        <span className="whitespace-nowrap text-sm text-gray-700 capitalize">
-          {p.paymentMethod?.replace('_', ' ').replace('.', ' ') || 'N/A'}
-        </span>
+        <div className="flex flex-col">
+          <span className="whitespace-nowrap text-sm text-gray-700 capitalize">
+            {p.paymentMethod?.replace('_', ' ').replace('.', ' ') || 'N/A'}
+          </span>
+          {p.cardLabel && <span className="whitespace-nowrap text-xs text-gray-500">{p.cardLabel}</span>}
+        </div>
       ),
     },
     {
@@ -600,6 +606,7 @@ const EventPurchases = () => {
       totalAmount: Number(purchase.total_amount),
       amountPaid: Number(purchase.amount_paid || 0),
       paymentMethod: purchase.payment_method || 'N/A',
+      cardLabel: cardFromPayments(purchase.payments)?.label ?? null,
       paymentStatus: purchase.payment_status,
       purchaseDate: purchase.purchase_date,
       purchaseTime: purchase.purchase_time,

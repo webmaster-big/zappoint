@@ -69,6 +69,7 @@ import type { AdminColumn, AdminFilterDef, DateRangeValue } from '../../../compo
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import { MICHIGAN_TZ } from '../../../utils/timeFormat';
 import type { PaymentsPagePayment, PaymentsMetrics } from '../../../types/Payments.types';
+import { formatCardLabel } from '../../../utils/cardLabel';
 import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
 import type { PaymentPayableType } from '../../../types/Payment.types';
 
@@ -170,6 +171,8 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
     guestName: booking?.guest_name || attractionPurchase?.guest_name,
     signature_image: payment.signature_image || null,
     terms_accepted: payment.terms_accepted ?? null,
+    card_last_four: payment.card_last_four ?? null,
+    card_type: payment.card_type ?? null,
   };
 };
 
@@ -782,10 +785,14 @@ const Payments = () => {
       exportValue: p => p.method,
       render: p => {
         const MethodIcon = methodConfig[p.method]?.icon || CreditCard;
+        const card = formatCardLabel(p.card_type, p.card_last_four);
         return (
           <div className="flex items-center gap-2">
             <MethodIcon className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-600 capitalize">{p.method}</span>
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-600 capitalize">{p.method}</span>
+              {card && <span className="text-xs text-gray-500">{card}</span>}
+            </div>
           </div>
         );
       },
@@ -1072,6 +1079,7 @@ const Payments = () => {
         { label: 'Booking Time', value: p => p.bookingTime || '' },
         { label: 'Participants', value: p => p.participants ?? '' },
         { label: 'Guest Name', value: p => p.guestName || '' },
+        { label: 'Card', value: p => formatCardLabel(p.card_type, p.card_last_four) ?? '' },
         { label: 'Terms Accepted', value: p => p.terms_accepted === true ? 'Yes' : p.terms_accepted === false ? 'No' : '' },
         { label: 'Signature On File', value: p => p.signature_image ? 'Yes' : 'No' },
       ],

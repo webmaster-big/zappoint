@@ -41,6 +41,7 @@ import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
+import { cardFromPayments } from '../../../utils/cardLabel';
 import { resolvePaymentState, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
 import type { BookingRepriceIntent } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
@@ -116,6 +117,7 @@ const Bookings: React.FC = () => {
       paymentStatus: resolvePaymentState(booking).state,
       createdAt: booking.created_at,
       paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
+      cardLabel: cardFromPayments(booking.payments)?.label ?? null,
       attractions: booking.attractions?.map((attr: any) => ({
         name: attr.name,
         quantity: attr.pivot?.quantity || 1
@@ -764,6 +766,7 @@ const Bookings: React.FC = () => {
               paymentStatus: resolvePaymentState(booking).state,
               createdAt: booking.created_at,
               paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
+      cardLabel: cardFromPayments(booking.payments)?.label ?? null,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               attractions: booking.attractions?.map((attr: any) => ({
                 name: attr.name,
@@ -2249,6 +2252,9 @@ const Bookings: React.FC = () => {
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${paymentColors[booking.paymentMethod as keyof typeof paymentColors] || 'bg-gray-100 text-gray-800'}`}>
               {(booking.paymentMethod ?? 'N/A').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </span>
+            {booking.cardLabel && (
+              <span className="block mt-1 text-xs text-gray-500">{booking.cardLabel}</span>
+            )}
           </td>
         );
       case 'paymentStatus':
