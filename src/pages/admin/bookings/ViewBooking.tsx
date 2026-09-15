@@ -31,7 +31,7 @@ import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDis
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 import { normalizeCategory } from '../../../utils/venueCategories';
 import { resolvePaymentState } from '../../../types/Bookings.types';
-import { cardFromPayments, formatCardLabel } from '../../../utils/cardLabel';
+import { cardFromPayments, formatCardLabel, formatMoney } from '../../../utils/cardLabel';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -588,7 +588,7 @@ const ViewBooking: React.FC = () => {
                           <DollarSign className={`h-4 w-4 ${payment.status === 'completed' ? 'text-green-600' : 'text-gray-600'}`} />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">${Number(payment.amount).toFixed(2)}</p>
+                          <p className="font-medium text-gray-900">{formatMoney(payment.amount)}</p>
                           <p className="text-sm text-gray-600">
                             {payment.method ? payment.method.replace('_', ' ').charAt(0).toUpperCase() + payment.method.slice(1).replace('_', ' ') : 'N/A'}
                             {' • '}
@@ -647,7 +647,7 @@ const ViewBooking: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <span className="font-medium">${totalPrice.toFixed(2)}</span>
+                            {totalPrice !== null && <span className="font-medium">{formatMoney(totalPrice)}</span>}
                           </li>
                         );
                       })}

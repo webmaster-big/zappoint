@@ -146,7 +146,7 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
     payable_type: payableType,
     customer_id: payment.customer_id,
     location_id: payment.location_id,
-    amount: Number(payment.amount),
+    amount: Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : 0,
     currency: payment.currency,
     method: payment.method,
     status: payment.status,

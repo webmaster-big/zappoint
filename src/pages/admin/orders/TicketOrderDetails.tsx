@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import ticketOrderService, { type TicketOrder, type OrderLine } from '../../../services/TicketOrderService';
 import { getPayments, createPayment } from '../../../services/PaymentService';
-import { cardFromPayments, formatCardLabel } from '../../../utils/cardLabel';
+import { cardFromPayments, formatCardLabel, formatMoney } from '../../../utils/cardLabel';
 import { PAYMENT_TYPE, type Payment } from '../../../types/Payment.types';
 import LoadingSpinner from '../../../components/ui/LoadingSpinner';
 import Toast from '../../../components/ui/Toast';
@@ -28,7 +28,7 @@ import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPa
 import { generateOrderQRCode } from '../../../utils/qrcode';
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 
-const money = (v: number) => `$${Number(v ?? 0).toFixed(2)}`;
+const money = (v: number) => formatMoney(v, '$0.00');
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-800' },

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -19,6 +19,11 @@ import { normalizeCategory } from '../../../utils/venueCategories';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayScheduleView';
+import { cardFromPayments } from '../../../utils/cardLabel';
+import type { FreeState } from '../../../utils/scheduleGeometry';
+import { freeState, minuteAtOffset } from '../../../utils/scheduleGeometry';
+import { buildBookingUrl, snapToInterval } from '../../../utils/bookingPrefill';
 
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
@@ -29,16 +34,24 @@ const parseLocalDate = (isoDateString: string): Date => {
 const timeToMinutes = (time: string): number => {
   if (!time) return 0;
   const [h, m] = time.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+};
+
+const minutesToTime = (minutes: number): string => {
+  if (!Number.isFinite(minutes)) return '00:00';
+  const wrapped = ((minutes % 1440) + 1440) % 1440;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
 };
 
 const durationToMinutes = (duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): number => {
+  const value = Number(duration);
+  if (!Number.isFinite(value) || value <= 0) return 0;
   if (unit === 'hours and minutes') {
-    const hours = Math.floor(duration);
-    const mins = Math.round((duration % 1) * 60);
+    const hours = Math.floor(value);
+    const mins = Math.round((value % 1) * 60);
     return hours * 60 + mins;
   }
-  return unit === 'hours' ? duration * 60 : duration;
+  return unit === 'hours' ? value * 60 : value;
 };
 
 const minutesToLabel = (mins: number): string => {
@@ -65,7 +78,7 @@ const ZOOM_LEVELS = [1, 1.6, 2.4];
 const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
-const VIEW_STATE_KEY = 'spaceScheduleViewState';
+const VIEW_STATE_KEY = 'spaceScheduleViewState:v2';
 
 interface ScheduleViewState {
   categoryFilter?: string;
@@ -130,6 +143,8 @@ interface ScheduleColumn {
   capacity?: number;
   roomId?: number;
   virtual: boolean;
+  openMinutes?: number | null;
+  closeMinutes?: number | null;
 }
 
 interface PositionedBooking {
@@ -172,6 +187,7 @@ const assignLanes = (list: PositionedBooking[]): void => {
 
 const SpaceSchedule = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const navigate = useNavigate();
   const { effectiveLocationId } = useLocationScope();
   const savedViewState = useRef(readViewState()).current;
   const [selectedDate, setSelectedDate] = useState(() => michiganToday());
@@ -189,7 +205,7 @@ const SpaceSchedule = () => {
   const [categoryFilter, setCategoryFilter] = useState(savedViewState.categoryFilter ?? 'all');
   const [statusFilter, setStatusFilter] = useState(savedViewState.statusFilter ?? 'all');
   const [searchInput, setSearchInput] = useState(savedViewState.searchInput ?? '');
-  const [hideEmptySpaces, setHideEmptySpaces] = useState(savedViewState.hideEmptySpaces ?? true);
+  const [hideEmptySpaces, setHideEmptySpaces] = useState(savedViewState.hideEmptySpaces ?? false);
   const [zoomLevel, setZoomLevel] = useState(() => {
     const saved = savedViewState.zoomLevel;
     return typeof saved === 'number' && Number.isInteger(saved) && saved >= 0 && saved < ZOOM_LEVELS.length ? saved : 1;
@@ -349,28 +365,30 @@ const SpaceSchedule = () => {
 
   const loadSpaces = useCallback(async () => {
     if (spacesLoadedRef.current) return;
+    const user = getStoredUser();
+
     try {
-      const user = getStoredUser();
-      const hasCachedRooms = await roomCacheService.hasCachedData();
-      if (hasCachedRooms) {
-        const cachedRooms = await roomCacheService.getCachedRooms();
-        if (cachedRooms) {
-          const sortedSpaces = [...cachedRooms].sort(naturalSort);
-          setSpaces(sortedSpaces);
-          spacesLoadedRef.current = true;
-          roomCacheService.syncInBackground({ user_id: user?.id });
-          return;
-        }
+      const cachedRooms = await roomCacheService.getCachedRooms();
+      if (cachedRooms && cachedRooms.length > 0) {
+        setSpaces([...cachedRooms].sort(naturalSort));
       }
+    } catch (error) {
+      console.error('Error reading cached spaces:', error);
+    }
+
+    try {
       const spacesResponse = await roomService.getRooms({
         user_id: user?.id,
-        per_page: 500
+        per_page: 500,
+        include_unavailable: true
       });
-      const fetchedSpaces = Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || [];
-      await roomCacheService.cacheRooms(fetchedSpaces);
-      const sortedSpaces = [...fetchedSpaces].sort(naturalSort);
-      setSpaces(sortedSpaces);
+      const fetchedSpaces: Room[] = Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || [];
+      setSpaces([...fetchedSpaces].sort(naturalSort));
       spacesLoadedRef.current = true;
+      const bookableSpaces = fetchedSpaces.filter(room => room.is_available !== false);
+      if (bookableSpaces.length > 0) {
+        await roomCacheService.cacheRooms(bookableSpaces);
+      }
     } catch (error) {
       console.error('Error loading spaces:', error);
     }
@@ -516,6 +534,7 @@ const SpaceSchedule = () => {
   };
 
   const isMichiganToday = isToday(selectedDate);
+  const isPastDate = dateKeyOf(selectedDate) < dateKeyOf(michiganToday());
   const nowMinutes = nowTick.hour * 60 + nowTick.minute;
 
   const activeBookings = useMemo(
@@ -559,6 +578,25 @@ const SpaceSchedule = () => {
     [knownRoomIds]
   );
 
+  const { dayWindow } = useScheduleDayWindow(selectedDate, effectiveLocationId);
+
+  const roomWindows = useMemo(() => {
+    const map = new Map<
+      number,
+      { open: number | null; close: number | null; closed: boolean; bookable: boolean; reason: string | null }
+    >();
+    for (const entry of dayWindow?.rooms ?? []) {
+      map.set(entry.room_id, {
+        open: entry.open_minutes,
+        close: entry.close_minutes,
+        closed: entry.closed_all_day,
+        bookable: entry.bookable !== false,
+        reason: entry.reason,
+      });
+    }
+    return map;
+  }, [dayWindow]);
+
   const columns = useMemo<ScheduleColumn[]>(() => {
     const roomBookingCount = new Map<number, number>();
     for (const b of filteredBookings) {
@@ -566,18 +604,47 @@ const SpaceSchedule = () => {
     }
     const roomColumns: ScheduleColumn[] = displaySpaces
       .filter(space => !hideEmptySpaces || (roomBookingCount.get(space.id) || 0) > 0)
-      .map(space => ({ key: `room-${space.id}`, name: space.name, capacity: space.capacity, roomId: space.id, virtual: false }));
+      .map(space => ({
+        key: `room-${space.id}`,
+        name: space.name,
+        capacity: space.capacity,
+        roomId: space.id,
+        virtual: false,
+        openMinutes: roomWindows.get(space.id)?.open ?? null,
+        closeMinutes: roomWindows.get(space.id)?.close ?? null,
+      }));
     const virtualMap = new Map<string, ScheduleColumn>();
     for (const b of filteredBookings) {
       const key = columnKeyFor(b);
       if (key.startsWith('room-')) continue;
       if (!virtualMap.has(key)) {
-        virtualMap.set(key, { key, name: b.package?.name || 'Unassigned', virtual: true });
+        const packageWindow = (dayWindow?.packages ?? []).find(entry => entry.package_id === b.package_id);
+        virtualMap.set(key, {
+          key,
+          name: b.package?.name || 'Unassigned',
+          virtual: true,
+          openMinutes: packageWindow?.open_minutes ?? null,
+          closeMinutes: packageWindow?.close_minutes ?? null,
+        });
+      }
+    }
+    if (!hideEmptySpaces) {
+      for (const entry of dayWindow?.packages ?? []) {
+        if (entry.room_ids.length > 0) continue;
+        const key = `pkg-${entry.package_id}`;
+        if (virtualMap.has(key)) continue;
+        virtualMap.set(key, {
+          key,
+          name: entry.name,
+          virtual: true,
+          openMinutes: entry.open_minutes,
+          closeMinutes: entry.close_minutes,
+        });
       }
     }
     const virtualColumns = [...virtualMap.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     return [...roomColumns, ...virtualColumns];
-  }, [displaySpaces, filteredBookings, hideEmptySpaces, knownRoomIds, columnKeyFor]);
+  }, [displaySpaces, filteredBookings, hideEmptySpaces, knownRoomIds, columnKeyFor, roomWindows, dayWindow]);
 
   const roomBreaks = useMemo(() => {
     const map = new Map<number, Array<{ start: number; end: number }>>();
@@ -627,6 +694,10 @@ const SpaceSchedule = () => {
         }
       }
     }
+    if (dayWindow) {
+      if (dayWindow.open_minutes < earliest) earliest = dayWindow.open_minutes;
+      if (dayWindow.close_minutes > latest) latest = dayWindow.close_minutes;
+    }
     if (!Number.isFinite(earliest) || !Number.isFinite(latest)) {
       earliest = 10 * 60;
       latest = 22 * 60;
@@ -636,7 +707,7 @@ const SpaceSchedule = () => {
       if (nowMinutes > latest) latest = nowMinutes;
     }
     let start = Math.max(0, Math.floor(earliest / 60) * 60 - 60);
-    let end = Math.min(24 * 60, Math.ceil(latest / 60) * 60 + 60);
+    let end = Math.ceil(latest / 60) * 60 + 60;
     const extentKey = `${dateKeyOf(selectedDate)}:${effectiveLocationId ?? 'all'}`;
     const prev = windowExtentRef.current;
     if (prev && prev.key === extentKey) {
@@ -645,7 +716,7 @@ const SpaceSchedule = () => {
     }
     windowExtentRef.current = { key: extentKey, start, end };
     return { start, end, total: end - start };
-  }, [filteredBookings, roomBreaks, spaceClosures, isMichiganToday, nowMinutes, selectedDate, effectiveLocationId]);
+  }, [filteredBookings, roomBreaks, spaceClosures, isMichiganToday, nowMinutes, selectedDate, effectiveLocationId, dayWindow]);
 
   const positionedByColumn = useMemo(() => {
     const map = new Map<string, PositionedBooking[]>();
@@ -662,7 +733,7 @@ const SpaceSchedule = () => {
         startMin,
         endMin,
         top: (startMin - timeWindow.start) * pxPerMinute,
-        height: Math.max(24, (endMin - startMin) * pxPerMinute - 2),
+        height: Math.max(8, (endMin - startMin) * pxPerMinute - 2),
         lane: 0,
         laneCount: 1,
         clipped: rawEnd > timeWindow.end,
@@ -671,6 +742,39 @@ const SpaceSchedule = () => {
     for (const list of map.values()) assignLanes(list);
     return map;
   }, [columns, filteredBookings, timeWindow, columnKeyFor, pxPerMinute]);
+
+  const freeFromByColumn = useMemo(() => {
+    const map = new Map<string, FreeState>();
+
+    for (const column of columns) {
+      const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
+      if (closure?.fullDay || roomWindows.get(column.roomId ?? -1)?.closed) {
+        map.set(column.key, { kind: 'closed' });
+        continue;
+      }
+
+      const open = column.openMinutes ?? (column.virtual ? timeWindow.start : null);
+      const close = column.closeMinutes ?? (column.virtual ? timeWindow.end : null);
+      const blocked = [
+        ...activeBookings
+          .filter(b => columnKeyFor(b) === column.key)
+          .map(b => {
+            const startMinutes = timeToMinutes(b.booking_time);
+            return { startMinutes, endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) };
+          }),
+        ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end, reason: 'On break' })) : []),
+        ...(closure?.ranges || []).map(r => ({
+          startMinutes: r.time_start ? timeToMinutes(r.time_start) : (open ?? timeWindow.start),
+          endMinutes: r.time_end ? timeToMinutes(r.time_end) : (close ?? timeWindow.end),
+          reason: 'Closed',
+        })),
+      ];
+
+      map.set(column.key, freeState(open, close, blocked, isMichiganToday ? nowMinutes : (open ?? timeWindow.start), roomWindows.get(column.roomId ?? -1)?.bookable !== false));
+    }
+
+    return map;
+  }, [columns, activeBookings, columnKeyFor, roomBreaks, spaceClosures, roomWindows, timeWindow, isMichiganToday, nowMinutes]);
 
   const hourMarks = useMemo(() => {
     const marks: number[] = [];
@@ -949,11 +1053,97 @@ const SpaceSchedule = () => {
     );
   };
 
+  const packageForSlot = (column: ScheduleColumn, minute: number): number | null => {
+    if (column.virtual) {
+      const id = Number(column.key.replace('pkg-', ''));
+      return Number.isInteger(id) && id > 0 ? id : null;
+    }
+    const candidates = (dayWindow?.packages ?? []).filter(
+      entry =>
+        column.roomId !== undefined &&
+        entry.room_ids.includes(column.roomId) &&
+        minute >= entry.open_minutes &&
+        minute < entry.close_minutes
+    );
+    return candidates.length === 1 ? candidates[0].package_id : null;
+  };
+
+  const openBookingForSlot = (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const clickedMinute = minuteAtOffset(originMinute, event.clientY - bounds.top, pxPerMinute);
+    const minute = snapToInterval(
+      clickedMinute,
+      dayWindow?.interval_minutes ?? 15,
+      isMichiganToday ? nowMinutes : undefined
+    );
+
+    navigate(
+      buildBookingUrl({
+        locationId: effectiveLocationId ?? dayWindow?.location_id ?? null,
+        date: dateKeyOf(selectedDate),
+        minute,
+        roomId: column.roomId ?? null,
+        packageId: packageForSlot(column, minute),
+        walkIn: isMichiganToday,
+      })
+    );
+  };
+
   const renderColumnBackground = (column: ScheduleColumn) => {
     const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
     const breaks = column.roomId ? roomBreaks.get(column.roomId) || [] : [];
+    const roomWindow = column.roomId ? roomWindows.get(column.roomId) : undefined;
+    const openMinutes = column.openMinutes ?? null;
+    const closeMinutes = column.closeMinutes ?? null;
+    const availableFrom = openMinutes === null ? null : Math.max(openMinutes, timeWindow.start);
+    const availableTo = closeMinutes === null ? null : Math.min(closeMinutes, timeWindow.end);
+    const showsAvailable =
+      availableFrom !== null && availableTo !== null && availableTo > availableFrom && !roomWindow?.closed && roomWindow?.bookable !== false;
+    const slotIsBookable = showsAvailable && !isPastDate;
+
     return (
       <>
+        {showsAvailable && (
+          <div
+            role={slotIsBookable ? 'button' : undefined}
+            tabIndex={slotIsBookable ? 0 : undefined}
+            onClick={slotIsBookable ? event => openBookingForSlot(column, event, availableFrom) : undefined}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                const minute = snapToInterval(
+                  isMichiganToday ? Math.max(nowMinutes, availableFrom) : availableFrom,
+                  dayWindow?.interval_minutes ?? 15,
+                  isMichiganToday ? nowMinutes : undefined
+                );
+                navigate(
+                  buildBookingUrl({
+                    locationId: effectiveLocationId ?? dayWindow?.location_id ?? null,
+                    date: dateKeyOf(selectedDate),
+                    minute,
+                    roomId: column.roomId ?? null,
+                    packageId: packageForSlot(column, minute),
+                    walkIn: isMichiganToday,
+                  })
+                );
+              }
+            }}
+            className={`absolute inset-x-0 z-[1] bg-gray-100 ${slotIsBookable ? 'cursor-pointer transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400' : ''}`}
+            style={{
+              top: (availableFrom - timeWindow.start) * pxPerMinute,
+              height: (availableTo - availableFrom) * pxPerMinute,
+            }}
+            title={`Available ${formatTime12Hour(minutesToTime(availableFrom))} – ${formatTime12Hour(minutesToTime(availableTo))} — click to start a booking`}
+            aria-label={`Start a booking in ${column.name}`}
+          />
+        )}
+        {!showsAvailable && !closure?.fullDay && roomWindow?.reason && (
+          <div className="absolute inset-0 z-[1] flex items-start justify-center bg-gray-50/70 pt-8">
+            <span className="rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+              {roomWindow.reason}
+            </span>
+          </div>
+        )}
         {closure?.fullDay && (
           <div className="absolute inset-0 bg-red-50/80 z-[5] flex items-start justify-center pt-8">
             <span className="text-[10px] font-semibold text-red-500 bg-white/80 border border-red-200 rounded-full px-2 py-0.5">Closed all day</span>
@@ -1134,7 +1324,7 @@ const SpaceSchedule = () => {
                 Today
               </button>
             )}
-            {nowLineTop !== null && activeBookings.length > 0 && filteredBookings.length > 0 && (
+            {nowLineTop !== null && (
               <button
                 type="button"
                 onClick={scrollToNow}
@@ -1330,48 +1520,42 @@ const SpaceSchedule = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        {activeBookings.length === 0 ? (
+        {columns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">
             <div className={`w-20 h-20 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
               <Calendar className={`w-10 h-10 text-${fullColor}`} />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Bookings Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Spaces To Show</h3>
             <p className="text-gray-600 text-center max-w-md">
-              There are no bookings scheduled for {selectedDate.toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}. The schedule will appear here once bookings are made.
+              No spaces are configured for this location, so there is no schedule to display.
             </p>
-            {spaceClosures.size > 0 && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-lg">
-                {displaySpaces.filter(space => spaceClosures.has(space.id)).map(space => (
-                  <span key={space.id} className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
-                    {space.name}: {getSpaceClosureLabel(space.id)}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : filteredBookings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <Search className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Matching Bookings</h3>
-            <p className="text-gray-600 text-center max-w-md mb-4">
-              {activeBookings.length} {activeBookings.length === 1 ? 'booking is' : 'bookings are'} scheduled this day, but none match the current filters.
-            </p>
-            <StandardButton variant="secondary" onClick={clearFilters}>
-              Clear filters
-            </StandardButton>
           </div>
         ) : (
+          <>
+            {activeBookings.length === 0 && (
+              <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600">
+                <Calendar className="h-4 w-4 shrink-0 text-gray-400" />
+                <span>
+                  No bookings for {selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} — every space below is open for its scheduled hours.
+                </span>
+              </div>
+            )}
+            {activeBookings.length > 0 && filteredBookings.length === 0 && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600">
+                <Search className="h-4 w-4 shrink-0 text-gray-400" />
+                <span>
+                  {activeBookings.length} {activeBookings.length === 1 ? 'booking is' : 'bookings are'} scheduled this day, but none match the current filters.
+                </span>
+                <StandardButton variant="secondary" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </StandardButton>
+              </div>
+            )}
           <div ref={scrollRef} className="overflow-auto max-h-[72vh] relative">
             <div className="min-w-max">
               <div className="sticky top-0 z-30 flex bg-gray-50 border-b-2 border-gray-200">
                 <div
-                  className="sticky left-0 z-40 bg-gray-50 border-r border-gray-200 flex items-center justify-center px-2 py-3"
+                  className="sticky left-0 z-40 bg-gray-50 border-r border-gray-200 flex items-center justify-center px-0 py-0"
                   style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH }}
                 >
                   <Clock className="w-4 h-4 text-gray-500" />
@@ -1379,26 +1563,50 @@ const SpaceSchedule = () => {
                 {columns.map(column => (
                   <div
                     key={column.key}
-                    className="px-4 py-3 text-center border-r border-gray-200"
+                    className="px-0 py-0 text-center border-r border-gray-200"
                     style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
                   >
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-sm font-semibold text-gray-700 truncate max-w-full">{column.name}</span>
+                    <div className="flex flex-col items-center gap-0 leading-none">
+                      <span className="text-sm font-semibold text-gray-700 leading-tight truncate max-w-full">{column.name}</span>
                       {column.virtual ? (
-                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 leading-tight rounded-full">
                           No room assigned
                         </span>
                       ) : (
-                        <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          Max {column.capacity}
+                        <span className="text-[11px] font-normal text-gray-500 leading-tight flex items-center gap-0.5">
+                          <Users className="w-2.5 h-2.5" />
+                          {column.capacity ? `Max ${column.capacity}` : 'No max'}
                         </span>
                       )}
                       {column.roomId && spaceClosures.has(column.roomId) && (
-                        <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
+                        <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 leading-tight rounded-full">
                           {getSpaceClosureLabel(column.roomId)}
                         </span>
                       )}
+                      {(() => {
+                        const state = freeFromByColumn.get(column.key);
+                        if (!state) return null;
+                        if (state.kind === 'closed') {
+                          return <span className="text-[10px] font-medium text-gray-500">Not bookable</span>;
+                        }
+                        if (state.kind === 'booked') {
+                          return <span className="text-[10px] font-medium text-gray-500">Booked until close</span>;
+                        }
+                        if (state.kind === 'day-over') {
+                          return <span className="text-[10px] font-medium text-gray-500">Closed for the day</span>;
+                        }
+                        if (state.kind === 'blocked') {
+                          return <span className="text-[10px] font-medium text-gray-500">{state.reason}</span>;
+                        }
+                        if (isMichiganToday && state.atMinute <= nowMinutes) {
+                          return <span className="text-[10px] font-semibold text-green-700">Free now</span>;
+                        }
+                        return (
+                          <span className="text-[10px] font-medium text-gray-600">
+                            Free {formatTime12Hour(minutesToTime(state.atMinute))}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -1420,7 +1628,7 @@ const SpaceSchedule = () => {
                       {minutesToLabel(mark)}
                     </div>
                   ))}
-                  {nowLineTop !== null && activeBookings.length > 0 && filteredBookings.length > 0 && (
+                  {nowLineTop !== null && (
                     <div
                       className="absolute right-1 z-30 -translate-y-1/2 px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold whitespace-nowrap"
                       style={{ top: nowLineTop }}
@@ -1459,7 +1667,7 @@ const SpaceSchedule = () => {
                     </div>
                   ))}
 
-                  {nowLineTop !== null && activeBookings.length > 0 && filteredBookings.length > 0 && (
+                  {nowLineTop !== null && (
                     <div
                       className="absolute left-0 right-0 z-20 pointer-events-none"
                       style={{ top: nowLineTop }}
@@ -1472,6 +1680,7 @@ const SpaceSchedule = () => {
               </div>
             </div>
           </div>
+          </>
         )}
       </div>
 
@@ -1629,6 +1838,12 @@ const SpaceSchedule = () => {
                       {resolvePaymentState(selectedBooking).label}
                     </span>
                   </div>
+                  {cardFromPayments(selectedBooking.payments) && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Card</span>
+                      <span className="text-sm font-medium text-gray-900">{cardFromPayments(selectedBooking.payments)?.label}</span>
+                    </div>
+                  )}
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex justify-between items-center text-base">
                       <span className="font-medium text-gray-900">Total Amount</span>

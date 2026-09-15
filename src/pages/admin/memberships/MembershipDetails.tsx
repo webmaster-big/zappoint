@@ -37,9 +37,10 @@ import { formatMembershipDate, formatMembershipPrice } from '../../../utils/memb
 
 const describeRedemptionValue = (r: MembershipBenefitRedemption): string => {
   const v = Number(r.value_applied);
+  const safe = Number.isFinite(v) ? v : 0;
   switch (r.value_mode) {
-    case 'percent': return `${v}% off`;
-    case 'fixed':   return `$${v.toFixed(2)} off`;
+    case 'percent': return `${safe}% off`;
+    case 'fixed':   return `$${safe.toFixed(2)} off`;
     case 'free':    return 'Free (100% off)';
     case 'count':   return 'Pass used';
     case 'flag':    return 'Access granted';

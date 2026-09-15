@@ -46,6 +46,7 @@ import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, parseLocalDate, getMichiganNow } from '../../../utils/timeFormat';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { cardFromPayments } from '../../../utils/cardLabel';
 
 const michiganToday = (): Date => {
   const now = getMichiganNow();
@@ -1727,7 +1728,19 @@ const CalendarView: React.FC = () => {
                         {selectedBooking.payment_method || 'N/A'}
                       </span>
                     </div>
-                    
+
+                    {cardFromPayments(selectedBooking.payments) && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <CreditCard className="h-4 w-4 text-gray-400 mr-3" />
+                          <span className="text-sm text-gray-600">Card</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {cardFromPayments(selectedBooking.payments)?.label}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Subtotal</span>
                       <span className="text-sm text-gray-900">${Number(selectedBooking.total_amount).toFixed(2)}</span>

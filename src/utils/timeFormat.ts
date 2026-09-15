@@ -4,6 +4,12 @@ export function parseLocalDate(isoDateString: string): Date {
   return new Date(year, month - 1, day);
 }
 
+const ZONED_TIMESTAMP = /(?:Z|[+-]\d{2}:?\d{2})$/;
+
+export function isZonedTimestamp(value: string): boolean {
+  return ZONED_TIMESTAMP.test(String(value ?? '').trim());
+}
+
 export function parseLocalDateTime(dateTimeString: string): Date {
   if (!dateTimeString) return new Date();
   const cleaned = dateTimeString.replace('T', ' ').replace(/[Z]$/, '');
@@ -22,7 +28,6 @@ export function formatLocalDateTime(
   options?: Intl.DateTimeFormatOptions
 ): string {
   if (!dateTimeString) return 'N/A';
-  const date = parseLocalDateTime(dateTimeString);
   const defaultOptions: Intl.DateTimeFormatOptions = options || {
     year: 'numeric',
     month: 'long',
@@ -30,7 +35,15 @@ export function formatLocalDateTime(
     hour: '2-digit',
     minute: '2-digit',
   };
-  return date.toLocaleDateString('en-US', defaultOptions);
+
+  if (isZonedTimestamp(dateTimeString)) {
+    const zoned = new Date(dateTimeString);
+    if (!Number.isNaN(zoned.getTime())) {
+      return zoned.toLocaleString('en-US', { ...defaultOptions, timeZone: MICHIGAN_TZ });
+    }
+  }
+
+  return parseLocalDateTime(dateTimeString).toLocaleDateString('en-US', defaultOptions);
 }
 
 export function formatHourLabel(time: string | number): string {
@@ -148,7 +161,7 @@ export function getMichiganNow(): { year: number; month: number; day: number; ho
   const year = parseInt(get('year'), 10);
   const month = parseInt(get('month'), 10);
   const day = parseInt(get('day'), 10);
-  const hour = parseInt(get('hour'), 10);
+  const hour = parseInt(get('hour'), 10) % 24;
   const minute = parseInt(get('minute'), 10);
   const weekdayName = get('weekday').toLowerCase();
   

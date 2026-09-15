@@ -44,6 +44,7 @@ export interface BreakTime {
 export interface RoomFilters {
   location_id?: number;
   is_available?: boolean;
+  include_unavailable?: boolean;
   search?: string;
   sort_by?: 'name' | 'capacity' | 'created_at';
   sort_order?: 'asc' | 'desc';

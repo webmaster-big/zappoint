@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { readBookingPrefill } from '../../../utils/bookingPrefill';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -120,7 +122,17 @@ const OnsiteBooking: React.FC = () => {
     }
   };
   
-  const selectedLocation = effectiveLocationId;
+  const [searchParams] = useSearchParams();
+  const slotPrefill = useMemo(() => readBookingPrefill(searchParams), [searchParams]);
+  const prefillApplied = useRef(false);
+  const prefillTimeChecked = useRef(false);
+  const prefillLanded = useRef(false);
+
+  const arrivalLocation = useRef(effectiveLocationId);
+  const sidebarMoved = effectiveLocationId !== arrivalLocation.current;
+  const selectedLocation = isCompanyAdmin && !sidebarMoved
+    ? (slotPrefill.locationId ?? effectiveLocationId)
+    : effectiveLocationId;
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
   const gatewayLocationId = selectedPackage?.location_id
@@ -142,6 +154,7 @@ const OnsiteBooking: React.FC = () => {
   const [globalNotes, setGlobalNotes] = useState<GlobalNote[]>([]);
   const [step, setStep] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAllPackages, setShowAllPackages] = useState(false);
   
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
@@ -916,9 +929,71 @@ const OnsiteBooking: React.FC = () => {
       room: '' // Reset room when package changes
     }));
     setSelectedRoomId(null); // Reset selected room ID
+
+    if (slotPrefill.hasAny && !prefillLanded.current) {
+      setBookingData(prev => ({
+        ...prev,
+        date: slotPrefill.date ?? prev.date,
+        time: slotPrefill.time ?? prev.time,
+      }));
+      if (slotPrefill.roomId) setSelectedRoomId(slotPrefill.roomId);
+      prefillTimeChecked.current = false;
+    }
+
     setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
     scrollToTop();
   };
+
+  useEffect(() => {
+    if (prefillApplied.current || !slotPrefill.hasAny || loadingPackages) return;
+
+    const pkg = slotPrefill.packageId
+      ? packages.find(p => Number(p.id) === slotPrefill.packageId)
+      : undefined;
+
+    if (slotPrefill.packageId && packages.length === 0) return;
+
+    prefillApplied.current = true;
+
+    const applyDateTimeRoom = () => {
+      setBookingData(prev => ({
+        ...prev,
+        date: slotPrefill.date ?? prev.date,
+        time: slotPrefill.time ?? prev.time,
+      }));
+      if (slotPrefill.roomId) setSelectedRoomId(slotPrefill.roomId);
+      prefillLanded.current = true;
+    };
+
+    if (pkg) {
+      void handlePackageSelect(pkg).then(applyDateTimeRoom).catch(applyDateTimeRoom);
+    } else {
+      applyDateTimeRoom();
+      if (slotPrefill.date || slotPrefill.time) {
+        setToast({
+          message: 'Date and time carried over — choose the package to continue.',
+          type: 'info',
+        });
+      }
+    }
+  }, [slotPrefill, packages, loadingPackages]);
+
+  useEffect(() => {
+    if (!prefillApplied.current || prefillTimeChecked.current) return;
+    if (!slotPrefill.time || loadingTimeSlots) return;
+    if (!bookingData.date) return;
+    if (availableTimeSlots.length === 0) return;
+
+    prefillTimeChecked.current = true;
+
+    if (!availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) {
+      setBookingData(prev => ({ ...prev, time: '' }));
+      setToast({
+        message: 'That start time is no longer offered for this package — pick another below.',
+        type: 'info',
+      });
+    }
+  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, bookingData.date]);
 
   const handleAttractionToggle = (attractionId: string) => {
     setBookingData(prev => {
@@ -1956,7 +2031,13 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const renderStep1 = () => {
-    const filteredPackages = packages.filter(pkg => 
+    const slotMatches = slotPrefill.packageIds.length === 0
+      ? packages
+      : packages.filter(pkg => slotPrefill.packageIds.includes(Number(pkg.id)));
+    const slotPackages = showAllPackages || slotMatches.length === 0 ? packages : slotMatches;
+    const narrowedBySlot = slotPackages.length !== packages.length;
+
+    const filteredPackages = slotPackages.filter(pkg => 
       pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       pkg.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       normalizeCategory(pkg.category).toLowerCase().includes(searchQuery.toLowerCase())
@@ -1966,6 +2047,17 @@ const OnsiteBooking: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Select a Package</h2>
+
+          {narrowedBySlot && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-sm text-gray-700">
+                Showing the {slotPackages.length} {slotPackages.length === 1 ? 'package' : 'packages'} that run in this space at the time you picked.
+              </p>
+              <StandardButton variant="ghost" size="sm" onClick={() => setShowAllPackages(true)}>
+                Show all packages
+              </StandardButton>
+            </div>
+          )}
           
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="mb-4">

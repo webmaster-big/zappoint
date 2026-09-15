@@ -6,6 +6,7 @@ import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
 import { getStoredUser } from '../../../utils/storage';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { cardFromPayments } from '../../../utils/cardLabel';
 
 export interface ScheduledRange {
   from: string;
@@ -359,6 +360,9 @@ export const AttractionScheduleCard: React.FC<{ purchase: AttractionPurchase }> 
           )}
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <DetailRow label="Payment Method"><span className="capitalize">{p.payment_method || 'N/A'}</span></DetailRow>
+            {cardFromPayments(p.payments) && (
+              <DetailRow label="Card"><span>{cardFromPayments(p.payments)?.label}</span></DetailRow>
+            )}
             <div className="flex justify-between items-center pt-2 border-t border-gray-200">
               <span className="font-medium text-gray-900">Total Amount</span>
               <span className="font-semibold text-gray-900 text-lg">${Number(p.total_amount).toFixed(2)}</span>
@@ -458,6 +462,9 @@ export const EventScheduleCard: React.FC<{ purchase: EventPurchase }> = ({ purch
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <DetailRow label="Payment Method"><span className="capitalize">{p.payment_method || 'N/A'}</span></DetailRow>
             <DetailRow label="Payment Status"><span className={`font-medium ${resolvePaymentState(p).amountClass}`}>{resolvePaymentState(p).label}</span></DetailRow>
+            {cardFromPayments(p.payments) && (
+              <DetailRow label="Card"><span>{cardFromPayments(p.payments)?.label}</span></DetailRow>
+            )}
             <div className="flex justify-between items-center pt-2 border-t border-gray-200">
               <span className="font-medium text-gray-900">Total Amount</span>
               <span className="font-semibold text-gray-900 text-lg">${Number(p.total_amount).toFixed(2)}</span>

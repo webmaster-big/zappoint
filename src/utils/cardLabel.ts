@@ -33,7 +33,7 @@ const BRANDS: Record<string, string> = {
 };
 
 export function normalizeCardBrand(type?: string | null): string | null {
-  const raw = (type ?? '').trim();
+  const raw = String(type ?? '').trim();
   if (!raw) return null;
   const key = raw.toLowerCase().replace(/[^a-z]/g, '');
   return BRANDS[key] ?? raw;
@@ -55,6 +55,11 @@ export function cardIdentity(type?: string | null, lastFour?: string | null): Ca
   if (!four) return null;
   const brand = normalizeCardBrand(type);
   return { brand, lastFour: four, label: `${brand ?? 'Card'} ending in ${four}` };
+}
+
+export function formatMoney(value: unknown, fallback = '—'): string {
+  const amount = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+  return Number.isFinite(amount) ? `$${amount.toFixed(2)}` : fallback;
 }
 
 export function cardFromPayments(payments?: CardBearingPayment[] | null): CardIdentity | null {

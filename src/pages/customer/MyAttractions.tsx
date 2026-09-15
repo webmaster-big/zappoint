@@ -646,7 +646,7 @@ const MyAttractions = () => {
                   </div>
                   {selectedPurchase.scheduled_date && (
                     <p className="text-sm text-blue-600">
-                      {new Date(selectedPurchase.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      {formatDate(selectedPurchase.scheduled_date)}
                     </p>
                   )}
                 </div>

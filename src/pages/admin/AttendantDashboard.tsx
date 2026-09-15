@@ -53,7 +53,7 @@ import { buildCalendarCategories, useCategoryFilter } from '../../components/adm
 import { CalendarCategoryTabs } from '../../components/admin/calendar/CategoryFilter';
 import CalendarDatePicker from '../../components/admin/calendar/CalendarDatePicker';
 import { fetchDayBookings } from '../../components/admin/calendar/fetchDayBookings';
-import { useHideEmptySpaces } from '../../components/admin/calendar/useDayScheduleView';
+import { useHideEmptySpaces, useScheduleDayWindow } from '../../components/admin/calendar/useDayScheduleView';
 import CustomerSearch from '../../components/admin/calendar/CustomerSearch';
 import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
@@ -63,6 +63,7 @@ import { useThemeColor } from '../../hooks/useThemeColor';
 import { parseLocalDate, convertTo12Hour, formatDurationDisplay, formatLocalDateTime, michiganToday } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
+import { cardFromPayments } from '../../utils/cardLabel';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { resolvePaymentState } from '../../types/Bookings.types';
 
@@ -78,6 +79,7 @@ const AttendantDashboard: React.FC = () => {
    const [loading, setLoading] = useState(true);
    const [metricsLoading, setMetricsLoading] = useState(false);
    const [locationId, setLocationId] = useState<number | null>(() => getStoredUser()?.location_id ?? null);
+   const { dayWindow, windowLoading } = useScheduleDayWindow(currentDay, locationId);
    const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
    const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
    
@@ -185,16 +187,14 @@ const AttendantDashboard: React.FC = () => {
            const filteredRooms = cachedRooms.filter(r => r.location_id === locationId);
            if (filteredRooms.length > 0) {
              setRooms(filteredRooms);
-             console.log('📦 [AttendantDashboard] Loaded', filteredRooms.length, 'spaces from cache');
-             roomCacheService.syncInBackground({ location_id: locationId });
-             return;
            }
          }
-         const response = await roomService.getRooms({ location_id: locationId, per_page: 100 });
-         const fetchedRooms = response.data.rooms || [];
+         const response = await roomService.getRooms({ location_id: locationId, per_page: 100, include_unavailable: true });
+         const fetchedRooms: Room[] = response.data.rooms || [];
          setRooms(fetchedRooms);
-         if (fetchedRooms.length > 0) {
-           await roomCacheService.cacheRooms(fetchedRooms);
+         const bookableRooms = fetchedRooms.filter(room => room.is_available !== false);
+         if (bookableRooms.length > 0) {
+           await roomCacheService.cacheRooms(bookableRooms);
          }
        } catch (error) {
          console.error('Error fetching spaces:', error);
@@ -990,10 +990,13 @@ const AttendantDashboard: React.FC = () => {
            {calendarView === 'day' && (
              <DayScheduleGrid
                date={currentDay}
+               dayWindow={dayWindow}
                rooms={sortedRooms}
                bookings={shownDailyBookings}
+
+               allDayBookings={dailyBookings}
                hideEmptySpaces={hideEmptySpaces}
-               loading={roomsLoading || dayLoading}
+               loading={roomsLoading || dayLoading || windowLoading}
                onSelectBooking={setSelectedBooking}
                themeColor={themeColor}
                fullColor={fullColor}
@@ -1592,6 +1595,12 @@ const AttendantDashboard: React.FC = () => {
                          {resolvePaymentState(selectedBooking).label}
                        </span>
                      </div>
+                     {cardFromPayments(selectedBooking.payments) && (
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Card</span>
+                         <span className="text-sm font-medium text-gray-900">{cardFromPayments(selectedBooking.payments)?.label}</span>
+                       </div>
+                     )}
                      {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                        <div className="pt-2 border-t border-gray-100">
                          <p className="text-xs text-gray-500 mb-1">Applied Fees</p>

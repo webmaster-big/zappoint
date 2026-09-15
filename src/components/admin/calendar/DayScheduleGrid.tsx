@@ -1,22 +1,34 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Clock, Users, AlertTriangle, MapPin } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, Users, AlertTriangle, MapPin, Ban, Plus } from 'lucide-react';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
+import type { ScheduleDayWindow } from '../../../services/ScheduleWindowService';
+import { FALLBACK_DAY_WINDOW } from '../../../services/ScheduleWindowService';
 import { customerNameOf } from '../../../utils/bookingSearch';
 import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeFormat';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { buildBookingUrl, snapToInterval } from '../../../utils/bookingPrefill';
+import type { TimeRange } from '../../../utils/scheduleGeometry';
+import type { FreeState } from '../../../utils/scheduleGeometry';
+import {
+  assignLanes,
+  availableBand,
+  blockGeometry,
+  buildTimeline,
+  freeState,
+  minuteAtOffset,
+  nextFreeMinute,
+} from '../../../utils/scheduleGeometry';
 
-const SLOT_MINUTES = 15;
-const ROW_HEIGHT = 44;
 const MINUTES_PER_DAY = 24 * 60;
+const SLOT_HEIGHT = 30;
+const MIN_BLOCK_HEIGHT = 8;
+const LANE_GAP = 2;
 
 export const SLOT_COLUMN_WIDTH = 76;
 export const ROOM_COLUMN_WIDTH = 132;
-
-interface TimeSlot {
-  label: string;
-  minutes: number;
-}
+const HEADER_HEIGHT = 28;
 
 interface ScheduleColumn {
   key: string;
@@ -25,17 +37,29 @@ interface ScheduleColumn {
   roomId?: number;
   locationId?: number;
   virtual: boolean;
+  openMinutes: number | null;
+  closeMinutes: number | null;
+  closedAllDay: boolean;
+  closedReason: string | null;
+  bookable: boolean;
+  windowKnown: boolean;
+  closedRanges: { startMinutes: number; endMinutes: number; reason: string | null }[];
 }
 
-interface Cell {
-  bookings: Booking[];
-  rowSpan: number;
+interface PositionedBooking {
+  booking: Booking;
+  startMinutes: number;
+  endMinutes: number;
+  lane: number;
+  laneCount: number;
 }
 
 interface DayScheduleGridProps {
   date: Date;
   rooms: Room[];
   bookings: Booking[];
+  allDayBookings?: Booking[];
+  dayWindow?: ScheduleDayWindow | null;
   hideEmptySpaces?: boolean;
   loading?: boolean;
   locationNames?: Record<number, string>;
@@ -47,11 +71,11 @@ interface DayScheduleGridProps {
 }
 
 const STATUS_BG: Record<string, string> = {
-  confirmed: 'bg-green-50 border-green-300',
-  pending: 'bg-yellow-50 border-yellow-300',
-  'checked-in': 'bg-blue-50 border-blue-300',
-  completed: 'bg-gray-50 border-gray-300',
-  cancelled: 'bg-red-50 border-red-300',
+  confirmed: 'bg-green-50 border-green-400',
+  pending: 'bg-yellow-50 border-yellow-400',
+  'checked-in': 'bg-blue-50 border-blue-400',
+  completed: 'bg-gray-50 border-gray-400',
+  cancelled: 'bg-red-50 border-red-400',
 };
 
 export const durationMinutesOf = (booking: Pick<Booking, 'duration' | 'duration_unit'>): number => {
@@ -73,8 +97,9 @@ export const startMinutesOf = (booking: Pick<Booking, 'booking_time'>): number =
 };
 
 const formatSlotLabel = (minutes: number): string => {
+  if (!Number.isFinite(minutes)) return '--:--';
   const hour24 = Math.floor(minutes / 60) % 24;
-  const minute = minutes % 60;
+  const minute = Math.round(minutes % 60);
   const hour = hour24 % 12 || 12;
   const meridiem = hour24 >= 12 ? 'PM' : 'AM';
   return `${hour}:${String(minute).padStart(2, '0')} ${meridiem}`;
@@ -86,16 +111,45 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   date,
   rooms,
   bookings,
-  hideEmptySpaces = true,
+  allDayBookings,
+  dayWindow,
+  hideEmptySpaces = false,
   loading = false,
   locationNames,
   bare = false,
   onSelectBooking,
   emptyMessage,
-  themeColor = 'blue',
   fullColor = 'blue-600',
 }) => {
+  const windowData = dayWindow ?? FALLBACK_DAY_WINDOW;
   const knownRoomIds = useMemo(() => new Set(rooms.map(room => room.id)), [rooms]);
+
+  const roomWindows = useMemo(() => {
+    const map = new Map<number, ScheduleDayWindow['rooms'][number]>();
+    for (const entry of windowData.rooms ?? []) map.set(entry.room_id, entry);
+    return map;
+  }, [windowData]);
+
+  const roomBreaks = useMemo(() => {
+    const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
+    const map = new Map<number, TimeRange[]>();
+
+    for (const room of rooms) {
+      const ranges: TimeRange[] = [];
+      for (const brk of room.break_time ?? []) {
+        if (!brk.days?.includes(dayName)) continue;
+        const [sh, sm] = (brk.start_time || '').split(':').map(Number);
+        const [eh, em] = (brk.end_time || '').split(':').map(Number);
+        if (!Number.isFinite(sh) || !Number.isFinite(eh)) continue;
+        const startMinutes = sh * 60 + (sm || 0);
+        const endMinutes = eh * 60 + (em || 0);
+        if (endMinutes > startMinutes) ranges.push({ startMinutes, endMinutes });
+      }
+      if (ranges.length) map.set(room.id, ranges);
+    }
+
+    return map;
+  }, [rooms, date]);
 
   const columnKeyFor = React.useCallback(
     (booking: Booking): string => {
@@ -104,6 +158,14 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     },
     [knownRoomIds]
   );
+
+  const packageWindows = useMemo(() => {
+    const map = new Map<number, { open: number; close: number }>();
+    for (const entry of windowData.packages ?? []) {
+      map.set(entry.package_id, { open: entry.open_minutes, close: entry.close_minutes });
+    }
+    return map;
+  }, [windowData]);
 
   const columns = useMemo<ScheduleColumn[]>(() => {
     const counts = new Map<string, number>();
@@ -114,102 +176,128 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
     const roomColumns = rooms
       .filter(room => !hideEmptySpaces || (counts.get(`room-${room.id}`) || 0) > 0)
-      .map<ScheduleColumn>(room => ({
-        key: `room-${room.id}`,
-        name: room.name,
-        capacity: room.capacity,
-        roomId: room.id,
-        locationId: room.location_id,
-        virtual: false,
-      }));
+      .map<ScheduleColumn>(room => {
+        const entry = roomWindows.get(room.id);
+        return {
+          key: `room-${room.id}`,
+          name: room.name,
+          capacity: room.capacity,
+          roomId: room.id,
+          locationId: room.location_id,
+          virtual: false,
+          openMinutes: entry?.open_minutes ?? null,
+          closeMinutes: entry?.close_minutes ?? null,
+          closedAllDay: entry?.closed_all_day ?? false,
+          closedReason: entry?.reason ?? null,
+          windowKnown: entry !== undefined,
+          bookable: entry ? entry.bookable !== false : true,
+          closedRanges: (entry?.closed_ranges ?? []).map(r => ({
+            startMinutes: r.start_minutes,
+            endMinutes: r.end_minutes,
+            reason: r.reason,
+          })),
+        };
+      });
 
     const virtualMap = new Map<string, ScheduleColumn>();
     for (const booking of bookings) {
       const key = columnKeyFor(booking);
       if (key.startsWith('room-')) continue;
       if (!virtualMap.has(key)) {
-        virtualMap.set(key, { key, name: booking.package?.name || 'Unassigned', virtual: true });
+        const packageWindow = booking.package_id ? packageWindows.get(booking.package_id) : undefined;
+        virtualMap.set(key, {
+          key,
+          name: booking.package?.name || 'Unassigned',
+          virtual: true,
+          openMinutes: packageWindow?.open ?? null,
+          closeMinutes: packageWindow?.close ?? null,
+          closedAllDay: false,
+          closedReason: null,
+          bookable: !windowData.location_closed,
+          windowKnown: true,
+          closedRanges: [],
+        });
       }
     }
+
+    const bookedPackageIds = new Set(
+      bookings.filter(booking => !booking.room_id || !knownRoomIds.has(booking.room_id)).map(booking => booking.package_id)
+    );
+
+    if (!hideEmptySpaces) {
+      for (const entry of windowData.packages ?? []) {
+        if (entry.room_ids.length > 0) continue;
+        const key = `pkg-${entry.package_id}`;
+        if (virtualMap.has(key) || bookedPackageIds.has(entry.package_id)) continue;
+        virtualMap.set(key, {
+          key,
+          name: entry.name,
+          virtual: true,
+          openMinutes: entry.open_minutes,
+          closeMinutes: entry.close_minutes,
+          closedAllDay: false,
+          closedReason: null,
+          bookable: !windowData.location_closed,
+          windowKnown: true,
+          closedRanges: [],
+        });
+      }
+    }
+
     const virtualColumns = [...virtualMap.values()].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
     );
 
     return [...roomColumns, ...virtualColumns];
-  }, [rooms, bookings, hideEmptySpaces, columnKeyFor]);
+  }, [rooms, bookings, hideEmptySpaces, columnKeyFor, roomWindows, packageWindows, windowData, knownRoomIds]);
 
-  const slots = useMemo<TimeSlot[]>(() => {
-    if (bookings.length === 0) return [];
+  const occupancy = useMemo(() => {
+    const source = allDayBookings ?? bookings;
+    const map = new Map<string, TimeRange[]>();
+    for (const booking of source) {
+      const key = columnKeyFor(booking);
+      const startMinutes = startMinutesOf(booking);
+      const bucket = map.get(key);
+      const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) };
+      if (bucket) bucket.push(range);
+      else map.set(key, [range]);
+    }
+    return map;
+  }, [allDayBookings, bookings, columnKeyFor]);
 
-    const covered = new Set<number>();
+  const positioned = useMemo(() => {
+    const map = new Map<string, PositionedBooking[]>();
+    for (const column of columns) map.set(column.key, []);
+
     for (const booking of bookings) {
-      const start = startMinutesOf(booking);
-      const end = start + durationMinutesOf(booking);
-      const first = Math.floor(start / SLOT_MINUTES) * SLOT_MINUTES;
-      for (let minutes = first; minutes < end; minutes += SLOT_MINUTES) covered.add(minutes);
+      const key = columnKeyFor(booking);
+      const bucket = map.get(key);
+      if (!bucket) continue;
+      const startMinutes = startMinutesOf(booking);
+      bucket.push({
+        booking,
+        startMinutes,
+        endMinutes: startMinutes + durationMinutesOf(booking),
+        lane: 0,
+        laneCount: 1,
+      });
     }
 
-    return [...covered]
-      .sort((a, b) => a - b)
-      .map(minutes => ({ minutes, label: formatSlotLabel(minutes) }));
-  }, [bookings]);
+    for (const bucket of map.values()) assignLanes(bucket);
+    return map;
+  }, [columns, bookings, columnKeyFor]);
 
-  const layout = useMemo(() => {
-    const map = new Map<string, Map<number, Cell>>();
-    const suppressed = new Set<string>();
-
-    for (const column of columns) {
-      const columnBookings = bookings
-        .filter(booking => columnKeyFor(booking) === column.key)
-        .sort((a, b) => startMinutesOf(a) - startMinutesOf(b));
-
-      const anchored = new Map<number, Booking[]>();
-      for (const booking of columnBookings) {
-        const start = startMinutesOf(booking);
-        let index = -1;
-        for (let i = 0; i < slots.length; i += 1) {
-          if (slots[i].minutes <= start) index = i;
-          else break;
-        }
-        if (index < 0) index = 0;
-        const bucket = anchored.get(index);
-        if (bucket) bucket.push(booking);
-        else anchored.set(index, [booking]);
-      }
-
-      const cells = new Map<number, Cell>();
-      let index = 0;
-      while (index < slots.length) {
-        const group = anchored.get(index);
-        if (!group || group.length === 0) {
-          index += 1;
-          continue;
-        }
-
-        const absorbed = [...group];
-        let end = Math.max(...group.map(booking => startMinutesOf(booking) + durationMinutesOf(booking)));
-        let next = index + 1;
-        while (next < slots.length && slots[next].minutes < end) {
-          const extra = anchored.get(next);
-          if (extra) {
-            for (const booking of extra) {
-              absorbed.push(booking);
-              end = Math.max(end, startMinutesOf(booking) + durationMinutesOf(booking));
-            }
-          }
-          suppressed.add(`${column.key}:${next}`);
-          next += 1;
-        }
-
-        cells.set(index, { bookings: absorbed, rowSpan: next - index });
-        index = next;
-      }
-
-      map.set(column.key, cells);
-    }
-
-    return { map, suppressed };
-  }, [columns, bookings, slots, columnKeyFor]);
+  const timeline = useMemo(
+    () =>
+      buildTimeline(
+        windowData.open_minutes,
+        windowData.close_minutes,
+        windowData.interval_minutes,
+        SLOT_HEIGHT,
+        [...positioned.values()].flat()
+      ),
+    [windowData, positioned]
+  );
 
   const showColumnLocation = useMemo(() => {
     if (!locationNames) return false;
@@ -218,13 +306,13 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   }, [locationNames, columns]);
 
   const [nowTick, setNowTick] = useState(() => getMichiganNow());
-
   const isViewingToday = dateKey(date) === dateKey(michiganToday());
+  const isPastDate = dateKey(date) < dateKey(michiganToday());
 
   useEffect(() => {
     if (!isViewingToday) return;
     const tick = () => setNowTick(getMichiganNow());
-    const timer = window.setInterval(tick, 60000);
+    const timer = window.setInterval(tick, 15000);
     document.addEventListener('visibilitychange', tick);
     return () => {
       window.clearInterval(timer);
@@ -233,20 +321,111 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   }, [isViewingToday]);
 
   const nowMinutes = nowTick.hour * 60 + nowTick.minute;
+  const showNowLine = isViewingToday && nowMinutes >= timeline.start && nowMinutes <= timeline.end;
 
-  const nowMarker = useMemo(() => {
-    if (!isViewingToday || slots.length === 0) return { index: -1, exact: false };
-    const exact = slots.findIndex(slot => nowMinutes >= slot.minutes && nowMinutes < slot.minutes + SLOT_MINUTES);
-    if (exact !== -1) return { index: exact, exact: true };
-    const next = slots.findIndex(slot => slot.minutes > nowMinutes);
-    return { index: next, exact: false };
-  }, [isViewingToday, slots, nowMinutes]);
+  const freeFromByColumn = useMemo(() => {
+    const map = new Map<string, FreeState>();
 
-  const hiddenSpaceCount = useMemo(() => {
-    if (!hideEmptySpaces) return 0;
-    const shown = columns.filter(column => !column.virtual).length;
-    return Math.max(0, rooms.length - shown);
-  }, [hideEmptySpaces, columns, rooms.length]);
+    for (const column of columns) {
+      if (column.closedAllDay) {
+        map.set(column.key, { kind: 'closed' });
+        continue;
+      }
+
+      const open = column.openMinutes ?? (column.windowKnown && !column.virtual ? null : timeline.start);
+      const close = column.closeMinutes ?? (column.windowKnown && !column.virtual ? null : timeline.end);
+      const from = isViewingToday ? nowMinutes : (open ?? timeline.start);
+
+      const blocked: TimeRange[] = [
+        ...(occupancy.get(column.key) ?? []),
+        ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []).map(b => ({ ...b, reason: 'On break' })),
+        ...column.closedRanges.map(r => ({ ...r, reason: r.reason ?? 'Closed' })),
+      ];
+
+      map.set(column.key, freeState(open, close, blocked, from, column.bookable && column.windowKnown));
+    }
+
+    return map;
+  }, [columns, occupancy, timeline, isViewingToday, nowMinutes, roomBreaks]);
+
+  const navigate = useNavigate();
+  const [hoverSlot, setHoverSlot] = useState<{ key: string; minute: number } | null>(null);
+
+  const packagesForSlot = React.useCallback(
+    (column: ScheduleColumn, minute: number): number[] => {
+      if (!column.virtual) {
+        return (windowData.packages ?? [])
+          .filter(
+            entry =>
+              column.roomId !== undefined &&
+              entry.room_ids.includes(column.roomId) &&
+              minute >= entry.open_minutes &&
+              minute < entry.close_minutes &&
+              !(entry.closed_ranges ?? []).some(
+                range => minute >= range.start_minutes && minute < range.end_minutes
+              )
+          )
+          .map(entry => entry.package_id);
+      }
+
+      const id = Number(column.key.replace('pkg-', ''));
+      return Number.isInteger(id) && id > 0 ? [id] : [];
+    },
+    [windowData]
+  );
+
+  const minuteFromPointer = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>, originMinute: number): number => {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const offset = minuteAtOffset(originMinute, event.clientY - bounds.top, timeline.pxPerMinute);
+      return snapToInterval(offset, timeline.interval, isViewingToday ? nowMinutes : undefined);
+    },
+    [timeline, isViewingToday, nowMinutes]
+  );
+
+  const openBookingForSlot = React.useCallback(
+    (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
+      const raw = minuteFromPointer(event, originMinute);
+      const blocked = [
+        ...(occupancy.get(column.key) ?? []),
+        ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
+        ...column.closedRanges,
+      ];
+      const columnOpen = column.openMinutes ?? timeline.start;
+      const columnClose = column.closeMinutes ?? timeline.end;
+      const free = nextFreeMinute(columnOpen, columnClose, blocked, raw);
+      const minute =
+        free === null || free === raw
+          ? raw
+          : snapToInterval(free, timeline.interval, isViewingToday ? Math.max(free, nowMinutes) : free);
+
+      const candidates = packagesForSlot(column, minute);
+
+      navigate(
+        buildBookingUrl({
+          locationId: column.locationId ?? windowData.location_id ?? null,
+          date: dateKey(date),
+          minute,
+          roomId: column.roomId ?? null,
+          packageId: candidates.length === 1 ? candidates[0] : null,
+          packageIds: candidates,
+          walkIn: isViewingToday,
+        })
+      );
+    },
+    [navigate, minuteFromPointer, isViewingToday, nowMinutes, windowData, date, packagesForSlot, occupancy, roomBreaks, timeline]
+  );
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const didAutoScroll = useRef(false);
+
+  useEffect(() => {
+    if (loading || didAutoScroll.current || !showNowLine) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    didAutoScroll.current = true;
+    el.scrollTop = Math.max(0, (nowMinutes - timeline.start) * timeline.pxPerMinute - el.clientHeight / 3);
+  }, [loading, showNowLine, nowMinutes, timeline]);
 
   const frame = bare ? '' : 'rounded-lg border border-gray-200';
 
@@ -271,195 +450,308 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     );
   }
 
-  if (rooms.length === 0 && columns.length === 0) {
+  if (columns.length === 0) {
     return (
       <div className={`${frame} p-8 text-center text-gray-500`}>
-        <p>No spaces configured for this location.</p>
-        <p className="mt-2 text-sm">Add spaces in the Spaces section to see the daily schedule.</p>
+        <p>{rooms.length === 0 ? 'No spaces configured for this location.' : (emptyMessage ?? 'Nothing to show for this day.')}</p>
+        {rooms.length === 0 && <p className="mt-2 text-sm">Add spaces in the Spaces section to see the daily schedule.</p>}
       </div>
     );
   }
 
-  if (slots.length === 0 || columns.length === 0) {
-    return (
-      <div className={`${frame} p-8 text-center text-gray-500`}>
-        <p>
-          {emptyMessage ??
-            `No bookings for ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`}
-        </p>
-      </div>
-    );
-  }
+  const bodyHeight = timeline.total * timeline.pxPerMinute;
 
   return (
-    <div className={bare ? 'overflow-x-auto' : 'overflow-x-auto rounded-lg border border-gray-200'}>
-      <table className="border-collapse" style={{ minWidth: '100%' }}>
-        <thead>
-          <tr className="border-b-2 border-gray-200 bg-gray-50">
-            <th
-              className="sticky left-0 z-20 border-r border-gray-200 bg-gray-50 px-2 py-2 text-left text-xs font-semibold text-gray-700"
-              style={{ width: SLOT_COLUMN_WIDTH, minWidth: SLOT_COLUMN_WIDTH }}
+    <div className={bare ? '' : 'rounded-lg border border-gray-200'}>
+      {windowData.location_closed && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <Ban className="h-3.5 w-3.5 shrink-0" />
+          This location is closed for the day. Every space below is marked unavailable.
+        </div>
+      )}
+
+      <div ref={scrollRef} className="overflow-auto" style={{ maxHeight: '70vh' }}>
+        <div className="inline-flex min-w-full">
+          <div
+            className="sticky left-0 z-40 shrink-0 bg-white"
+            style={{ width: SLOT_COLUMN_WIDTH, minWidth: SLOT_COLUMN_WIDTH }}
+          >
+            <div
+              className="sticky top-0 z-10 flex items-center justify-center gap-1 border-b-2 border-r border-gray-200 bg-gray-50 px-0 text-xs font-semibold text-gray-700"
+              style={{ height: HEADER_HEIGHT }}
             >
-              <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                Time
-              </span>
-            </th>
-            {columns.map(column => (
-              <th
-                key={column.key}
-                className={`border-r border-gray-200 px-1.5 py-2 text-center text-xs font-semibold ${
-                  column.virtual ? 'bg-amber-50 text-amber-800' : 'text-gray-700'
-                }`}
-                style={{ width: ROOM_COLUMN_WIDTH, minWidth: ROOM_COLUMN_WIDTH, maxWidth: ROOM_COLUMN_WIDTH }}
-                title={
-                  column.virtual
-                    ? `${column.name} — no room assigned`
-                    : [
-                        column.name,
-                        column.locationId && locationNames?.[column.locationId],
-                        column.capacity ? `max ${column.capacity}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')
-                }
-              >
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="w-full truncate leading-tight">{column.name}</span>
-                  {column.virtual ? (
-                    <span className="flex items-center gap-1 text-[0.65rem] font-normal text-amber-600">
-                      <AlertTriangle className="h-2.5 w-2.5" />
-                      No room
-                    </span>
-                  ) : showColumnLocation ? (
-                    <span className="flex w-full items-center justify-center gap-1 text-[0.65rem] font-normal text-gray-500">
-                      <MapPin className="h-2.5 w-2.5 shrink-0" />
-                      <span className="truncate">
-                        {(column.locationId && locationNames?.[column.locationId]) || 'Unknown'}
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-[0.65rem] font-normal text-gray-500">
-                      <Users className="h-2.5 w-2.5" />
-                      {column.capacity ? `Max ${column.capacity}` : 'No max'}
-                    </span>
-                  )}
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {slots.map((slot, slotIndex) => (
-            <tr
-              key={slot.minutes}
-              className={
-                slotIndex === nowMarker.index
-                  ? 'border-b border-gray-100 border-t-2 border-t-red-500'
-                  : 'border-b border-gray-100'
-              }
-              title={
-                slotIndex === nowMarker.index
-                  ? nowMarker.exact
-                    ? 'Now'
-                    : 'Everything above this line is in the past'
-                  : undefined
-              }
-            >
-              <td
-                className={`sticky left-0 z-10 border-r border-gray-200 bg-white px-2 py-1 text-xs font-medium ${
-                  slotIndex === nowMarker.index && nowMarker.exact ? 'text-red-600' : 'text-gray-600'
-                }`}
-                style={{ height: ROW_HEIGHT, width: SLOT_COLUMN_WIDTH, minWidth: SLOT_COLUMN_WIDTH }}
-              >
-                {slotIndex === nowMarker.index && nowMarker.exact ? (
-                  <span className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-hidden="true" />
-                    <span className="sr-only">Current time: </span>
-                    {slot.label}
+              <Clock className="h-3.5 w-3.5" />
+              Time
+            </div>
+            <div className="relative border-r border-gray-200" style={{ height: bodyHeight }}>
+              {timeline.slots.map(minutes => (
+                <div
+                  key={minutes}
+                  className="absolute left-0 right-0 flex items-start justify-end pr-2 text-[0.7rem] tabular-nums text-gray-500"
+                  style={{ top: (minutes - timeline.start) * timeline.pxPerMinute, height: SLOT_HEIGHT }}
+                >
+                  <span className={minutes % 60 === 0 ? 'font-semibold text-gray-700' : ''}>
+                    {formatSlotLabel(minutes)}
+                    {minutes >= MINUTES_PER_DAY ? ' +1' : ''}
                   </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    {slot.label}
-                    {slot.minutes >= MINUTES_PER_DAY && (
-                      <span className="rounded bg-gray-100 px-1 text-[0.6rem] text-gray-500" title="Next day">
-                        +1
+                </div>
+              ))}
+              {showNowLine && (
+                <div
+                  className="absolute left-0 right-0 z-20 flex items-center justify-end pr-1"
+                  style={{ top: (nowMinutes - timeline.start) * timeline.pxPerMinute - 7 }}
+                >
+                  <span className="rounded bg-red-500 px-1 py-0.5 text-[0.6rem] font-bold text-white">
+                    {formatSlotLabel(nowMinutes)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex">
+            {columns.map(column => {
+              const items = positioned.get(column.key) ?? [];
+              const open = column.openMinutes ?? (column.windowKnown && !column.virtual ? null : timeline.start);
+              const close = column.closeMinutes ?? (column.windowKnown && !column.virtual ? null : timeline.end);
+              const band = column.closedAllDay || !column.bookable ? null : availableBand(open, close, timeline);
+              const bookable = Boolean(band) && !isPastDate && column.windowKnown;
+              const bandOrigin = Math.max(open ?? timeline.start, timeline.start);
+              const freeFrom = freeFromByColumn.get(column.key);
+
+              return (
+                <div
+                  key={column.key}
+                  className="shrink-0 border-r border-gray-200"
+                  style={{ width: ROOM_COLUMN_WIDTH, minWidth: ROOM_COLUMN_WIDTH }}
+                >
+                  <div
+                    className={`sticky top-0 z-30 flex flex-col items-center justify-center gap-0 border-b-2 border-gray-200 px-0 leading-none ${
+                      column.virtual ? 'bg-amber-50 text-amber-800' : 'bg-gray-50 text-gray-700'
+                    }`}
+                    style={{ height: HEADER_HEIGHT }}
+                    title={
+                      column.virtual
+                        ? `${column.name} — no room assigned`
+                        : [
+                            column.name,
+                            column.locationId && locationNames?.[column.locationId],
+                            column.capacity ? `max ${column.capacity}` : null,
+                            column.closedAllDay ? column.closedReason ?? 'Closed' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')
+                    }
+                  >
+                    <span className="w-full truncate text-center text-xs font-semibold leading-tight">{column.name}</span>
+                    {column.closedAllDay || freeFrom?.kind === 'closed' ? (
+                      <span className="flex items-center gap-1 text-[0.65rem] font-medium text-gray-500">
+                        <Ban className="h-2.5 w-2.5" />
+                        {column.closedReason ?? 'Not bookable'}
+                      </span>
+                    ) : freeFrom?.kind === 'booked' ? (
+                      <span className="text-[0.65rem] font-medium text-gray-500">Booked until close</span>
+                    ) : freeFrom?.kind === 'blocked' ? (
+                      <span className="text-[0.65rem] font-medium text-gray-500">{freeFrom.reason}</span>
+                    ) : freeFrom?.kind === 'day-over' ? (
+                      <span className="text-[0.65rem] font-medium text-gray-500">Closed for the day</span>
+                    ) : freeFrom?.kind === 'free' && isViewingToday && freeFrom.atMinute <= nowMinutes ? (
+                      <span className="text-[0.65rem] font-semibold text-green-700">Free now</span>
+                    ) : freeFrom?.kind === 'free' ? (
+                      <span className="text-[0.65rem] font-medium text-gray-600">Free {formatSlotLabel(freeFrom.atMinute)}</span>
+                    ) : column.virtual ? (
+                      <span className="flex items-center gap-1 text-[0.65rem] font-normal text-amber-600">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        No room
+                      </span>
+                    ) : showColumnLocation ? (
+                      <span className="flex w-full items-center justify-center gap-1 text-[0.65rem] font-normal text-gray-500">
+                        <MapPin className="h-2.5 w-2.5 shrink-0" />
+                        <span className="truncate">{(column.locationId && locationNames?.[column.locationId]) || 'Unknown'}</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[0.65rem] font-normal text-gray-500">
+                        <Users className="h-2.5 w-2.5" />
+                        {column.capacity ? `Max ${column.capacity}` : 'No max'}
                       </span>
                     )}
-                  </span>
-                )}
-              </td>
-              {columns.map(column => {
-                if (layout.suppressed.has(`${column.key}:${slotIndex}`)) return null;
+                  </div>
 
-                const cell = layout.map.get(column.key)?.get(slotIndex);
-                if (!cell) {
-                  return (
-                    <td
-                      key={column.key}
-                      className={`border-r border-gray-200 text-center text-xs text-gray-300 ${
-                        column.virtual ? 'bg-amber-50/40' : `hover:bg-${themeColor}-50`
-                      }`}
-                      style={{ height: ROW_HEIGHT, width: ROOM_COLUMN_WIDTH, minWidth: ROOM_COLUMN_WIDTH }}
-                    >
-                      —
-                    </td>
-                  );
-                }
+                  <div className="relative bg-white" style={{ height: bodyHeight }}>
+                    {band && !bookable && (
+                      <div className="absolute inset-x-0 bg-gray-100" style={band} title={`Available ${formatRange(open as number, close as number)}`} />
+                    )}
 
-                return (
-                  <td
-                    key={column.key}
-                    rowSpan={cell.rowSpan}
-                    className="border-r border-gray-200 p-1 align-top"
-                    style={{ width: ROOM_COLUMN_WIDTH, minWidth: ROOM_COLUMN_WIDTH }}
-                  >
-                    <div className="flex h-full flex-col gap-1">
-                      {cell.bookings.map(booking => {
-                        const start = startMinutesOf(booking);
-                        const end = start + durationMinutesOf(booking);
-                        const tone = STATUS_BG[booking.status] ?? 'bg-gray-50 border-gray-300';
-                        return (
-                          <button
-                            key={booking.id}
-                            type="button"
-                            onClick={() => onSelectBooking?.(booking)}
-                            title={`${customerNameOf(booking)} · ${booking.package?.name ?? 'No package'} · ${formatRange(start, end)}`}
-                            className={`flex min-h-0 flex-1 flex-col rounded border-l-2 px-1.5 py-1 text-left transition hover:brightness-95 ${tone}`}
-                          >
-                            <span className="text-[0.65rem] font-bold leading-tight text-gray-700 tabular-nums">
-                              {formatSlotLabel(start)}–{formatSlotLabel(end)}
-                            </span>
-                            <span className="truncate text-xs font-semibold leading-tight text-gray-900">
-                              {customerNameOf(booking)}
-                            </span>
+                    {band && bookable && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={event => openBookingForSlot(column, event, bandOrigin)}
+                        onMouseMove={event => setHoverSlot({ key: column.key, minute: minuteFromPointer(event, bandOrigin) })}
+                        onMouseLeave={() => setHoverSlot(prev => (prev?.key === column.key ? null : prev))}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            const keyboardMinute = snapToInterval(
+                              isViewingToday ? Math.max(nowMinutes, bandOrigin) : bandOrigin,
+                              timeline.interval,
+                              isViewingToday ? nowMinutes : undefined
+                            );
+                            const keyboardCandidates = packagesForSlot(column, keyboardMinute);
+                            navigate(
+                              buildBookingUrl({
+                                locationId: column.locationId ?? windowData.location_id ?? null,
+                                date: dateKey(date),
+                                minute: keyboardMinute,
+                                roomId: column.roomId ?? null,
+                                packageId: keyboardCandidates.length === 1 ? keyboardCandidates[0] : null,
+                                packageIds: keyboardCandidates,
+                                walkIn: isViewingToday,
+                              })
+                            );
+                          }
+                        }}
+                        className="absolute inset-x-0 cursor-pointer bg-gray-100 transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
+                        style={band}
+                        title={`Available ${formatRange(open as number, close as number)} — click to start a booking`}
+                        aria-label={`Start a booking in ${column.name}`}
+                      />
+                    )}
+
+                    {hoverSlot?.key === column.key && bookable && (
+                      <div
+                        className="pointer-events-none absolute inset-x-0 z-[5] flex items-center gap-1 border-y border-dashed border-gray-400 bg-white/70 px-1"
+                        style={{
+                          top: (hoverSlot.minute - timeline.start) * timeline.pxPerMinute,
+                          height: Math.max(14, timeline.interval * timeline.pxPerMinute),
+                        }}
+                      >
+                        <Plus className="h-3 w-3 shrink-0 text-gray-600" />
+                        <span className="truncate text-[0.65rem] font-semibold text-gray-700">
+                          {formatSlotLabel(hoverSlot.minute)}
+                        </span>
+                      </div>
+                    )}
+
+                    {column.closedRanges.map((closure, index) => {
+                      const closedBand = availableBand(closure.startMinutes, closure.endMinutes, timeline);
+                      if (!closedBand) return null;
+                      return (
+                        <div
+                          key={`closed-${index}`}
+                          className="pointer-events-none absolute inset-x-0 border-y border-dashed border-red-200 bg-red-50/80"
+                          style={closedBand}
+                          title={`${closure.reason ?? 'Closed'} ${formatRange(closure.startMinutes, closure.endMinutes)}`}
+                        >
+                          <span className="block px-1 pt-0.5 text-[0.6rem] font-medium text-red-500">
+                            {closure.reason ?? 'Closed'}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []).map((brk, index) => {
+                      const band = availableBand(brk.startMinutes, brk.endMinutes, timeline);
+                      if (!band) return null;
+                      return (
+                        <div
+                          key={`break-${index}`}
+                          className="pointer-events-none absolute inset-x-0 border-y border-dashed border-gray-300 bg-white"
+                          style={band}
+                          title={`Break ${formatRange(brk.startMinutes, brk.endMinutes)}`}
+                        >
+                          <span className="block px-1 pt-0.5 text-[0.6rem] font-medium text-gray-400">Break</span>
+                        </div>
+                      );
+                    })}
+
+                    {timeline.slots.map(minutes => (
+                      <div
+                        key={minutes}
+                        className={`pointer-events-none absolute inset-x-0 border-t ${minutes % 60 === 0 ? 'border-gray-200' : 'border-gray-100'}`}
+                        style={{ top: (minutes - timeline.start) * timeline.pxPerMinute }}
+                      />
+                    ))}
+
+                    {column.closedAllDay && (
+                      <div className="absolute inset-0 flex items-start justify-center bg-gray-50/80 pt-3">
+                        <span className="rounded bg-white/90 px-1.5 py-0.5 text-[0.65rem] font-medium text-gray-500">
+                          {column.closedReason ?? 'Closed'}
+                        </span>
+                      </div>
+                    )}
+
+                    {showNowLine && (
+                      <div
+                        className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
+                        style={{ top: (nowMinutes - timeline.start) * timeline.pxPerMinute }}
+                      />
+                    )}
+
+                    {items.map(item => {
+                      const { top, height } = blockGeometry(item, timeline, MIN_BLOCK_HEIGHT, 2);
+                      const widthPercent = 100 / item.laneCount;
+                      const tone = STATUS_BG[item.booking.status] ?? 'bg-gray-50 border-gray-400';
+
+                      return (
+                        <button
+                          key={item.booking.id}
+                          type="button"
+                          onClick={() => onSelectBooking?.(item.booking)}
+                          title={`${customerNameOf(item.booking)} · ${item.booking.package?.name ?? 'No package'} · ${formatRange(item.startMinutes, item.endMinutes)}`}
+                          className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 py-1 text-left shadow-sm transition hover:z-20 hover:brightness-95 ${tone}`}
+                          style={{
+                            top,
+                            height,
+                            left: `calc(${item.lane * widthPercent}% + 2px)`,
+                            width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
+                          }}
+                        >
+                          <span className="text-[0.65rem] font-bold leading-tight tabular-nums text-gray-700">
+                            {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
+                          </span>
+                          <span className="truncate text-xs font-semibold leading-tight text-gray-900">
+                            {customerNameOf(item.booking)}
+                          </span>
+                          {height > 52 && (
                             <span className="truncate text-[0.65rem] leading-tight text-gray-600">
-                              {booking.package?.name || 'No package'}
+                              {item.booking.package?.name || 'No package'}
                             </span>
+                          )}
+                          {height > 72 && (
                             <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[0.65rem]">
-                              <span className="truncate capitalize text-gray-500">{booking.status}</span>
-                              <span
-                                className={`font-semibold ${resolvePaymentState(booking).amountClass}`}
-                              >
-                                ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
+                              <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
+                              <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
+                                ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
                               </span>
                             </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className={`border-t border-gray-100 bg-gray-50 px-3 py-1.5 text-[0.7rem] text-gray-600`}>
-        <span className={`font-semibold text-${fullColor}`}>{bookings.length}</span> booking
-        {bookings.length === 1 ? '' : 's'} across <span className="font-semibold">{columns.length}</span> column
-        {columns.length === 1 ? '' : 's'}
-        {hiddenSpaceCount > 0 ? ` · ${hiddenSpaceCount} empty space${hiddenSpaceCount === 1 ? '' : 's'} hidden` : ''}
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 bg-gray-50 px-3 py-1.5 text-[0.7rem] text-gray-600">
+        <span>
+          <span className={`font-semibold text-${fullColor}`}>{bookings.length}</span> booking
+          {bookings.length === 1 ? '' : 's'} across <span className="font-semibold">{columns.filter(c => !c.virtual).length}</span> space
+          {columns.filter(c => !c.virtual).length === 1 ? '' : 's'}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-3.5 rounded-sm bg-gray-100 ring-1 ring-inset ring-gray-300" aria-hidden="true" />
+          Available
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-3.5 rounded-sm border-l-4 border-green-400 bg-green-50" aria-hidden="true" />
+          Booked
+        </span>
+        {!windowData.has_schedule && <span className="text-gray-500">No package schedule for this day — showing a default window.</span>}
       </div>
     </div>
   );
