@@ -1555,7 +1555,7 @@ const SpaceSchedule = () => {
             <div className="min-w-max">
               <div className="sticky top-0 z-30 flex bg-gray-50 border-b border-gray-200">
                 <div
-                  className="sticky left-0 z-40 bg-gray-50 border-r border-gray-200 flex items-center justify-center px-0 py-0"
+                  className="sticky left-0 z-40 bg-gray-50 border-r border-gray-200 flex items-center justify-center px-1 py-1"
                   style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH }}
                 >
                   <Clock className="w-4 h-4 text-gray-500" />
@@ -1563,11 +1563,11 @@ const SpaceSchedule = () => {
                 {columns.map(column => (
                   <div
                     key={column.key}
-                    className="px-0 py-0 text-center border-r border-gray-200"
+                    className="px-1 py-1 text-center border-r border-gray-200"
                     style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
                   >
-                    <div className="flex flex-col items-center gap-0 leading-none">
-                      <span className="text-[10px] font-semibold text-gray-700 leading-none truncate max-w-full">{column.name}</span>
+                    <div className="flex flex-col items-center gap-0.5 leading-none">
+                      <span className="text-[11px] font-semibold text-gray-700 leading-tight truncate max-w-full">{column.name}</span>
                       {column.virtual ? (
                         <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 leading-tight rounded-full">
                           No room assigned

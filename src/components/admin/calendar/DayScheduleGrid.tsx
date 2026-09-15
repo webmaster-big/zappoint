@@ -27,8 +27,9 @@ const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
 
 export const SLOT_COLUMN_WIDTH = 64;
-export const ROOM_COLUMN_WIDTH = 96;
-const HEADER_LINE = 13;
+export const ROOM_COLUMN_WIDTH = 132;
+const HEADER_LINE = 14;
+const HEADER_PAD = 4;
 
 interface ScheduleColumn {
   key: string;
@@ -356,7 +357,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         showColumnLocation ||
         freeFromByColumn.get(column.key) !== undefined
     );
-    return hasSecondLine ? HEADER_LINE * 2 + 2 : HEADER_LINE;
+    return (hasSecondLine ? HEADER_LINE * 2 + 2 : HEADER_LINE) + HEADER_PAD * 2;
   }, [columns, showColumnLocation, freeFromByColumn]);
 
 
@@ -489,7 +490,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
             style={{ width: SLOT_COLUMN_WIDTH, minWidth: SLOT_COLUMN_WIDTH }}
           >
             <div
-              className="sticky top-0 z-10 flex items-center justify-center gap-1 border-b-2 border-r border-gray-200 bg-gray-50 px-0 text-xs font-semibold text-gray-700"
+              className="sticky top-0 z-10 flex items-center justify-center gap-1 border-b border-r border-gray-200 bg-gray-50 px-1 text-xs font-semibold text-gray-700"
               style={{ height: headerHeight }}
             >
               <Clock className="h-3.5 w-3.5" />
@@ -538,7 +539,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                   style={{ width: ROOM_COLUMN_WIDTH, minWidth: ROOM_COLUMN_WIDTH }}
                 >
                   <div
-                    className={`sticky top-0 z-30 flex flex-col items-center justify-center gap-0 border-b border-gray-200 px-0 leading-none ${
+                    className={`sticky top-0 z-30 flex flex-col items-center justify-center gap-0.5 border-b border-gray-200 px-1 leading-none ${
                       column.virtual ? 'bg-amber-50 text-amber-800' : 'bg-gray-50 text-gray-700'
                     }`}
                     style={{ height: headerHeight }}
@@ -555,7 +556,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             .join(' · ')
                     }
                   >
-                    <span className="w-full truncate text-center text-[10px] font-semibold leading-none">{column.name}</span>
+                    <span className="w-full truncate text-center text-[11px] font-semibold leading-tight">{column.name}</span>
                     {column.closedAllDay || freeFrom?.kind === 'closed' ? (
                       <span className="flex items-center gap-1 text-[0.65rem] font-medium text-gray-500">
                         <Ban className="h-2.5 w-2.5" />
