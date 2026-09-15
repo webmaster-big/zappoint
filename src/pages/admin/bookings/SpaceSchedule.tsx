@@ -1553,7 +1553,7 @@ const SpaceSchedule = () => {
             )}
           <div ref={scrollRef} className="overflow-auto max-h-[72vh] relative">
             <div className="min-w-max">
-              <div className="sticky top-0 z-30 flex bg-gray-50 border-b-2 border-gray-200">
+              <div className="sticky top-0 z-30 flex bg-gray-50 border-b border-gray-200">
                 <div
                   className="sticky left-0 z-40 bg-gray-50 border-r border-gray-200 flex items-center justify-center px-0 py-0"
                   style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH }}
@@ -1567,17 +1567,12 @@ const SpaceSchedule = () => {
                     style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
                   >
                     <div className="flex flex-col items-center gap-0 leading-none">
-                      <span className="text-sm font-semibold text-gray-700 leading-tight truncate max-w-full">{column.name}</span>
+                      <span className="text-[10px] font-semibold text-gray-700 leading-none truncate max-w-full">{column.name}</span>
                       {column.virtual ? (
                         <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 leading-tight rounded-full">
                           No room assigned
                         </span>
-                      ) : (
-                        <span className="text-[11px] font-normal text-gray-500 leading-tight flex items-center gap-0.5">
-                          <Users className="w-2.5 h-2.5" />
-                          {column.capacity ? `Max ${column.capacity}` : 'No max'}
-                        </span>
-                      )}
+                      ) : null}
                       {column.roomId && spaceClosures.has(column.roomId) && (
                         <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 leading-tight rounded-full">
                           {getSpaceClosureLabel(column.roomId)}
