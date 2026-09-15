@@ -218,7 +218,6 @@ const OnsiteBooking: React.FC = () => {
       bookingData.participants > 0 &&
       bookingData.customer.firstName.trim() &&
       bookingData.customer.lastName.trim() &&
-      bookingData.customer.email.trim() &&
       bookingData.customer.phone.trim()
     );
   };
@@ -2593,7 +2592,8 @@ const OnsiteBooking: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address *
+                Email Address
+                <span className="ml-1 text-xs font-normal text-gray-500">(optional)</span>
                 {loadingCustomer && (
                   <span className="ml-2 text-xs text-${the}-600 animate-pulse">(Searching...)</span>
                 )}
@@ -2604,9 +2604,12 @@ const OnsiteBooking: React.FC = () => {
                 onChange={handleInputChange}
                 className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
                 placeholder="john.doe@example.com"
-                required
               />
-              <p className="text-xs text-gray-500 mt-1">We'll auto-fill info if this customer exists</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {bookingData.customer.email.trim()
+                  ? "We'll auto-fill info if this customer exists"
+                  : 'Leave blank for a walk-in — no confirmation email will be sent'}
+              </p>
             </div>
             
             <div>
