@@ -558,27 +558,27 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                   >
                     <span className="w-full truncate text-center text-[11px] font-semibold leading-tight">{column.name}</span>
                     {column.closedAllDay || freeFrom?.kind === 'closed' ? (
-                      <span className="flex items-center gap-1 text-[0.65rem] font-medium text-gray-500">
+                      <span className="flex items-center gap-1 text-[9px] leading-tight font-medium text-gray-500">
                         <Ban className="h-2.5 w-2.5" />
                         {column.closedReason ?? 'Not bookable'}
                       </span>
                     ) : freeFrom?.kind === 'booked' ? (
-                      <span className="text-[0.65rem] font-medium text-gray-500">Booked until close</span>
+                      <span className="text-[9px] leading-tight font-medium text-gray-500">Booked until close</span>
                     ) : freeFrom?.kind === 'blocked' ? (
-                      <span className="text-[0.65rem] font-medium text-gray-500">{freeFrom.reason}</span>
+                      <span className="text-[9px] leading-tight font-medium text-gray-500">{freeFrom.reason}</span>
                     ) : freeFrom?.kind === 'day-over' ? (
-                      <span className="text-[0.65rem] font-medium text-gray-500">Closed for the day</span>
+                      <span className="text-[9px] leading-tight font-medium text-gray-500">Closed for the day</span>
                     ) : freeFrom?.kind === 'free' && isViewingToday && freeFrom.atMinute <= nowMinutes ? (
-                      <span className="text-[0.65rem] font-semibold text-green-700">Free now</span>
+                      <span className="text-[9px] leading-tight font-semibold text-green-700">Free now</span>
                     ) : freeFrom?.kind === 'free' ? (
-                      <span className="text-[0.65rem] font-medium text-gray-600">Free {formatSlotLabel(freeFrom.atMinute)}</span>
+                      <span className="text-[9px] leading-tight font-medium text-gray-600">Free {formatSlotLabel(freeFrom.atMinute)}</span>
                     ) : column.virtual ? (
-                      <span className="flex items-center gap-1 text-[0.65rem] font-normal text-amber-600">
+                      <span className="flex items-center gap-1 text-[9px] leading-tight font-normal text-amber-600">
                         <AlertTriangle className="h-2.5 w-2.5" />
                         No room
                       </span>
                     ) : showColumnLocation ? (
-                      <span className="flex w-full items-center justify-center gap-1 text-[0.65rem] font-normal text-gray-500">
+                      <span className="flex w-full items-center justify-center gap-1 text-[9px] leading-tight font-normal text-gray-500">
                         <MapPin className="h-2.5 w-2.5 shrink-0" />
                         <span className="truncate">{(column.locationId && locationNames?.[column.locationId]) || 'Unknown'}</span>
                       </span>
@@ -635,7 +635,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         }}
                       >
                         <Plus className="h-3 w-3 shrink-0 text-gray-600" />
-                        <span className="truncate text-[0.65rem] font-semibold text-gray-700">
+                        <span className="truncate text-[9px] leading-tight font-semibold text-gray-700">
                           {formatSlotLabel(hoverSlot.minute)}
                         </span>
                       </div>
@@ -683,7 +683,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
                     {column.closedAllDay && (
                       <div className="absolute inset-0 flex items-start justify-center bg-gray-50/80 pt-3">
-                        <span className="rounded bg-white/90 px-1.5 py-0.5 text-[0.65rem] font-medium text-gray-500">
+                        <span className="rounded bg-white/90 px-1.5 py-0.5 text-[9px] leading-tight font-medium text-gray-500">
                           {column.closedReason ?? 'Closed'}
                         </span>
                       </div>
@@ -715,19 +715,19 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
                           }}
                         >
-                          <span className="text-[0.65rem] font-bold leading-tight tabular-nums text-gray-700">
+                          <span className="text-[9px] leading-tight font-bold leading-tight tabular-nums text-gray-700">
                             {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
                           </span>
                           <span className="truncate text-xs font-semibold leading-tight text-gray-900">
                             {customerNameOf(item.booking)}
                           </span>
                           {height > 52 && (
-                            <span className="truncate text-[0.65rem] leading-tight text-gray-600">
+                            <span className="truncate text-[9px] leading-tight leading-tight text-gray-600">
                               {item.booking.package?.name || 'No package'}
                             </span>
                           )}
                           {height > 72 && (
-                            <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[0.65rem]">
+                            <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[9px] leading-tight">
                               <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
                               <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
                                 ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
