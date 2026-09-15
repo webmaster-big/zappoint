@@ -75,7 +75,10 @@ const dateKeyOf = (date: Date): string => {
 };
 
 const ZOOM_LEVELS = [1, 1.6, 2.4];
-const COLUMN_WIDTH = 150;
+const COLUMN_MIN_WIDTH = 58;
+const COLUMN_MAX_WIDTH = 170;
+const COLUMN_BOOKED_MIN_WIDTH = 132;
+const HEADER_CHAR_WIDTH = 6.1;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
 const VIEW_STATE_KEY = 'spaceScheduleViewState:v2';
@@ -742,6 +745,19 @@ const SpaceSchedule = () => {
     for (const list of map.values()) assignLanes(list);
     return map;
   }, [columns, filteredBookings, timeWindow, columnKeyFor, pxPerMinute]);
+
+  const columnWidths = useMemo(() => {
+    const widths = new Map<string, number>();
+    for (const column of columns) {
+      const label = Math.ceil(column.name.length * HEADER_CHAR_WIDTH) + 16;
+      const booked = (positionedByColumn.get(column.key) || []).length > 0;
+      const floor = booked ? COLUMN_BOOKED_MIN_WIDTH : COLUMN_MIN_WIDTH;
+      widths.set(column.key, Math.min(COLUMN_MAX_WIDTH, Math.max(floor, label)));
+    }
+    return widths;
+  }, [columns, positionedByColumn]);
+
+  const widthOf = (key: string) => columnWidths.get(key) ?? COLUMN_MIN_WIDTH;
 
   const freeFromByColumn = useMemo(() => {
     const map = new Map<string, FreeState>();
@@ -1564,7 +1580,7 @@ const SpaceSchedule = () => {
                   <div
                     key={column.key}
                     className="px-0 py-0 text-center border-r border-gray-200"
-                    style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+                    style={{ width: widthOf(column.key), minWidth: widthOf(column.key) }}
                   >
                     <div className="flex flex-col items-center gap-0 leading-none">
                       <span className="text-[10px] font-semibold text-gray-700 leading-none truncate max-w-full">{column.name}</span>
@@ -1655,7 +1671,7 @@ const SpaceSchedule = () => {
                     <div
                       key={column.key}
                       className={`relative border-r border-gray-200 ${column.virtual ? 'bg-amber-50/20' : ''}`}
-                      style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+                      style={{ width: widthOf(column.key), minWidth: widthOf(column.key) }}
                     >
                       {renderColumnBackground(column)}
                       {(positionedByColumn.get(column.key) || []).map(renderBookingBlock)}
