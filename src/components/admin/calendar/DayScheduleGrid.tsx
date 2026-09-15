@@ -28,10 +28,6 @@ const LANE_GAP = 2;
 
 export const SLOT_COLUMN_WIDTH = 64;
 export const ROOM_COLUMN_WIDTH = 96;
-const COLUMN_MIN_WIDTH = 58;
-const COLUMN_MAX_WIDTH = 150;
-const COLUMN_BOOKED_MIN_WIDTH = 120;
-const HEADER_CHAR_WIDTH = 6.1;
 const HEADER_LINE = 13;
 
 interface ScheduleColumn {
@@ -363,17 +359,6 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     return hasSecondLine ? HEADER_LINE * 2 + 2 : HEADER_LINE;
   }, [columns, showColumnLocation, freeFromByColumn]);
 
-  const columnWidths = useMemo(() => {
-    const widths = new Map<string, number>();
-    for (const column of columns) {
-      const label = Math.ceil(column.name.length * HEADER_CHAR_WIDTH) + 16;
-      const booked = (positioned.get(column.key) ?? []).length > 0;
-      const floor = booked ? COLUMN_BOOKED_MIN_WIDTH : COLUMN_MIN_WIDTH;
-      widths.set(column.key, Math.min(COLUMN_MAX_WIDTH, Math.max(floor, label)));
-    }
-    return widths;
-  }, [columns, positioned]);
-
 
   const navigate = useNavigate();
   const [hoverSlot, setHoverSlot] = useState<{ key: string; minute: number } | null>(null);
@@ -550,7 +535,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                 <div
                   key={column.key}
                   className="shrink-0 border-r border-gray-200"
-                  style={{ width: columnWidths.get(column.key) ?? COLUMN_MIN_WIDTH, minWidth: columnWidths.get(column.key) ?? COLUMN_MIN_WIDTH }}
+                  style={{ width: ROOM_COLUMN_WIDTH, minWidth: ROOM_COLUMN_WIDTH }}
                 >
                   <div
                     className={`sticky top-0 z-30 flex flex-col items-center justify-center gap-0 border-b border-gray-200 px-0 leading-none ${
