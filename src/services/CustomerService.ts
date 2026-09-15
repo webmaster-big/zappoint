@@ -92,6 +92,18 @@ export interface GroupedAttractionLocation {
   state: string;
   phone: string;
   availability?: AttractionAvailabilitySchedule[] | null;
+  special_pricing?: SpecialPricing;
+  description?: string;
+  price?: number;
+  pricing_type?: string;
+  category?: string;
+  max_capacity?: number;
+  max_tickets_per_slot?: number | null;
+  display_capacity_to_customers?: boolean;
+  duration?: number;
+  duration_unit?: string;
+  rating?: number;
+  min_age?: number;
 }
 
 export interface AttractionPurchaseLink {
@@ -157,6 +169,20 @@ export interface GroupedPackageLocation {
   state: string;
   phone: string;
   availability_schedules?: PackageAvailabilitySchedule[];
+  special_pricing?: SpecialPricing;
+  description?: string;
+  price?: number;
+  category?: string;
+  min_participants?: number;
+  max_guests?: number;
+  price_per_additional?: number;
+  pricing_type?: 'base' | 'per_person';
+  participant_label?: string | null;
+  display_label?: string | null;
+  max_tickets_per_slot?: number | null;
+  duration?: number;
+  duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
+  package_type?: string;
 }
 
 export interface PackageBookingLink {
@@ -227,6 +253,15 @@ export interface GroupedEventLocation {
   phone: string;
   time_start?: string | null;
   time_end?: string | null;
+  description?: string | null;
+  price?: string;
+  features?: string[] | null;
+  date_type?: 'one_time' | 'date_range';
+  start_date?: string;
+  end_date?: string | null;
+  interval_minutes?: number | null;
+  max_bookings_per_slot?: number | null;
+  max_tickets_per_slot?: number | null;
   add_ons: Array<{
     id: number;
     name: string;

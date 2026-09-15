@@ -115,6 +115,10 @@ interface CatalogLocation {
   package_id?: number;
   attraction_id?: number;
   special_pricing?: SpecialPricing;
+  price?: number;
+  pricing_type?: string;
+  category?: string | null;
+  display_label?: string | null;
 }
 
 const atLocation = (entry: { locations?: CatalogLocation[] }, locationId: number): CatalogLocation | undefined =>
@@ -156,8 +160,8 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   list(packagesRes).forEach((pkg) => {
     const here = atLocation(pkg, locationId);
     if (!here) return;
-    const label = normalizeCategory(String(pkg.display_label || pkg.category || '')) || 'Packages';
-    const { price, was, discounted } = priceNow(here.special_pricing ?? pkg.special_pricing, pkg.price, pkg.pricing_type);
+    const label = normalizeCategory(String(here.display_label || pkg.display_label || here.category || pkg.category || '')) || 'Packages';
+    const { price, was, discounted } = priceNow(here.special_pricing ?? pkg.special_pricing, here.price ?? pkg.price, here.pricing_type ?? pkg.pricing_type);
     if (!price) return;
     pool.push({ key: `pkg-${here.package_id}`, label, name: pkg.name, price, was, when: null, rank: discounted ? 3 : 1 });
   });
@@ -165,8 +169,8 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   list(attractionsRes).forEach((attr) => {
     const here = atLocation(attr, locationId);
     if (!here) return;
-    const label = normalizeCategory(String(attr.category || '')) || 'Activities';
-    const { price, was, discounted } = priceNow(here.special_pricing ?? attr.special_pricing, attr.price, attr.pricing_type);
+    const label = normalizeCategory(String(here.category || attr.category || '')) || 'Activities';
+    const { price, was, discounted } = priceNow(here.special_pricing ?? attr.special_pricing, here.price ?? attr.price, here.pricing_type ?? attr.pricing_type);
     if (!price) return;
     pool.push({ key: `attr-${here.attraction_id}`, label, name: attr.name, price, was, when: null, rank: discounted ? 3 : 1 });
   });

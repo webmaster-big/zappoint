@@ -72,6 +72,7 @@ export interface Attraction {
   availability?: AttractionAvailabilitySchedule[];
   callToBookByLocation?: Record<number, boolean>;
   imageByLocation?: Record<number, string | null>;
+  overridesByLocation?: Record<number, Partial<Attraction>>;
   special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 
@@ -106,6 +107,7 @@ export interface Package {
   pricing_type?: 'base' | 'per_person';
   participant_label?: string | null;
   display_label?: string | null;
+  overridesByLocation?: Record<number, Partial<Package>>;
   special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 

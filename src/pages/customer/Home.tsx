@@ -20,7 +20,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
-import { type GroupedAttraction, type GroupedPackage, type GroupedEvent } from '../../services/CustomerService';
+import { type GroupedAttraction, type GroupedPackage, type GroupedEvent, type SpecialPricing } from '../../services/CustomerService';
 import { customerDataCacheService } from '../../services/CustomerDataCacheService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
@@ -75,6 +75,7 @@ interface DisplayEvent {
   purchaseLinks: Array<{ location: string; url: string; event_id: number; location_id: number }>;
   callToBookByLocation?: Record<number, boolean>;
   imageByLocation?: Record<number, string | null>;
+  overridesByLocation?: Record<number, Partial<DisplayEvent>>;
 }
 
 type StorefrontFilter =
@@ -103,8 +104,158 @@ const firstImage = (value?: string | string[] | null): string | null => {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 };
 
+// Two rows can share a name AND a location. booking_links.find() and the group
+// scalars both take the first such row, so every per-location map has to agree
+// with that or a card shows one row's price beside another row's photo.
+const byLocation = <L extends { location_id: number }, V>(locations: L[], value: (loc: L) => V): Record<number, V> => {
+  const out: Record<number, V> = {};
+  locations.forEach(loc => {
+    if (loc.location_id in out) return;
+    out[loc.location_id] = value(loc);
+  });
+  return out;
+};
+
 const imagesByLocation = (locations: Array<{ location_id: number; image?: string | string[] | null }>) =>
-  Object.fromEntries(locations.map(loc => [loc.location_id, firstImage(loc.image)]));
+  byLocation(locations, loc => firstImage(loc.image));
+
+// The grouped endpoints collapse ten locations into one entry per name, so every
+// scalar on the group belongs to whichever row sorted first. These rebuild the
+// display fields from one location's own row.
+const durationText = (value?: number | null, unit?: string) =>
+  !value || value === 0 || String(value) === '0' ? 'Unlimited' : formatDurationDisplay(value, unit);
+
+const carriesLocationScalars = (loc: { description?: unknown }) => loc.description !== undefined;
+
+interface AttractionScalars {
+  description?: string;
+  price?: number;
+  min_age?: number;
+  max_capacity?: number;
+  display_capacity_to_customers?: boolean;
+  rating?: number;
+  category?: string | null;
+  duration?: number;
+  duration_unit?: string;
+  pricing_type?: string;
+  special_pricing?: SpecialPricing;
+}
+
+type AttractionViewFields = Pick<
+  Attraction,
+  'description' | 'price' | 'minAge' | 'capacity' | 'displayCapacityToCustomers' | 'rating' | 'category' | 'duration' | 'pricingType' | 'special_pricing'
+>;
+
+const attractionViewFields = (src: AttractionScalars): AttractionViewFields => ({
+  description: src.description ?? '',
+  price: src.price ?? 0,
+  minAge: src.min_age ?? 0,
+  capacity: src.max_capacity ?? 0,
+  displayCapacityToCustomers: src.display_capacity_to_customers ?? true,
+  rating: src.rating || 4.5,
+  category: normalizeCategory(src.category),
+  duration: durationText(src.duration, src.duration_unit),
+  pricingType: src.pricing_type,
+  special_pricing: src.special_pricing,
+});
+
+const attractionOverrides = (attr: GroupedAttraction): Record<number, Partial<Attraction>> =>
+  byLocation(attr.locations.filter(carriesLocationScalars), attractionViewFields);
+
+interface PackageScalars {
+  description?: string;
+  price?: number;
+  category?: string | null;
+  min_participants?: number;
+  max_guests?: number;
+  price_per_additional?: number;
+  pricing_type?: 'base' | 'per_person';
+  participant_label?: string | null;
+  display_label?: string | null;
+  duration?: number;
+  duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
+  package_type?: string;
+  special_pricing?: SpecialPricing;
+}
+
+type PackageViewFields = Pick<
+  PackageType,
+  'description' | 'price' | 'duration' | 'participants' | 'category' | 'package_type' | 'min_participants' | 'max_guests' | 'price_per_additional' | 'pricing_type' | 'participant_label' | 'display_label' | 'special_pricing'
+>;
+
+const packageViewFields = (src: PackageScalars): PackageViewFields => {
+  const minGuests = src.min_participants || 1;
+  const maxGuests = src.max_guests || minGuests;
+  const unit = (src.participant_label || 'guest').toLowerCase();
+  const participants = src.pricing_type === 'per_person'
+    ? (maxGuests > minGuests ? `${minGuests}–${maxGuests} ${unit}s` : `${minGuests} ${unit}s`)
+    : (maxGuests > minGuests
+      ? `Starts at ${minGuests} ${unit}s (up to ${maxGuests})`
+      : `${minGuests} ${unit}s`);
+  return {
+    description: src.description ?? '',
+    price: src.price ?? 0,
+    duration: durationText(src.duration, src.duration_unit),
+    participants,
+    category: normalizeCategory(src.category),
+    package_type: src.package_type || 'regular',
+    min_participants: src.min_participants,
+    max_guests: src.max_guests,
+    price_per_additional: src.price_per_additional,
+    pricing_type: src.pricing_type || 'base',
+    participant_label: src.participant_label,
+    display_label: src.display_label,
+    special_pricing: src.special_pricing,
+  };
+};
+
+const packageOverrides = (pkg: GroupedPackage): Record<number, Partial<PackageType>> =>
+  byLocation(pkg.locations.filter(carriesLocationScalars), packageViewFields);
+
+interface EventScalars {
+  description?: string | null;
+  price?: string;
+  features?: string[] | null;
+  date_type?: 'one_time' | 'date_range';
+  start_date?: string;
+  end_date?: string | null;
+  time_start?: string | null;
+  time_end?: string | null;
+  interval_minutes?: number | null;
+  max_bookings_per_slot?: number | null;
+}
+
+type EventViewFields = Pick<
+  DisplayEvent,
+  'description' | 'price' | 'features' | 'date_type' | 'start_date' | 'end_date' | 'time_start' | 'time_end' | 'interval_minutes' | 'max_bookings_per_slot'
+>;
+
+const eventViewFields = (src: EventScalars): EventViewFields => ({
+  description: src.description ?? null,
+  price: src.price ?? '',
+  features: src.features ?? null,
+  date_type: src.date_type ?? 'one_time',
+  start_date: src.start_date ?? '',
+  end_date: src.end_date ?? null,
+  time_start: src.time_start ?? null,
+  time_end: src.time_end ?? null,
+  interval_minutes: src.interval_minutes ?? null,
+  max_bookings_per_slot: src.max_bookings_per_slot ?? null,
+});
+
+const eventOverrides = (evt: GroupedEvent): Record<number, Partial<DisplayEvent>> =>
+  byLocation(evt.locations.filter(carriesLocationScalars), eventViewFields);
+
+const resolveForLocation = <T extends { overridesByLocation?: Record<number, Partial<T>> }>(
+  items: T[],
+  locationId: number | null,
+): T[] => {
+  if (locationId === null) return items;
+  return items.map(item => {
+    const own = item.overridesByLocation?.[locationId];
+    return own ? { ...item, ...own } : item;
+  });
+};
 
 const EVENTS_CATEGORY_LABEL = 'Events';
 
@@ -180,11 +331,32 @@ const EntertainmentLandingPage = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
   
-  const [attractions, setAttractions] = useState<Attraction[]>([]);
-  const [packages, setPackages] = useState<PackageType[]>([]);
-  const [events, setEvents] = useState<DisplayEvent[]>([]);
+  const [rawAttractions, setAttractions] = useState<Attraction[]>([]);
+  const [rawPackages, setPackages] = useState<PackageType[]>([]);
+  const [rawEvents, setEvents] = useState<DisplayEvent[]>([]);
   const [locations, setLocations] = useState<string[]>(['All Locations']);
   const [dataLoading, setDataLoading] = useState(true);
+
+  // A package sold at ten locations keeps ten separate photos, so a card has to
+  // show the one belonging to the location the guest is actually looking at.
+  const viewedLocationId = useMemo(() => {
+    if (activeLocation) return activeLocation.id;
+    if (selectedLocation === 'All Locations') return null;
+    return storefrontLocations.find(loc => loc.name === selectedLocation)?.id ?? null;
+  }, [activeLocation, selectedLocation, storefrontLocations]);
+
+  const attractions = useMemo(
+    () => resolveForLocation(rawAttractions, viewedLocationId),
+    [rawAttractions, viewedLocationId],
+  );
+  const packages = useMemo(
+    () => resolveForLocation(rawPackages, viewedLocationId),
+    [rawPackages, viewedLocationId],
+  );
+  const events = useMemo(
+    () => resolveForLocation(rawEvents, viewedLocationId),
+    [rawEvents, viewedLocationId],
+  );
 
   const processData = useCallback((
     attractionsData: GroupedAttraction[],
@@ -198,26 +370,16 @@ const EntertainmentLandingPage = () => {
       return {
         id: attr.purchase_links[0]?.attraction_id || 0,
         name: attr.name,
-        description: attr.description,
-        price: attr.price,
-        minAge: attr.min_age,
-        capacity: attr.max_capacity,
-        displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
-        rating: attr.rating || 4.5,
+        ...attractionViewFields(attr),
         image: firstImage(attr.image) ?? '',
         imageByLocation: imagesByLocation(attr.locations),
-        category: normalizeCategory(attr.category),
+        overridesByLocation: attractionOverrides(attr),
         availableLocations: attr.locations.map(loc => loc.location_name),
         availableLocationIds: attr.locations.map(loc => loc.location_id),
-        duration: !attr.duration || attr.duration === 0 || String(attr.duration) === '0' ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
-        pricingType: attr.pricing_type,
         purchaseLinks: attr.purchase_links,
         availability: attr.availability,
-        callToBookByLocation: Object.fromEntries(attr.locations.map(loc => [
-          loc.location_id,
-          loc.availability !== undefined ? attractionIsCallToBook(loc.availability) : attractionIsCallToBook(attr.availability),
-        ])),
-        special_pricing: attr.special_pricing,
+        callToBookByLocation: byLocation(attr.locations, loc =>
+          loc.availability !== undefined ? attractionIsCallToBook(loc.availability) : attractionIsCallToBook(attr.availability)),
       };
     });
     setAttractions(transformedAttractions);
@@ -226,44 +388,23 @@ const EntertainmentLandingPage = () => {
       pkg.locations.forEach(loc => allLocations.add(loc.location_name));
     });
     const transformedPackages: PackageType[] = packagesData.map((pkg: GroupedPackage) => {
-      const minGuests = pkg.min_participants || 1;
-      const maxGuests = pkg.max_guests || minGuests;
-      const unit = (pkg.participant_label || 'guest').toLowerCase();
-      const participantsText = pkg.pricing_type === 'per_person'
-        ? (maxGuests > minGuests ? `${minGuests}–${maxGuests} ${unit}s` : `${minGuests} ${unit}s`)
-        : (maxGuests > minGuests
-          ? `Starts at ${minGuests} ${unit}s (up to ${maxGuests})`
-          : `${minGuests} ${unit}s`);
       return {
         id: pkg.booking_links[0]?.package_id || 0,
         name: pkg.name,
-        description: pkg.description,
-        price: pkg.price,
-        duration: !pkg.duration || pkg.duration === 0 || String(pkg.duration) === '0' ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
-        participants: participantsText,
+        ...packageViewFields(pkg),
         includes: [],
         rating: 4.8,
         image: firstImage(pkg.image) ?? '',
         imageByLocation: imagesByLocation(pkg.locations),
-        category: normalizeCategory(pkg.category),
+        overridesByLocation: packageOverrides(pkg),
         availableLocations: pkg.locations.map(loc => loc.location_name),
         availableLocationIds: pkg.locations.map(loc => loc.location_id),
         bookingLinks: pkg.booking_links,
         availability_schedules: pkg.availability_schedules,
-        callToBookByLocation: Object.fromEntries(pkg.locations.map(loc => [
-          loc.location_id,
+        callToBookByLocation: byLocation(pkg.locations, loc =>
           loc.availability_schedules !== undefined
             ? packageIsCallToBook(loc.availability_schedules)
-            : packageIsCallToBook(pkg.availability_schedules),
-        ])),
-        package_type: pkg.package_type || 'regular',
-        min_participants: pkg.min_participants,
-        max_guests: pkg.max_guests,
-        price_per_additional: pkg.price_per_additional,
-        pricing_type: pkg.pricing_type || 'base',
-        participant_label: pkg.participant_label,
-        display_label: pkg.display_label,
-        special_pricing: pkg.special_pricing,
+            : packageIsCallToBook(pkg.availability_schedules)),
       };
     });
     setPackages(transformedPackages);
@@ -279,23 +420,13 @@ const EntertainmentLandingPage = () => {
       .map((evt: GroupedEvent) => ({
         id: evt.purchase_links[0]?.event_id || 0,
         name: evt.name,
-        description: evt.description,
+        ...eventViewFields(evt),
         image: firstImage(evt.image),
         imageByLocation: imagesByLocation(evt.locations),
-        date_type: evt.date_type,
-        start_date: evt.start_date,
-        end_date: evt.end_date,
-        time_start: evt.time_start,
-        time_end: evt.time_end,
-        interval_minutes: evt.interval_minutes,
-        max_bookings_per_slot: evt.max_bookings_per_slot,
-        price: evt.price,
-        features: evt.features,
+        overridesByLocation: eventOverrides(evt),
         availableLocations: evt.locations.map(loc => loc.location_name),
-        callToBookByLocation: Object.fromEntries(evt.locations.map(loc => [
-          loc.location_id,
-          loc.time_start !== undefined ? eventIsCallToBook(loc) : eventIsCallToBook(evt),
-        ])),
+        callToBookByLocation: byLocation(evt.locations, loc =>
+          loc.time_start !== undefined ? eventIsCallToBook(loc) : eventIsCallToBook(evt)),
         locations: evt.locations.map(loc => ({
           location_id: loc.location_id,
           location_name: loc.location_name,
@@ -490,7 +621,7 @@ const EntertainmentLandingPage = () => {
       type: 'attraction',
       id: link.attraction_id,
       name: attraction.name,
-      image: attraction.image ?? null,
+      image: imageFor(attraction),
       locationId: activeLocation.id,
       locationName: activeLocation.name,
       unitPrice: Number.isFinite(price) ? price : 0,
@@ -511,7 +642,7 @@ const EntertainmentLandingPage = () => {
       type: 'event',
       id: match?.event_id ?? evt.id,
       name: evt.name,
-      image: evt.image ?? null,
+      image: imageFor(evt),
       locationId: activeLocation.id,
       locationName: activeLocation.name,
       unitPrice: Number.isFinite(price) ? price : 0,
@@ -621,14 +752,6 @@ const EntertainmentLandingPage = () => {
 
   const eventCTB = (evt: DisplayEvent, locationId?: number | null) =>
     itemCallToBookAt(evt.callToBookByLocation, eventIsCallToBook(evt), locationId ?? activeLocation?.id ?? null);
-
-  // A package sold at ten locations keeps ten separate photos, so a card has to
-  // show the one belonging to the location the guest is actually looking at.
-  const viewedLocationId = useMemo(() => {
-    if (activeLocation) return activeLocation.id;
-    if (selectedLocation === 'All Locations') return null;
-    return storefrontLocations.find(loc => loc.name === selectedLocation)?.id ?? null;
-  }, [activeLocation, selectedLocation, storefrontLocations]);
 
   const imageFor = (item: { image?: string | null; imageByLocation?: Record<number, string | null> }) => {
     if (viewedLocationId !== null) {

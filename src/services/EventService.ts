@@ -83,26 +83,32 @@ class EventService {
       const response = await api.get('/events/grouped-by-name');
       groups = response.data?.data || [];
     }
+    // The group's scalars belong to whichever row sorted first, so an event sold at
+    // several venues would hand this page another venue's dates, times and price.
+    const definedOnly = (o: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+
     for (const group of groups) {
       const loc = group.locations?.find((l: { event_id: number }) => l.event_id === eventId);
       if (loc) {
+        const src = { ...group, ...definedOnly(loc) };
         return {
           success: true,
           data: {
             id: eventId,
             name: group.name,
-            description: group.description,
-            image: group.image,
-            date_type: group.date_type,
-            start_date: group.start_date,
-            end_date: group.end_date,
-            time_start: group.time_start,
-            time_end: group.time_end,
-            interval_minutes: group.interval_minutes,
-            max_bookings_per_slot: group.max_bookings_per_slot,
-            max_tickets_per_slot: group.max_tickets_per_slot,
-            price: group.price,
-            features: group.features,
+            description: src.description,
+            image: loc.image || group.image,
+            date_type: src.date_type,
+            start_date: src.start_date,
+            end_date: src.end_date,
+            time_start: src.time_start,
+            time_end: src.time_end,
+            interval_minutes: src.interval_minutes,
+            max_bookings_per_slot: src.max_bookings_per_slot,
+            max_tickets_per_slot: src.max_tickets_per_slot,
+            price: src.price,
+            features: src.features,
             location_id: loc.location_id,
             location: { id: loc.location_id, name: loc.location_name },
             is_active: true,
