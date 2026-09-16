@@ -19,6 +19,7 @@ export interface BookingPrefill {
   freeUntil: string | null;
   freeUntilMinutes: number | null;
   freeUntilKnown: boolean;
+  startMinutes: number | null;
   walkIn: boolean;
   hasAny: boolean;
 }
@@ -72,12 +73,15 @@ export function buildBookingUrl(prefill: SlotPrefill): string {
 
   if (prefill.locationId != null) params.set('location_id', String(prefill.locationId));
   if (prefill.date) params.set('date', prefill.date);
-  if (Number.isFinite(prefill.minute)) params.set('time', minutesToClock(prefill.minute));
+  if (Number.isFinite(prefill.minute)) {
+    params.set('time', minutesToClock(prefill.minute));
+    params.set('start_minutes', String(Math.round(prefill.minute)));
+  }
   if (prefill.roomId != null) params.set('room_id', String(prefill.roomId));
   if (prefill.packageId != null) params.set('package_id', String(prefill.packageId));
 
   const candidates = (prefill.packageIds ?? []).filter(id => Number.isInteger(id) && id > 0);
-  if (candidates.length > 1) params.set('package_ids', Array.from(new Set(candidates)).join(','));
+  if (candidates.length > 0) params.set('package_ids', Array.from(new Set(candidates)).join(','));
 
   if (prefill.freeUntilMinute != null && Number.isFinite(prefill.freeUntilMinute)) {
     params.set('free_until_minutes', String(Math.round(prefill.freeUntilMinute)));
@@ -122,6 +126,11 @@ export function readBookingPrefill(params: URLSearchParams): BookingPrefill {
     freeUntil: freeUntil === null ? null : minutesToClock(freeUntil),
     freeUntilMinutes: freeUntil,
     freeUntilKnown: freeUntil !== null,
+    startMinutes: (() => {
+      const raw = params.get('start_minutes');
+      const n = raw === null ? NaN : Number(raw);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : minute;
+    })(),
     walkIn: params.get('walk_in') === '1',
     hasAny: false,
   };

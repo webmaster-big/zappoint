@@ -128,6 +128,7 @@ const OnsiteBooking: React.FC = () => {
   const prefillApplied = useRef(false);
   const prefillTimeChecked = useRef(false);
   const prefillLanded = useRef(false);
+  const slotsAnsweredFor = useRef('');
 
   const arrivalLocation = useRef(effectiveLocationId);
   const sidebarMoved = effectiveLocationId !== arrivalLocation.current;
@@ -345,10 +346,12 @@ const OnsiteBooking: React.FC = () => {
     if (!bookingData.date || bookingData.date !== slotPrefill.date) return null;
     if (availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) return null;
 
+    if (slotPrefill.roomId && !packageServesRoom(selectedPackage, slotPrefill.roomId)) return null;
+
     const [hours, minutes] = slotPrefill.time.split(':').map(Number);
     if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
 
-    const startMinutes = hours * 60 + minutes;
+    const startMinutes = slotPrefill.startMinutes ?? hours * 60 + minutes;
     const endAbsolute = startMinutes + packageDurationMinutes;
 
     if (!slotPrefill.freeUntilKnown || endAbsolute > (slotPrefill.freeUntilMinutes ?? -1)) return null;
@@ -872,6 +875,7 @@ const OnsiteBooking: React.FC = () => {
         
         setAvailableTimeSlots(data.available_slots);
         setLoadingTimeSlots(false);
+        slotsAnsweredFor.current = `${selectedPackage.id}|${bookingData.date}`;
         
         if (isFirstUpdate) {
           isFirstUpdate = false;
@@ -890,6 +894,7 @@ const OnsiteBooking: React.FC = () => {
         date: bookingData.date,
       });
       setLoadingTimeSlots(false);
+      slotsAnsweredFor.current = `${selectedPackage?.id}|${bookingData.date}`;
       eventSource.close();
     };
     
@@ -1036,10 +1041,15 @@ const OnsiteBooking: React.FC = () => {
     if (!prefillApplied.current || prefillTimeChecked.current) return;
     if (!slotPrefill.time || loadingTimeSlots) return;
     if (!bookingData.date) return;
+    if (slotsAnsweredFor.current !== `${selectedPackage?.id}|${bookingData.date}`) return;
 
     prefillTimeChecked.current = true;
 
-    if (availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) return;
+    const serverSlot = availableTimeSlots.find(slot => slot.start_time === slotPrefill.time);
+    if (serverSlot) {
+      setSelectedRoomId(serverSlot.room_id ?? null);
+      return;
+    }
 
     if (walkInSlot) {
       setToast({
@@ -1054,7 +1064,7 @@ const OnsiteBooking: React.FC = () => {
       message: 'That start time is no longer offered for this package — pick another below.',
       type: 'info',
     });
-  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, bookingData.date]);
+  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, bookingData.date, selectedPackage]);
 
   const handleAttractionToggle = (attractionId: string) => {
     setBookingData(prev => {

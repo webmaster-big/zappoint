@@ -1163,7 +1163,8 @@ const SpaceSchedule = () => {
       return entry?.start_minutes ? entry.start_minutes.includes(minute) : true;
     });
 
-    return { ids, autoSelect: offering.length === 1 ? offering[0] : null };
+    const lone = offering.length === 1 ? offering[0] : null;
+    return { ids, autoSelect: lone ?? (offering.length === 0 && ids.length === 1 ? ids[0] : null) };
   };
 
   const navigateToSlot = (column: ScheduleColumn, minute: number) => {
