@@ -482,10 +482,17 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     [offeredStartsFor, isViewingToday, nowMinutes, occupancy, roomBreaks, timeline]
   );
 
-  const openBookingForSlot = React.useCallback(
-    (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
-      const minute = slotMinuteFor(column, rawMinuteFromPointer(event, originMinute));
+  /** The next minute a booking can actually START here, not just the first unoccupied minute. */
+  const nextBookableFrom = React.useCallback(
+    (column: ScheduleColumn, atMinute: number): number => {
+      const offered = offeredStartsFor(column).filter(start => start >= atMinute);
+      return offered.length > 0 ? Math.min(...offered) : atMinute;
+    },
+    [offeredStartsFor]
+  );
 
+  const goToBooking = React.useCallback(
+    (column: ScheduleColumn, minute: number) => {
       const blocked = [
         ...(occupancy.get(column.key) ?? []),
         ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
@@ -509,7 +516,14 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         })
       );
     },
-    [navigate, rawMinuteFromPointer, slotMinuteFor, isViewingToday, windowData, date, offeredCandidates, occupancy, roomBreaks, timeline]
+    [navigate, isViewingToday, windowData, date, offeredCandidates, occupancy, roomBreaks, timeline]
+  );
+
+  const openBookingForSlot = React.useCallback(
+    (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
+      goToBooking(column, slotMinuteFor(column, rawMinuteFromPointer(event, originMinute)));
+    },
+    [goToBooking, slotMinuteFor, rawMinuteFromPointer]
   );
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -652,9 +666,19 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     ) : freeFrom?.kind === 'day-over' ? (
                       <span className="text-[9px] leading-tight font-medium text-gray-500">Closed for the day</span>
                     ) : freeFrom?.kind === 'free' && isViewingToday && freeFrom.atMinute <= nowMinutes ? (
-                      <span className="text-[9px] leading-tight font-semibold text-green-700">Free now</span>
+                      <button
+                        type="button"
+                        onClick={event => {
+                          event.stopPropagation();
+                          goToBooking(column, nowMinutes);
+                        }}
+                        title={`Start a walk-in in ${column.name} at ${formatSlotLabel(nowMinutes)}`}
+                        className="rounded px-1 text-[9px] font-semibold leading-tight text-green-700 transition hover:bg-green-50 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-400"
+                      >
+                        Free now · walk-in
+                      </button>
                     ) : freeFrom?.kind === 'free' ? (
-                      <span className="text-[9px] leading-tight font-medium text-gray-600">Free {formatSlotLabel(freeFrom.atMinute)}</span>
+                      <span className="text-[9px] leading-tight font-medium text-gray-600">Free {formatSlotLabel(nextBookableFrom(column, freeFrom.atMinute))}</span>
                     ) : column.virtual ? (
                       <span className="flex items-center gap-1 text-[9px] leading-tight font-normal text-amber-600">
                         <AlertTriangle className="h-2.5 w-2.5" />
