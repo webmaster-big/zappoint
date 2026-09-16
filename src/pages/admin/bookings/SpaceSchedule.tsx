@@ -1144,6 +1144,12 @@ const SpaceSchedule = () => {
     return [...starts].sort((a, b) => a - b);
   };
 
+  /** The next minute staff can actually START a booking here, not just the first unoccupied minute. */
+  const nextBookableFrom = (column: ScheduleColumn, atMinute: number): number => {
+    const offered = offeredStartsFor(column, atMinute).filter(start => start >= atMinute);
+    return offered.length > 0 ? Math.min(...offered) : atMinute;
+  };
+
   const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number => {
     const interval = intervalForColumn(column);
     const columnClose = column.closeMinutes ?? timeWindow.end;
@@ -1725,7 +1731,7 @@ const SpaceSchedule = () => {
                         }
                         return (
                           <span className="text-[10px] font-medium text-gray-600">
-                            Free {formatTime12Hour(minutesToTime(state.atMinute))}
+                            Free {formatTime12Hour(minutesToTime(nextBookableFrom(column, state.atMinute)))}
                           </span>
                         );
                       })()}
