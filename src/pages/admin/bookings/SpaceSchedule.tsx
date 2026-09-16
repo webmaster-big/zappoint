@@ -24,6 +24,7 @@ import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
 import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
 import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES } from '../../../utils/bookingPrefill';
+import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
@@ -142,6 +143,7 @@ interface ScheduleColumn {
   name: string;
   capacity?: number;
   roomId?: number;
+  locationId?: number;
   virtual: boolean;
   openMinutes?: number | null;
   closeMinutes?: number | null;
@@ -609,6 +611,7 @@ const SpaceSchedule = () => {
         name: space.name,
         capacity: space.capacity,
         roomId: space.id,
+        locationId: space.location_id,
         virtual: false,
         openMinutes: roomWindows.get(space.id)?.open ?? null,
         closeMinutes: roomWindows.get(space.id)?.close ?? null,
@@ -622,6 +625,7 @@ const SpaceSchedule = () => {
         virtualMap.set(key, {
           key,
           name: b.package?.name || 'Unassigned',
+          locationId: packageWindow?.location_id ?? b.location_id ?? undefined,
           virtual: true,
           openMinutes: packageWindow?.open_minutes ?? null,
           closeMinutes: packageWindow?.close_minutes ?? null,
@@ -1076,13 +1080,19 @@ const SpaceSchedule = () => {
     const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
     const open = column.openMinutes ?? timeWindow.start;
     const close = column.closeMinutes ?? timeWindow.end;
+    // the space stays shut for its turnaround after a booking ends, so the booking page
+    // refuses that minute even though the band would otherwise look free
+    const turnaround = turnaroundFor(column);
 
     return [
       ...activeBookings
         .filter(b => columnKeyFor(b) === column.key)
         .map(b => {
           const startMinutes = timeToMinutes(b.booking_time);
-          return { startMinutes, endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) };
+          return {
+            startMinutes,
+            endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) + turnaround,
+          };
         }),
       ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end })) : []),
       ...(closure?.ranges || []).map(r => ({
@@ -1105,6 +1115,13 @@ const SpaceSchedule = () => {
     }
 
     return dayWindow?.interval_minutes ?? 15;
+  };
+
+  /** How long this space stays shut after a booking ends, mirroring the server's conflict check. */
+  const turnaroundFor = (column: ScheduleColumn): number => {
+    if (column.roomId === undefined) return DEFAULT_SLOT_CLEANUP_MINUTES;
+    const space = (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId);
+    return space?.interval_minutes && space.interval_minutes > 0 ? space.interval_minutes : DEFAULT_SLOT_CLEANUP_MINUTES;
   };
 
   const offeredStartsFor = (column: ScheduleColumn, minute: number): number[] => {
@@ -1172,7 +1189,7 @@ const SpaceSchedule = () => {
 
     navigate(
       buildBookingUrl({
-        locationId: effectiveLocationId ?? dayWindow?.location_id ?? null,
+        locationId: column.locationId ?? effectiveLocationId ?? dayWindow?.location_id ?? null,
         date: dateKeyOf(selectedDate),
         minute,
         roomId: column.roomId ?? null,

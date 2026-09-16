@@ -26,6 +26,7 @@ const MINUTES_PER_DAY = 24 * 60;
 const SLOT_HEIGHT = 30;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
+const DEFAULT_TURNAROUND_MINUTES = 15;
 
 export const SLOT_COLUMN_WIDTH = 64;
 export const ROOM_COLUMN_WIDTH = 132;
@@ -259,13 +260,18 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     for (const booking of source) {
       const key = columnKeyFor(booking);
       const startMinutes = startMinutesOf(booking);
+      // a space stays shut for its turnaround after a booking ends; without it the band looks
+      // free and the booking page then refuses that minute
+      const turnaround = booking.room_id
+        ? roomWindows.get(booking.room_id)?.interval_minutes || DEFAULT_TURNAROUND_MINUTES
+        : DEFAULT_TURNAROUND_MINUTES;
       const bucket = map.get(key);
-      const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) };
+      const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) + turnaround };
       if (bucket) bucket.push(range);
       else map.set(key, [range]);
     }
     return map;
-  }, [allDayBookings, bookings, columnKeyFor]);
+  }, [allDayBookings, bookings, columnKeyFor, roomWindows]);
 
   const positioned = useMemo(() => {
     const map = new Map<string, PositionedBooking[]>();
