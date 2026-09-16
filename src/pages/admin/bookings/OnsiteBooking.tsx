@@ -394,35 +394,11 @@ const OnsiteBooking: React.FC = () => {
     return Math.max(0, startMinutes + packageDurationMinutes - (slotPrefill.freeUntilMinutes ?? 0));
   }, [walkInSlot, slotPrefill.freeUntilKnown, slotPrefill.startMinutes, slotPrefill.freeUntilMinutes, packageDurationMinutes]);
 
-  const WALK_IN_STEP_MINUTES = 5;
-
   /**
-   * A scheduled booking must land on one of the package's start times, but a walk-in records when
-   * the guests actually go in. That is never on the package grid, so offer a 5-minute grid around
-   * the moment staff pressed the button — a little before it, for a group already inside.
+   * Only the start staff actually picked on the schedule. The 5-minute freedom belongs to the
+   * schedule click, not to this list — offering every 5-minute option here buried the real slots.
    */
-  const walkInSlots = useMemo<TimeSlot[]>(() => {
-    if (!walkInSlot) return [];
-
-    const anchor = slotPrefill.startMinutes ?? 0;
-    const offered = new Set(availableTimeSlots.map(slot => slot.start_time));
-    const slots: TimeSlot[] = [];
-
-    for (let minute = anchor - 15; minute <= anchor + 45; minute += WALK_IN_STEP_MINUTES) {
-      if (minute < 0 || minute >= 24 * 60) continue;
-
-      const start = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-      if (offered.has(start)) continue;
-
-      const endAbsolute = minute + packageDurationMinutes;
-      const end = `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`;
-      if (isTimeSlotRestricted(start, `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`)) continue;
-
-      slots.push({ ...walkInSlot, start_time: start, end_time: end });
-    }
-
-    return slots.length > 0 ? slots : [walkInSlot];
-  }, [walkInSlot, slotPrefill.startMinutes, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
+  const walkInSlots = useMemo<TimeSlot[]>(() => (walkInSlot ? [walkInSlot] : []), [walkInSlot]);
 
   const isWalkInStart = useCallback(
     (startTime: string) => walkInSlots.some(slot => slot.start_time === startTime),

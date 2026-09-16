@@ -623,24 +623,11 @@ const EditBooking: React.FC = () => {
 
   const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? packageDetails?.min_participants ?? 1));
 
-  const filteredTimeSlots = availableTimeSlots.filter(slot => {
-    if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
-
-    const noticeHoursValue = Number(packageDetails?.min_booking_notice_hours) || 0;
-    if (noticeHoursValue > 0 && formData.date) {
-      const now = new Date();
-      const noticeMs = noticeHoursValue * 60 * 60 * 1000;
-      const earliestBookableTime = new Date(now.getTime() + noticeMs);
-
-      const [slotHours, slotMinutes] = slot.start_time.split(':').map(Number);
-      const slotDate = parseLocalDate(formData.date);
-      slotDate.setHours(slotHours, slotMinutes, 0, 0);
-
-      if (slotDate < earliestBookableTime) return false;
-    }
-
-    return true;
-  });
+  // the package's advance booking notice is a rule for CUSTOMERS booking online; staff working
+  // the desk are not held to it, so it never thins the admin list
+  const filteredTimeSlots = availableTimeSlots.filter(
+    slot => !isTimeSlotRestricted(slot.start_time, slot.end_time)
+  );
 
   /**
    * Availability no longer offers starts that have already passed, so a booking being edited later
@@ -692,16 +679,9 @@ const EditBooking: React.FC = () => {
     const bookingWindowDays = packageWindow ?? locationWindow ?? null;
     const maxDays = bookingWindowDays === null ? 730 : Math.max(1, bookingWindowDays);
 
-    const noticeHours = Number(packageDetails.min_booking_notice_hours) || 0;
-    const earliestBookableTime = new Date(today.getTime() + noticeHours * 60 * 60 * 1000);
-    const earliestBookableDate = new Date(earliestBookableTime.getFullYear(), earliestBookableTime.getMonth(), earliestBookableTime.getDate());
-
     for (let i = 0; i < maxDays; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
-
-      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      if (dateOnly < earliestBookableDate) continue;
 
       let isAvailable = false;
 
