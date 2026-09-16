@@ -23,7 +23,7 @@ import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayS
 import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
 import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
-import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES, WALK_IN_REACH_MINUTES } from '../../../utils/bookingPrefill';
+import { buildBookingUrl, snapToInterval, snapToOfferedStart } from '../../../utils/bookingPrefill';
 import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 
 const parseLocalDate = (isoDateString: string): Date => {
@@ -978,8 +978,10 @@ const SpaceSchedule = () => {
     const { booking } = item;
     const color = packageColorFor(booking.package?.name || '');
     const laneWidth = 100 / item.laneCount;
-    const compact = item.height < 56;
-    const medium = item.height >= 56 && item.height < 100;
+    // below one line of text there is no room for a label, so show the block alone
+    const tiny = item.height < 24;
+    const compact = !tiny && item.height < 60;
+    const medium = item.height >= 60 && item.height < 140;
     const timeLabel = `${formatTime12Hour(booking.booking_time)} – ${formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}`;
     const inProgress = isMichiganToday && nowMinutes >= item.startMin && nowMinutes < item.endMin;
     const needsCheckIn = inProgress && booking.status !== 'checked-in';
@@ -998,8 +1000,8 @@ const SpaceSchedule = () => {
           width: `calc(${laneWidth}% - 6px)`,
         }}
       >
-        <div className={`h-full flex flex-col ${compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
-          {compact ? (
+        <div className={`h-full flex flex-col ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
+          {tiny ? null : compact ? (
             <div className={`flex items-center gap-1.5 text-xs ${color.text} min-w-0`}>
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                 booking.status === 'confirmed' ? 'bg-green-500' :
@@ -1012,19 +1014,21 @@ const SpaceSchedule = () => {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full text-white flex-shrink-0 ${
-                  booking.status === 'confirmed' ? 'bg-green-500' :
-                  booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
-                }`}>
-                  {booking.status}
-                </span>
-                <span className={`text-[10px] font-medium ${color.text} opacity-70 truncate`}>
-                  #{booking.reference_number?.slice(-6)}
-                </span>
-              </div>
-              <div className={`font-bold text-xs ${color.text} flex items-center gap-1.5`}>
-                {timeLabel}
+              {!medium && (
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full text-white flex-shrink-0 ${
+                    booking.status === 'confirmed' ? 'bg-green-500' :
+                    booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
+                  }`}>
+                    {booking.status}
+                  </span>
+                  <span className={`text-[10px] font-medium ${color.text} opacity-70 truncate`}>
+                    #{booking.reference_number?.slice(-6)}
+                  </span>
+                </div>
+              )}
+              <div className={`font-bold text-xs ${color.text} flex items-center gap-1.5 truncate`}>
+                <span className="truncate">{timeLabel}</span>
                 {needsCheckIn && (
                   <span className="flex items-center gap-0.5 px-1.5 py-px rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">
                     <AlertCircle className="w-2.5 h-2.5" />
@@ -1145,20 +1149,10 @@ const SpaceSchedule = () => {
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
     const floor = isMichiganToday ? nowMinutes : undefined;
-    // A click at the now line is a walk-in starting on the spot, so it keeps the fine grid.
-    // Anything further ahead is a planned booking and must land on a real start time, or the
-    // booking page will refuse it.
-    const isWalkInNow = isMichiganToday && rawMinute <= nowMinutes + WALK_IN_REACH_MINUTES;
-    const onGrid = !isWalkInNow && offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
-
-    const snapped =
-      onGrid ??
-      (isMichiganToday
-        ? Math.max(
-            snapToInterval(rawMinute, WALK_IN_SNAP_MINUTES),
-            snapToInterval(nowMinutes, WALK_IN_SNAP_MINUTES)
-          )
-        : snapToInterval(rawMinute, interval, floor));
+    // Always land on a start time the packages in this space actually offer, today included —
+    // the interval is only a fallback for a stretch no package covers.
+    const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
+    const snapped = onGrid ?? snapToInterval(rawMinute, interval, floor);
     const columnOpen = column.openMinutes ?? timeWindow.start;
     const blocked = blockedRangesFor(column);
     const free = nextFreeMinute(columnOpen, columnClose, blocked, snapped);

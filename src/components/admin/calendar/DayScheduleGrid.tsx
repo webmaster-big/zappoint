@@ -8,7 +8,7 @@ import { FALLBACK_DAY_WINDOW } from '../../../services/ScheduleWindowService';
 import { customerNameOf } from '../../../utils/bookingSearch';
 import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeFormat';
 import { resolvePaymentState } from '../../../types/Bookings.types';
-import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES, WALK_IN_REACH_MINUTES } from '../../../utils/bookingPrefill';
+import { buildBookingUrl, snapToInterval, snapToOfferedStart } from '../../../utils/bookingPrefill';
 import type { TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
 import {
@@ -442,18 +442,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
       const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
-      // a click at the now line is a walk-in starting on the spot and keeps the fine grid;
-      // anything further ahead is a planned booking and must land on a real start time
-      const isWalkInNow = isViewingToday && rawMinute <= nowMinutes + WALK_IN_REACH_MINUTES;
-      const onGrid = !isWalkInNow && offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
-      const snapped =
-        onGrid ??
-        (isViewingToday
-          ? Math.max(
-              snapToInterval(rawMinute, WALK_IN_SNAP_MINUTES),
-              snapToInterval(nowMinutes, WALK_IN_SNAP_MINUTES)
-            )
-          : snapToInterval(rawMinute, timeline.interval, floor));
+      // always land on a start time the packages in this space actually offer, today included
+      const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
+      const snapped = onGrid ?? snapToInterval(rawMinute, timeline.interval, floor);
 
       const blocked = [
         ...(occupancy.get(column.key) ?? []),
@@ -804,12 +795,16 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
                           }}
                         >
-                          <span className="text-[9px] leading-tight font-bold leading-tight tabular-nums text-gray-700">
-                            {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
-                          </span>
-                          <span className="truncate text-xs font-semibold leading-tight text-gray-900">
-                            {customerNameOf(item.booking)}
-                          </span>
+                          {height >= 34 && (
+                            <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
+                              {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
+                            </span>
+                          )}
+                          {height >= 18 && (
+                            <span className="truncate text-xs font-semibold leading-tight text-gray-900">
+                              {customerNameOf(item.booking)}
+                            </span>
+                          )}
                           {height > 52 && (
                             <span className="truncate text-[9px] leading-tight leading-tight text-gray-600">
                               {item.booking.package?.name || 'No package'}

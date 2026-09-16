@@ -26,11 +26,6 @@ export interface BookingPrefill {
 
 export const BOOKING_CREATE_PATH = '/bookings/create';
 
-export const WALK_IN_SNAP_MINUTES = 5;
-
-/** How far past "now" a click still counts as a walk-in starting on the spot. */
-export const WALK_IN_REACH_MINUTES = 30;
-
 export function minutesToClock(minute: number): string {
   if (!Number.isFinite(minute)) return '00:00';
   const wrapped = ((Math.round(minute) % 1440) + 1440) % 1440;
