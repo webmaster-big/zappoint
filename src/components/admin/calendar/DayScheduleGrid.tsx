@@ -553,11 +553,18 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
       const onFive = (minute: number) => Math.round(minute / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+      const floor = onFive(columnOpen);
 
-      const snapped = Math.min(
-        Math.max(onFive(rawMinute), onFive(columnOpen)),
-        Math.max(onFive(columnOpen), columnClose - WALK_IN_STEP_MINUTES)
-      );
+      // a booking still has to finish before the space closes, so the last start is a whole package
+      // duration back from closing — not five minutes back
+      const startable = new Set(packagesForSlot(column, onFive(rawMinute)));
+      const durations = (windowData.packages ?? [])
+        .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+        .map(entry => entry.duration_minutes as number);
+      const shortest = durations.length > 0 ? Math.min(...durations) : WALK_IN_STEP_MINUTES;
+      const ceiling = Math.max(floor, columnClose - shortest);
+
+      const snapped = Math.min(Math.max(onFive(rawMinute), floor), ceiling);
 
       const blocked = [
         ...(occupancy.get(column.key) ?? []),
@@ -569,12 +576,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
       if (free === null || free === snapped) return snapped;
 
-      return Math.min(
-        Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES,
-        columnClose - WALK_IN_STEP_MINUTES
-      );
+      return Math.min(Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES, ceiling);
     },
-    [occupancy, roomBreaks, timeline]
+    [occupancy, roomBreaks, timeline, packagesForSlot, windowData]
   );
 
   /** A walk-in runs for the package's duration, so it is only possible if one fits before the next booking. */

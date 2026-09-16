@@ -1427,22 +1427,33 @@ const SpaceSchedule = () => {
    * are not held to it: a walk-in starts when the guests actually walk in, so a click on the
    * admin schedule lands on a 5-minute grid and 4:05 or 4:10 is a perfectly good start.
    */
+  /** The shortest package that can actually start at this minute, used to keep a start inside the day. */
+  const shortestDurationAt = (column: ScheduleColumn, minute: number): number => {
+    const startable = new Set(packagesForSlot(column, minute));
+    const durations = (dayWindow?.packages ?? [])
+      .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+      .map(entry => entry.duration_minutes as number);
+
+    return durations.length > 0 ? Math.min(...durations) : WALK_IN_STEP_MINUTES;
+  };
+
   const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number => {
     const columnOpen = column.openMinutes ?? timeWindow.start;
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const onFive = (minute: number) => Math.round(minute / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+    const floor = onFive(columnOpen);
+    // a booking still has to finish before the space closes, so the last start is a whole package
+    // duration back from closing — not five minutes back
+    const ceiling = Math.max(floor, columnClose - shortestDurationAt(column, onFive(rawMinute)));
 
-    const snapped = Math.min(
-      Math.max(onFive(rawMinute), onFive(columnOpen)),
-      Math.max(onFive(columnOpen), columnClose - WALK_IN_STEP_MINUTES)
-    );
+    const snapped = Math.min(Math.max(onFive(rawMinute), floor), ceiling);
 
     // only move if the click landed inside something already booked
     const free = nextFreeMinute(columnOpen, columnClose, blockedRangesFor(column), snapped);
 
     if (free === null || free === snapped) return snapped;
 
-    return Math.min(Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES, columnClose - WALK_IN_STEP_MINUTES);
+    return Math.min(Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES, ceiling);
   };
 
   /**
