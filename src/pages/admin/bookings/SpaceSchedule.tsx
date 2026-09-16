@@ -815,24 +815,49 @@ const SpaceSchedule = () => {
     return map;
   }, [columns, filteredBookings, activeBookings, timeWindow, columnKeyFor, pxPerMinute, dayWindow]);
 
-  /** Every clashing pair on this day, so staff see it without hovering a single block. */
+  /**
+   * Every clashing pair on this day, derived from the live bookings rather than from the blocks
+   * currently drawn — a filter that hides both sides of a clash must not hide the clash itself.
+   */
   const overlapSummary = useMemo(() => {
     const rows: { columnName: string; a: Booking; b: Booking; overlapMinutes: number }[] = [];
-    const seen = new Set<string>();
 
     for (const column of columns) {
-      for (const item of positionedByColumn.get(column.key) ?? []) {
-        for (const clash of item.conflicts) {
-          const key = [item.booking.id, clash.booking.id].sort((x, y) => x - y).join('-');
-          if (seen.has(key)) continue;
-          seen.add(key);
-          rows.push({ columnName: column.name, a: item.booking, b: clash.booking, overlapMinutes: clash.overlapMinutes });
+      const space = column.roomId !== undefined
+        ? (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId)
+        : undefined;
+      const turnaround = column.roomId === undefined ? 0 : space?.interval_minutes ?? 0;
+
+      const inColumn = activeBookings
+        .filter(b => columnKeyFor(b) === column.key)
+        .map(b => {
+          const startMinutes = timeToMinutes(b.booking_time);
+          return {
+            booking: b,
+            startMinutes,
+            endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)),
+          };
+        })
+        .sort((x, y) => x.startMinutes - y.startMinutes);
+
+      for (let i = 0; i < inColumn.length; i++) {
+        for (let j = i + 1; j < inColumn.length; j++) {
+          const a = inColumn[i];
+          const b = inColumn[j];
+          if (!(a.startMinutes < b.endMinutes + turnaround && a.endMinutes + turnaround > b.startMinutes)) continue;
+
+          rows.push({
+            columnName: column.name,
+            a: a.booking,
+            b: b.booking,
+            overlapMinutes: Math.max(0, Math.min(a.endMinutes, b.endMinutes) - Math.max(a.startMinutes, b.startMinutes)),
+          });
         }
       }
     }
 
     return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
-  }, [columns, positionedByColumn]);
+  }, [columns, activeBookings, columnKeyFor, dayWindow]);
 
   const freeFromByColumn = useMemo(() => {
     const map = new Map<string, FreeState>();
@@ -1211,24 +1236,28 @@ const SpaceSchedule = () => {
       .map(entry => entry.package_id);
   };
 
-  const blockedRangesFor = (column: ScheduleColumn): TimeRange[] => {
+  /** Bookings only. The space stays shut for its turnaround after each one. */
+  const bookingRangesFor = (column: ScheduleColumn): TimeRange[] => {
+    const turnaround = turnaroundFor(column);
+
+    return activeBookings
+      .filter(b => columnKeyFor(b) === column.key)
+      .map(b => {
+        const startMinutes = timeToMinutes(b.booking_time);
+        return {
+          startMinutes,
+          endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) + turnaround,
+        };
+      });
+  };
+
+  /** Breaks and closures. The server buffers neither, so neither may the grid. */
+  const hardRangesFor = (column: ScheduleColumn): TimeRange[] => {
     const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
     const open = column.openMinutes ?? timeWindow.start;
     const close = column.closeMinutes ?? timeWindow.end;
-    // the space stays shut for its turnaround after a booking ends, so the booking page
-    // refuses that minute even though the band would otherwise look free
-    const turnaround = turnaroundFor(column);
 
     return [
-      ...activeBookings
-        .filter(b => columnKeyFor(b) === column.key)
-        .map(b => {
-          const startMinutes = timeToMinutes(b.booking_time);
-          return {
-            startMinutes,
-            endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) + turnaround,
-          };
-        }),
       ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end })) : []),
       ...(closure?.ranges || []).map(r => ({
         startMinutes: r.time_start ? timeToMinutes(r.time_start) : open,
@@ -1236,6 +1265,11 @@ const SpaceSchedule = () => {
       })),
     ];
   };
+
+  const blockedRangesFor = (column: ScheduleColumn): TimeRange[] => [
+    ...bookingRangesFor(column),
+    ...hardRangesFor(column),
+  ];
 
   const intervalForColumn = (column: ScheduleColumn): number => {
     const intervals = packagesForColumn(column)
@@ -1288,11 +1322,18 @@ const SpaceSchedule = () => {
   const usableFreeUntil = (column: ScheduleColumn, minute: number): number | null => {
     const columnOpen = column.openMinutes ?? timeWindow.start;
     const columnClose = column.closeMinutes ?? timeWindow.end;
-    const until = freeUntilMinute(columnOpen, columnClose, blockedRangesFor(column), minute);
 
-    if (until === null) return null;
+    const untilBooking = freeUntilMinute(columnOpen, columnClose, bookingRangesFor(column), minute);
+    const untilHard = freeUntilMinute(columnOpen, columnClose, hardRangesFor(column), minute);
 
-    return until >= columnClose ? until : Math.max(minute, until - turnaroundFor(column));
+    if (untilBooking === null || untilHard === null) return null;
+
+    // a booking must clear the turnaround before the NEXT BOOKING; a break or a closure needs no
+    // such gap, so buffering it there would hide starts the booking page still accepts
+    const bookingCap =
+      untilBooking >= columnClose ? untilBooking : Math.max(minute, untilBooking - turnaroundFor(column));
+
+    return Math.min(bookingCap, untilHard);
   };
 
   /**

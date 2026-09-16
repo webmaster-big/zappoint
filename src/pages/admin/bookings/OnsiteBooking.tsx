@@ -344,7 +344,12 @@ const OnsiteBooking: React.FC = () => {
   const walkInSlot = useMemo<TimeSlot | null>(() => {
     if (!slotPrefill.walkIn || !slotPrefill.time || !selectedPackage) return null;
     if (!bookingData.date || bookingData.date !== slotPrefill.date) return null;
-    if (availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) return null;
+    const serverOffersThisSpace = availableTimeSlots.some(
+      slot =>
+        slot.start_time === slotPrefill.time &&
+        (!slotPrefill.roomId || (slot.available_room_ids ?? []).includes(slotPrefill.roomId))
+    );
+    if (serverOffersThisSpace) return null;
 
     if (slotPrefill.roomId && !packageServesRoom(selectedPackage, slotPrefill.roomId)) return null;
 
@@ -1106,6 +1111,17 @@ const OnsiteBooking: React.FC = () => {
       // time; the slot only names one of possibly several free spaces
       const clicked = slotPrefill.roomId;
       const clickedIsFree = clicked != null && (serverSlot.available_room_ids ?? []).includes(clicked);
+
+      // staff who pressed "Start anyway" chose THIS space on purpose — never move them
+      if (clicked != null && !clickedIsFree && slotPrefill.walkInOverride) {
+        setSelectedRoomId(clicked);
+        setToast({
+          message: 'Kept in the space you picked, even though it is taken at this time — the schedule will flag the overlap.',
+          type: 'error',
+        });
+
+        return;
+      }
 
       setSelectedRoomId(clickedIsFree ? clicked : serverSlot.room_id ?? null);
 

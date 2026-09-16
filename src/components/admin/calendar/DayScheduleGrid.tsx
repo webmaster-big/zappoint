@@ -337,24 +337,46 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     return map;
   }, [columns, bookings, allDayBookings, columnKeyFor, roomWindows]);
 
-  /** Every clashing pair today, so staff see it without hovering a single block. */
+  /**
+   * Every clashing pair today, derived from the live bookings rather than from the blocks this
+   * grid happens to draw — a filter that hides both sides of a clash must not hide the clash.
+   */
   const overlapSummary = useMemo(() => {
     const rows: { columnName: string; a: Booking; b: Booking; overlapMinutes: number }[] = [];
-    const seen = new Set<string>();
+    const source = allDayBookings ?? bookings;
 
     for (const column of columns) {
-      for (const item of positioned.get(column.key) ?? []) {
-        for (const clash of item.conflicts) {
-          const key = [item.booking.id, clash.booking.id].sort((x, y) => x - y).join('-');
-          if (seen.has(key)) continue;
-          seen.add(key);
-          rows.push({ columnName: column.name, a: item.booking, b: clash.booking, overlapMinutes: clash.overlapMinutes });
+      const turnaroundOf = (roomId?: number | null) =>
+        roomId ? roomWindows.get(roomId)?.interval_minutes ?? 0 : 0;
+
+      const inColumn = source
+        .filter(b => columnKeyFor(b) === column.key)
+        .map(b => {
+          const startMinutes = startMinutesOf(b);
+          return { booking: b, startMinutes, endMinutes: startMinutes + durationMinutesOf(b) };
+        })
+        .sort((x, y) => x.startMinutes - y.startMinutes);
+
+      for (let i = 0; i < inColumn.length; i++) {
+        for (let j = i + 1; j < inColumn.length; j++) {
+          const a = inColumn[i];
+          const b = inColumn[j];
+          const ta = turnaroundOf(a.booking.room_id);
+          const tb = turnaroundOf(b.booking.room_id);
+          if (!(a.startMinutes < b.endMinutes + tb && a.endMinutes + ta > b.startMinutes)) continue;
+
+          rows.push({
+            columnName: column.name,
+            a: a.booking,
+            b: b.booking,
+            overlapMinutes: Math.max(0, Math.min(a.endMinutes, b.endMinutes) - Math.max(a.startMinutes, b.startMinutes)),
+          });
         }
       }
     }
 
     return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
-  }, [columns, positioned]);
+  }, [columns, allDayBookings, bookings, columnKeyFor, roomWindows]);
 
   const timeline = useMemo(
     () =>
@@ -562,20 +584,26 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     (column: ScheduleColumn, minute: number): number | null => {
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
-      const blocked = [
-        ...(occupancy.get(column.key) ?? []),
-        ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
-        ...column.closedRanges,
-      ];
-      const until = freeUntilMinute(columnOpen, columnClose, blocked, minute);
+      const untilBooking = freeUntilMinute(columnOpen, columnClose, occupancy.get(column.key) ?? [], minute);
+      const untilHard = freeUntilMinute(
+        columnOpen,
+        columnClose,
+        [...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []), ...column.closedRanges],
+        minute
+      );
 
-      if (until === null) return null;
+      if (untilBooking === null || untilHard === null) return null;
 
       const turnaround = column.roomId
         ? roomWindows.get(column.roomId)?.interval_minutes ?? 0
         : 0;
 
-      return until >= columnClose ? until : Math.max(minute, until - turnaround);
+      // the turnaround is owed to the next BOOKING; a break or closure needs no such gap, and
+      // buffering it there would hide starts the booking page still accepts
+      const bookingCap =
+        untilBooking >= columnClose ? untilBooking : Math.max(minute, untilBooking - turnaround);
+
+      return Math.min(bookingCap, untilHard);
     },
     [occupancy, roomBreaks, roomWindows, timeline]
   );
