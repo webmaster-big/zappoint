@@ -76,7 +76,9 @@ const dateKeyOf = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const ZOOM_LEVELS = [1, 1.6, 2.4];
+// the tightest zoom still has to leave a short booking — a 20 minute escape room — enough
+// height to read its guest and time without opening the modal
+const ZOOM_LEVELS = [1.6, 2.4, 3.6];
 const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
@@ -991,6 +993,17 @@ const SpaceSchedule = () => {
         key={booking.id}
         type="button"
         onClick={() => setSelectedBooking(booking)}
+        title={[
+          booking.guest_name || 'Walk-in',
+          timeLabel,
+          booking.package?.name,
+          `${booking.participants} ${booking.participants === 1 ? 'guest' : 'guests'}`,
+          booking.status,
+          `$${Number(booking.total_amount || 0).toFixed(2)} · ${resolvePaymentState(booking).label}`,
+          booking.reference_number ? `#${booking.reference_number}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n')}
         className={`absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm hover:shadow-md hover:brightness-[0.98] transition overflow-hidden z-10 ${
           needsCheckIn ? 'ring-2 ring-red-400' : inProgress ? 'ring-2 ring-emerald-400' : ''
         }`}
