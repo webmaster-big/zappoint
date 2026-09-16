@@ -981,7 +981,7 @@ const Rooms: React.FC = () => {
                                                         name="booking_interval"
                                                         value={formData.booking_interval}
                                                         onChange={handleInputChange}
-                                                        min="5"
+                                                        min="0"
                                                         max="120"
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
@@ -1495,7 +1495,7 @@ const Rooms: React.FC = () => {
                                                 name="booking_interval"
                                                 value={formData.booking_interval}
                                                 onChange={handleInputChange}
-                                                min="5"
+                                                min="0"
                                                 max="120"
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="15"
