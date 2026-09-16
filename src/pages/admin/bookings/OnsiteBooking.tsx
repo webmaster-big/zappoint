@@ -11,7 +11,8 @@ import EmailInput from '../../../components/ui/EmailInput';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { 
   OnsiteBookingPackage, 
-  OnsiteBookingData 
+  OnsiteBookingData,
+  OnsiteBookingRoom
 } from '../../../types/onsiteBooking.types';
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
 import { promoService } from '../../../services/PromoService';
@@ -248,6 +249,15 @@ const OnsiteBooking: React.FC = () => {
     return formatDurationDisplay(pkg.duration, pkg.durationUnit);
   };
 
+  const packageServesRoom = (pkg: OnsiteBookingPackage | null | undefined, roomId: number): boolean => {
+    const rooms = pkg?.rooms;
+    if (!rooms || rooms.length === 0) return true;
+    const ids = rooms
+      .map(room => (typeof room === 'object' && room !== null ? Number((room as OnsiteBookingRoom).id) : NaN))
+      .filter(id => Number.isInteger(id));
+    return ids.length === 0 ? true : ids.includes(roomId);
+  };
+
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
     if (!bookingData.date || dayOffsWithTime.length === 0 || !selectedPackage) return false;
     
@@ -318,6 +328,50 @@ const OnsiteBooking: React.FC = () => {
 
   const filteredTimeSlots = availableTimeSlots.filter(slot => 
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
+  );
+
+  const packageDurationMinutes = useMemo(() => {
+    if (!selectedPackage) return 0;
+    const value = Number(selectedPackage.duration);
+    if (!Number.isFinite(value) || value <= 0) return 60;
+    const unit = selectedPackage.durationUnit || 'hours';
+    if (unit === 'minutes') return Math.round(value);
+    if (unit === 'hours and minutes') return Math.floor(value) * 60 + Math.round((value % 1) * 60);
+    return Math.round(value * 60);
+  }, [selectedPackage]);
+
+  const walkInSlot = useMemo<TimeSlot | null>(() => {
+    if (!slotPrefill.walkIn || !slotPrefill.time || !selectedPackage) return null;
+    if (!bookingData.date || bookingData.date !== slotPrefill.date) return null;
+    if (availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) return null;
+
+    const [hours, minutes] = slotPrefill.time.split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+    const startMinutes = hours * 60 + minutes;
+    const endAbsolute = startMinutes + packageDurationMinutes;
+
+    if (!slotPrefill.freeUntilKnown || endAbsolute > (slotPrefill.freeUntilMinutes ?? -1)) return null;
+
+    const endTime = `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`;
+
+    if (isTimeSlotRestricted(slotPrefill.time, `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`)) return null;
+
+    return {
+      start_time: slotPrefill.time,
+      end_time: endTime,
+      duration: Number(selectedPackage.duration) || 0,
+      duration_unit: selectedPackage.durationUnit || 'hours',
+      room_id: slotPrefill.roomId ?? null,
+    };
+  }, [slotPrefill, selectedPackage, bookingData.date, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
+
+  const displayedTimeSlots = useMemo(
+    () =>
+      (walkInSlot ? [...filteredTimeSlots, walkInSlot] : filteredTimeSlots)
+        .slice()
+        .sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    [filteredTimeSlots, walkInSlot]
   );
 
 
@@ -935,8 +989,9 @@ const OnsiteBooking: React.FC = () => {
         date: slotPrefill.date ?? prev.date,
         time: slotPrefill.time ?? prev.time,
       }));
-      if (slotPrefill.roomId) setSelectedRoomId(slotPrefill.roomId);
+      if (slotPrefill.roomId && packageServesRoom(pkg, slotPrefill.roomId)) setSelectedRoomId(slotPrefill.roomId);
       prefillTimeChecked.current = false;
+      prefillLanded.current = true;
     }
 
     setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
@@ -960,8 +1015,8 @@ const OnsiteBooking: React.FC = () => {
         date: slotPrefill.date ?? prev.date,
         time: slotPrefill.time ?? prev.time,
       }));
-      if (slotPrefill.roomId) setSelectedRoomId(slotPrefill.roomId);
-      prefillLanded.current = true;
+      if (slotPrefill.roomId && (!pkg || packageServesRoom(pkg, slotPrefill.roomId))) setSelectedRoomId(slotPrefill.roomId);
+      prefillLanded.current = Boolean(pkg);
     };
 
     if (pkg) {
@@ -981,18 +1036,25 @@ const OnsiteBooking: React.FC = () => {
     if (!prefillApplied.current || prefillTimeChecked.current) return;
     if (!slotPrefill.time || loadingTimeSlots) return;
     if (!bookingData.date) return;
-    if (availableTimeSlots.length === 0) return;
 
     prefillTimeChecked.current = true;
 
-    if (!availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) {
-      setBookingData(prev => ({ ...prev, time: '' }));
+    if (availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) return;
+
+    if (walkInSlot) {
       setToast({
-        message: 'That start time is no longer offered for this package — pick another below.',
+        message: `Walk-in start kept at ${formatTimeTo12Hour(slotPrefill.time)} — it is outside this package's usual start times.`,
         type: 'info',
       });
+      return;
     }
-  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, bookingData.date]);
+
+    setBookingData(prev => ({ ...prev, time: '' }));
+    setToast({
+      message: 'That start time is no longer offered for this package — pick another below.',
+      type: 'info',
+    });
+  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, bookingData.date]);
 
   const handleAttractionToggle = (attractionId: string) => {
     setBookingData(prev => {
@@ -1102,9 +1164,9 @@ const OnsiteBooking: React.FC = () => {
         await searchCustomerByEmail(value);
       }
     } else if (name === 'time') {
-      const selectedSlot = availableTimeSlots.find(slot => slot.start_time === value);
+      const selectedSlot = displayedTimeSlots.find(slot => slot.start_time === value);
+      setSelectedRoomId(selectedSlot?.room_id ?? null);
       if (selectedSlot && selectedSlot.room_id) {
-        setSelectedRoomId(selectedSlot.room_id);
         console.log('🏠 Room auto-assigned from time slot:', {
           time: value,
           room_id: selectedSlot.room_id,
@@ -2265,6 +2327,15 @@ const OnsiteBooking: React.FC = () => {
             <Clock className="w-4 h-4 mr-2" />
             Select Time Slot
           </label>
+          {walkInSlot && bookingData.time === walkInSlot.start_time && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-semibold">Walk-in</span>
+              <span>
+                Starting at <strong>{formatTimeTo12Hour(bookingData.time)}</strong> today
+                {selectedPackage ? ` — ${formatDuration(selectedPackage)}` : ''}. This is the time that will be recorded.
+              </span>
+            </div>
+          )}
           {loadingTimeSlots ? (
             <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg">
               <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
@@ -2272,8 +2343,8 @@ const OnsiteBooking: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {filteredTimeSlots.length > 0 ? (
-                filteredTimeSlots.map((slot) => (
+              {displayedTimeSlots.length > 0 ? (
+                displayedTimeSlots.map((slot) => (
                   <label 
                     key={slot.start_time} 
                     className={`flex flex-col p-3 rounded-lg border-2 cursor-pointer transition-all ${
@@ -2292,7 +2363,9 @@ const OnsiteBooking: React.FC = () => {
                         className={`accent-${fullColor} w-4 h-4`}
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
-                      {slot.remaining_tickets != null && !slot.exclusive && (
+                      {slot === walkInSlot ? (
+                        <span className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">Walk-in</span>
+                      ) : slot.remaining_tickets != null && !slot.exclusive && (
                         <span className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${slot.remaining_tickets <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{slot.remaining_tickets} left</span>
                       )}
                     </div>

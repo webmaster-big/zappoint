@@ -21,9 +21,9 @@ import type { Room } from '../../../services/RoomService';
 import { resolvePaymentState } from '../../../types/Bookings.types';
 import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayScheduleView';
 import { cardFromPayments } from '../../../utils/cardLabel';
-import type { FreeState } from '../../../utils/scheduleGeometry';
-import { freeState, minuteAtOffset } from '../../../utils/scheduleGeometry';
-import { buildBookingUrl, snapToInterval } from '../../../utils/bookingPrefill';
+import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
+import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
+import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES } from '../../../utils/bookingPrefill';
 
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
@@ -1053,29 +1053,121 @@ const SpaceSchedule = () => {
     );
   };
 
-  const packageForSlot = (column: ScheduleColumn, minute: number): number | null => {
+  const packagesForSlot = (column: ScheduleColumn, minute: number): number[] => {
     if (column.virtual) {
       const id = Number(column.key.replace('pkg-', ''));
-      return Number.isInteger(id) && id > 0 ? id : null;
+      return Number.isInteger(id) && id > 0 ? [id] : [];
     }
-    const candidates = (dayWindow?.packages ?? []).filter(
-      entry =>
-        column.roomId !== undefined &&
-        entry.room_ids.includes(column.roomId) &&
-        minute >= entry.open_minutes &&
-        minute < entry.close_minutes
-    );
-    return candidates.length === 1 ? candidates[0].package_id : null;
+    return (dayWindow?.packages ?? [])
+      .filter(
+        entry =>
+          column.roomId !== undefined &&
+          entry.room_ids.includes(column.roomId) &&
+          minute >= entry.open_minutes &&
+          minute < entry.close_minutes &&
+          !(entry.closed_ranges ?? []).some(
+            range => minute >= range.start_minutes && minute < range.end_minutes
+          )
+      )
+      .map(entry => entry.package_id);
   };
 
-  const openBookingForSlot = (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const clickedMinute = minuteAtOffset(originMinute, event.clientY - bounds.top, pxPerMinute);
-    const minute = snapToInterval(
-      clickedMinute,
-      dayWindow?.interval_minutes ?? 15,
-      isMichiganToday ? nowMinutes : undefined
+  const blockedRangesFor = (column: ScheduleColumn): TimeRange[] => {
+    const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
+    const open = column.openMinutes ?? timeWindow.start;
+    const close = column.closeMinutes ?? timeWindow.end;
+
+    return [
+      ...activeBookings
+        .filter(b => columnKeyFor(b) === column.key)
+        .map(b => {
+          const startMinutes = timeToMinutes(b.booking_time);
+          return { startMinutes, endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) };
+        }),
+      ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end })) : []),
+      ...(closure?.ranges || []).map(r => ({
+        startMinutes: r.time_start ? timeToMinutes(r.time_start) : open,
+        endMinutes: r.time_end ? timeToMinutes(r.time_end) : close,
+      })),
+    ];
+  };
+
+  const intervalForColumn = (column: ScheduleColumn): number => {
+    if (column.roomId !== undefined) {
+      const space = (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId);
+      if (space?.interval_minutes) return space.interval_minutes;
+    }
+
+    if (column.virtual) {
+      const packageId = Number(column.key.replace('pkg-', ''));
+      const entry = (dayWindow?.packages ?? []).find(candidate => candidate.package_id === packageId);
+      if (entry?.interval_minutes) return entry.interval_minutes;
+    }
+
+    return dayWindow?.interval_minutes ?? 15;
+  };
+
+  const offeredStartsFor = (column: ScheduleColumn, minute: number): number[] => {
+    const ids = packagesForSlot(column, minute);
+    if (ids.length === 0) return [];
+
+    const starts = new Set<number>();
+    for (const id of ids) {
+      const entry = (dayWindow?.packages ?? []).find(candidate => candidate.package_id === id);
+      for (const start of entry?.start_minutes ?? []) starts.add(start);
+    }
+
+    return [...starts].sort((a, b) => a - b);
+  };
+
+  const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number => {
+    const interval = intervalForColumn(column);
+    const columnClose = column.closeMinutes ?? timeWindow.end;
+    const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
+    const floor = isMichiganToday ? nowMinutes : undefined;
+    const onGrid = !isMichiganToday && offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
+
+    const snapped =
+      onGrid ??
+      (isMichiganToday
+        ? Math.max(
+            snapToInterval(rawMinute, WALK_IN_SNAP_MINUTES),
+            snapToInterval(nowMinutes, WALK_IN_SNAP_MINUTES)
+          )
+        : snapToInterval(rawMinute, interval, floor));
+    const columnOpen = column.openMinutes ?? timeWindow.start;
+    const blocked = blockedRangesFor(column);
+    const free = nextFreeMinute(columnOpen, columnClose, blocked, snapped);
+
+    if (free === null || free === snapped) return snapped;
+
+    const fromFree = snapToInterval(free, interval, isMichiganToday ? Math.max(free, nowMinutes) : free);
+
+    if (onGrid === null) return fromFree;
+
+    const freeOffered = offered.find(
+      start => start >= free && nextFreeMinute(columnOpen, columnClose, blocked, start) === start
     );
+
+    return freeOffered ?? fromFree;
+  };
+
+  /**
+   * Auto-select only a package that really has a start at this minute — otherwise the booking
+   * page refuses the prefilled time. The full list is still offered so staff can choose.
+   */
+  const offeredCandidates = (column: ScheduleColumn, minute: number): { ids: number[]; autoSelect: number | null } => {
+    const ids = packagesForSlot(column, minute);
+    const offering = ids.filter(id => {
+      const entry = (dayWindow?.packages ?? []).find(candidate => candidate.package_id === id);
+      return entry?.start_minutes ? entry.start_minutes.includes(minute) : true;
+    });
+
+    return { ids, autoSelect: offering.length === 1 ? offering[0] : null };
+  };
+
+  const navigateToSlot = (column: ScheduleColumn, minute: number) => {
+    const { ids: candidates, autoSelect } = offeredCandidates(column, minute);
 
     navigate(
       buildBookingUrl({
@@ -1083,10 +1175,23 @@ const SpaceSchedule = () => {
         date: dateKeyOf(selectedDate),
         minute,
         roomId: column.roomId ?? null,
-        packageId: packageForSlot(column, minute),
+        packageId: autoSelect,
+        packageIds: candidates,
+        freeUntilMinute: freeUntilMinute(
+          column.openMinutes ?? timeWindow.start,
+          column.closeMinutes ?? timeWindow.end,
+          blockedRangesFor(column),
+          minute
+        ),
         walkIn: isMichiganToday,
       })
     );
+  };
+
+  const openBookingForSlot = (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const clickedMinute = minuteAtOffset(originMinute, event.clientY - bounds.top, pxPerMinute);
+    navigateToSlot(column, slotMinuteFor(column, clickedMinute));
   };
 
   const renderColumnBackground = (column: ScheduleColumn) => {
@@ -1108,33 +1213,32 @@ const SpaceSchedule = () => {
             role={slotIsBookable ? 'button' : undefined}
             tabIndex={slotIsBookable ? 0 : undefined}
             onClick={slotIsBookable ? event => openBookingForSlot(column, event, availableFrom) : undefined}
-            onKeyDown={event => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                const minute = snapToInterval(
-                  isMichiganToday ? Math.max(nowMinutes, availableFrom) : availableFrom,
-                  dayWindow?.interval_minutes ?? 15,
-                  isMichiganToday ? nowMinutes : undefined
-                );
-                navigate(
-                  buildBookingUrl({
-                    locationId: effectiveLocationId ?? dayWindow?.location_id ?? null,
-                    date: dateKeyOf(selectedDate),
-                    minute,
-                    roomId: column.roomId ?? null,
-                    packageId: packageForSlot(column, minute),
-                    walkIn: isMichiganToday,
-                  })
-                );
-              }
-            }}
+            onKeyDown={
+              slotIsBookable
+                ? event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigateToSlot(
+                        column,
+                        slotMinuteFor(column, isMichiganToday ? Math.max(nowMinutes, availableFrom) : availableFrom)
+                      );
+                    }
+                  }
+                : undefined
+            }
             className={`absolute inset-x-0 z-[1] bg-gray-100 ${slotIsBookable ? 'cursor-pointer transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400' : ''}`}
             style={{
               top: (availableFrom - timeWindow.start) * pxPerMinute,
               height: (availableTo - availableFrom) * pxPerMinute,
             }}
-            title={`Available ${formatTime12Hour(minutesToTime(availableFrom))} – ${formatTime12Hour(minutesToTime(availableTo))} — click to start a booking`}
-            aria-label={`Start a booking in ${column.name}`}
+            title={`Available ${formatTime12Hour(minutesToTime(availableFrom))} – ${formatTime12Hour(minutesToTime(availableTo))}${
+              slotIsBookable ? ' — click to start a booking' : ''
+            }`}
+            aria-label={
+              slotIsBookable
+                ? `Start a booking in ${column.name}`
+                : `${column.name} available ${formatTime12Hour(minutesToTime(availableFrom))} to ${formatTime12Hour(minutesToTime(availableTo))}`
+            }
           />
         )}
         {!showsAvailable && !closure?.fullDay && roomWindow?.reason && (
@@ -1385,6 +1489,10 @@ const SpaceSchedule = () => {
                 <div className="pt-3 border-t border-gray-200">
                   <div className="text-xs font-medium text-gray-600 mb-2">Color Coding</div>
                   <p className="text-xs text-gray-500 mb-2">Each package has a unique color</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 bg-gray-100 rounded ring-1 ring-inset ring-gray-300" />
+                    <span className="text-gray-600 text-xs">Available — click to book</span>
+                  </div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-3 bg-gray-200 rounded border border-dashed border-gray-400 flex items-center justify-center">
                       <Coffee className="w-1.5 h-1.5 text-gray-500" />

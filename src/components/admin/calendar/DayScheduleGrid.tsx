@@ -8,7 +8,7 @@ import { FALLBACK_DAY_WINDOW } from '../../../services/ScheduleWindowService';
 import { customerNameOf } from '../../../utils/bookingSearch';
 import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeFormat';
 import { resolvePaymentState } from '../../../types/Bookings.types';
-import { buildBookingUrl, snapToInterval } from '../../../utils/bookingPrefill';
+import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES } from '../../../utils/bookingPrefill';
 import type { TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
 import {
@@ -17,6 +17,7 @@ import {
   blockGeometry,
   buildTimeline,
   freeState,
+  freeUntilMinute,
   minuteAtOffset,
   nextFreeMinute,
 } from '../../../utils/scheduleGeometry';
@@ -387,18 +388,89 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     [windowData]
   );
 
-  const minuteFromPointer = React.useCallback(
+  const rawMinuteFromPointer = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>, originMinute: number): number => {
       const bounds = event.currentTarget.getBoundingClientRect();
-      const offset = minuteAtOffset(originMinute, event.clientY - bounds.top, timeline.pxPerMinute);
-      return snapToInterval(offset, timeline.interval, isViewingToday ? nowMinutes : undefined);
+      return minuteAtOffset(originMinute, event.clientY - bounds.top, timeline.pxPerMinute);
     },
-    [timeline, isViewingToday, nowMinutes]
+    [timeline]
+  );
+
+  const offeredStartsFor = React.useCallback(
+    (column: ScheduleColumn, minute: number): number[] => {
+      const ids = packagesForSlot(column, minute);
+      if (ids.length === 0) return [];
+
+      const starts = new Set<number>();
+      for (const id of ids) {
+        const entry = windowData.packages.find(candidate => candidate.package_id === id);
+        for (const start of entry?.start_minutes ?? []) starts.add(start);
+      }
+
+      return [...starts].sort((a, b) => a - b);
+    },
+    [packagesForSlot, windowData]
+  );
+
+  /**
+   * Auto-select only a package that really has a start at this minute — otherwise the booking
+   * page refuses the prefilled time. The full list is still offered so staff can choose.
+   */
+  const offeredCandidates = React.useCallback(
+    (column: ScheduleColumn, minute: number): { ids: number[]; autoSelect: number | null } => {
+      const ids = packagesForSlot(column, minute);
+      const offering = ids.filter(id => {
+        const entry = windowData.packages.find(candidate => candidate.package_id === id);
+        return entry?.start_minutes ? entry.start_minutes.includes(minute) : true;
+      });
+
+      return { ids, autoSelect: offering.length === 1 ? offering[0] : null };
+    },
+    [packagesForSlot, windowData]
+  );
+
+  const slotMinuteFor = React.useCallback(
+    (column: ScheduleColumn, rawMinute: number): number => {
+      const floor = isViewingToday ? nowMinutes : undefined;
+      const columnOpen = column.openMinutes ?? timeline.start;
+      const columnClose = column.closeMinutes ?? timeline.end;
+      const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
+      const onGrid = !isViewingToday && offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
+      const snapped =
+        onGrid ??
+        (isViewingToday
+          ? Math.max(
+              snapToInterval(rawMinute, WALK_IN_SNAP_MINUTES),
+              snapToInterval(nowMinutes, WALK_IN_SNAP_MINUTES)
+            )
+          : snapToInterval(rawMinute, timeline.interval, floor));
+
+      const blocked = [
+        ...(occupancy.get(column.key) ?? []),
+        ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
+        ...column.closedRanges,
+      ];
+      const free = nextFreeMinute(columnOpen, columnClose, blocked, snapped);
+
+      if (free === null || free === snapped) return snapped;
+
+      const fromFree = snapToInterval(free, timeline.interval, isViewingToday ? Math.max(free, nowMinutes) : free);
+
+      if (onGrid === null) return fromFree;
+
+      const freeOffered = offered.find(
+        start => start >= free && nextFreeMinute(columnOpen, columnClose, blocked, start) === start
+      );
+
+      return freeOffered ?? fromFree;
+    },
+    [offeredStartsFor, isViewingToday, nowMinutes, occupancy, roomBreaks, timeline]
   );
 
   const openBookingForSlot = React.useCallback(
     (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
-      const raw = minuteFromPointer(event, originMinute);
+      const minute = slotMinuteFor(column, rawMinuteFromPointer(event, originMinute));
+
       const blocked = [
         ...(occupancy.get(column.key) ?? []),
         ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
@@ -406,13 +478,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       ];
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
-      const free = nextFreeMinute(columnOpen, columnClose, blocked, raw);
-      const minute =
-        free === null || free === raw
-          ? raw
-          : snapToInterval(free, timeline.interval, isViewingToday ? Math.max(free, nowMinutes) : free);
 
-      const candidates = packagesForSlot(column, minute);
+      const { ids: candidates, autoSelect } = offeredCandidates(column, minute);
 
       navigate(
         buildBookingUrl({
@@ -420,13 +487,14 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           date: dateKey(date),
           minute,
           roomId: column.roomId ?? null,
-          packageId: candidates.length === 1 ? candidates[0] : null,
+          packageId: autoSelect,
           packageIds: candidates,
+          freeUntilMinute: freeUntilMinute(columnOpen, columnClose, blocked, minute),
           walkIn: isViewingToday,
         })
       );
     },
-    [navigate, minuteFromPointer, isViewingToday, nowMinutes, windowData, date, packagesForSlot, occupancy, roomBreaks, timeline]
+    [navigate, rawMinuteFromPointer, slotMinuteFor, isViewingToday, windowData, date, offeredCandidates, occupancy, roomBreaks, timeline]
   );
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -595,25 +663,36 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         role="button"
                         tabIndex={0}
                         onClick={event => openBookingForSlot(column, event, bandOrigin)}
-                        onMouseMove={event => setHoverSlot({ key: column.key, minute: minuteFromPointer(event, bandOrigin) })}
+                        onMouseMove={event =>
+                          setHoverSlot({ key: column.key, minute: slotMinuteFor(column, rawMinuteFromPointer(event, bandOrigin)) })
+                        }
                         onMouseLeave={() => setHoverSlot(prev => (prev?.key === column.key ? null : prev))}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            const keyboardMinute = snapToInterval(
-                              isViewingToday ? Math.max(nowMinutes, bandOrigin) : bandOrigin,
-                              timeline.interval,
-                              isViewingToday ? nowMinutes : undefined
+                            const keyboardMinute = slotMinuteFor(
+                              column,
+                              isViewingToday ? Math.max(nowMinutes, bandOrigin) : bandOrigin
                             );
-                            const keyboardCandidates = packagesForSlot(column, keyboardMinute);
+                            const keyboardOffer = offeredCandidates(column, keyboardMinute);
                             navigate(
                               buildBookingUrl({
                                 locationId: column.locationId ?? windowData.location_id ?? null,
                                 date: dateKey(date),
                                 minute: keyboardMinute,
                                 roomId: column.roomId ?? null,
-                                packageId: keyboardCandidates.length === 1 ? keyboardCandidates[0] : null,
-                                packageIds: keyboardCandidates,
+                                packageId: keyboardOffer.autoSelect,
+                                packageIds: keyboardOffer.ids,
+                                freeUntilMinute: freeUntilMinute(
+                                  open,
+                                  close,
+                                  [
+                                    ...(occupancy.get(column.key) ?? []),
+                                    ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
+                                    ...column.closedRanges,
+                                  ],
+                                  keyboardMinute
+                                ),
                                 walkIn: isViewingToday,
                               })
                             );

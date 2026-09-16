@@ -24,6 +24,7 @@ export interface ScheduleClosedRange {
 export interface ScheduleRoomWindow {
   room_id: number;
   location_id: number;
+  interval_minutes: number | null;
   open_minutes: number | null;
   close_minutes: number | null;
   closed_all_day: boolean;
@@ -39,6 +40,7 @@ export interface SchedulePackageWindow {
   open_minutes: number;
   close_minutes: number;
   interval_minutes: number;
+  start_minutes?: number[];
   closed_ranges?: ScheduleClosedRange[];
   room_ids: number[];
 }

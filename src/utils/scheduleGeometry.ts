@@ -213,3 +213,29 @@ export function availableBand(
     height: (to - from) * timeline.pxPerMinute,
   };
 }
+
+export function freeUntilMinute(
+  openMinutes: number | null,
+  closeMinutes: number | null,
+  busy: TimeRange[],
+  from: number,
+): number | null {
+  const open = finiteOrNull(openMinutes);
+  const close = finiteOrNull(closeMinutes);
+  const start = finiteOrNull(from);
+
+  if (open === null || close === null || start === null || close <= open) return null;
+
+  let end = close;
+
+  for (const range of busy) {
+    const rangeStart = finiteOrNull(range.startMinutes);
+    const rangeEnd = finiteOrNull(range.endMinutes);
+    if (rangeStart === null || rangeEnd === null || rangeEnd <= rangeStart) continue;
+    if (rangeEnd <= start) continue;
+    if (rangeStart <= start) return start;
+    if (rangeStart < end) end = rangeStart;
+  }
+
+  return end;
+}

@@ -5,6 +5,7 @@ export interface SlotPrefill {
   roomId?: number | null;
   packageId?: number | null;
   packageIds?: number[];
+  freeUntilMinute?: number | null;
   walkIn?: boolean;
 }
 
@@ -15,11 +16,16 @@ export interface BookingPrefill {
   roomId: number | null;
   packageId: number | null;
   packageIds: number[];
+  freeUntil: string | null;
+  freeUntilMinutes: number | null;
+  freeUntilKnown: boolean;
   walkIn: boolean;
   hasAny: boolean;
 }
 
 export const BOOKING_CREATE_PATH = '/bookings/create';
+
+export const WALK_IN_SNAP_MINUTES = 5;
 
 export function minutesToClock(minute: number): string {
   if (!Number.isFinite(minute)) return '00:00';
@@ -47,6 +53,20 @@ export function snapToInterval(minute: number, intervalMinutes: number, floorMin
   return Math.max(0, snapped);
 }
 
+/**
+ * Snap to the nearest start the server actually offers. Interval snapping drifts off the
+ * room-driven grid whenever duration+cleanup is not a whole number of intervals, and the
+ * booking page then refuses the prefilled time.
+ */
+export function snapToOfferedStart(starts: number[], minute: number, floorMinute?: number): number | null {
+  const usable = floorMinute === undefined ? starts : starts.filter(start => start >= floorMinute);
+  if (usable.length === 0) return null;
+
+  return usable.reduce((best, start) =>
+    Math.abs(start - minute) < Math.abs(best - minute) ? start : best
+  );
+}
+
 export function buildBookingUrl(prefill: SlotPrefill): string {
   const params = new URLSearchParams();
 
@@ -58,6 +78,10 @@ export function buildBookingUrl(prefill: SlotPrefill): string {
 
   const candidates = (prefill.packageIds ?? []).filter(id => Number.isInteger(id) && id > 0);
   if (candidates.length > 1) params.set('package_ids', Array.from(new Set(candidates)).join(','));
+
+  if (prefill.freeUntilMinute != null && Number.isFinite(prefill.freeUntilMinute)) {
+    params.set('free_until_minutes', String(Math.round(prefill.freeUntilMinute)));
+  }
 
   if (prefill.walkIn) params.set('walk_in', '1');
 
@@ -85,6 +109,9 @@ const toDate = (value: string | null): string | null =>
 
 export function readBookingPrefill(params: URLSearchParams): BookingPrefill {
   const minute = clockToMinutes(params.get('time'));
+  const freeUntilRaw = params.get('free_until_minutes');
+  const freeUntilParsed = freeUntilRaw === null ? NaN : Number(freeUntilRaw);
+  const freeUntil = Number.isFinite(freeUntilParsed) && freeUntilParsed >= 0 ? Math.round(freeUntilParsed) : null;
   const prefill: BookingPrefill = {
     locationId: toId(params.get('location_id')),
     date: toDate(params.get('date')),
@@ -92,6 +119,9 @@ export function readBookingPrefill(params: URLSearchParams): BookingPrefill {
     roomId: toId(params.get('room_id')),
     packageId: toId(params.get('package_id')),
     packageIds: toIdList(params.get('package_ids')),
+    freeUntil: freeUntil === null ? null : minutesToClock(freeUntil),
+    freeUntilMinutes: freeUntil,
+    freeUntilKnown: freeUntil !== null,
     walkIn: params.get('walk_in') === '1',
     hasAny: false,
   };
