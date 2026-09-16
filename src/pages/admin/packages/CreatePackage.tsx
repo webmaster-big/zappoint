@@ -174,7 +174,8 @@ const CreatePackage: React.FC = () => {
                     id: room.id,
                     name: room.name,
                     area_group: room.area_group || undefined,
-                    booking_interval: room.booking_interval ?? undefined
+                    booking_interval: room.booking_interval ?? undefined,
+                    is_available: room.is_available ?? true
                 }));
 
                 if (!cachedRooms || cachedRooms.length === 0) {
@@ -391,9 +392,10 @@ const CreatePackage: React.FC = () => {
 
     // the spaces chosen for this package decide how often bookings can start
     const selectedSpaceIntervals = useMemo(
-        () => form.rooms
-            .map(name => rooms.find(room => room.name === name)?.booking_interval ?? 0)
-            .filter(minutes => minutes > 0),
+        () => form.rooms.flatMap(name => {
+            const room = rooms.find(candidate => candidate.name === name);
+            return room && room.is_available !== false ? [room.booking_interval ?? 0] : [];
+        }),
         [form.rooms, rooms],
     );
     const spacesRunStartTimes = spacesDriveStartTimes(selectedSpaceIntervals);

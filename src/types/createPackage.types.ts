@@ -20,6 +20,7 @@ export interface CreatePackageRoom {
   name: string;
   area_group?: string;
   booking_interval?: number;
+  is_available?: boolean;
 }
 
 export interface CreatePackageForm {

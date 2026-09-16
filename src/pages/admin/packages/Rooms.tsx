@@ -986,7 +986,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings in group</p>
+                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings &mdash; the gap after one booking ends before the next can start in this space.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1239,7 +1239,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings in group</p>
+                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings for spaces in this group.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1500,7 +1500,7 @@ const Rooms: React.FC = () => {
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="15"
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">Minutes between bookings</p>
+                                            <p className="text-xs text-gray-500 mt-1">Minutes between bookings &mdash; the gap after one booking ends before the next can start in this space.</p>
                                         </div>
                                     </div>
                                 </div>

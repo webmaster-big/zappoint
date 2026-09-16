@@ -17,7 +17,7 @@ import { addOnCacheService } from '../../../services/AddOnCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Category } from '../../../services/CategoryService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
-import { ScheduleIntervalNote, ScheduleStartTimesPreview, spacesDriveStartTimes } from '../../../components/admin/packages/ScheduleStartTimes';
+import { ScheduleIntervalNote, ScheduleStartTimesPreview, spacesDriveStartTimes, startCadenceLabel } from '../../../components/admin/packages/ScheduleStartTimes';
 import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 import { scheduleWindowMinutes } from '../../../utils/timeSlots';
 import type {
@@ -221,7 +221,8 @@ const EditPackage: React.FC = () => {
                     id: room.id,
                     name: room.name,
                     area_group: room.area_group || undefined,
-                    booking_interval: room.booking_interval ?? undefined
+                    booking_interval: room.booking_interval ?? undefined,
+                    is_available: room.is_available ?? true
                 }));
                 
                 if (!cachedRooms || cachedRooms.length === 0) {
@@ -495,12 +496,23 @@ const EditPackage: React.FC = () => {
 
     // the spaces chosen for this package decide how often bookings can start
     const selectedSpaceIntervals = useMemo(
-        () => form.rooms
-            .map(name => rooms.find(room => room.name === name)?.booking_interval ?? 0)
-            .filter(minutes => minutes > 0),
+        () => form.rooms.flatMap(name => {
+            const room = rooms.find(candidate => candidate.name === name);
+            return room && room.is_available !== false ? [room.booking_interval ?? 0] : [];
+        }),
         [form.rooms, rooms],
     );
     const spacesRunStartTimes = spacesDriveStartTimes(selectedSpaceIntervals);
+
+    const previewCadence = (startTime: string, endTime: string, interval: number): string =>
+        startCadenceLabel({
+            startTime,
+            endTime,
+            durationMinutes: durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes),
+            interval,
+            spaceIntervals: selectedSpaceIntervals,
+            cleanupMinutes: slotCleanupMinutes,
+        });
 
     const addNewSchedule = () => {
         const newSchedule: AvailabilitySchedule = {
@@ -2123,11 +2135,11 @@ const EditPackage: React.FC = () => {
                                     {form.availability_schedules.length > 0 ? (
                                         form.availability_schedules.map((schedule, idx) => (
                                             <div key={idx}>
-                                                {formatTimeRange(schedule.time_slot_start, schedule.time_slot_end)} (a start every {spacesRunStartTimes ? Math.min(...selectedSpaceIntervals) : schedule.time_slot_interval} min)
+                                                {formatTimeRange(schedule.time_slot_start, schedule.time_slot_end)} ({previewCadence(schedule.time_slot_start, schedule.time_slot_end, schedule.time_slot_interval)})
                                             </div>
                                         ))
                                     ) : form.timeSlotStart && form.timeSlotEnd && form.timeSlotInterval ? (
-                                        <span>{formatTimeRange(form.timeSlotStart, form.timeSlotEnd)} (a start every {spacesRunStartTimes ? Math.min(...selectedSpaceIntervals) : form.timeSlotInterval} min)</span>
+                                        <span>{formatTimeRange(form.timeSlotStart, form.timeSlotEnd)} ({previewCadence(form.timeSlotStart, form.timeSlotEnd, Number(form.timeSlotInterval))})</span>
                                     ) : (
                                         <span className="text-gray-400">Not configured</span>
                                     )}

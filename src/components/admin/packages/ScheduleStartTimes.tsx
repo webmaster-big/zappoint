@@ -33,20 +33,67 @@ export const resolveStartTimes = ({
   return generateTimeSlots(startTime, endTime, interval);
 };
 
-export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () => void }> = ({
-  durationMinutes,
-  interval,
-  spaceIntervals,
-  onUseDuration,
-}) => {
+/**
+ * Sentence fragment describing how often this schedule really starts. Never states a raw
+ * interval when the spaces drive the grid, and says so plainly when 0 or 1 start fits.
+ */
+export const startCadenceLabel = (args: StartTimeArgs): string => {
+  const starts = resolveStartTimes(args);
+
+  if (starts.length === 0) return 'no start times fit this window';
+  if (starts.length === 1) return 'only one start fits this window';
+
+  const gap = smallestGap(starts);
+
+  return gap === null ? `a start every ${args.interval} min` : `a start every ${gap} min`;
+};
+
+const smallestGap = (starts: string[]): number | null => {
+  if (starts.length < 2) return null;
+
+  const minutes = starts.map(start => {
+    const [h, m] = start.split(':').map(Number);
+    return h * 60 + m;
+  });
+
+  let smallest = Infinity;
+  for (let i = 1; i < minutes.length; i += 1) {
+    // a window that crosses midnight wraps the clock, so a negative delta is a real gap
+    const delta = minutes[i] - minutes[i - 1];
+    const gap = delta > 0 ? delta : delta + MINUTES_PER_DAY;
+    if (gap > 0 && gap < smallest) smallest = gap;
+  }
+
+  return Number.isFinite(smallest) ? smallest : null;
+};
+
+export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () => void }> = props => {
+  const { durationMinutes, interval, spaceIntervals, onUseDuration } = props;
+
   if (!durationMinutes || !interval) return null;
 
   if (spacesDriveStartTimes(spaceIntervals)) {
     const stagger = Math.min(...spaceIntervals.filter(m => m > 0));
+    const starts = resolveStartTimes(props);
+    const gap = smallestGap(starts);
+
+    const oneSpace = spaceIntervals.length === 1;
+
+    const cadence =
+      starts.length === 0
+        ? ' No start time fits inside this window.'
+        : starts.length === 1
+          ? ' Only one start fits inside this window.'
+          : oneSpace
+            ? ` This package runs ${durationMinutes} min, so with a ${stagger} min gap a start opens every ${gap} min.`
+            : gap !== null && gap !== stagger
+              ? ` A start every ${gap} min.`
+              : ` A start every ${stagger} min.`;
+
     return (
       <p className="mt-1.5 text-xs text-gray-500">
-        Not used &mdash; your {plural(spaceIntervals.length, 'space')} set the start times, one every {stagger} min.
-        Edit the interval on the space instead.
+        Not used &mdash; your {plural(spaceIntervals.length, 'space')} set the start times.
+        {cadence} Edit the interval on the space instead.
       </p>
     );
   }

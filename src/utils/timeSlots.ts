@@ -67,7 +67,16 @@ export function generateSpaceDrivenTimeSlots(
 
   const stagger = Math.min(...usableIntervals);
   const spaceCount = spaceIntervals.length;
-  const cycle = Math.max(durationMinutes + Math.max(0, cleanupMinutes), spaceCount * stagger);
+  const cleanup = Math.max(0, cleanupMinutes);
+
+  // mirrors GeneratesAvailableTimeSlots::reopenCycle — with ONE space the interval is the gap
+  // between bookings (what the Spaces form calls "minutes between bookings"); with several it
+  // is the stagger between them.
+  const cycle =
+    spaceCount === 1
+      ? durationMinutes + Math.max(stagger, cleanup)
+      : Math.max(durationMinutes + cleanup, spaceCount * stagger);
+
   if (cycle <= 0) return null;
 
   const starts = new Set<number>();

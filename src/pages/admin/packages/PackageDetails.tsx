@@ -20,6 +20,8 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { startCadenceLabel } from '../../../components/admin/packages/ScheduleStartTimes';
+import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 
 const PackageDetails = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -128,6 +130,29 @@ const PackageDetails = () => {
   }
 
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+  const spaceIntervals = (Array.isArray(packageData.rooms) ? packageData.rooms : [])
+    .flatMap((room: unknown) =>
+      room && typeof room === 'object' && (room as { is_available?: boolean }).is_available !== false
+        ? [Number((room as { booking_interval?: number }).booking_interval ?? 0)]
+        : []
+    );
+
+  const durationMinutes =
+    packageData.duration_unit === 'minutes'
+      ? Number(packageData.duration) || 0
+      : Math.round((Number(packageData.duration) || 0) * 60);
+
+  /** The spaces, not the schedule interval, decide how often this package can start. */
+  const scheduleCadence = (schedule: { time_slot_start: string; time_slot_end: string; time_slot_interval: number }): string =>
+    startCadenceLabel({
+      startTime: schedule.time_slot_start,
+      endTime: schedule.time_slot_end,
+      durationMinutes,
+      interval: schedule.time_slot_interval,
+      spaceIntervals,
+      cleanupMinutes: DEFAULT_SLOT_CLEANUP_MINUTES,
+    });
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
@@ -332,7 +357,7 @@ const PackageDetails = () => {
                         </span>
                         {schedule.time_slot_interval && (
                           <span className="text-xs text-gray-500 ml-2">
-                            ({schedule.time_slot_interval} min intervals)
+                            ({scheduleCadence(schedule)})
                           </span>
                         )}
                       </div>
