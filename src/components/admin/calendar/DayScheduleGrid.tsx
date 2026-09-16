@@ -508,13 +508,13 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
   const slotMinuteFor = React.useCallback(
     (column: ScheduleColumn, rawMinute: number): number => {
-      const floor = isViewingToday ? nowMinutes : undefined;
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
       const offered = offeredStartsFor(column).filter(start => start < columnClose);
-      // always land on a start time the packages in this space actually offer, today included
-      const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
-      const snapped = onGrid ?? snapToInterval(rawMinute, timeline.interval, floor);
+      // always land on a start time the packages in this space actually offer. Starts earlier today
+      // are included on purpose: staff record groups that have already gone in.
+      const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute) : null;
+      const snapped = onGrid ?? snapToInterval(rawMinute, timeline.interval);
 
       const blocked = [
         ...(occupancy.get(column.key) ?? []),
@@ -525,7 +525,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
       if (free === null || free === snapped) return snapped;
 
-      const fromFree = snapToInterval(free, timeline.interval, isViewingToday ? Math.max(free, nowMinutes) : free);
+      const fromFree = snapToInterval(free, timeline.interval, free);
 
       if (onGrid === null) return fromFree;
 
@@ -607,6 +607,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       ];
 
       for (const start of offeredStartsFor(column).filter(candidate => candidate >= atMinute)) {
+        // a start that has gone by is still drawn, but it is never the NEXT one
+        if (isViewingToday && start < nowMinutes) continue;
         if (nextFreeMinute(columnOpen, columnClose, blocked, start) !== start) continue;
 
         const startable = new Set(packagesForSlot(column, start));
@@ -633,6 +635,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   const goToBooking = React.useCallback(
     (column: ScheduleColumn, minute: number, options?: { walkInOverride?: boolean }) => {
       const { ids: candidates, autoSelect } = offeredCandidates(column, minute);
+      // availability stops offering a start once it has gone by, so a deliberate click on an earlier
+      // slot today has to carry the same override the walk-in warning uses
+      const alreadyStarted = isViewingToday && minute < nowMinutes;
 
       navigate(
         buildBookingUrl({
@@ -644,7 +649,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           packageIds: candidates,
           freeUntilMinute: usableFreeUntil(column, minute),
           walkIn: isViewingToday,
-          walkInOverride: options?.walkInOverride ?? false,
+          walkInOverride: (options?.walkInOverride ?? false) || alreadyStarted,
         })
       );
     },

@@ -34,7 +34,7 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { formatDurationDisplay, getMichiganNow, dateKey } from '../../../utils/timeFormat';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -371,6 +371,17 @@ const OnsiteBooking: React.FC = () => {
       room_id: slotPrefill.roomId ?? null,
     };
   }, [slotPrefill, selectedPackage, bookingData.date, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
+
+  /** A start staff picked from earlier today — availability no longer offers it, so say so plainly. */
+  const walkInAlreadyStarted = useMemo(() => {
+    if (!walkInSlot || !slotPrefill.date) return false;
+
+    const now = getMichiganNow();
+    if (dateKey(now.date) !== slotPrefill.date) return false;
+
+    const [hours, minutes] = walkInSlot.start_time.split(':').map(Number);
+    return hours * 60 + minutes < now.hour * 60 + now.minute;
+  }, [walkInSlot, slotPrefill.date]);
 
   const walkInOverlapMinutes = useMemo(() => {
     if (!walkInSlot || !slotPrefill.freeUntilKnown) return 0;
@@ -2379,11 +2390,12 @@ const OnsiteBooking: React.FC = () => {
                   walkInOverlapMinutes > 0 ? 'bg-rose-200 text-rose-900' : 'bg-amber-100'
                 }`}
               >
-                {walkInOverlapMinutes > 0 ? 'Overlap' : 'Walk-in'}
+                {walkInOverlapMinutes > 0 ? 'Overlap' : walkInAlreadyStarted ? 'Already started' : 'Walk-in'}
               </span>
               <span>
                 Starting at <strong>{formatTimeTo12Hour(bookingData.time)}</strong> today
                 {selectedPackage ? ` — ${formatDuration(selectedPackage)}` : ''}. This is the time that will be recorded.
+                {walkInAlreadyStarted && ' That start time has already gone by, so it is no longer offered to customers.'}
                 {walkInOverlapMinutes > 0 && (
                   <>
                     {' '}It runs <strong>{walkInOverlapMinutes} min</strong> past the next booking in this space

@@ -1327,6 +1327,8 @@ const SpaceSchedule = () => {
     const blocked = blockedRangesFor(column);
 
     for (const start of offeredStartsFor(column).filter(candidate => candidate >= atMinute)) {
+      // a start that has gone by is still drawn, but it is never the NEXT one
+      if (isMichiganToday && start < nowMinutes) continue;
       if (nextFreeMinute(columnOpen, columnClose, blocked, start) !== start) continue;
 
       const startable = new Set(packagesForSlot(column, start));
@@ -1352,18 +1354,17 @@ const SpaceSchedule = () => {
     const interval = intervalForColumn(column);
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const offered = offeredStartsFor(column).filter(start => start < columnClose);
-    const floor = isMichiganToday ? nowMinutes : undefined;
-    // Always land on a start time the packages in this space actually offer, today included —
-    // the interval is only a fallback for a stretch no package covers.
-    const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
-    const snapped = onGrid ?? snapToInterval(rawMinute, interval, floor);
+    // Always land on a start time the packages in this space actually offer. Starts earlier today
+    // are included on purpose: staff record groups that have already gone in.
+    const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute) : null;
+    const snapped = onGrid ?? snapToInterval(rawMinute, interval);
     const columnOpen = column.openMinutes ?? timeWindow.start;
     const blocked = blockedRangesFor(column);
     const free = nextFreeMinute(columnOpen, columnClose, blocked, snapped);
 
     if (free === null || free === snapped) return snapped;
 
-    const fromFree = snapToInterval(free, interval, isMichiganToday ? Math.max(free, nowMinutes) : free);
+    const fromFree = snapToInterval(free, interval, free);
 
     if (onGrid === null) return fromFree;
 
@@ -1391,6 +1392,9 @@ const SpaceSchedule = () => {
 
   const navigateToSlot = (column: ScheduleColumn, minute: number, options?: { walkInOverride?: boolean }) => {
     const { ids: candidates, autoSelect } = offeredCandidates(column, minute);
+    // availability stops offering a start once it has gone by, so a deliberate click on an earlier
+    // slot today has to carry the same override the walk-in warning uses
+    const alreadyStarted = isMichiganToday && minute < nowMinutes;
 
     navigate(
       buildBookingUrl({
@@ -1402,7 +1406,7 @@ const SpaceSchedule = () => {
         packageIds: candidates,
         freeUntilMinute: usableFreeUntil(column, minute),
         walkIn: isMichiganToday,
-        walkInOverride: options?.walkInOverride ?? false,
+        walkInOverride: (options?.walkInOverride ?? false) || alreadyStarted,
       })
     );
   };

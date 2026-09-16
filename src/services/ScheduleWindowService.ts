@@ -42,6 +42,8 @@ export interface SchedulePackageWindow {
   interval_minutes: number;
   duration_minutes?: number;
   start_minutes?: number[];
+  /** starts already gone by today — shown to staff, never offered as the next start */
+  past_start_minutes?: number[];
   closed_ranges?: ScheduleClosedRange[];
   room_ids: number[];
 }
