@@ -23,7 +23,7 @@ import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayS
 import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
 import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
-import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES } from '../../../utils/bookingPrefill';
+import { buildBookingUrl, snapToInterval, snapToOfferedStart, WALK_IN_SNAP_MINUTES, WALK_IN_REACH_MINUTES } from '../../../utils/bookingPrefill';
 import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 
 const parseLocalDate = (isoDateString: string): Date => {
@@ -1145,7 +1145,11 @@ const SpaceSchedule = () => {
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
     const floor = isMichiganToday ? nowMinutes : undefined;
-    const onGrid = !isMichiganToday && offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
+    // A click at the now line is a walk-in starting on the spot, so it keeps the fine grid.
+    // Anything further ahead is a planned booking and must land on a real start time, or the
+    // booking page will refuse it.
+    const isWalkInNow = isMichiganToday && rawMinute <= nowMinutes + WALK_IN_REACH_MINUTES;
+    const onGrid = !isWalkInNow && offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
 
     const snapped =
       onGrid ??

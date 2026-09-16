@@ -1047,7 +1047,20 @@ const OnsiteBooking: React.FC = () => {
 
     const serverSlot = availableTimeSlots.find(slot => slot.start_time === slotPrefill.time);
     if (serverSlot) {
-      setSelectedRoomId(serverSlot.room_id ?? null);
+      // keep the space the user actually clicked on the schedule whenever it is free at this
+      // time; the slot only names one of possibly several free spaces
+      const clicked = slotPrefill.roomId;
+      const clickedIsFree = clicked != null && (serverSlot.available_room_ids ?? []).includes(clicked);
+
+      setSelectedRoomId(clickedIsFree ? clicked : serverSlot.room_id ?? null);
+
+      if (clicked != null && !clickedIsFree) {
+        setToast({
+          message: 'That space is taken at this time — the booking moved to the next free one.',
+          type: 'info',
+        });
+      }
+
       return;
     }
 

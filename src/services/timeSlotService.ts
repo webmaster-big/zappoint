@@ -30,6 +30,7 @@ export interface TimeSlot {
   room_id?: number | null;
   room_name?: string | null;
   available_rooms_count?: number;
+  available_room_ids?: number[];
   remaining_tickets?: number | null;
   min_participants?: number;
   exclusive?: boolean;
