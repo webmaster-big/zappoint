@@ -12,8 +12,6 @@ interface StartTimeArgs {
   cleanupMinutes?: number;
 }
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
-
 /**
  * The schedule interval decides which start times are offered. A space's booking interval is
  * its turnaround AFTER a booking — it removes slots once one is taken, it never thins this list.
@@ -41,7 +39,9 @@ export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () 
   const spaceNote = turnaround !== null && (
     <>
       {' '}Once a booking is taken, that space reopens {turnaround} min after it ends
-      {spaceIntervals.length > 1 ? `, and your other ${plural(spaceIntervals.length - 1, 'space')} stay open.` : '.'}
+      {spaceIntervals.length > 1
+        ? `, and spaces sharing an area group also hold that ${turnaround} min apart from each other.`
+        : '.'}
     </>
   );
 

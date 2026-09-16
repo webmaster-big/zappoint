@@ -390,7 +390,7 @@ const CreatePackage: React.FC = () => {
         return minutes >= 15 ? minutes : 30;
     };
 
-    // the spaces chosen for this package decide how often bookings can start
+    // the schedule interval decides the start times; a space's interval is its turnaround
     const selectedSpaceIntervals = useMemo(
         () => form.rooms.flatMap(name => {
             const room = rooms.find(candidate => candidate.name === name);

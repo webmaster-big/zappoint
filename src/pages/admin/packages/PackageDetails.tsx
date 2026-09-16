@@ -143,7 +143,7 @@ const PackageDetails = () => {
       ? Number(packageData.duration) || 0
       : Math.round((Number(packageData.duration) || 0) * 60);
 
-  /** The spaces, not the schedule interval, decide how often this package can start. */
+  /** The schedule interval decides the start times; a space's interval is only its turnaround. */
   const scheduleCadence = (schedule: { time_slot_start: string; time_slot_end: string; time_slot_interval: number }): string =>
     startCadenceLabel({
       startTime: schedule.time_slot_start,

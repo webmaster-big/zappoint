@@ -792,12 +792,16 @@ const Rooms: React.FC = () => {
                                                 </div>
                                             )}
 
-                                            {room.area_group && (
+                                            {(room.area_group || room.booking_interval != null) && (
                                                 <div className="flex items-center gap-2 text-sm text-gray-700">
                                                     <Layers className="w-4 h-4 text-gray-400" />
-                                                    <span className="font-medium">{room.area_group}</span>
-                                                    {room.booking_interval && (
-                                                        <span className="text-xs text-gray-500">({room.booking_interval}min interval)</span>
+                                                    {room.area_group && <span className="font-medium">{room.area_group}</span>}
+                                                    {room.booking_interval != null && (
+                                                        <span className="text-xs text-gray-500">
+                                                            {room.booking_interval > 0
+                                                                ? `${room.booking_interval} min between bookings`
+                                                                : 'back-to-back bookings'}
+                                                        </span>
                                                     )}
                                                 </div>
                                             )}

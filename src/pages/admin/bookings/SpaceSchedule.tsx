@@ -759,12 +759,20 @@ const SpaceSchedule = () => {
 
       const open = column.openMinutes ?? (column.virtual ? timeWindow.start : null);
       const close = column.closeMinutes ?? (column.virtual ? timeWindow.end : null);
+      const space = column.roomId !== undefined
+        ? (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId)
+        : undefined;
+      // the space is still shut for its turnaround, so it is not free the moment a booking ends
+      const columnTurnaround = space?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES;
       const blocked = [
         ...activeBookings
           .filter(b => columnKeyFor(b) === column.key)
           .map(b => {
             const startMinutes = timeToMinutes(b.booking_time);
-            return { startMinutes, endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) };
+            return {
+              startMinutes,
+              endMinutes: startMinutes + Math.max(15, durationToMinutes(b.duration, b.duration_unit)) + columnTurnaround,
+            };
           }),
         ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end, reason: 'On break' })) : []),
         ...(closure?.ranges || []).map(r => ({
@@ -778,7 +786,7 @@ const SpaceSchedule = () => {
     }
 
     return map;
-  }, [columns, activeBookings, columnKeyFor, roomBreaks, spaceClosures, roomWindows, timeWindow, isMichiganToday, nowMinutes]);
+  }, [columns, activeBookings, columnKeyFor, roomBreaks, spaceClosures, roomWindows, dayWindow, timeWindow, isMichiganToday, nowMinutes]);
 
   const hourMarks = useMemo(() => {
     const marks: number[] = [];
