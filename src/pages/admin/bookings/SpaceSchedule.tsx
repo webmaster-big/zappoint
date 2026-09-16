@@ -1738,7 +1738,21 @@ const SpaceSchedule = () => {
                           return <span className="text-[10px] font-medium text-gray-500">{state.reason}</span>;
                         }
                         if (isMichiganToday && state.atMinute <= nowMinutes) {
-                          return <span className="text-[10px] font-semibold text-green-700">Free now</span>;
+                          // a walk-in starts at the actual minute, which is deliberately not one
+                          // of the package's start times — hence its own action
+                          return (
+                            <button
+                              type="button"
+                              onClick={event => {
+                                event.stopPropagation();
+                                navigateToSlot(column, nowMinutes);
+                              }}
+                              title={`Start a walk-in in ${column.name} at ${formatTime12Hour(minutesToTime(nowMinutes))}`}
+                              className="text-[10px] font-semibold text-green-700 hover:text-green-800 hover:bg-green-50 rounded px-1 -mx-1 leading-tight transition focus:outline-none focus:ring-2 focus:ring-green-400"
+                            >
+                              Free now &middot; start walk-in
+                            </button>
+                          );
                         }
                         return (
                           <span className="text-[10px] font-medium text-gray-600">
