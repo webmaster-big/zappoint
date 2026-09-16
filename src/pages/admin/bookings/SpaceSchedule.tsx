@@ -19,6 +19,7 @@ import { normalizeCategory } from '../../../utils/venueCategories';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import type { SchedulePackageWindow } from '../../../services/ScheduleWindowService';
 import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayScheduleView';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
@@ -1115,13 +1116,11 @@ const SpaceSchedule = () => {
   };
 
   const intervalForColumn = (column: ScheduleColumn): number => {
-    if (column.virtual) {
-      const packageId = Number(column.key.replace('pkg-', ''));
-      const entry = (dayWindow?.packages ?? []).find(candidate => candidate.package_id === packageId);
-      if (entry?.interval_minutes) return entry.interval_minutes;
-    }
+    const intervals = packagesForColumn(column)
+      .map(entry => entry.interval_minutes)
+      .filter(minutes => Number.isFinite(minutes) && minutes > 0);
 
-    return dayWindow?.interval_minutes ?? 15;
+    return intervals.length > 0 ? Math.min(...intervals) : dayWindow?.interval_minutes ?? 15;
   };
 
   /** How long this space stays shut after a booking ends, mirroring the server's conflict check. */
@@ -1131,14 +1130,26 @@ const SpaceSchedule = () => {
     return space?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES;
   };
 
-  const offeredStartsFor = (column: ScheduleColumn, minute: number): number[] => {
-    const ids = packagesForSlot(column, minute);
-    if (ids.length === 0) return [];
+  /**
+   * Every package attached to this space today. A space's own packages are what define its
+   * schedule and its interval, so resolve them by space and not by the minute that was clicked —
+   * otherwise clicking outside one package's window falls back to a location-wide guess.
+   */
+  const packagesForColumn = (column: ScheduleColumn): SchedulePackageWindow[] => {
+    const all = dayWindow?.packages ?? [];
 
+    if (column.virtual) {
+      const id = Number(column.key.replace('pkg-', ''));
+      return all.filter(entry => entry.package_id === id);
+    }
+
+    return column.roomId === undefined ? [] : all.filter(entry => entry.room_ids.includes(column.roomId as number));
+  };
+
+  const offeredStartsFor = (column: ScheduleColumn): number[] => {
     const starts = new Set<number>();
-    for (const id of ids) {
-      const entry = (dayWindow?.packages ?? []).find(candidate => candidate.package_id === id);
-      for (const start of entry?.start_minutes ?? []) starts.add(start);
+    for (const entry of packagesForColumn(column)) {
+      for (const start of entry.start_minutes ?? []) starts.add(start);
     }
 
     return [...starts].sort((a, b) => a - b);
@@ -1146,14 +1157,14 @@ const SpaceSchedule = () => {
 
   /** The next minute staff can actually START a booking here, not just the first unoccupied minute. */
   const nextBookableFrom = (column: ScheduleColumn, atMinute: number): number => {
-    const offered = offeredStartsFor(column, atMinute).filter(start => start >= atMinute);
+    const offered = offeredStartsFor(column).filter(start => start >= atMinute);
     return offered.length > 0 ? Math.min(...offered) : atMinute;
   };
 
   const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number => {
     const interval = intervalForColumn(column);
     const columnClose = column.closeMinutes ?? timeWindow.end;
-    const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
+    const offered = offeredStartsFor(column).filter(start => start < columnClose);
     const floor = isMichiganToday ? nowMinutes : undefined;
     // Always land on a start time the packages in this space actually offer, today included —
     // the interval is only a fallback for a stretch no package covers.

@@ -402,20 +402,34 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     [timeline]
   );
 
-  const offeredStartsFor = React.useCallback(
-    (column: ScheduleColumn, minute: number): number[] => {
-      const ids = packagesForSlot(column, minute);
-      if (ids.length === 0) return [];
+  /**
+   * Every package attached to this space today. A space's own packages define its schedule and
+   * interval, so resolve them by space rather than by the clicked minute.
+   */
+  const packagesForColumn = React.useCallback(
+    (column: ScheduleColumn) => {
+      if (column.virtual) {
+        const id = Number(column.key.replace('pkg-', ''));
+        return windowData.packages.filter(entry => entry.package_id === id);
+      }
 
+      return column.roomId === undefined
+        ? []
+        : windowData.packages.filter(entry => entry.room_ids.includes(column.roomId as number));
+    },
+    [windowData]
+  );
+
+  const offeredStartsFor = React.useCallback(
+    (column: ScheduleColumn): number[] => {
       const starts = new Set<number>();
-      for (const id of ids) {
-        const entry = windowData.packages.find(candidate => candidate.package_id === id);
-        for (const start of entry?.start_minutes ?? []) starts.add(start);
+      for (const entry of packagesForColumn(column)) {
+        for (const start of entry.start_minutes ?? []) starts.add(start);
       }
 
       return [...starts].sort((a, b) => a - b);
     },
-    [packagesForSlot, windowData]
+    [packagesForColumn]
   );
 
   /**
@@ -441,7 +455,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       const floor = isViewingToday ? nowMinutes : undefined;
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
-      const offered = offeredStartsFor(column, rawMinute).filter(start => start < columnClose);
+      const offered = offeredStartsFor(column).filter(start => start < columnClose);
       // always land on a start time the packages in this space actually offer, today included
       const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute, floor) : null;
       const snapped = onGrid ?? snapToInterval(rawMinute, timeline.interval, floor);
