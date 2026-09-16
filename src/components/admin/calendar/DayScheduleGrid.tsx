@@ -482,6 +482,29 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     [offeredStartsFor, isViewingToday, nowMinutes, occupancy, roomBreaks, timeline]
   );
 
+  /** A walk-in runs for the package's duration, so it is only possible if one fits before the next booking. */
+  const walkInFit = React.useCallback(
+    (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null } => {
+      const columnOpen = column.openMinutes ?? timeline.start;
+      const columnClose = column.closeMinutes ?? timeline.end;
+      const blocked = [
+        ...(occupancy.get(column.key) ?? []),
+        ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
+        ...column.closedRanges,
+      ];
+      const until = freeUntilMinute(columnOpen, columnClose, blocked, nowMinutes);
+      const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
+
+      const durations = packagesForColumn(column)
+        .map(entry => entry.duration_minutes ?? 0)
+        .filter(minutes => minutes > 0);
+      const shortest = durations.length > 0 ? Math.min(...durations) : null;
+
+      return { fits: shortest !== null && shortest <= freeFor, freeFor, shortest };
+    },
+    [packagesForColumn, occupancy, roomBreaks, timeline, nowMinutes]
+  );
+
   /** The next minute a booking can actually START here, not just the first unoccupied minute. */
   const nextBookableFrom = React.useCallback(
     (column: ScheduleColumn, atMinute: number): number => {
@@ -666,19 +689,34 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     ) : freeFrom?.kind === 'day-over' ? (
                       <span className="text-[9px] leading-tight font-medium text-gray-500">Closed for the day</span>
                     ) : freeFrom?.kind === 'free' && isViewingToday && freeFrom.atMinute <= nowMinutes ? (
-                      <button
-                        type="button"
-                        onClick={event => {
-                          event.stopPropagation();
-                          goToBooking(column, nowMinutes);
-                        }}
-                        title={`Start a walk-in in ${column.name} at ${formatSlotLabel(nowMinutes)}`}
-                        className="rounded px-1 text-[9px] font-semibold leading-tight text-green-700 transition hover:bg-green-50 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-400"
-                      >
-                        Free now · walk-in
-                      </button>
+                      (() => {
+                        const fit = walkInFit(column);
+                        return (
+                          <button
+                            type="button"
+                            onClick={event => {
+                              event.stopPropagation();
+                              goToBooking(column, nowMinutes);
+                            }}
+                            title={
+                              fit.fits
+                                ? `Start a walk-in in ${column.name} at ${formatSlotLabel(nowMinutes)} — ${fit.freeFor} min free`
+                                : `Only ${fit.freeFor} min free before the next booking${fit.shortest ? `, and the shortest package here needs ${fit.shortest} min` : ''}`
+                            }
+                            className={`rounded px-1 text-[9px] font-semibold leading-tight transition focus:outline-none focus:ring-2 ${
+                              fit.fits
+                                ? 'text-green-700 hover:bg-green-50 hover:text-green-800 focus:ring-green-400'
+                                : 'text-amber-700 hover:bg-amber-50 hover:text-amber-800 focus:ring-amber-400'
+                            }`}
+                          >
+                            {fit.fits ? 'Free now · walk-in' : `Free ${fit.freeFor} min · walk-in`}
+                          </button>
+                        );
+                      })()
                     ) : freeFrom?.kind === 'free' ? (
-                      <span className="text-[9px] leading-tight font-medium text-gray-600">Free {formatSlotLabel(nextBookableFrom(column, freeFrom.atMinute))}</span>
+                      <span className="text-[9px] leading-tight font-medium text-gray-600">
+                        Free {formatSlotLabel(nextBookableFrom(column, freeFrom.atMinute))}
+                      </span>
                     ) : column.virtual ? (
                       <span className="flex items-center gap-1 text-[9px] leading-tight font-normal text-amber-600">
                         <AlertTriangle className="h-2.5 w-2.5" />

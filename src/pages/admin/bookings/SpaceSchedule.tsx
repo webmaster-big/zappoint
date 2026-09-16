@@ -202,6 +202,15 @@ const SpaceSchedule = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [walkInPrompt, setWalkInPrompt] = useState<{
+    column: ScheduleColumn;
+    startMinute: number;
+    endMinute: number;
+    freeFor: number;
+    duration: number;
+    packageName: string;
+    clash: Booking | null;
+  } | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => michiganToday());
   const spacesLoadedRef = useRef(false);
@@ -1004,17 +1013,45 @@ const SpaceSchedule = () => {
         ]
           .filter(Boolean)
           .join('\n')}
-        className={`absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm hover:shadow-md hover:brightness-[0.98] transition overflow-hidden z-10 ${
+        className={`group absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm overflow-hidden transition-shadow z-10 hover:z-30 hover:shadow-lg hover:!h-auto hover:overflow-visible ${
           needsCheckIn ? 'ring-2 ring-red-400' : inProgress ? 'ring-2 ring-emerald-400' : ''
         }`}
         style={{
           top: item.top,
           height: item.height,
+          minHeight: item.height,
           left: `calc(${item.lane * laneWidth}% + 3px)`,
           width: `calc(${laneWidth}% - 6px)`,
         }}
       >
-        <div className={`h-full flex flex-col ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
+        {/* the whole booking, shown on hover so a short block never hides its detail */}
+        <div className={`hidden group-hover:flex flex-col gap-0.5 p-2 ${color.bg} rounded-lg`}>
+          <div className="flex items-center gap-1.5">
+            <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full text-white ${
+              booking.status === 'confirmed' ? 'bg-green-500' :
+              booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
+            }`}>
+              {booking.status}
+            </span>
+            <span className={`text-[10px] font-medium ${color.text} opacity-70 truncate`}>
+              #{booking.reference_number?.slice(-6)}
+            </span>
+          </div>
+          <div className={`font-bold text-xs ${color.text}`}>{timeLabel}</div>
+          <div className={`font-semibold text-sm ${color.text} break-words`}>{booking.guest_name || 'Walk-in'}</div>
+          <div className={`text-xs ${color.text} opacity-80 break-words`}>{booking.package?.name || 'No package'}</div>
+          <div className={`text-xs ${color.text} opacity-70 flex items-center gap-1`}>
+            <Users className="w-3 h-3" />
+            {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
+            <span className={`font-bold ${color.text}`}>${Number(booking.total_amount || 0).toFixed(2)}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${resolvePaymentState(booking).pillClass}`}>
+              {resolvePaymentState(booking).label}
+            </span>
+          </div>
+        </div>
+        <div className={`h-full flex flex-col group-hover:hidden ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
           {tiny ? null : compact ? (
             <div className={`flex items-center gap-1.5 text-xs ${color.text} min-w-0`}>
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -1166,6 +1203,56 @@ const SpaceSchedule = () => {
     }
 
     return [...starts].sort((a, b) => a - b);
+  };
+
+  /**
+   * A walk-in starts now and runs for the package's duration, so it is only possible if a
+   * package actually fits before the next booking. Returns the shortest package that fits,
+   * and how long the space is free for.
+   */
+  const walkInFit = (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null } => {
+    const columnOpen = column.openMinutes ?? timeWindow.start;
+    const columnClose = column.closeMinutes ?? timeWindow.end;
+    const until = freeUntilMinute(columnOpen, columnClose, blockedRangesFor(column), nowMinutes);
+    const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
+
+    const durations = packagesForColumn(column)
+      .map(entry => entry.duration_minutes ?? 0)
+      .filter(minutes => minutes > 0);
+
+    const shortest = durations.length > 0 ? Math.min(...durations) : null;
+
+    return { fits: shortest !== null && shortest <= freeFor, freeFor, shortest };
+  };
+
+  const startWalkIn = (column: ScheduleColumn) => {
+    const fit = walkInFit(column);
+
+    if (fit.fits || fit.shortest === null) {
+      navigateToSlot(column, nowMinutes);
+      return;
+    }
+
+    const endMinute = nowMinutes + fit.shortest;
+    const shortestPackage = packagesForColumn(column)
+      .filter(entry => (entry.duration_minutes ?? 0) === fit.shortest)
+      .map(entry => entry.name)[0];
+
+    const clash = activeBookings
+      .filter(b => columnKeyFor(b) === column.key)
+      .map(b => ({ booking: b, start: timeToMinutes(b.booking_time) }))
+      .filter(({ start }) => start >= nowMinutes && start < endMinute)
+      .sort((a, b) => a.start - b.start)[0]?.booking ?? null;
+
+    setWalkInPrompt({
+      column,
+      startMinute: nowMinutes,
+      endMinute,
+      freeFor: fit.freeFor,
+      duration: fit.shortest,
+      packageName: shortestPackage ?? 'the shortest package here',
+      clash,
+    });
   };
 
   /** The next minute staff can actually START a booking here, not just the first unoccupied minute. */
@@ -1753,17 +1840,27 @@ const SpaceSchedule = () => {
                         if (isMichiganToday && state.atMinute <= nowMinutes) {
                           // a walk-in starts at the actual minute, which is deliberately not one
                           // of the package's start times — hence its own action
+                          const fit = walkInFit(column);
+
                           return (
                             <button
                               type="button"
                               onClick={event => {
                                 event.stopPropagation();
-                                navigateToSlot(column, nowMinutes);
+                                startWalkIn(column);
                               }}
-                              title={`Start a walk-in in ${column.name} at ${formatTime12Hour(minutesToTime(nowMinutes))}`}
-                              className="text-[10px] font-semibold text-green-700 hover:text-green-800 hover:bg-green-50 rounded px-1 -mx-1 leading-tight transition focus:outline-none focus:ring-2 focus:ring-green-400"
+                              title={
+                                fit.fits
+                                  ? `Start a walk-in in ${column.name} at ${formatTime12Hour(minutesToTime(nowMinutes))} — ${fit.freeFor} min free`
+                                  : `Only ${fit.freeFor} min free before the next booking here`
+                              }
+                              className={`text-[10px] font-semibold rounded px-1 -mx-1 leading-tight transition focus:outline-none focus:ring-2 ${
+                                fit.fits
+                                  ? 'text-green-700 hover:text-green-800 hover:bg-green-50 focus:ring-green-400'
+                                  : 'text-amber-700 hover:text-amber-800 hover:bg-amber-50 focus:ring-amber-400'
+                              }`}
                             >
-                              Free now &middot; start walk-in
+                              {fit.fits ? 'Free now · start walk-in' : `Free ${fit.freeFor} min · walk-in`}
                             </button>
                           );
                         }
@@ -1850,6 +1947,75 @@ const SpaceSchedule = () => {
         )}
       </div>
 
+
+      {walkInPrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setWalkInPrompt(null)}>
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">This walk-in runs past the next booking</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {walkInPrompt.column.name} is free for {walkInPrompt.freeFor} min, but {walkInPrompt.packageName} needs{' '}
+                    {walkInPrompt.duration} min.
+                  </p>
+                </div>
+              </div>
+
+              <dl className="rounded-lg border border-gray-200 divide-y divide-gray-200 text-sm mb-3">
+                <div className="flex justify-between gap-4 px-3 py-2">
+                  <dt className="text-gray-500">Walk-in would run</dt>
+                  <dd className="font-medium text-gray-900">
+                    {formatTime12Hour(minutesToTime(walkInPrompt.startMinute))} – {formatTime12Hour(minutesToTime(walkInPrompt.endMinute))}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4 px-3 py-2">
+                  <dt className="text-gray-500">Space is free for</dt>
+                  <dd className="font-medium text-gray-900">{walkInPrompt.freeFor} min</dd>
+                </div>
+                <div className="flex justify-between gap-4 px-3 py-2">
+                  <dt className="text-gray-500">Overlap</dt>
+                  <dd className="font-semibold text-amber-700">{walkInPrompt.duration - walkInPrompt.freeFor} min</dd>
+                </div>
+              </dl>
+
+              {walkInPrompt.clash && (
+                <dl className="rounded-lg border border-amber-200 bg-amber-50 divide-y divide-amber-200 text-sm mb-4">
+                  <div className="flex justify-between gap-4 px-3 py-2">
+                    <dt className="text-amber-800">Clashes with</dt>
+                    <dd className="font-semibold text-amber-900">{walkInPrompt.clash.guest_name || 'Walk-in'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 px-3 py-2">
+                    <dt className="text-amber-800">Their booking</dt>
+                    <dd className="font-medium text-amber-900">
+                      {formatTime12Hour(walkInPrompt.clash.booking_time)} ·{' '}
+                      {walkInPrompt.clash.package?.name || 'No package'}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+
+              <div className="flex gap-2 justify-end">
+                <StandardButton variant="secondary" size="md" onClick={() => setWalkInPrompt(null)}>
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  onClick={() => {
+                    const target = walkInPrompt;
+                    setWalkInPrompt(null);
+                    navigateToSlot(target.column, target.startMinute);
+                  }}
+                >
+                  Start anyway
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setSelectedBooking(null)}>

@@ -40,6 +40,7 @@ export interface SchedulePackageWindow {
   open_minutes: number;
   close_minutes: number;
   interval_minutes: number;
+  duration_minutes?: number;
   start_minutes?: number[];
   closed_ranges?: ScheduleClosedRange[];
   room_ids: number[];
