@@ -2441,11 +2441,12 @@ const OnsiteBooking: React.FC = () => {
                   walkInOverlapMinutes > 0 ? 'bg-rose-200 text-rose-900' : 'bg-amber-100'
                 }`}
               >
-                {walkInOverlapMinutes > 0 ? 'Overlap' : walkInAlreadyStarted ? 'Already started' : 'Walk-in'}
+                {walkInOverlapMinutes > 0 ? 'Overlap' : walkInAlreadyStarted ? 'Already started' : 'Off the customer grid'}
               </span>
               <span>
-                Starting at <strong>{formatTimeTo12Hour(bookingData.time)}</strong> today
-                {selectedPackage ? ` — ${formatDuration(selectedPackage)}` : ''}. This is the time that will be recorded.
+                Starting at <strong>{formatTimeTo12Hour(bookingData.time)}</strong>
+                {selectedPackage ? ` — ${formatDuration(selectedPackage)}` : ''}. This is the time that will be
+                recorded. Customers only see this package's scheduled start times; staff are not limited to them.
                 {walkInAlreadyStarted && ' That start time has already gone by, so it is no longer offered to customers.'}
                 {walkInOverlapMinutes > 0 && (
                   <>

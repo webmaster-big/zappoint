@@ -25,7 +25,7 @@ import BookingHoverCard from '../../../components/admin/calendar/BookingHoverCar
 import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
 import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
-import { buildBookingUrl, snapToInterval, snapToOfferedStart } from '../../../utils/bookingPrefill';
+import { buildBookingUrl } from '../../../utils/bookingPrefill';
 
 const WALK_IN_STEP_MINUTES = 5;
 
@@ -1271,14 +1271,6 @@ const SpaceSchedule = () => {
     ...hardRangesFor(column),
   ];
 
-  const intervalForColumn = (column: ScheduleColumn): number => {
-    const intervals = packagesForColumn(column)
-      .map(entry => entry.interval_minutes)
-      .filter(minutes => Number.isFinite(minutes) && minutes > 0);
-
-    return intervals.length > 0 ? Math.min(...intervals) : dayWindow?.interval_minutes ?? 15;
-  };
-
   /** How long this space stays shut after a booking ends, mirroring the server's conflict check. */
   /**
    * A package with no space attached is never conflict-checked by the server and gets no turnaround,
@@ -1430,29 +1422,27 @@ const SpaceSchedule = () => {
     return null;
   };
 
+  /**
+   * The package interval is the CUSTOMER's grid — 4:00, 5:00, 6:00 for an hourly package. Staff
+   * are not held to it: a walk-in starts when the guests actually walk in, so a click on the
+   * admin schedule lands on a 5-minute grid and 4:05 or 4:10 is a perfectly good start.
+   */
   const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number => {
-    const interval = intervalForColumn(column);
-    const columnClose = column.closeMinutes ?? timeWindow.end;
-    const offered = offeredStartsFor(column).filter(start => start < columnClose);
-    // Always land on a start time the packages in this space actually offer. Starts earlier today
-    // are included on purpose: staff record groups that have already gone in.
-    const onGrid = offered.length > 0 ? snapToOfferedStart(offered, rawMinute) : null;
-    const snapped = onGrid ?? snapToInterval(rawMinute, interval);
     const columnOpen = column.openMinutes ?? timeWindow.start;
-    const blocked = blockedRangesFor(column);
-    const free = nextFreeMinute(columnOpen, columnClose, blocked, snapped);
+    const columnClose = column.closeMinutes ?? timeWindow.end;
+    const onFive = (minute: number) => Math.round(minute / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+
+    const snapped = Math.min(
+      Math.max(onFive(rawMinute), onFive(columnOpen)),
+      Math.max(onFive(columnOpen), columnClose - WALK_IN_STEP_MINUTES)
+    );
+
+    // only move if the click landed inside something already booked
+    const free = nextFreeMinute(columnOpen, columnClose, blockedRangesFor(column), snapped);
 
     if (free === null || free === snapped) return snapped;
 
-    const fromFree = snapToInterval(free, interval, free);
-
-    if (onGrid === null) return fromFree;
-
-    const freeOffered = offered.find(
-      start => start >= free && nextFreeMinute(columnOpen, columnClose, blocked, start) === start
-    );
-
-    return freeOffered ?? fromFree;
+    return Math.min(Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES, columnClose - WALK_IN_STEP_MINUTES);
   };
 
   /**
@@ -1475,6 +1465,8 @@ const SpaceSchedule = () => {
     // availability stops offering a start once it has gone by, so a deliberate click on an earlier
     // slot today has to carry the same override the walk-in warning uses
     const alreadyStarted = isMichiganToday && minute < nowMinutes;
+    // the customer grid does not contain 4:05, so the booking page has to be told to keep it
+    const offCustomerGrid = !offeredStartsFor(column).includes(minute);
 
     navigate(
       buildBookingUrl({
@@ -1485,7 +1477,7 @@ const SpaceSchedule = () => {
         packageId: autoSelect,
         packageIds: candidates,
         freeUntilMinute: usableFreeUntil(column, minute),
-        walkIn: isMichiganToday,
+        walkIn: isMichiganToday || offCustomerGrid,
         walkInOverride: (options?.walkInOverride ?? false) || alreadyStarted,
       })
     );
