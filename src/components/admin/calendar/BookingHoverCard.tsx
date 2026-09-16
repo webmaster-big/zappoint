@@ -17,6 +17,8 @@ export interface BookingHoverCardProps {
   status: string;
   reference?: string | null;
   overlapLabel?: string | null;
+  overlapTitle?: string;
+  overlapTone?: 'overlap' | 'tight';
   flag?: { label: string; tone: 'red' | 'emerald' } | null;
 }
 
@@ -45,6 +47,8 @@ const BookingHoverCard: React.FC<BookingHoverCardProps> = ({
   status,
   reference,
   overlapLabel,
+  overlapTitle = 'Overlaps',
+  overlapTone = 'overlap',
   flag,
 }) => {
   if (typeof document === 'undefined') return null;
@@ -96,10 +100,16 @@ const BookingHoverCard: React.FC<BookingHoverCardProps> = ({
       </p>
 
       {overlapLabel && (
-        <p className="mt-1.5 flex items-start gap-1 rounded border border-rose-200 bg-rose-50 px-1.5 py-1 text-[10px] leading-snug break-words text-rose-800">
+        <p
+          className={`mt-1.5 flex items-start gap-1 rounded border px-1.5 py-1 text-[10px] leading-snug break-words ${
+            overlapTone === 'overlap'
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}
+        >
           <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
           <span>
-            <span className="font-bold uppercase">Overlaps</span> {overlapLabel}
+            <span className="font-bold uppercase">{overlapTitle}</span> {overlapLabel}
           </span>
         </p>
       )}

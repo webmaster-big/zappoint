@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { readBookingPrefill } from '../../../utils/bookingPrefill';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
@@ -389,12 +389,47 @@ const OnsiteBooking: React.FC = () => {
     return Math.max(0, startMinutes + packageDurationMinutes - (slotPrefill.freeUntilMinutes ?? 0));
   }, [walkInSlot, slotPrefill.freeUntilKnown, slotPrefill.startMinutes, slotPrefill.freeUntilMinutes, packageDurationMinutes]);
 
+  const WALK_IN_STEP_MINUTES = 5;
+
+  /**
+   * A scheduled booking must land on one of the package's start times, but a walk-in records when
+   * the guests actually go in. That is never on the package grid, so offer a 5-minute grid around
+   * the moment staff pressed the button — a little before it, for a group already inside.
+   */
+  const walkInSlots = useMemo<TimeSlot[]>(() => {
+    if (!walkInSlot) return [];
+
+    const anchor = slotPrefill.startMinutes ?? 0;
+    const offered = new Set(availableTimeSlots.map(slot => slot.start_time));
+    const slots: TimeSlot[] = [];
+
+    for (let minute = anchor - 15; minute <= anchor + 45; minute += WALK_IN_STEP_MINUTES) {
+      if (minute < 0 || minute >= 24 * 60) continue;
+
+      const start = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+      if (offered.has(start)) continue;
+
+      const endAbsolute = minute + packageDurationMinutes;
+      const end = `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`;
+      if (isTimeSlotRestricted(start, `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`)) continue;
+
+      slots.push({ ...walkInSlot, start_time: start, end_time: end });
+    }
+
+    return slots.length > 0 ? slots : [walkInSlot];
+  }, [walkInSlot, slotPrefill.startMinutes, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
+
+  const isWalkInStart = useCallback(
+    (startTime: string) => walkInSlots.some(slot => slot.start_time === startTime),
+    [walkInSlots]
+  );
+
   const displayedTimeSlots = useMemo(
     () =>
-      (walkInSlot ? [...filteredTimeSlots, walkInSlot] : filteredTimeSlots)
+      (walkInSlots.length > 0 ? [...filteredTimeSlots, ...walkInSlots] : filteredTimeSlots)
         .slice()
         .sort((a, b) => a.start_time.localeCompare(b.start_time)),
-    [filteredTimeSlots, walkInSlot]
+    [filteredTimeSlots, walkInSlots]
   );
 
 
@@ -2377,7 +2412,7 @@ const OnsiteBooking: React.FC = () => {
             <Clock className="w-4 h-4 mr-2" />
             Select Time Slot
           </label>
-          {walkInSlot && bookingData.time === walkInSlot.start_time && (
+          {walkInSlot && isWalkInStart(bookingData.time) && (
             <div
               className={`mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
                 walkInOverlapMinutes > 0
@@ -2433,7 +2468,7 @@ const OnsiteBooking: React.FC = () => {
                         className={`accent-${fullColor} w-4 h-4`}
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
-                      {slot === walkInSlot ? (
+                      {isWalkInStart(slot.start_time) ? (
                         <span
                           className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
                             walkInOverlapMinutes > 0 ? 'bg-rose-200 text-rose-900' : 'bg-amber-100 text-amber-800'

@@ -10,7 +10,6 @@ import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeForma
 import { resolvePaymentState } from '../../../types/Bookings.types';
 import { buildBookingUrl, snapToInterval, snapToOfferedStart } from '../../../utils/bookingPrefill';
 import BookingHoverCard from './BookingHoverCard';
-import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 import type { TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
 import {
@@ -25,6 +24,7 @@ import {
 } from '../../../utils/scheduleGeometry';
 
 const MINUTES_PER_DAY = 24 * 60;
+const WALK_IN_STEP_MINUTES = 5;
 const SLOT_HEIGHT = 30;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
@@ -56,7 +56,13 @@ interface PositionedBooking {
   endMinutes: number;
   lane: number;
   laneCount: number;
-  conflicts: Booking[];
+  conflicts: BookingClash[];
+}
+
+/** A real overlap is a double booking; a pair merely closer than the turnaround is only tight. */
+interface BookingClash {
+  booking: Booking;
+  overlapMinutes: number;
 }
 
 interface DayScheduleGridProps {
@@ -237,6 +243,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         virtualMap.set(key, {
           key,
           name: entry.name,
+          // without this a click from the company-wide view reaches the booking page with no
+          // location, and the same package name exists at all ten venues
+          locationId: entry.location_id ?? undefined,
           virtual: true,
           openMinutes: entry.open_minutes,
           closeMinutes: entry.close_minutes,
@@ -265,8 +274,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       // a space stays shut for its turnaround after a booking ends; without it the band looks
       // free and the booking page then refuses that minute
       const turnaround = booking.room_id
-        ? roomWindows.get(booking.room_id)?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES
-        : DEFAULT_SLOT_CLEANUP_MINUTES;
+        ? roomWindows.get(booking.room_id)?.interval_minutes ?? 0
+        : 0;
       const bucket = map.get(key);
       const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) + turnaround };
       if (bucket) bucket.push(range);
@@ -296,7 +305,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
     // a space stays shut for its turnaround, so a booking starting inside it clashes too
     const turnaroundOf = (roomId?: number | null) =>
-      roomId ? roomWindows.get(roomId)?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES : DEFAULT_SLOT_CLEANUP_MINUTES;
+      roomId ? roomWindows.get(roomId)?.interval_minutes ?? 0 : 0;
 
     for (const column of columns) {
       const bucket = map.get(column.key);
@@ -316,7 +325,13 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
             other.booking.id !== item.booking.id &&
             item.startMinutes < other.endMinutes + turnaroundOf(other.booking.room_id) &&
             item.endMinutes + turnaroundOf(item.booking.room_id) > other.startMinutes)
-          .map(other => other.booking);
+          .map(other => ({
+            booking: other.booking,
+            overlapMinutes: Math.max(
+              0,
+              Math.min(item.endMinutes, other.endMinutes) - Math.max(item.startMinutes, other.startMinutes)
+            ),
+          }));
       }
     }
     return map;
@@ -324,21 +339,21 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
   /** Every clashing pair today, so staff see it without hovering a single block. */
   const overlapSummary = useMemo(() => {
-    const rows: { columnName: string; a: Booking; b: Booking }[] = [];
+    const rows: { columnName: string; a: Booking; b: Booking; overlapMinutes: number }[] = [];
     const seen = new Set<string>();
 
     for (const column of columns) {
       for (const item of positioned.get(column.key) ?? []) {
-        for (const other of item.conflicts) {
-          const key = [item.booking.id, other.id].sort((x, y) => x - y).join('-');
+        for (const clash of item.conflicts) {
+          const key = [item.booking.id, clash.booking.id].sort((x, y) => x - y).join('-');
           if (seen.has(key)) continue;
           seen.add(key);
-          rows.push({ columnName: column.name, a: item.booking, b: other });
+          rows.push({ columnName: column.name, a: item.booking, b: clash.booking, overlapMinutes: clash.overlapMinutes });
         }
       }
     }
 
-    return rows;
+    return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
   }, [columns, positioned]);
 
   const timeline = useMemo(
@@ -416,7 +431,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
   const navigate = useNavigate();
   const [hoverSlot, setHoverSlot] = useState<{ key: string; minute: number } | null>(null);
-  const [hoverCard, setHoverCard] = useState<{ item: PositionedBooking; rect: DOMRect } | null>(null);
+  const [hoverCard, setHoverCard] = useState<{ bookingId: number; rect: DOMRect } | null>(null);
   const [walkInPrompt, setWalkInPrompt] = useState<{
     column: ScheduleColumn;
     startMinute: number;
@@ -557,8 +572,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       if (until === null) return null;
 
       const turnaround = column.roomId
-        ? roomWindows.get(column.roomId)?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES
-        : DEFAULT_SLOT_CLEANUP_MINUTES;
+        ? roomWindows.get(column.roomId)?.interval_minutes ?? 0
+        : 0;
 
       return until >= columnClose ? until : Math.max(minute, until - turnaround);
     },
@@ -660,22 +675,24 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   const startWalkIn = React.useCallback(
     (column: ScheduleColumn) => {
       const fit = walkInFit(column);
+      // a walk-in records when the guests actually go in, on a 5-minute grid
+      const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
 
       if (fit.fits || fit.shortest === null) {
-        goToBooking(column, nowMinutes);
+        goToBooking(column, walkInMinute);
         return;
       }
 
-      const endMinute = nowMinutes + fit.shortest;
+      const endMinute = walkInMinute + fit.shortest;
       const clash = (allDayBookings ?? bookings)
         .filter(b => columnKeyFor(b) === column.key)
         .map(b => ({ booking: b, start: startMinutesOf(b) }))
-        .filter(({ start }) => start >= nowMinutes && start < endMinute)
+        .filter(({ start }) => start >= walkInMinute && start < endMinute)
         .sort((a, b) => a.start - b.start)[0]?.booking ?? null;
 
       setWalkInPrompt({
         column,
-        startMinute: nowMinutes,
+        startMinute: walkInMinute,
         endMinute,
         freeFor: fit.freeFor,
         duration: fit.shortest,
@@ -747,25 +764,39 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         </div>
       )}
 
-      {overlapSummary.length > 0 && (
-        <div className="flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
-          <div className="min-w-0">
-            <p className="font-semibold text-rose-900">
-              {overlapSummary.length} overlapping {overlapSummary.length === 1 ? 'booking' : 'bookings'} — these spaces are double-booked
-            </p>
-            <ul className="mt-0.5 space-y-0.5 text-rose-800">
-              {overlapSummary.map(row => (
-                <li key={`${row.a.id}-${row.b.id}`} className="break-words">
-                  <span className="font-medium">{row.columnName}</span>: {customerNameOf(row.a)} at{' '}
-                  {formatSlotLabel(startMinutesOf(row.a))} runs into {customerNameOf(row.b)} at{' '}
-                  {formatSlotLabel(startMinutesOf(row.b))}
-                </li>
-              ))}
-            </ul>
+      {overlapSummary.length > 0 && (() => {
+        const doubleBooked = overlapSummary.filter(row => row.overlapMinutes > 0);
+        const backToBack = overlapSummary.filter(row => row.overlapMinutes === 0);
+        const tone = doubleBooked.length > 0;
+
+        return (
+          <div
+            className={`flex items-start gap-2 border-b px-3 py-2 text-xs ${
+              tone ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'
+            }`}
+          >
+            <AlertTriangle className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${tone ? 'text-rose-600' : 'text-amber-600'}`} />
+            <div className="min-w-0 flex-1">
+              <p className={`font-semibold ${tone ? 'text-rose-900' : 'text-amber-900'}`}>
+                {doubleBooked.length > 0 && <>{doubleBooked.length} double-booked {doubleBooked.length === 1 ? 'space' : 'spaces'}</>}
+                {doubleBooked.length > 0 && backToBack.length > 0 && ' · '}
+                {backToBack.length > 0 && <>{backToBack.length} back-to-back with no turnaround</>}
+              </p>
+              <ul className={`mt-0.5 max-h-24 space-y-0.5 overflow-y-auto pr-1 ${tone ? 'text-rose-800' : 'text-amber-800'}`}>
+                {overlapSummary.map(row => (
+                  <li key={`${row.a.id}-${row.b.id}`} className="break-words">
+                    <span className="font-medium">{row.columnName}</span>: {customerNameOf(row.a)} at{' '}
+                    {formatSlotLabel(startMinutesOf(row.a))}{' '}
+                    {row.overlapMinutes > 0
+                      ? `overlaps ${customerNameOf(row.b)} at ${formatSlotLabel(startMinutesOf(row.b))} by ${row.overlapMinutes} min`
+                      : `ends as ${customerNameOf(row.b)} starts at ${formatSlotLabel(startMinutesOf(row.b))} — no time to reset the space`}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div ref={scrollRef} className="overflow-auto" style={{ maxHeight: '70vh' }}>
         <div className="inline-flex min-w-full">
@@ -992,7 +1023,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       return (
                         <div
                           key={`break-${index}`}
-                          className="pointer-events-none absolute inset-x-0 border-y border-dashed border-gray-300 bg-white"
+                          className="pointer-events-none absolute inset-x-0 z-[4] border-y border-dashed border-gray-400 bg-gray-300/70"
                           style={band}
                           title={`Break ${formatRange(brk.startMinutes, brk.endMinutes)}`}
                         >
@@ -1010,7 +1041,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     ))}
 
                     {column.closedAllDay && (
-                      <div className="absolute inset-0 flex items-start justify-center bg-gray-50/80 pt-3">
+                      <div className="absolute inset-0 z-[6] flex items-start justify-center bg-gray-300/70 pt-3">
                         <span className="rounded bg-white/90 px-1.5 py-0.5 text-[9px] leading-tight font-medium text-gray-500">
                           {column.closedReason ?? 'Closed'}
                         </span>
@@ -1025,12 +1056,34 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     )}
 
                     {items.map(item => {
+                      const turnaround = item.booking.room_id
+                        ? roomWindows.get(item.booking.room_id)?.interval_minutes ?? 0
+                        : 0;
+                      if (turnaround <= 0) return null;
+                      const strip = availableBand(item.endMinutes, item.endMinutes + turnaround, timeline);
+                      if (!strip) return null;
+
+                      return (
+                        <div
+                          key={`turnaround-${item.booking.id}`}
+                          className="pointer-events-none absolute inset-x-0 z-[3] border-y border-amber-200 bg-amber-100/70"
+                          style={strip}
+                          title={`Resetting ${column.name} — free again at ${formatSlotLabel(item.endMinutes + turnaround)}`}
+                        />
+                      );
+                    })}
+
+                    {items.map(item => {
                       const { top, height } = blockGeometry(item, timeline, MIN_BLOCK_HEIGHT, 2);
                       const widthPercent = 100 / item.laneCount;
                       const tone = STATUS_BG[item.booking.status] ?? 'bg-gray-50 border-gray-400';
-                      const overlapping = item.conflicts.length > 0;
+                      const doubleBooked = item.conflicts.some(clash => clash.overlapMinutes > 0);
+                      const clashing = item.conflicts.length > 0;
                       const overlapLabel = item.conflicts
-                        .map(other => `${customerNameOf(other)} at ${formatSlotLabel(startMinutesOf(other))}`)
+                        .map(clash =>
+                          `${customerNameOf(clash.booking)} at ${formatSlotLabel(startMinutesOf(clash.booking))}` +
+                          (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
+                        )
                         .join(', ');
 
                       return (
@@ -1038,20 +1091,20 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                           key={item.booking.id}
                           type="button"
                           onClick={() => onSelectBooking?.(item.booking)}
-                          title={[
+                          aria-label={[
                             customerNameOf(item.booking),
                             item.booking.package?.name ?? 'No package',
                             formatRange(item.startMinutes, item.endMinutes),
-                            overlapping ? `OVERLAPS: ${overlapLabel}` : null,
+                            clashing ? `${doubleBooked ? 'OVERLAPS' : 'NO TURNAROUND'}: ${overlapLabel}` : null,
                           ]
                             .filter(Boolean)
                             .join(' · ')}
-                          onMouseEnter={event => setHoverCard({ item, rect: event.currentTarget.getBoundingClientRect() })}
-                          onMouseLeave={() => setHoverCard(current => (current?.item === item ? null : current))}
-                          onFocus={event => setHoverCard({ item, rect: event.currentTarget.getBoundingClientRect() })}
-                          onBlur={() => setHoverCard(current => (current?.item === item ? null : current))}
+                          onMouseEnter={event => setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+                          onMouseLeave={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
+                          onFocus={event => setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+                          onBlur={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
                           className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 py-1 text-left shadow-sm transition hover:z-20 hover:shadow-lg hover:brightness-95 ${tone} ${
-                            overlapping ? 'ring-2 ring-rose-500' : ''
+                            doubleBooked ? 'ring-2 ring-rose-500' : clashing ? 'ring-2 ring-amber-400' : ''
                           }`}
                           style={{
                             top,
@@ -1060,36 +1113,55 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
                           }}
                         >
-                          {overlapping && (
-                            <span className="absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-bl bg-rose-500 px-1 py-px text-[8px] font-bold uppercase leading-tight text-white">
+                          {clashing && (
+                            <span
+                              className={`absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-bl px-1 py-px text-[8px] font-bold uppercase leading-tight text-white ${
+                                doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
+                              }`}
+                            >
                               <AlertTriangle className="h-2 w-2 shrink-0" />
-                              {height >= 18 ? 'Overlap' : null}
+                              {height >= 18 ? (doubleBooked ? 'Overlap' : 'No gap') : null}
                             </span>
                           )}
 
-                          <span className="flex h-full flex-col">
-                            {height >= 34 && (
-                              <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
-                                {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
-                              </span>
-                            )}
-                            {height >= 18 && (
-                              <span className="truncate text-xs font-semibold leading-tight text-gray-900">
-                                {customerNameOf(item.booking)}
-                              </span>
-                            )}
-                            {height > 52 && (
-                              <span className="truncate text-[9px] leading-tight text-gray-600">
-                                {item.booking.package?.name || 'No package'}
-                              </span>
-                            )}
-                            {height > 72 && (
-                              <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[9px] leading-tight">
-                                <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
-                                <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
-                                  ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
+                          <span className="flex h-full min-w-0 flex-col">
+                            {height < 30 ? (
+                              // a short package leaves one line, so spend it on the time AND the name
+                              <span className="flex min-w-0 items-baseline gap-1 text-[10px] leading-tight">
+                                <span className="shrink-0 font-bold tabular-nums text-gray-700">
+                                  {formatSlotLabel(item.startMinutes)}
+                                </span>
+                                <span className="truncate font-semibold text-gray-900">
+                                  {customerNameOf(item.booking)}
                                 </span>
                               </span>
+                            ) : (
+                              <>
+                                <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
+                                  {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
+                                </span>
+                                <span className="truncate text-xs font-semibold leading-tight text-gray-900">
+                                  {customerNameOf(item.booking)}
+                                </span>
+                                {height >= 46 && (
+                                  <span className="truncate text-[9px] leading-tight text-gray-600">
+                                    {item.booking.package?.name || 'No package'}
+                                  </span>
+                                )}
+                                {height >= 60 && (
+                                  <span className="truncate text-[9px] leading-tight text-gray-600">
+                                    {item.booking.participants} {item.booking.participants === 1 ? 'guest' : 'guests'}
+                                  </span>
+                                )}
+                                {height >= 74 && (
+                                  <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[9px] leading-tight">
+                                    <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
+                                    <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
+                                      ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
+                                    </span>
+                                  </span>
+                                )}
+                              </>
                             )}
                           </span>
                         </button>
@@ -1121,14 +1193,18 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       </div>
 
       {hoverCard && (() => {
-        const hovered = hoverCard.item.booking;
+        // looked up fresh so a re-render (the clock ticks every minute) cannot strand the card
+        const item = [...positioned.values()].flat().find(entry => entry.booking.id === hoverCard.bookingId);
+        if (!item) return null;
+
+        const hovered = item.booking;
         const payment = resolvePaymentState(hovered);
 
         return (
           <BookingHoverCard
             anchor={hoverCard.rect}
             guestName={customerNameOf(hovered)}
-            timeLabel={formatRange(hoverCard.item.startMinutes, hoverCard.item.endMinutes)}
+            timeLabel={formatRange(item.startMinutes, item.endMinutes)}
             packageName={hovered.package?.name || 'No package'}
             participants={hovered.participants}
             amount={parseFloat(String(hovered.total_amount || 0))}
@@ -1137,12 +1213,17 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
             status={hovered.status}
             reference={hovered.reference_number}
             overlapLabel={
-              hoverCard.item.conflicts.length > 0
-                ? hoverCard.item.conflicts
-                    .map(other => `${customerNameOf(other)} at ${formatSlotLabel(startMinutesOf(other))}`)
+              item.conflicts.length > 0
+                ? item.conflicts
+                    .map(clash =>
+                      `${customerNameOf(clash.booking)} at ${formatSlotLabel(startMinutesOf(clash.booking))}` +
+                      (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
+                    )
                     .join(', ')
                 : null
             }
+            overlapTitle={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'Overlaps' : 'No turnaround'}
+            overlapTone={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'overlap' : 'tight'}
           />
         );
       })()}

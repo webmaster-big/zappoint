@@ -26,7 +26,8 @@ import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
 import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
 import { buildBookingUrl, snapToInterval, snapToOfferedStart } from '../../../utils/bookingPrefill';
-import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
+
+const WALK_IN_STEP_MINUTES = 5;
 
 const parseLocalDate = (isoDateString: string): Date => {
   if (!isoDateString) return new Date();
@@ -163,7 +164,17 @@ interface PositionedBooking {
   laneCount: number;
   clipped: boolean;
   endMinRaw: number;
-  conflicts: Booking[];
+  conflicts: BookingClash[];
+}
+
+/**
+ * Two bookings can fail the server's rule in two different ways, and staff must not be told the
+ * same thing about both: a real overlap is a double booking, while a pair that merely sits closer
+ * together than the space's turnaround is back-to-back with no time to reset the room.
+ */
+interface BookingClash {
+  booking: Booking;
+  overlapMinutes: number;
 }
 
 const assignLanes = (list: PositionedBooking[]): void => {
@@ -214,7 +225,7 @@ const SpaceSchedule = () => {
     packageName: string;
     clash: Booking | null;
   } | null>(null);
-  const [hoverCard, setHoverCard] = useState<{ item: PositionedBooking; rect: DOMRect } | null>(null);
+  const [hoverCard, setHoverCard] = useState<{ bookingId: number; rect: DOMRect } | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => michiganToday());
   const spacesLoadedRef = useRef(false);
@@ -656,6 +667,9 @@ const SpaceSchedule = () => {
         virtualMap.set(key, {
           key,
           name: entry.name,
+          // without this a click from the company-wide view reaches the booking page with no
+          // location, and the same package name exists at all ten venues
+          locationId: entry.location_id ?? undefined,
           virtual: true,
           openMinutes: entry.open_minutes,
           closeMinutes: entry.close_minutes,
@@ -769,7 +783,7 @@ const SpaceSchedule = () => {
       const space = column.roomId !== undefined
         ? (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId)
         : undefined;
-      const turnaround = space?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES;
+      const turnaround = column.roomId === undefined ? 0 : space?.interval_minutes ?? 0;
       // measured against every live booking in this space, not only the ones passing the current
       // filters — a clash staff cannot see is exactly the one that hurts
       const neighbours = activeBookings
@@ -789,7 +803,13 @@ const SpaceSchedule = () => {
             other.booking.id !== item.booking.id &&
             item.startMin < other.endMinutes + turnaround &&
             item.endMinRaw + turnaround > other.startMinutes)
-          .map(other => other.booking);
+          .map(other => ({
+            booking: other.booking,
+            overlapMinutes: Math.max(
+              0,
+              Math.min(item.endMinRaw, other.endMinutes) - Math.max(item.startMin, other.startMinutes)
+            ),
+          }));
       }
     }
     return map;
@@ -797,21 +817,21 @@ const SpaceSchedule = () => {
 
   /** Every clashing pair on this day, so staff see it without hovering a single block. */
   const overlapSummary = useMemo(() => {
-    const rows: { columnName: string; a: Booking; b: Booking }[] = [];
+    const rows: { columnName: string; a: Booking; b: Booking; overlapMinutes: number }[] = [];
     const seen = new Set<string>();
 
     for (const column of columns) {
       for (const item of positionedByColumn.get(column.key) ?? []) {
-        for (const other of item.conflicts) {
-          const key = [item.booking.id, other.id].sort((x, y) => x - y).join('-');
+        for (const clash of item.conflicts) {
+          const key = [item.booking.id, clash.booking.id].sort((x, y) => x - y).join('-');
           if (seen.has(key)) continue;
           seen.add(key);
-          rows.push({ columnName: column.name, a: item.booking, b: other });
+          rows.push({ columnName: column.name, a: item.booking, b: clash.booking, overlapMinutes: clash.overlapMinutes });
         }
       }
     }
 
-    return rows;
+    return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
   }, [columns, positionedByColumn]);
 
   const freeFromByColumn = useMemo(() => {
@@ -830,7 +850,7 @@ const SpaceSchedule = () => {
         ? (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId)
         : undefined;
       // the space is still shut for its turnaround, so it is not free the moment a booking ends
-      const columnTurnaround = space?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES;
+      const columnTurnaround = column.roomId === undefined ? 0 : space?.interval_minutes ?? 0;
       const blocked = [
         ...activeBookings
           .filter(b => columnKeyFor(b) === column.key)
@@ -1046,30 +1066,38 @@ const SpaceSchedule = () => {
     const color = packageColorFor(booking.package?.name || '');
     const laneWidth = 100 / item.laneCount;
     // below one line of text there is no room for a label, so show the block alone
-    const tiny = item.height < 24;
+    const tiny = item.height < 30;
     const compact = !tiny && item.height < 60;
     const medium = item.height >= 60 && item.height < 140;
     const timeLabel = `${formatTime12Hour(booking.booking_time)} – ${formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}`;
     const inProgress = isMichiganToday && nowMinutes >= item.startMin && nowMinutes < item.endMin;
     const needsCheckIn = inProgress && booking.status !== 'checked-in';
-    const overlapping = item.conflicts.length > 0;
+    const doubleBooked = item.conflicts.some(clash => clash.overlapMinutes > 0);
+    const clashing = item.conflicts.length > 0;
     const overlapLabel = item.conflicts
-      .map(other => `${other.guest_name || 'Walk-in'} at ${formatTime12Hour(other.booking_time)}`)
+      .map(clash =>
+        `${clash.booking.guest_name || 'Walk-in'} at ${formatTime12Hour(clash.booking.booking_time)}` +
+        (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
+      )
       .join(', ');
     return (
       <button
         key={booking.id}
         type="button"
         onClick={() => setSelectedBooking(booking)}
-        aria-label={`${booking.guest_name || 'Walk-in'}, ${timeLabel}`}
-        onMouseEnter={event => setHoverCard({ item, rect: event.currentTarget.getBoundingClientRect() })}
-        onMouseLeave={() => setHoverCard(current => (current?.item === item ? null : current))}
-        onFocus={event => setHoverCard({ item, rect: event.currentTarget.getBoundingClientRect() })}
-        onBlur={() => setHoverCard(current => (current?.item === item ? null : current))}
+        aria-label={`${booking.guest_name || 'Walk-in'}, ${timeLabel}${
+          clashing ? `, ${doubleBooked ? 'overlaps' : 'no turnaround before'} ${overlapLabel}` : ''
+        }`}
+        onMouseEnter={event => setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+        onMouseLeave={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
+        onFocus={event => setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+        onBlur={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
         className={`absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm overflow-hidden transition-shadow z-10 hover:z-20 hover:shadow-lg ${
-          overlapping
+          doubleBooked
             ? 'ring-2 ring-rose-500'
-            : needsCheckIn
+            : clashing
+              ? 'ring-2 ring-amber-400'
+              : needsCheckIn
               ? 'ring-2 ring-red-400'
               : inProgress
                 ? 'ring-2 ring-emerald-400'
@@ -1082,26 +1110,30 @@ const SpaceSchedule = () => {
           width: `calc(${laneWidth}% - 6px)`,
         }}
       >
-        {overlapping && (
+        {clashing && (
           <span
-            title={`Overlaps ${overlapLabel}`}
-            className="absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-tr-lg rounded-bl bg-rose-500 px-1 py-px text-[9px] font-bold uppercase leading-tight text-white"
+            className={`absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-tr-lg rounded-bl px-1 py-px text-[9px] font-bold uppercase leading-tight text-white ${
+              doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
+            }`}
           >
             <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
-            {tiny ? null : 'Overlap'}
+            {tiny ? null : doubleBooked ? 'Overlap' : 'No gap'}
           </span>
         )}
         <div className={`h-full flex flex-col ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
-          {tiny ? null : compact ? (
+          {tiny ? (
+            <div className={`flex items-baseline gap-1 px-1 text-[10px] leading-tight ${color.text} min-w-0`}>
+              <span className="font-bold tabular-nums flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
+              <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+            </div>
+          ) : compact ? (
             <div className={`flex items-center gap-1.5 text-xs ${color.text} min-w-0`}>
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                 booking.status === 'confirmed' ? 'bg-green-500' :
                 booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
               }`} />
+              <span className="font-bold tabular-nums flex-shrink-0 opacity-80">{formatTime12Hour(booking.booking_time)}</span>
               <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
-              {item.laneCount === 1 && (
-                <span className="opacity-70 flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
-              )}
             </div>
           ) : (
             <>
@@ -1214,10 +1246,14 @@ const SpaceSchedule = () => {
   };
 
   /** How long this space stays shut after a booking ends, mirroring the server's conflict check. */
+  /**
+   * A package with no space attached is never conflict-checked by the server and gets no turnaround,
+   * so the grid must not invent one — it would hide starts the booking page still offers.
+   */
   const turnaroundFor = (column: ScheduleColumn): number => {
-    if (column.roomId === undefined) return DEFAULT_SLOT_CLEANUP_MINUTES;
+    if (column.roomId === undefined) return 0;
     const space = (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId);
-    return space?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES;
+    return space?.interval_minutes ?? 0;
   };
 
   /**
@@ -1289,24 +1325,27 @@ const SpaceSchedule = () => {
 
   const startWalkIn = (column: ScheduleColumn) => {
     const fit = walkInFit(column);
+    // a walk-in records when the guests actually go in, on a 5-minute grid rather than the
+    // package's scheduled start times
+    const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
 
     if (fit.fits || fit.shortest === null) {
-      navigateToSlot(column, nowMinutes);
+      navigateToSlot(column, walkInMinute);
       return;
     }
 
-    const endMinute = nowMinutes + fit.shortest;
+    const endMinute = walkInMinute + fit.shortest;
     const shortestPackage = fit.packageName;
 
     const clash = activeBookings
       .filter(b => columnKeyFor(b) === column.key)
       .map(b => ({ booking: b, start: timeToMinutes(b.booking_time) }))
-      .filter(({ start }) => start >= nowMinutes && start < endMinute)
+      .filter(({ start }) => start >= walkInMinute && start < endMinute)
       .sort((a, b) => a.start - b.start)[0]?.booking ?? null;
 
     setWalkInPrompt({
       column,
-      startMinute: nowMinutes,
+      startMinute: walkInMinute,
       endMinute,
       freeFor: fit.freeFor,
       duration: fit.shortest,
@@ -1465,8 +1504,8 @@ const SpaceSchedule = () => {
           />
         )}
         {!showsAvailable && !closure?.fullDay && roomWindow?.reason && (
-          <div className="absolute inset-0 z-[1] flex items-start justify-center bg-gray-50/70 pt-8">
-            <span className="rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+          <div className="absolute inset-0 z-[1] flex items-start justify-center bg-gray-200/70 pt-8">
+            <span className="rounded-full border border-gray-300 bg-white/90 px-2 py-0.5 text-[10px] font-medium text-gray-600">
               {roomWindow.reason}
             </span>
           </div>
@@ -1490,14 +1529,30 @@ const SpaceSchedule = () => {
             </div>
           );
         })}
+        {(positionedByColumn.get(column.key) ?? []).map(item => {
+          const turnaround = turnaroundFor(column);
+          if (turnaround <= 0) return null;
+          const from = item.endMinRaw;
+          const to = Math.min(timeWindow.end, from + turnaround);
+          if (to <= from) return null;
+
+          return (
+            <div
+              key={`turnaround-${item.booking.id}`}
+              className="absolute inset-x-0 z-[3] border-y border-amber-200 bg-amber-100/70"
+              style={{ top: (from - timeWindow.start) * pxPerMinute, height: (to - from) * pxPerMinute }}
+              title={`Resetting ${column.name} — free again at ${formatTime12Hour(minutesToTime(to))}`}
+            />
+          );
+        })}
         {breaks.map((brk, i) => (
           <div
             key={`break-${i}`}
-            className="absolute left-0.5 right-0.5 bg-gray-100 border-2 border-dashed border-gray-300 rounded z-[4] flex flex-col items-center justify-center"
+            className="absolute left-0.5 right-0.5 bg-gray-300/70 border-2 border-dashed border-gray-400 rounded z-[4] flex flex-col items-center justify-center"
             style={{ top: (brk.start - timeWindow.start) * pxPerMinute, height: (brk.end - brk.start) * pxPerMinute }}
           >
-            <Coffee className="w-4 h-4 text-gray-400" />
-            <span className="text-[10px] font-medium text-gray-500 mt-0.5">Break</span>
+            <Coffee className="w-4 h-4 text-gray-600" />
+            <span className="text-[10px] font-semibold text-gray-700 mt-0.5">Break</span>
           </div>
         ))}
       </>
@@ -1871,25 +1926,47 @@ const SpaceSchedule = () => {
                 </span>
               </div>
             )}
-            {overlapSummary.length > 0 && (
-              <div className="flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-4 py-2.5 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-                <div className="min-w-0">
-                  <p className="font-semibold text-rose-900">
-                    {overlapSummary.length} overlapping {overlapSummary.length === 1 ? 'booking' : 'bookings'} — these spaces are double-booked
-                  </p>
-                  <ul className="mt-1 space-y-0.5 text-rose-800">
-                    {overlapSummary.map(row => (
-                      <li key={`${row.a.id}-${row.b.id}`} className="break-words">
-                        <span className="font-medium">{row.columnName}</span>: {row.a.guest_name || 'Walk-in'} at{' '}
-                        {formatTime12Hour(row.a.booking_time)} runs into {row.b.guest_name || 'Walk-in'} at{' '}
-                        {formatTime12Hour(row.b.booking_time)}
-                      </li>
-                    ))}
-                  </ul>
+            {overlapSummary.length > 0 && (() => {
+              const doubleBooked = overlapSummary.filter(row => row.overlapMinutes > 0);
+              const backToBack = overlapSummary.filter(row => row.overlapMinutes === 0);
+              const tone = doubleBooked.length > 0;
+
+              return (
+                <div
+                  className={`flex items-start gap-2 border-b px-4 py-2.5 text-sm ${
+                    tone ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'
+                  }`}
+                >
+                  <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${tone ? 'text-rose-600' : 'text-amber-600'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`font-semibold ${tone ? 'text-rose-900' : 'text-amber-900'}`}>
+                      {doubleBooked.length > 0 && (
+                        <>
+                          {doubleBooked.length} double-booked {doubleBooked.length === 1 ? 'space' : 'spaces'}
+                        </>
+                      )}
+                      {doubleBooked.length > 0 && backToBack.length > 0 && ' · '}
+                      {backToBack.length > 0 && (
+                        <>
+                          {backToBack.length} back-to-back with no turnaround
+                        </>
+                      )}
+                    </p>
+                    <ul className={`mt-1 max-h-32 space-y-0.5 overflow-y-auto pr-1 ${tone ? 'text-rose-800' : 'text-amber-800'}`}>
+                      {overlapSummary.map(row => (
+                        <li key={`${row.a.id}-${row.b.id}`} className="break-words">
+                          <span className="font-medium">{row.columnName}</span>: {row.a.guest_name || 'Walk-in'} at{' '}
+                          {formatTime12Hour(row.a.booking_time)}{' '}
+                          {row.overlapMinutes > 0
+                            ? `overlaps ${row.b.guest_name || 'Walk-in'} at ${formatTime12Hour(row.b.booking_time)} by ${row.overlapMinutes} min`
+                            : `ends as ${row.b.guest_name || 'Walk-in'} starts at ${formatTime12Hour(row.b.booking_time)} — no time to reset the space`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {activeBookings.length > 0 && filteredBookings.length === 0 && (
               <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600">
                 <Search className="h-4 w-4 shrink-0 text-gray-400" />
@@ -2012,7 +2089,7 @@ const SpaceSchedule = () => {
                 </div>
 
                 <div className="relative flex" style={{ height: timeWindow.total * pxPerMinute }}>
-                  <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute inset-0 z-[2] pointer-events-none">
                     {hourMarks.map(mark => (
                       <div key={mark}>
                         <div
@@ -2059,8 +2136,12 @@ const SpaceSchedule = () => {
 
 
       {hoverCard && (() => {
-        const hovered = hoverCard.item.booking;
-        const running = isMichiganToday && nowMinutes >= hoverCard.item.startMin && nowMinutes < hoverCard.item.endMin;
+        // looked up fresh: the clock ticks every minute and rebuilds every positioned booking
+        const item = [...positionedByColumn.values()].flat().find(entry => entry.booking.id === hoverCard.bookingId);
+        if (!item) return null;
+
+        const hovered = item.booking;
+        const running = isMichiganToday && nowMinutes >= item.startMin && nowMinutes < item.endMin;
         const payment = resolvePaymentState(hovered);
 
         return (
@@ -2078,12 +2159,17 @@ const SpaceSchedule = () => {
             status={hovered.status}
             reference={hovered.reference_number}
             overlapLabel={
-              hoverCard.item.conflicts.length > 0
-                ? hoverCard.item.conflicts
-                    .map(other => `${other.guest_name || 'Walk-in'} at ${formatTime12Hour(other.booking_time)}`)
+              item.conflicts.length > 0
+                ? item.conflicts
+                    .map(clash =>
+                      `${clash.booking.guest_name || 'Walk-in'} at ${formatTime12Hour(clash.booking.booking_time)}` +
+                      (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
+                    )
                     .join(', ')
                 : null
             }
+            overlapTitle={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'Overlaps' : 'No turnaround'}
+            overlapTone={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'overlap' : 'tight'}
             flag={
               running && hovered.status !== 'checked-in'
                 ? { label: 'Check in', tone: 'red' }
