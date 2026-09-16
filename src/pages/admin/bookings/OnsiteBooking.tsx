@@ -354,7 +354,10 @@ const OnsiteBooking: React.FC = () => {
     const startMinutes = slotPrefill.startMinutes ?? hours * 60 + minutes;
     const endAbsolute = startMinutes + packageDurationMinutes;
 
-    if (!slotPrefill.freeUntilKnown || endAbsolute > (slotPrefill.freeUntilMinutes ?? -1)) return null;
+    // staff were shown the overlap and chose to go ahead, so the fit test must not veto them
+    if (!slotPrefill.walkInOverride && (!slotPrefill.freeUntilKnown || endAbsolute > (slotPrefill.freeUntilMinutes ?? -1))) {
+      return null;
+    }
 
     const endTime = `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`;
 
@@ -368,6 +371,12 @@ const OnsiteBooking: React.FC = () => {
       room_id: slotPrefill.roomId ?? null,
     };
   }, [slotPrefill, selectedPackage, bookingData.date, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
+
+  const walkInOverlapMinutes = useMemo(() => {
+    if (!walkInSlot || !slotPrefill.freeUntilKnown) return 0;
+    const startMinutes = slotPrefill.startMinutes ?? 0;
+    return Math.max(0, startMinutes + packageDurationMinutes - (slotPrefill.freeUntilMinutes ?? 0));
+  }, [walkInSlot, slotPrefill.freeUntilKnown, slotPrefill.startMinutes, slotPrefill.freeUntilMinutes, packageDurationMinutes]);
 
   const displayedTimeSlots = useMemo(
     () =>
@@ -1065,10 +1074,17 @@ const OnsiteBooking: React.FC = () => {
     }
 
     if (walkInSlot) {
-      setToast({
-        message: `Walk-in start kept at ${formatTimeTo12Hour(slotPrefill.time)} — it is outside this package's usual start times.`,
-        type: 'info',
-      });
+      setToast(
+        walkInOverlapMinutes > 0
+          ? {
+              message: `Walk-in kept at ${formatTimeTo12Hour(slotPrefill.time)} — it runs ${walkInOverlapMinutes} min past the next booking in this space.`,
+              type: 'error',
+            }
+          : {
+              message: `Walk-in start kept at ${formatTimeTo12Hour(slotPrefill.time)} — it is outside this package's usual start times.`,
+              type: 'info',
+            }
+      );
       return;
     }
 
@@ -1077,7 +1093,7 @@ const OnsiteBooking: React.FC = () => {
       message: 'That start time is no longer offered for this package — pick another below.',
       type: 'info',
     });
-  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, bookingData.date, selectedPackage]);
+  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, walkInOverlapMinutes, bookingData.date, selectedPackage]);
 
   const handleAttractionToggle = (attractionId: string) => {
     setBookingData(prev => {
@@ -2351,11 +2367,30 @@ const OnsiteBooking: React.FC = () => {
             Select Time Slot
           </label>
           {walkInSlot && bookingData.time === walkInSlot.start_time && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-semibold">Walk-in</span>
+            <div
+              className={`mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                walkInOverlapMinutes > 0
+                  ? 'border-rose-300 bg-rose-50 text-rose-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}
+            >
+              <span
+                className={`rounded-full px-1.5 py-0.5 font-semibold ${
+                  walkInOverlapMinutes > 0 ? 'bg-rose-200 text-rose-900' : 'bg-amber-100'
+                }`}
+              >
+                {walkInOverlapMinutes > 0 ? 'Overlap' : 'Walk-in'}
+              </span>
               <span>
                 Starting at <strong>{formatTimeTo12Hour(bookingData.time)}</strong> today
                 {selectedPackage ? ` — ${formatDuration(selectedPackage)}` : ''}. This is the time that will be recorded.
+                {walkInOverlapMinutes > 0 && (
+                  <>
+                    {' '}It runs <strong>{walkInOverlapMinutes} min</strong> past the next booking in this space
+                    {slotPrefill.freeUntil ? ` (free until ${formatTimeTo12Hour(slotPrefill.freeUntil)})` : ''} — the
+                    schedule will flag both bookings as overlapping.
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -2387,7 +2422,13 @@ const OnsiteBooking: React.FC = () => {
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
                       {slot === walkInSlot ? (
-                        <span className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">Walk-in</span>
+                        <span
+                          className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            walkInOverlapMinutes > 0 ? 'bg-rose-200 text-rose-900' : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {walkInOverlapMinutes > 0 ? 'Overlap' : 'Walk-in'}
+                        </span>
                       ) : slot.remaining_tickets != null && !slot.exclusive && (
                         <span className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${slot.remaining_tickets <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{slot.remaining_tickets} left</span>
                       )}

@@ -642,6 +642,32 @@ const EditBooking: React.FC = () => {
     return true;
   });
 
+  /**
+   * Availability no longer offers starts that have already passed, so a booking being edited later
+   * the same day would lose its own time from the list. Keep it selectable and clearly marked.
+   */
+  const displayedTimeSlots: TimeSlot[] = (() => {
+    if (!formData.time) return filteredTimeSlots;
+    if (filteredTimeSlots.some(slot => slot.start_time === formData.time)) return filteredTimeSlots;
+    if (originalBooking?.booking_time?.slice(0, 5) !== formData.time) return filteredTimeSlots;
+
+    const unit = originalBooking.duration_unit || 'hours';
+    const raw = Number(originalBooking.duration) || 0;
+    const durationMinutes = unit === 'minutes' ? Math.round(raw) : Math.round(raw * 60);
+    const [startHours, startMinutes] = formData.time.split(':').map(Number);
+    const endTotal = (startHours * 60 + startMinutes + durationMinutes) % (24 * 60);
+
+    const current: TimeSlot = {
+      start_time: formData.time,
+      end_time: `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`,
+      duration: raw,
+      duration_unit: unit,
+      room_id: originalBooking.room_id ?? null,
+    };
+
+    return [current, ...filteredTimeSlots].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  })();
+
   const getWeekOfMonth = (date: Date): number => {
     const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const dayOfMonth = date.getDate();
@@ -1176,9 +1202,9 @@ const EditBooking: React.FC = () => {
                       <div className={`animate-spin rounded-full h-6 w-6 border-b-2 border-${fullColor}`}></div>
                       <span className="ml-2 text-sm text-gray-600">Loading available times...</span>
                     </div>
-                  ) : filteredTimeSlots.length > 0 ? (
+                  ) : displayedTimeSlots.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {filteredTimeSlots.map((slot) => (
+                      {displayedTimeSlots.map((slot) => (
                         <label
                           key={slot.start_time}
                           className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${

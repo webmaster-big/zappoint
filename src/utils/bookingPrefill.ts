@@ -7,6 +7,8 @@ export interface SlotPrefill {
   packageIds?: number[];
   freeUntilMinute?: number | null;
   walkIn?: boolean;
+  /** staff saw the overlap warning and chose to go ahead anyway */
+  walkInOverride?: boolean;
 }
 
 export interface BookingPrefill {
@@ -21,6 +23,7 @@ export interface BookingPrefill {
   freeUntilKnown: boolean;
   startMinutes: number | null;
   walkIn: boolean;
+  walkInOverride: boolean;
   hasAny: boolean;
 }
 
@@ -86,6 +89,7 @@ export function buildBookingUrl(prefill: SlotPrefill): string {
   }
 
   if (prefill.walkIn) params.set('walk_in', '1');
+  if (prefill.walkInOverride) params.set('walk_in_override', '1');
 
   const query = params.toString();
   return query ? `${BOOKING_CREATE_PATH}?${query}` : BOOKING_CREATE_PATH;
@@ -130,6 +134,7 @@ export function readBookingPrefill(params: URLSearchParams): BookingPrefill {
       return Number.isFinite(n) && n >= 0 ? Math.round(n) : minute;
     })(),
     walkIn: params.get('walk_in') === '1',
+    walkInOverride: params.get('walk_in_override') === '1',
     hasAny: false,
   };
 

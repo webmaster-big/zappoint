@@ -9,6 +9,8 @@ import { customerNameOf } from '../../../utils/bookingSearch';
 import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeFormat';
 import { resolvePaymentState } from '../../../types/Bookings.types';
 import { buildBookingUrl, snapToInterval, snapToOfferedStart } from '../../../utils/bookingPrefill';
+import BookingHoverCard from './BookingHoverCard';
+import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 import type { TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
 import {
@@ -26,7 +28,6 @@ const MINUTES_PER_DAY = 24 * 60;
 const SLOT_HEIGHT = 30;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
-const DEFAULT_TURNAROUND_MINUTES = 15;
 
 export const SLOT_COLUMN_WIDTH = 64;
 export const ROOM_COLUMN_WIDTH = 132;
@@ -55,6 +56,7 @@ interface PositionedBooking {
   endMinutes: number;
   lane: number;
   laneCount: number;
+  conflicts: Booking[];
 }
 
 interface DayScheduleGridProps {
@@ -263,8 +265,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       // a space stays shut for its turnaround after a booking ends; without it the band looks
       // free and the booking page then refuses that minute
       const turnaround = booking.room_id
-        ? roomWindows.get(booking.room_id)?.interval_minutes ?? DEFAULT_TURNAROUND_MINUTES
-        : DEFAULT_TURNAROUND_MINUTES;
+        ? roomWindows.get(booking.room_id)?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES
+        : DEFAULT_SLOT_CLEANUP_MINUTES;
       const bucket = map.get(key);
       const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) + turnaround };
       if (bucket) bucket.push(range);
@@ -288,12 +290,56 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         endMinutes: startMinutes + durationMinutesOf(booking),
         lane: 0,
         laneCount: 1,
+        conflicts: [],
       });
     }
 
-    for (const bucket of map.values()) assignLanes(bucket);
+    // a space stays shut for its turnaround, so a booking starting inside it clashes too
+    const turnaroundOf = (roomId?: number | null) =>
+      roomId ? roomWindows.get(roomId)?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES : DEFAULT_SLOT_CLEANUP_MINUTES;
+
+    for (const column of columns) {
+      const bucket = map.get(column.key);
+      if (!bucket) continue;
+      assignLanes(bucket);
+      // measured against every booking in this space, not only the ones this grid draws
+      const neighbours = (allDayBookings ?? bookings)
+        .filter(b => columnKeyFor(b) === column.key)
+        .map(b => {
+          const startMinutes = startMinutesOf(b);
+          return { booking: b, startMinutes, endMinutes: startMinutes + durationMinutesOf(b) };
+        });
+
+      for (const item of bucket) {
+        item.conflicts = neighbours
+          .filter(other =>
+            other.booking.id !== item.booking.id &&
+            item.startMinutes < other.endMinutes + turnaroundOf(other.booking.room_id) &&
+            item.endMinutes + turnaroundOf(item.booking.room_id) > other.startMinutes)
+          .map(other => other.booking);
+      }
+    }
     return map;
-  }, [columns, bookings, columnKeyFor]);
+  }, [columns, bookings, allDayBookings, columnKeyFor, roomWindows]);
+
+  /** Every clashing pair today, so staff see it without hovering a single block. */
+  const overlapSummary = useMemo(() => {
+    const rows: { columnName: string; a: Booking; b: Booking }[] = [];
+    const seen = new Set<string>();
+
+    for (const column of columns) {
+      for (const item of positioned.get(column.key) ?? []) {
+        for (const other of item.conflicts) {
+          const key = [item.booking.id, other.id].sort((x, y) => x - y).join('-');
+          if (seen.has(key)) continue;
+          seen.add(key);
+          rows.push({ columnName: column.name, a: item.booking, b: other });
+        }
+      }
+    }
+
+    return rows;
+  }, [columns, positioned]);
 
   const timeline = useMemo(
     () =>
@@ -370,6 +416,16 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
   const navigate = useNavigate();
   const [hoverSlot, setHoverSlot] = useState<{ key: string; minute: number } | null>(null);
+  const [hoverCard, setHoverCard] = useState<{ item: PositionedBooking; rect: DOMRect } | null>(null);
+  const [walkInPrompt, setWalkInPrompt] = useState<{
+    column: ScheduleColumn;
+    startMinute: number;
+    endMinute: number;
+    freeFor: number;
+    duration: number;
+    packageName: string;
+    clash: Booking | null;
+  } | null>(null);
 
   const packagesForSlot = React.useCallback(
     (column: ScheduleColumn, minute: number): number[] => {
@@ -483,8 +539,12 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   );
 
   /** A walk-in runs for the package's duration, so it is only possible if one fits before the next booking. */
-  const walkInFit = React.useCallback(
-    (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null } => {
+  /**
+   * How long this space is really bookable from a minute: a booking must also clear the space's
+   * turnaround before the next one starts, which is what the server's conflict check enforces.
+   */
+  const usableFreeUntil = React.useCallback(
+    (column: ScheduleColumn, minute: number): number | null => {
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
       const blocked = [
@@ -492,38 +552,86 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
         ...column.closedRanges,
       ];
-      const until = freeUntilMinute(columnOpen, columnClose, blocked, nowMinutes);
+      const until = freeUntilMinute(columnOpen, columnClose, blocked, minute);
+
+      if (until === null) return null;
+
+      const turnaround = column.roomId
+        ? roomWindows.get(column.roomId)?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES
+        : DEFAULT_SLOT_CLEANUP_MINUTES;
+
+      return until >= columnClose ? until : Math.max(minute, until - turnaround);
+    },
+    [occupancy, roomBreaks, roomWindows, timeline]
+  );
+
+  const walkInFit = React.useCallback(
+    (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null } => {
+      const columnClose = column.closeMinutes ?? timeline.end;
+      const until = usableFreeUntil(column, nowMinutes);
       const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
 
-      const durations = packagesForColumn(column)
-        .map(entry => entry.duration_minutes ?? 0)
-        .filter(minutes => minutes > 0);
-      const shortest = durations.length > 0 ? Math.min(...durations) : null;
+      // only packages the booking page will actually offer at this minute
+      const startable = new Set(packagesForSlot(column, nowMinutes));
+      const candidates = (windowData.packages ?? [])
+        .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+        .sort((a, b) => (a.duration_minutes ?? 0) - (b.duration_minutes ?? 0));
 
-      return { fits: shortest !== null && shortest <= freeFor, freeFor, shortest };
+      const shortestEntry = candidates[0] ?? null;
+      const shortest = shortestEntry?.duration_minutes ?? null;
+
+      return {
+        fits: shortest !== null && shortest <= freeFor,
+        freeFor,
+        shortest,
+        packageName: shortestEntry?.name ?? null,
+      };
     },
-    [packagesForColumn, occupancy, roomBreaks, timeline, nowMinutes]
+    [packagesForSlot, windowData, usableFreeUntil, timeline, nowMinutes]
   );
 
   /** The next minute a booking can actually START here, not just the first unoccupied minute. */
+  /**
+   * The next minute staff can actually START a booking here. A start only counts if this space is
+   * free at it and a package that runs then still fits before the next booking — otherwise the
+   * header would advertise a time the booking page goes on to refuse.
+   */
   const nextBookableFrom = React.useCallback(
-    (column: ScheduleColumn, atMinute: number): number => {
-      const offered = offeredStartsFor(column).filter(start => start >= atMinute);
-      return offered.length > 0 ? Math.min(...offered) : atMinute;
-    },
-    [offeredStartsFor]
-  );
-
-  const goToBooking = React.useCallback(
-    (column: ScheduleColumn, minute: number) => {
+    (column: ScheduleColumn, atMinute: number): number | null => {
+      const columnOpen = column.openMinutes ?? timeline.start;
+      const columnClose = column.closeMinutes ?? timeline.end;
       const blocked = [
         ...(occupancy.get(column.key) ?? []),
         ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
         ...column.closedRanges,
       ];
-      const columnOpen = column.openMinutes ?? timeline.start;
-      const columnClose = column.closeMinutes ?? timeline.end;
 
+      for (const start of offeredStartsFor(column).filter(candidate => candidate >= atMinute)) {
+        if (nextFreeMinute(columnOpen, columnClose, blocked, start) !== start) continue;
+
+        const startable = new Set(packagesForSlot(column, start));
+        const shortest = (windowData.packages ?? [])
+          .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+          .reduce<number | null>((best, entry) => {
+            const minutes = entry.duration_minutes ?? 0;
+            return best === null || minutes < best ? minutes : best;
+          }, null);
+
+        if (shortest === null) continue;
+
+        const until = usableFreeUntil(column, start);
+        if (until !== null && start + shortest > until) continue;
+
+        return start;
+      }
+
+      return null;
+    },
+    [offeredStartsFor, packagesForSlot, windowData, usableFreeUntil, occupancy, roomBreaks, timeline]
+  );
+
+  const goToBooking = React.useCallback(
+    (column: ScheduleColumn, minute: number, options?: { walkInOverride?: boolean }) => {
       const { ids: candidates, autoSelect } = offeredCandidates(column, minute);
 
       navigate(
@@ -534,12 +642,43 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           roomId: column.roomId ?? null,
           packageId: autoSelect,
           packageIds: candidates,
-          freeUntilMinute: freeUntilMinute(columnOpen, columnClose, blocked, minute),
+          freeUntilMinute: usableFreeUntil(column, minute),
           walkIn: isViewingToday,
+          walkInOverride: options?.walkInOverride ?? false,
         })
       );
     },
-    [navigate, isViewingToday, windowData, date, offeredCandidates, occupancy, roomBreaks, timeline]
+    [navigate, isViewingToday, windowData, date, offeredCandidates, usableFreeUntil]
+  );
+
+  /** A walk-in that runs past the next booking is staff's call to make, but never a silent one. */
+  const startWalkIn = React.useCallback(
+    (column: ScheduleColumn) => {
+      const fit = walkInFit(column);
+
+      if (fit.fits || fit.shortest === null) {
+        goToBooking(column, nowMinutes);
+        return;
+      }
+
+      const endMinute = nowMinutes + fit.shortest;
+      const clash = (allDayBookings ?? bookings)
+        .filter(b => columnKeyFor(b) === column.key)
+        .map(b => ({ booking: b, start: startMinutesOf(b) }))
+        .filter(({ start }) => start >= nowMinutes && start < endMinute)
+        .sort((a, b) => a.start - b.start)[0]?.booking ?? null;
+
+      setWalkInPrompt({
+        column,
+        startMinute: nowMinutes,
+        endMinute,
+        freeFor: fit.freeFor,
+        duration: fit.shortest,
+        packageName: fit.packageName ?? 'the shortest package here',
+        clash,
+      });
+    },
+    [walkInFit, goToBooking, nowMinutes, allDayBookings, bookings, columnKeyFor]
   );
 
   const openBookingForSlot = React.useCallback(
@@ -600,6 +739,26 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
           <Ban className="h-3.5 w-3.5 shrink-0" />
           This location is closed for the day. Every space below is marked unavailable.
+        </div>
+      )}
+
+      {overlapSummary.length > 0 && (
+        <div className="flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
+          <div className="min-w-0">
+            <p className="font-semibold text-rose-900">
+              {overlapSummary.length} overlapping {overlapSummary.length === 1 ? 'booking' : 'bookings'} — these spaces are double-booked
+            </p>
+            <ul className="mt-0.5 space-y-0.5 text-rose-800">
+              {overlapSummary.map(row => (
+                <li key={`${row.a.id}-${row.b.id}`} className="break-words">
+                  <span className="font-medium">{row.columnName}</span>: {customerNameOf(row.a)} at{' '}
+                  {formatSlotLabel(startMinutesOf(row.a))} runs into {customerNameOf(row.b)} at{' '}
+                  {formatSlotLabel(startMinutesOf(row.b))}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
@@ -696,7 +855,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             type="button"
                             onClick={event => {
                               event.stopPropagation();
-                              goToBooking(column, nowMinutes);
+                              startWalkIn(column);
                             }}
                             title={
                               fit.fits
@@ -714,9 +873,17 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         );
                       })()
                     ) : freeFrom?.kind === 'free' ? (
-                      <span className="text-[9px] leading-tight font-medium text-gray-600">
-                        Free {formatSlotLabel(nextBookableFrom(column, freeFrom.atMinute))}
-                      </span>
+                      (() => {
+                        const nextStart = nextBookableFrom(column, freeFrom.atMinute);
+
+                        return nextStart === null ? (
+                          <span className="text-[9px] leading-tight font-medium text-gray-500">No more starts today</span>
+                        ) : (
+                          <span className="text-[9px] leading-tight font-medium text-gray-600">
+                            Free {formatSlotLabel(nextStart)}
+                          </span>
+                        );
+                      })()
                     ) : column.virtual ? (
                       <span className="flex items-center gap-1 text-[9px] leading-tight font-normal text-amber-600">
                         <AlertTriangle className="h-2.5 w-2.5" />
@@ -856,14 +1023,31 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       const { top, height } = blockGeometry(item, timeline, MIN_BLOCK_HEIGHT, 2);
                       const widthPercent = 100 / item.laneCount;
                       const tone = STATUS_BG[item.booking.status] ?? 'bg-gray-50 border-gray-400';
+                      const overlapping = item.conflicts.length > 0;
+                      const overlapLabel = item.conflicts
+                        .map(other => `${customerNameOf(other)} at ${formatSlotLabel(startMinutesOf(other))}`)
+                        .join(', ');
 
                       return (
                         <button
                           key={item.booking.id}
                           type="button"
                           onClick={() => onSelectBooking?.(item.booking)}
-                          title={`${customerNameOf(item.booking)} · ${item.booking.package?.name ?? 'No package'} · ${formatRange(item.startMinutes, item.endMinutes)}`}
-                          className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 py-1 text-left shadow-sm transition hover:z-20 hover:brightness-95 ${tone}`}
+                          title={[
+                            customerNameOf(item.booking),
+                            item.booking.package?.name ?? 'No package',
+                            formatRange(item.startMinutes, item.endMinutes),
+                            overlapping ? `OVERLAPS: ${overlapLabel}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                          onMouseEnter={event => setHoverCard({ item, rect: event.currentTarget.getBoundingClientRect() })}
+                          onMouseLeave={() => setHoverCard(current => (current?.item === item ? null : current))}
+                          onFocus={event => setHoverCard({ item, rect: event.currentTarget.getBoundingClientRect() })}
+                          onBlur={() => setHoverCard(current => (current?.item === item ? null : current))}
+                          className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 py-1 text-left shadow-sm transition hover:z-20 hover:shadow-lg hover:brightness-95 ${tone} ${
+                            overlapping ? 'ring-2 ring-rose-500' : ''
+                          }`}
                           style={{
                             top,
                             height,
@@ -871,29 +1055,38 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
                           }}
                         >
-                          {height >= 34 && (
-                            <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
-                              {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
+                          {overlapping && (
+                            <span className="absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-bl bg-rose-500 px-1 py-px text-[8px] font-bold uppercase leading-tight text-white">
+                              <AlertTriangle className="h-2 w-2 shrink-0" />
+                              {height >= 18 ? 'Overlap' : null}
                             </span>
                           )}
-                          {height >= 18 && (
-                            <span className="truncate text-xs font-semibold leading-tight text-gray-900">
-                              {customerNameOf(item.booking)}
-                            </span>
-                          )}
-                          {height > 52 && (
-                            <span className="truncate text-[9px] leading-tight leading-tight text-gray-600">
-                              {item.booking.package?.name || 'No package'}
-                            </span>
-                          )}
-                          {height > 72 && (
-                            <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[9px] leading-tight">
-                              <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
-                              <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
-                                ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
+
+                          <span className="flex h-full flex-col">
+                            {height >= 34 && (
+                              <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
+                                {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
                               </span>
-                            </span>
-                          )}
+                            )}
+                            {height >= 18 && (
+                              <span className="truncate text-xs font-semibold leading-tight text-gray-900">
+                                {customerNameOf(item.booking)}
+                              </span>
+                            )}
+                            {height > 52 && (
+                              <span className="truncate text-[9px] leading-tight text-gray-600">
+                                {item.booking.package?.name || 'No package'}
+                              </span>
+                            )}
+                            {height > 72 && (
+                              <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[9px] leading-tight">
+                                <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
+                                <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
+                                  ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
+                                </span>
+                              </span>
+                            )}
+                          </span>
                         </button>
                       );
                     })}
@@ -921,6 +1114,109 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         </span>
         {!windowData.has_schedule && <span className="text-gray-500">No package schedule for this day — showing a default window.</span>}
       </div>
+
+      {hoverCard && (() => {
+        const hovered = hoverCard.item.booking;
+        const payment = resolvePaymentState(hovered);
+
+        return (
+          <BookingHoverCard
+            anchor={hoverCard.rect}
+            guestName={customerNameOf(hovered)}
+            timeLabel={formatRange(hoverCard.item.startMinutes, hoverCard.item.endMinutes)}
+            packageName={hovered.package?.name || 'No package'}
+            participants={hovered.participants}
+            amount={parseFloat(String(hovered.total_amount || 0))}
+            paymentLabel={payment.label}
+            paymentClass={payment.pillClass}
+            status={hovered.status}
+            reference={hovered.reference_number}
+            overlapLabel={
+              hoverCard.item.conflicts.length > 0
+                ? hoverCard.item.conflicts
+                    .map(other => `${customerNameOf(other)} at ${formatSlotLabel(startMinutesOf(other))}`)
+                    .join(', ')
+                : null
+            }
+          />
+        );
+      })()}
+
+      {walkInPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setWalkInPrompt(null)}
+        >
+          <div className="w-full max-w-md rounded-lg bg-white shadow-lg" onClick={event => event.stopPropagation()}>
+            <div className="p-6">
+              <div className="mb-4 flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-amber-500" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">This walk-in runs past the next booking</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {walkInPrompt.column.name} is free for {walkInPrompt.freeFor} min, but {walkInPrompt.packageName} needs{' '}
+                    {walkInPrompt.duration} min.
+                  </p>
+                </div>
+              </div>
+
+              <dl className="mb-3 divide-y divide-gray-200 rounded-lg border border-gray-200 text-sm">
+                <div className="flex justify-between gap-4 px-3 py-2">
+                  <dt className="text-gray-500">Walk-in would run</dt>
+                  <dd className="font-medium text-gray-900">
+                    {formatSlotLabel(walkInPrompt.startMinute)} – {formatSlotLabel(walkInPrompt.endMinute)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4 px-3 py-2">
+                  <dt className="text-gray-500">Space is free for</dt>
+                  <dd className="font-medium text-gray-900">{walkInPrompt.freeFor} min</dd>
+                </div>
+                <div className="flex justify-between gap-4 px-3 py-2">
+                  <dt className="text-gray-500">Overlap</dt>
+                  <dd className="font-semibold text-amber-700">{walkInPrompt.duration - walkInPrompt.freeFor} min</dd>
+                </div>
+              </dl>
+
+              {walkInPrompt.clash && (
+                <dl className="mb-4 divide-y divide-amber-200 rounded-lg border border-amber-200 bg-amber-50 text-sm">
+                  <div className="flex justify-between gap-4 px-3 py-2">
+                    <dt className="text-amber-800">Clashes with</dt>
+                    <dd className="font-semibold text-amber-900">{customerNameOf(walkInPrompt.clash)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 px-3 py-2">
+                    <dt className="text-amber-800">Their booking</dt>
+                    <dd className="font-medium text-amber-900">
+                      {formatSlotLabel(startMinutesOf(walkInPrompt.clash))} ·{' '}
+                      {walkInPrompt.clash.package?.name || 'No package'}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWalkInPrompt(null)}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = walkInPrompt;
+                    setWalkInPrompt(null);
+                    goToBooking(target.column, target.startMinute, { walkInOverride: true });
+                  }}
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                >
+                  Start anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
