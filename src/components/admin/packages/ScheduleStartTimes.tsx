@@ -18,8 +18,8 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
  * The schedule interval decides which start times are offered. A space's booking interval is
  * its turnaround AFTER a booking — it removes slots once one is taken, it never thins this list.
  */
-export const resolveStartTimes = ({ startTime, endTime, interval }: StartTimeArgs): string[] =>
-  generateTimeSlots(startTime, endTime, interval);
+export const resolveStartTimes = ({ startTime, endTime, interval, durationMinutes }: StartTimeArgs): string[] =>
+  generateTimeSlots(startTime, endTime, interval, durationMinutes);
 
 export const startCadenceLabel = (args: StartTimeArgs): string => {
   const starts = resolveStartTimes(args);

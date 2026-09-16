@@ -4,6 +4,7 @@ export function generateTimeSlots(
   startTime: string,
   endTime: string,
   intervalMinutes: number = 60,
+  durationMinutes: number = 0,
 ): string[] {
   const slots: string[] = [];
   if (!startTime || !endTime || intervalMinutes <= 0) return slots;
@@ -17,6 +18,9 @@ export function generateTimeSlots(
   if (endMinutes <= startMinutes) endMinutes += MINUTES_PER_DAY;
 
   for (let cur = startMinutes; cur < endMinutes; cur += intervalMinutes) {
+    // mirrors PackageAvailabilitySchedule::getTimeSlotsForDate — a start must finish before closing
+    if (durationMinutes > 0 && cur + durationMinutes > endMinutes) break;
+
     const wrapped = cur % MINUTES_PER_DAY;
     const h = Math.floor(wrapped / 60);
     const m = wrapped % 60;

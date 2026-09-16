@@ -1103,11 +1103,6 @@ const SpaceSchedule = () => {
   };
 
   const intervalForColumn = (column: ScheduleColumn): number => {
-    if (column.roomId !== undefined) {
-      const space = (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId);
-      if (space?.interval_minutes) return space.interval_minutes;
-    }
-
     if (column.virtual) {
       const packageId = Number(column.key.replace('pkg-', ''));
       const entry = (dayWindow?.packages ?? []).find(candidate => candidate.package_id === packageId);
