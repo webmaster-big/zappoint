@@ -263,7 +263,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       // a space stays shut for its turnaround after a booking ends; without it the band looks
       // free and the booking page then refuses that minute
       const turnaround = booking.room_id
-        ? roomWindows.get(booking.room_id)?.interval_minutes || DEFAULT_TURNAROUND_MINUTES
+        ? roomWindows.get(booking.room_id)?.interval_minutes ?? DEFAULT_TURNAROUND_MINUTES
         : DEFAULT_TURNAROUND_MINUTES;
       const bucket = map.get(key);
       const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) + turnaround };

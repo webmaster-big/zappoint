@@ -1121,7 +1121,7 @@ const SpaceSchedule = () => {
   const turnaroundFor = (column: ScheduleColumn): number => {
     if (column.roomId === undefined) return DEFAULT_SLOT_CLEANUP_MINUTES;
     const space = (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId);
-    return space?.interval_minutes && space.interval_minutes > 0 ? space.interval_minutes : DEFAULT_SLOT_CLEANUP_MINUTES;
+    return space?.interval_minutes ?? DEFAULT_SLOT_CLEANUP_MINUTES;
   };
 
   const offeredStartsFor = (column: ScheduleColumn, minute: number): number[] => {

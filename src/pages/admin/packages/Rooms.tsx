@@ -1234,7 +1234,7 @@ const Rooms: React.FC = () => {
                                                         type="number"
                                                         value={bulkFormData.booking_interval}
                                                         onChange={(e) => setBulkFormData({ ...bulkFormData, booking_interval: e.target.value })}
-                                                        min="5"
+                                                        min="0"
                                                         max="120"
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
