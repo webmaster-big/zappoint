@@ -17,7 +17,7 @@ import { addOnCacheService } from '../../../services/AddOnCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Category } from '../../../services/CategoryService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
-import { ScheduleIntervalNote, ScheduleStartTimesPreview, spacesDriveStartTimes, startCadenceLabel } from '../../../components/admin/packages/ScheduleStartTimes';
+import { ScheduleIntervalNote, ScheduleStartTimesPreview, startCadenceLabel } from '../../../components/admin/packages/ScheduleStartTimes';
 import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
 import { scheduleWindowMinutes } from '../../../utils/timeSlots';
 import type {
@@ -502,7 +502,6 @@ const EditPackage: React.FC = () => {
         }),
         [form.rooms, rooms],
     );
-    const spacesRunStartTimes = spacesDriveStartTimes(selectedSpaceIntervals);
 
     const previewCadence = (startTime: string, endTime: string, interval: number): string =>
         startCadenceLabel({
@@ -1442,9 +1441,7 @@ const EditPackage: React.FC = () => {
                                                                 onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                                 min="15"
                                                                 step="15"
-                                                                readOnly={spacesRunStartTimes}
-                                                                title={spacesRunStartTimes ? "Your spaces set the start times. Edit the interval on the space instead." : undefined}
-                                                                className={`w-full rounded-md border border-gray-200 px-3 py-2 text-sm ${spacesRunStartTimes ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""}`}
+                                                                                                                                                                                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
                                                             />
                                                             <ScheduleIntervalNote
                                                                 startTime={schedule.time_slot_start}
