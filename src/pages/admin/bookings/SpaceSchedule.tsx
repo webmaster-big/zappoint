@@ -226,6 +226,7 @@ const SpaceSchedule = () => {
     duration: number;
     packageName: string;
     clash: Booking | null;
+    areaClash: Booking | null;
   } | null>(null);
   const [hoverCard, setHoverCard] = useState<{ bookingId: number; rect: DOMRect } | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -1348,12 +1349,40 @@ const SpaceSchedule = () => {
   };
 
   /**
+   * Spaces in one area group have to start apart from each other so staff can run them. The server
+   * refuses a booking that breaks this, so the schedule has to know about it too.
+   */
+  const areaStaggerClash = (column: ScheduleColumn, minute: number): Booking | null => {
+    if (column.roomId === undefined) return null;
+
+    const space = (dayWindow?.rooms ?? []).find(entry => entry.room_id === column.roomId);
+    const gap = space?.stagger_minutes ?? 0;
+
+    if (!space?.area_group || gap <= 0) return null;
+
+    const peers = new Set(
+      (dayWindow?.rooms ?? [])
+        .filter(entry => entry.area_group === space.area_group && entry.room_id !== column.roomId)
+        .map(entry => entry.room_id)
+    );
+
+    return (
+      activeBookings.find(
+        booking =>
+          booking.room_id != null &&
+          peers.has(booking.room_id) &&
+          Math.abs(timeToMinutes(booking.booking_time) - minute) < gap
+      ) ?? null
+    );
+  };
+
+  /**
    * A walk-in starts now and runs for the package's duration, so it is only possible if a
    * package that can actually start now fits before the next booking.
    */
   const walkInFit = (
     column: ScheduleColumn
-  ): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null } => {
+  ): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null; areaClash: Booking | null } => {
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const until = usableFreeUntil(column, nowMinutes);
     const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
@@ -1368,12 +1397,15 @@ const SpaceSchedule = () => {
 
     const shortestEntry = candidates[0] ?? null;
     const shortest = shortestEntry?.duration_minutes ?? null;
+    const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+    const areaClash = areaStaggerClash(column, walkInMinute);
 
     return {
-      fits: shortest !== null && shortest <= freeFor,
+      fits: shortest !== null && shortest <= freeFor && areaClash === null,
       freeFor,
       shortest,
       packageName: shortestEntry?.name ?? null,
+      areaClash,
     };
   };
 
@@ -1383,12 +1415,12 @@ const SpaceSchedule = () => {
     // package's scheduled start times
     const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
 
-    if (fit.fits || fit.shortest === null) {
+    if (fit.fits || (fit.shortest === null && fit.areaClash === null)) {
       navigateToSlot(column, walkInMinute);
       return;
     }
 
-    const endMinute = walkInMinute + fit.shortest;
+    const endMinute = walkInMinute + (fit.shortest ?? 0);
     const shortestPackage = fit.packageName;
 
     const clash = activeBookings
@@ -1402,9 +1434,10 @@ const SpaceSchedule = () => {
       startMinute: walkInMinute,
       endMinute,
       freeFor: fit.freeFor,
-      duration: fit.shortest,
+      duration: fit.shortest ?? 0,
       packageName: shortestPackage ?? 'the shortest package here',
       clash,
+      areaClash: fit.areaClash,
     });
   };
 
@@ -2266,10 +2299,24 @@ const SpaceSchedule = () => {
               <div className="flex items-start gap-3 mb-4">
                 <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">This walk-in runs past the next booking</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {walkInPrompt.areaClash
+                      ? 'Another space nearby starts too close to this'
+                      : 'This walk-in runs past the next booking'}
+                  </h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    {walkInPrompt.column.name} is free for {walkInPrompt.freeFor} min, but {walkInPrompt.packageName} needs{' '}
-                    {walkInPrompt.duration} min.
+                    {walkInPrompt.areaClash ? (
+                      <>
+                        {walkInPrompt.column.name} shares an area with a space that already starts at{' '}
+                        {formatTime12Hour(walkInPrompt.areaClash.booking_time)}. They have to start far enough apart for
+                        staff to run both.
+                      </>
+                    ) : (
+                      <>
+                        {walkInPrompt.column.name} is free for {walkInPrompt.freeFor} min, but {walkInPrompt.packageName}{' '}
+                        needs {walkInPrompt.duration} min.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

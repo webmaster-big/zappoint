@@ -464,6 +464,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     duration: number;
     packageName: string;
     clash: Booking | null;
+    areaClash: Booking | null;
   } | null>(null);
 
   const packagesForSlot = React.useCallback(
@@ -620,8 +621,36 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     [occupancy, roomBreaks, roomWindows, timeline]
   );
 
+  /** Spaces in one area group start apart from each other; the server refuses a booking that does not. */
+  const areaStaggerClash = React.useCallback(
+    (column: ScheduleColumn, minute: number): Booking | null => {
+      if (column.roomId === undefined) return null;
+
+      const space = roomWindows.get(column.roomId);
+      const gap = space?.stagger_minutes ?? 0;
+
+      if (!space?.area_group || gap <= 0) return null;
+
+      const peers = new Set(
+        [...roomWindows.entries()]
+          .filter(([roomId, entry]) => entry.area_group === space.area_group && roomId !== column.roomId)
+          .map(([roomId]) => roomId)
+      );
+
+      return (
+        (allDayBookings ?? bookings).find(
+          booking =>
+            booking.room_id != null &&
+            peers.has(booking.room_id) &&
+            Math.abs(startMinutesOf(booking) - minute) < gap
+        ) ?? null
+      );
+    },
+    [roomWindows, allDayBookings, bookings]
+  );
+
   const walkInFit = React.useCallback(
-    (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null } => {
+    (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null; areaClash: Booking | null } => {
       const columnClose = column.closeMinutes ?? timeline.end;
       const until = usableFreeUntil(column, nowMinutes);
       const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
@@ -636,15 +665,18 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
       const shortestEntry = candidates[0] ?? null;
       const shortest = shortestEntry?.duration_minutes ?? null;
+      const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+      const areaClash = areaStaggerClash(column, walkInMinute);
 
       return {
-        fits: shortest !== null && shortest <= freeFor,
+        fits: shortest !== null && shortest <= freeFor && areaClash === null,
         freeFor,
         shortest,
         packageName: shortestEntry?.name ?? null,
+        areaClash,
       };
     },
-    [packagesForSlot, windowData, usableFreeUntil, timeline, nowMinutes]
+    [packagesForSlot, windowData, usableFreeUntil, timeline, nowMinutes, areaStaggerClash]
   );
 
   /** The next minute a booking can actually START here, not just the first unoccupied minute. */
@@ -730,12 +762,12 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       // a walk-in records when the guests actually go in, on a 5-minute grid
       const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
 
-      if (fit.fits || fit.shortest === null) {
+      if (fit.fits || (fit.shortest === null && fit.areaClash === null)) {
         goToBooking(column, walkInMinute);
         return;
       }
 
-      const endMinute = walkInMinute + fit.shortest;
+      const endMinute = walkInMinute + (fit.shortest ?? 0);
       const clash = (allDayBookings ?? bookings)
         .filter(b => columnKeyFor(b) === column.key)
         .map(b => ({ booking: b, start: startMinutesOf(b) }))
@@ -747,9 +779,10 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         startMinute: walkInMinute,
         endMinute,
         freeFor: fit.freeFor,
-        duration: fit.shortest,
+        duration: fit.shortest ?? 0,
         packageName: fit.packageName ?? 'the shortest package here',
         clash,
+        areaClash: fit.areaClash,
       });
     },
     [walkInFit, goToBooking, nowMinutes, allDayBookings, bookings, columnKeyFor]
@@ -1292,10 +1325,24 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
               <div className="mb-4 flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-amber-500" />
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">This walk-in runs past the next booking</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {walkInPrompt.areaClash
+                      ? 'Another space nearby starts too close to this'
+                      : 'This walk-in runs past the next booking'}
+                  </h3>
                   <p className="mt-1 text-sm text-gray-600">
-                    {walkInPrompt.column.name} is free for {walkInPrompt.freeFor} min, but {walkInPrompt.packageName} needs{' '}
-                    {walkInPrompt.duration} min.
+                    {walkInPrompt.areaClash ? (
+                      <>
+                        {walkInPrompt.column.name} shares an area with a space that already starts at{' '}
+                        {formatSlotLabel(startMinutesOf(walkInPrompt.areaClash))}. They have to start far enough apart
+                        for staff to run both.
+                      </>
+                    ) : (
+                      <>
+                        {walkInPrompt.column.name} is free for {walkInPrompt.freeFor} min, but {walkInPrompt.packageName}{' '}
+                        needs {walkInPrompt.duration} min.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

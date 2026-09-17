@@ -398,25 +398,34 @@ const OnsiteBooking: React.FC = () => {
     }
 
     const [hours, minutes] = slotPrefill.time.split(':').map(Number);
-    const startMinutes = slotPrefill.startMinutes ?? (Number.isFinite(hours) ? hours * 60 + minutes : 0);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return 'The start time carried over from the schedule was not readable, so it could not be kept.';
+    }
+
+    const startMinutes = slotPrefill.startMinutes ?? hours * 60 + minutes;
     const endAbsolute = startMinutes + packageDurationMinutes;
 
+    // same order as walkInSlot, or staff are told the wrong cause when two guards both hold
+    if (!slotPrefill.walkInOverride) {
+      if (!slotPrefill.freeUntilKnown) {
+        return `How long the space is free was not carried over, so ${formatTimeTo12Hour(slotPrefill.time)} could not be kept.`;
+      }
+
+      if (endAbsolute > (slotPrefill.freeUntilMinutes ?? -1)) {
+        const over = endAbsolute - (slotPrefill.freeUntilMinutes ?? endAbsolute);
+        return `${formatTimeTo12Hour(slotPrefill.time)} would run ${over} min past what this space has free, so it was not kept. Start it from the schedule to approve the overlap.`;
+      }
+    }
+
+    // this only ever fires for a package-wide or venue-wide closure; a closure on the room itself is
+    // deliberately ignored here, so do not blame the space
     if (isTimeSlotRestricted(
       slotPrefill.time,
       `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`
     )) {
-      return `The space is closed for part of ${formatTimeTo12Hour(slotPrefill.time)} to ${formatTimeTo12Hour(
+      return `${selectedPackage.name} is closed for part of ${formatTimeTo12Hour(slotPrefill.time)} to ${formatTimeTo12Hour(
         `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`
       )}, so that start could not be kept.`;
-    }
-
-    if (!slotPrefill.walkInOverride && slotPrefill.freeUntilKnown && endAbsolute > (slotPrefill.freeUntilMinutes ?? -1)) {
-      const over = endAbsolute - (slotPrefill.freeUntilMinutes ?? endAbsolute);
-      return `${formatTimeTo12Hour(slotPrefill.time)} would run ${over} min past what this space has free, so it was not kept. Start it from the schedule to approve the overlap.`;
-    }
-
-    if (!slotPrefill.freeUntilKnown) {
-      return `How long the space is free was not carried over, so ${formatTimeTo12Hour(slotPrefill.time)} could not be kept.`;
     }
 
     return null;
@@ -1920,7 +1929,20 @@ const OnsiteBooking: React.FC = () => {
           console.log('✅ Payment charged and linked successfully:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
-          
+
+          // the booking itself was refused for a clash, not the card — ask for the manager's PIN
+          // rather than showing a payment error for something payment had no part in
+          if (paymentErr?.response?.status === 409 && paymentErr?.response?.data?.requires_override) {
+            setOverrideGate({
+              conflicts: (paymentErr.response.data.conflicts ?? []).map(
+                (reason: string) => `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`
+              ),
+              onlineSlotsLost: [],
+            });
+            setIsProcessingPayment(false);
+            return;
+          }
+
           if (createdBookingIdForCleanup) {
             try {
               await bookingService.rollbackBooking(createdBookingIdForCleanup);
@@ -3915,6 +3937,8 @@ const OnsiteBooking: React.FC = () => {
           onConfirm={() => {
             sideEffectsAcceptedRef.current = true;
             setOverrideGate(null);
+            // this IS the deliberate second attempt, so it must not be treated as a double click
+            lastSubmitTimeRef.current = 0;
             void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
           }}
           onApproved={(token, approvedBy) => {
@@ -3922,6 +3946,8 @@ const OnsiteBooking: React.FC = () => {
             sideEffectsAcceptedRef.current = true;
             setOverrideGate(null);
             setToast({ message: `${approvedBy} approved the overlap — saving the booking.`, type: 'info' });
+            // the first attempt already armed the double-click guard; this approved retry is not one
+            lastSubmitTimeRef.current = 0;
             // the gate is satisfied; run the same submit path again
             void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
           }}
