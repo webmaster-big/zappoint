@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCircle, Calendar, RefreshCw, ExternalLink, HelpCircle, Info } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
+import { getOverridePinStatus, setOverridePin, type OverridePinStatus } from '../../services/OverridePinService';
 import Toast from '../../components/ui/Toast';
 import EmailInput from '../../components/ui/EmailInput';
 import {
@@ -105,6 +106,13 @@ const Settings = () => {
   
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [overridePinStatus, setOverridePinStatus] = useState<OverridePinStatus | null>(null);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinValue, setPinValue] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinPassword, setPinPassword] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinSaving, setPinSaving] = useState(false);
   
   const [currentEmail, setCurrentEmail] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -680,6 +688,52 @@ const Settings = () => {
     setShowEmailModal(true);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void getOverridePinStatus()
+      .then(status => {
+        if (!cancelled) setOverridePinStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) setOverridePinStatus(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const savePin = async () => {
+    setPinError(null);
+
+    if (!/^\d{4,6}$/.test(pinValue)) {
+      setPinError('The PIN must be 4 to 6 digits.');
+      return;
+    }
+
+    if (pinValue !== pinConfirm) {
+      setPinError('The two PINs do not match.');
+      return;
+    }
+
+    setPinSaving(true);
+
+    try {
+      await setOverridePin(pinValue, pinPassword);
+      setOverridePinStatus(await getOverridePinStatus());
+      setShowPinModal(false);
+      setPinValue('');
+      setPinConfirm('');
+      setPinPassword('');
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setPinError(message || 'That PIN could not be saved.');
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
   const openPasswordModal = () => {
     setCurrentPassword('');
     setNewPassword('');
@@ -845,6 +899,27 @@ const Settings = () => {
                 Change Password
               </StandardButton>
             </div>
+
+            {overridePinStatus?.can_hold_pin && (
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 bg-${themeColor}-100 rounded-full flex items-center justify-center`}>
+                    <Lock className={`text-${themeColor}-600`} size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Overlap override PIN</p>
+                    <p className="text-sm text-gray-500">
+                      {overridePinStatus.has_pin
+                        ? 'Set — staff can ask you to approve a booking that overlaps another'
+                        : 'Not set — no one can ask you to approve an overlapping booking yet'}
+                    </p>
+                  </div>
+                </div>
+                <StandardButton onClick={() => setShowPinModal(true)} variant="ghost" size="sm">
+                  {overridePinStatus.has_pin ? 'Change PIN' : 'Set PIN'}
+                </StandardButton>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2029,6 +2104,73 @@ const Settings = () => {
           </div>
         )}
       </div>
+
+      {showPinModal && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowPinModal(false)}
+        >
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl" onClick={event => event.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900">
+                {overridePinStatus?.has_pin ? 'Change your override PIN' : 'Set your override PIN'}
+              </h3>
+              <p className="mt-1 text-sm text-gray-600">
+                Staff use this at the front desk to get your approval for a booking that overlaps another. Keep it
+                to yourself — every approval is recorded against your name.
+              </p>
+
+              <label className="mt-4 block text-sm font-medium text-gray-700">New PIN (4-6 digits)</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
+                value={pinValue}
+                onChange={event => setPinValue(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-lg tracking-[0.4em] focus:outline-none"
+                placeholder="••••"
+              />
+
+              <label className="mt-3 block text-sm font-medium text-gray-700">Repeat the PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
+                value={pinConfirm}
+                onChange={event => setPinConfirm(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-lg tracking-[0.4em] focus:outline-none"
+                placeholder="••••"
+              />
+
+              <label className="mt-3 block text-sm font-medium text-gray-700">Your account password</label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={pinPassword}
+                onChange={event => setPinPassword(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none"
+                placeholder="Confirms it is really you"
+              />
+
+              {pinError && <p className="mt-2 text-sm font-medium text-rose-700">{pinError}</p>}
+
+              <div className="mt-5 flex justify-end gap-2">
+                <StandardButton variant="secondary" size="md" onClick={() => setShowPinModal(false)} disabled={pinSaving}>
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  onClick={() => void savePin()}
+                  disabled={pinSaving || !pinValue || !pinConfirm || !pinPassword}
+                >
+                  {pinSaving ? 'Saving…' : 'Save PIN'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
