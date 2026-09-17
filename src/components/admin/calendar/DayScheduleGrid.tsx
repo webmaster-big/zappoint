@@ -13,7 +13,7 @@ import BookingHoverCard from './BookingHoverCard';
 import BookingNoteBadges from './BookingNoteBadges';
 import { supportsHover } from '../../../utils/pointer';
 import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
-import type { TimeRange } from '../../../utils/scheduleGeometry';
+import type { StretchSpan, TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
 import {
   assignLanes,
@@ -22,7 +22,6 @@ import {
   buildTimeline,
   freeState,
   freeUntilMinute,
-  minuteAtOffset,
   nextFreeMinute,
 } from '../../../utils/scheduleGeometry';
 
@@ -31,17 +30,11 @@ const WALK_IN_STEP_MINUTES = 5;
 const SLOT_HEIGHT = 40;
 
 /**
- * A booked cell has to be readable at a glance, so the grid is never drawn tighter than this. Three
- * pixels a minute gives a half-hour booking 88px — room for its times, the guest, the package, the
- * party size and what they owe. Below that the cell starts cutting its own text.
+ * The least a cell can be and still name its booking: the time, the guest and the package, three
+ * lines. Only the minutes a booking actually occupies are grown to reach it — an empty hour stays
+ * the height of its slot, so the day does not sprawl just because one walk-in is short.
  */
-const MIN_PX_PER_MINUTE = 3;
-
-/** What a booked cell needs to carry its times, guest, package, party size and balance. */
-const DETAILED_CELL_HEIGHT = 88;
-
-/** However short the booking, the day is never stretched past this. */
-const MAX_PX_PER_MINUTE = 6;
+const DETAIL_HEIGHT = 54;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
 
@@ -394,18 +387,18 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
   }, [columns, allDayBookings, bookings, columnKeyFor, roomWindows]);
 
-  const scaleForDay = useMemo(() => {
-    const durations = [...positioned.values()]
-      .flat()
-      .map(item => item.endMinutes - item.startMinutes)
-      .filter(minutes => minutes > 0);
-
-    if (durations.length === 0) return MIN_PX_PER_MINUTE;
-
-    const shortest = Math.min(...durations);
-
-    return Math.min(MAX_PX_PER_MINUTE, Math.max(MIN_PX_PER_MINUTE, DETAILED_CELL_HEIGHT / shortest));
-  }, [positioned]);
+  /**
+   * Only the minutes that hold a booking ask for room. A long booking is already tall enough and
+   * asks for nothing, so the stretch is paid for by short bookings alone and an empty stretch of
+   * the day keeps its normal, compact height.
+   */
+  const detailSpans = useMemo<StretchSpan[]>(
+    () =>
+      [...positioned.values()]
+        .flat()
+        .map(item => ({ startMinutes: item.startMinutes, endMinutes: item.endMinutes, minHeight: DETAIL_HEIGHT })),
+    [positioned]
+  );
 
   const timeline = useMemo(
     () =>
@@ -413,13 +406,11 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         windowData.open_minutes,
         windowData.close_minutes,
         windowData.interval_minutes,
-        // Stretch the whole day until even the SHORTEST booking on it can show its details. Growing
-        // one cell on its own would just push it over its neighbour; growing the timeline gives it
-        // real room and keeps every column, the time gutter and the now-line in step.
-        Math.round(scaleForDay * Math.max(5, windowData.interval_minutes || 30)),
-        [...positioned.values()].flat()
+        SLOT_HEIGHT,
+        [...positioned.values()].flat(),
+        detailSpans
       ),
-    [windowData, positioned, scaleForDay]
+    [windowData, positioned, detailSpans]
   );
 
   const showColumnLocation = useMemo(() => {
@@ -523,7 +514,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   const rawMinuteFromPointer = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>, originMinute: number): number => {
       const bounds = event.currentTarget.getBoundingClientRect();
-      return minuteAtOffset(originMinute, event.clientY - bounds.top, timeline.pxPerMinute);
+      // the scale is not a straight line any more, so walk back through it from where this element
+      // starts rather than dividing by a single rate
+      return timeline.scale.minuteAt(timeline.scale.at(originMinute) + (event.clientY - bounds.top));
     },
     [timeline]
   );
@@ -846,7 +839,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     const el = scrollRef.current;
     if (!el) return;
     didAutoScroll.current = true;
-    el.scrollTop = Math.max(0, (nowMinutes - timeline.start) * timeline.pxPerMinute - el.clientHeight / 3);
+    el.scrollTop = Math.max(0, timeline.scale.at(nowMinutes) - el.clientHeight / 3);
   }, [loading, showNowLine, nowMinutes, timeline]);
 
   const frame = bare ? '' : 'rounded-lg border border-gray-200';
@@ -881,7 +874,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     );
   }
 
-  const bodyHeight = timeline.total * timeline.pxPerMinute;
+  const bodyHeight = timeline.height;
 
   return (
     <div className={bare ? '' : 'rounded-lg border border-gray-200'}>
@@ -944,7 +937,10 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                 <div
                   key={minutes}
                   className="absolute left-0 right-0 flex items-start justify-end pr-2 text-[0.7rem] tabular-nums text-gray-500"
-                  style={{ top: (minutes - timeline.start) * timeline.pxPerMinute, height: SLOT_HEIGHT }}
+                  style={{
+                    top: timeline.scale.at(minutes),
+                    height: timeline.scale.spanHeight(minutes, Math.min(minutes + timeline.interval, timeline.end)),
+                  }}
                 >
                   <span className={minutes % 60 === 0 ? 'font-semibold text-gray-700' : ''}>
                     {formatSlotLabel(minutes)}
@@ -955,7 +951,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
               {showNowLine && (
                 <div
                   className="absolute left-0 right-0 z-20 flex items-center justify-end pr-1"
-                  style={{ top: (nowMinutes - timeline.start) * timeline.pxPerMinute - 7 }}
+                  style={{ top: timeline.scale.at(nowMinutes) - 7 }}
                 >
                   <span className="rounded bg-red-500 px-1 py-0.5 text-[0.6rem] font-bold text-white">
                     {formatSlotLabel(nowMinutes)}
@@ -1107,8 +1103,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       <div
                         className="pointer-events-none absolute inset-x-0 z-[5] flex items-center gap-1 border-y border-dashed border-gray-400 bg-white/70 px-1"
                         style={{
-                          top: (hoverSlot.minute - timeline.start) * timeline.pxPerMinute,
-                          height: Math.max(14, timeline.interval * timeline.pxPerMinute),
+                          top: timeline.scale.at(hoverSlot.minute),
+                          height: Math.max(14, timeline.scale.spanHeight(hoverSlot.minute, hoverSlot.minute + timeline.interval)),
                         }}
                       >
                         <Plus className="h-3 w-3 shrink-0 text-gray-600" />
@@ -1154,7 +1150,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       <div
                         key={minutes}
                         className={`pointer-events-none absolute inset-x-0 border-t ${minutes % 60 === 0 ? 'border-gray-200' : 'border-gray-100'}`}
-                        style={{ top: (minutes - timeline.start) * timeline.pxPerMinute }}
+                        style={{ top: timeline.scale.at(minutes) }}
                       />
                     ))}
 
@@ -1169,7 +1165,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     {showNowLine && (
                       <div
                         className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
-                        style={{ top: (nowMinutes - timeline.start) * timeline.pxPerMinute }}
+                        style={{ top: timeline.scale.at(nowMinutes) }}
                       />
                     )}
 

@@ -26,8 +26,8 @@ import BookingNoteBadges from '../../../components/admin/calendar/BookingNoteBad
 import { supportsHover } from '../../../utils/pointer';
 import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
 import { cardFromPayments } from '../../../utils/cardLabel';
-import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
-import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
+import type { FreeState, StretchSpan, TimeRange } from '../../../utils/scheduleGeometry';
+import { buildMinuteScale, freeState, freeUntilMinute, nextFreeMinute } from '../../../utils/scheduleGeometry';
 import { buildBookingUrl } from '../../../utils/bookingPrefill';
 
 const WALK_IN_STEP_MINUTES = 5;
@@ -81,16 +81,15 @@ const dateKeyOf = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// the tightest zoom still has to leave a short booking — a 20 minute escape room — enough
-// height to read its guest and time without opening the modal
-// even the tightest zoom has to leave a short booking room for its details rather than cut them
+// how tall an empty minute is drawn at each zoom step. A short booking is not held up by this —
+// its own minutes are stretched to DETAIL_HEIGHT below, whatever the zoom
 const ZOOM_LEVELS = [2.4, 3.6, 5.2];
 
-/** What a booked cell needs to carry its times, guest, package, party size and balance. */
-const DETAILED_CELL_HEIGHT = 88;
-
-/** However short the booking, the day is never stretched past this. */
-const MAX_PX_PER_MINUTE = 6;
+/**
+ * The least a cell can be and still name its booking: the time, the guest and the package. Only the
+ * minutes a booking occupies are grown to reach it, so an empty stretch of the day stays compact.
+ */
+const DETAIL_HEIGHT = 54;
 const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
@@ -616,23 +615,7 @@ const SpaceSchedule = () => {
     });
   }, [activeBookings, effectiveCategory, statusFilter, searchInput]);
 
-  /**
-   * Stretch the day until even the shortest booking on it can show its details. Growing one cell on
-   * its own would push it over its neighbour; growing the timeline gives it real room and keeps the
-   * columns, the time gutter and the now-line in step. Zooming in still works on top of this.
-   */
-  const pxPerMinute = useMemo(() => {
-    const zoom = ZOOM_LEVELS[zoomLevel];
-    const durations = filteredBookings
-      .map(booking => Math.max(15, durationToMinutes(booking.duration, booking.duration_unit)))
-      .filter(minutes => minutes > 0);
-
-    if (durations.length === 0) return zoom;
-
-    const needed = DETAILED_CELL_HEIGHT / Math.min(...durations);
-
-    return Math.min(MAX_PX_PER_MINUTE, Math.max(zoom, needed));
-  }, [zoomLevel, filteredBookings]);
+  const pxPerMinute = ZOOM_LEVELS[zoomLevel];
 
   const knownRoomIds = useMemo(() => new Set(displaySpaces.map(s => s.id)), [displaySpaces]);
 
@@ -795,6 +778,26 @@ const SpaceSchedule = () => {
     return { start, end, total: end - start };
   }, [filteredBookings, roomBreaks, spaceClosures, isMichiganToday, nowMinutes, selectedDate, effectiveLocationId, dayWindow]);
 
+  /**
+   * Only booked minutes ask for room, and only when the zoom leaves them too short to be read. An
+   * hour with nothing in it keeps its normal height, so the day does not sprawl because one walk-in
+   * ran fifteen minutes.
+   */
+  const scale = useMemo(() => {
+    const spans: StretchSpan[] = filteredBookings.map(booking => {
+      const startMinutes = timeToMinutes(booking.booking_time);
+      return {
+        startMinutes,
+        endMinutes: startMinutes + Math.max(15, durationToMinutes(booking.duration, booking.duration_unit)),
+        minHeight: DETAIL_HEIGHT,
+      };
+    });
+
+    return buildMinuteScale(timeWindow.start, timeWindow.end, pxPerMinute, spans);
+  }, [timeWindow, pxPerMinute, filteredBookings]);
+
+  const bodyHeight = scale.height;
+
   const positionedByColumn = useMemo(() => {
     const map = new Map<string, PositionedBooking[]>();
     for (const column of columns) map.set(column.key, []);
@@ -809,8 +812,8 @@ const SpaceSchedule = () => {
         booking: b,
         startMin,
         endMin,
-        top: (startMin - timeWindow.start) * pxPerMinute,
-        height: Math.max(8, (endMin - startMin) * pxPerMinute - 2),
+        top: scale.at(startMin),
+        height: Math.max(8, scale.spanHeight(startMin, endMin) - 2),
         lane: 0,
         laneCount: 1,
         clipped: rawEnd > timeWindow.end,
@@ -856,7 +859,7 @@ const SpaceSchedule = () => {
       }
     }
     return map;
-  }, [columns, filteredBookings, activeBookings, timeWindow, columnKeyFor, pxPerMinute, dayWindow]);
+  }, [columns, filteredBookings, activeBookings, timeWindow, columnKeyFor, scale, dayWindow]);
 
   /**
    * Every clashing pair on this day, derived from the live bookings rather than from the blocks
@@ -956,7 +959,7 @@ const SpaceSchedule = () => {
   }, [filteredBookings, knownRoomIds]);
 
   const nowLineTop = isMichiganToday && nowMinutes >= timeWindow.start && nowMinutes <= timeWindow.end
-    ? (nowMinutes - timeWindow.start) * pxPerMinute
+    ? scale.at(nowMinutes)
     : null;
 
   const scrollToNow = () => {
@@ -969,7 +972,7 @@ const SpaceSchedule = () => {
   const changeZoom = (next: number) => {
     if (next === zoomLevel || next < 0 || next >= ZOOM_LEVELS.length) return;
     const el = scrollRef.current;
-    if (el) pendingZoomAnchor.current = (el.scrollTop + el.clientHeight / 2) / pxPerMinute;
+    if (el) pendingZoomAnchor.current = scale.minuteAt(el.scrollTop + el.clientHeight / 2);
     setZoomLevel(next);
   };
 
@@ -978,8 +981,8 @@ const SpaceSchedule = () => {
     const anchor = pendingZoomAnchor.current;
     pendingZoomAnchor.current = null;
     if (!el || anchor === null) return;
-    el.scrollTop = Math.max(0, anchor * pxPerMinute - el.clientHeight / 2);
-  }, [pxPerMinute]);
+    el.scrollTop = Math.max(0, scale.at(anchor) - el.clientHeight / 2);
+  }, [scale]);
 
   const [weekCounts, setWeekCounts] = useState<Record<string, number>>({});
 
@@ -1261,9 +1264,10 @@ const SpaceSchedule = () => {
                 )}
               </div>
               <div className={`font-semibold text-sm ${color.text} truncate`}>{booking.guest_name || 'Walk-in'}</div>
+              {/* time, guest and package are the three a cell must always carry */}
+              <div className={`text-xs ${color.text} opacity-80 truncate`}>{booking.package?.name || 'N/A'}</div>
               {!medium && (
                 <>
-                  <div className={`text-xs ${color.text} opacity-80 truncate`}>{booking.package?.name || 'N/A'}</div>
                   <div className={`text-xs ${color.text} opacity-70 flex items-center gap-1`}>
                     <Users className="w-3 h-3" />
                     {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
@@ -1631,7 +1635,9 @@ const SpaceSchedule = () => {
 
   const openBookingForSlot = (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const clickedMinute = minuteAtOffset(originMinute, event.clientY - bounds.top, pxPerMinute);
+    // the scale is not a straight line any more, so walk back through it from this element's own
+    // top rather than dividing by a single rate
+    const clickedMinute = scale.minuteAt(scale.at(originMinute) + (event.clientY - bounds.top));
     const minute = slotMinuteFor(column, clickedMinute);
     if (minute === null) return;
 
@@ -1673,8 +1679,8 @@ const SpaceSchedule = () => {
             }
             className={`absolute inset-x-0 z-[1] bg-gray-100 ${slotIsBookable ? 'cursor-pointer transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400' : ''}`}
             style={{
-              top: (availableFrom - timeWindow.start) * pxPerMinute,
-              height: (availableTo - availableFrom) * pxPerMinute,
+              top: scale.at(availableFrom),
+              height: scale.spanHeight(availableFrom, availableTo),
             }}
             title={`Available ${formatTime12Hour(minutesToTime(availableFrom))} – ${formatTime12Hour(minutesToTime(availableTo))}${
               slotIsBookable ? ' — click to start a booking' : ''
@@ -1706,7 +1712,7 @@ const SpaceSchedule = () => {
             <div
               key={`closure-${i}`}
               className="absolute left-0.5 right-0.5 bg-red-50/90 border border-dashed border-red-200 rounded z-[5] flex items-center justify-center"
-              style={{ top: (start - timeWindow.start) * pxPerMinute, height: (end - start) * pxPerMinute }}
+              style={{ top: scale.at(start), height: scale.spanHeight(start, end) }}
             >
               <span className="text-[10px] font-medium text-red-500">Closed</span>
             </div>
@@ -1723,7 +1729,7 @@ const SpaceSchedule = () => {
             <div
               key={`turnaround-${item.booking.id}`}
               className="absolute inset-x-0 z-[3] border-y border-amber-200 bg-amber-100/70"
-              style={{ top: (from - timeWindow.start) * pxPerMinute, height: (to - from) * pxPerMinute }}
+              style={{ top: scale.at(from), height: scale.spanHeight(from, to) }}
               title={`Resetting ${column.name} — free again at ${formatTime12Hour(minutesToTime(to))}`}
             />
           );
@@ -1732,7 +1738,7 @@ const SpaceSchedule = () => {
           <div
             key={`break-${i}`}
             className="absolute left-0.5 right-0.5 bg-gray-300/70 border-2 border-dashed border-gray-400 rounded z-[4] flex flex-col items-center justify-center"
-            style={{ top: (brk.start - timeWindow.start) * pxPerMinute, height: (brk.end - brk.start) * pxPerMinute }}
+            style={{ top: scale.at(brk.start), height: scale.spanHeight(brk.start, brk.end) }}
           >
             <Coffee className="w-4 h-4 text-gray-600" />
             <span className="text-[10px] font-semibold text-gray-700 mt-0.5">Break</span>
@@ -2277,7 +2283,7 @@ const SpaceSchedule = () => {
               <div className="relative flex">
                 <div
                   className="sticky left-0 z-20 bg-white border-r border-gray-200"
-                  style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH, height: timeWindow.total * pxPerMinute }}
+                  style={{ width: GUTTER_WIDTH, minWidth: GUTTER_WIDTH, height: bodyHeight }}
                 >
                   {hourMarks.map(mark => (
                     <div
@@ -2285,7 +2291,7 @@ const SpaceSchedule = () => {
                       className={`absolute right-2 text-xs font-medium text-gray-500 ${
                         mark === timeWindow.start ? 'translate-y-0.5' : mark === timeWindow.end ? '-translate-y-full' : '-translate-y-1/2'
                       }`}
-                      style={{ top: (mark - timeWindow.start) * pxPerMinute }}
+                      style={{ top: scale.at(mark) }}
                     >
                       {minutesToLabel(mark)}
                     </div>
@@ -2300,18 +2306,18 @@ const SpaceSchedule = () => {
                   )}
                 </div>
 
-                <div className="relative flex" style={{ height: timeWindow.total * pxPerMinute }}>
+                <div className="relative flex" style={{ height: bodyHeight }}>
                   <div className="absolute inset-0 z-[2] pointer-events-none">
                     {hourMarks.map(mark => (
                       <div key={mark}>
                         <div
                           className="absolute left-0 right-0 border-t border-gray-200"
-                          style={{ top: (mark - timeWindow.start) * pxPerMinute }}
+                          style={{ top: scale.at(mark) }}
                         />
                         {mark + 30 < timeWindow.end && (
                           <div
                             className="absolute left-0 right-0 border-t border-dashed border-gray-100"
-                            style={{ top: (mark + 30 - timeWindow.start) * pxPerMinute }}
+                            style={{ top: scale.at(mark + 30) }}
                           />
                         )}
                       </div>
