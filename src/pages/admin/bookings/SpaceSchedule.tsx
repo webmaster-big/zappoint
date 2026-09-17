@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle, AlertTriangle, MessageSquare, StickyNote } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
@@ -2434,20 +2434,35 @@ const SpaceSchedule = () => {
                 </div>
               )}
 
-              {(selectedBooking.special_requests || selectedBooking.notes) && (
+              {(selectedBooking.special_requests || selectedBooking.notes || selectedBooking.internal_notes) && (
                 <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Notes & Requests</h4>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                    {selectedBooking.special_requests && (
-                      <div>
-                        <span className="text-xs font-medium text-gray-600 uppercase">Special Requests</span>
-                        <p className="text-sm text-gray-900 mt-1">{selectedBooking.special_requests}</p>
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Notes</h4>
+                  <div className="space-y-3">
+                    {selectedBooking.notes && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase text-blue-800">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          From the guest
+                        </span>
+                        <p className="mt-1 text-sm whitespace-pre-line text-blue-900">{selectedBooking.notes}</p>
                       </div>
                     )}
-                    {selectedBooking.notes && (
-                      <div className={selectedBooking.special_requests ? 'pt-3 border-t border-gray-200' : ''}>
-                        <span className="text-xs font-medium text-gray-600 uppercase">Internal Notes</span>
-                        <p className="text-sm text-gray-900 mt-1">{selectedBooking.notes}</p>
+                    {selectedBooking.special_requests && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase text-blue-800">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          Special requests
+                        </span>
+                        <p className="mt-1 text-sm whitespace-pre-line text-blue-900">{selectedBooking.special_requests}</p>
+                      </div>
+                    )}
+                    {selectedBooking.internal_notes && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase text-amber-800">
+                          <StickyNote className="h-3.5 w-3.5" />
+                          Staff note — not shown to the guest
+                        </span>
+                        <p className="mt-1 text-sm whitespace-pre-line text-amber-900">{selectedBooking.internal_notes}</p>
                       </div>
                     )}
                   </div>
