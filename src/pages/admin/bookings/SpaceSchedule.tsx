@@ -85,6 +85,12 @@ const dateKeyOf = (date: Date): string => {
 // height to read its guest and time without opening the modal
 // even the tightest zoom has to leave a short booking room for its details rather than cut them
 const ZOOM_LEVELS = [2.4, 3.6, 5.2];
+
+/** What a booked cell needs to carry its times, guest, package, party size and balance. */
+const DETAILED_CELL_HEIGHT = 88;
+
+/** However short the booking, the day is never stretched past this. */
+const MAX_PX_PER_MINUTE = 6;
 const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
@@ -285,7 +291,6 @@ const SpaceSchedule = () => {
     writeViewState({ categoryFilter, statusFilter, searchInput, hideEmptySpaces, zoomLevel });
   }, [categoryFilter, statusFilter, searchInput, hideEmptySpaces, zoomLevel]);
 
-  const pxPerMinute = ZOOM_LEVELS[zoomLevel];
 
   const formatTime12Hour = (time: string): string => {
     const [hourStr, minuteStr] = time.split(':');
@@ -610,6 +615,24 @@ const SpaceSchedule = () => {
       return true;
     });
   }, [activeBookings, effectiveCategory, statusFilter, searchInput]);
+
+  /**
+   * Stretch the day until even the shortest booking on it can show its details. Growing one cell on
+   * its own would push it over its neighbour; growing the timeline gives it real room and keeps the
+   * columns, the time gutter and the now-line in step. Zooming in still works on top of this.
+   */
+  const pxPerMinute = useMemo(() => {
+    const zoom = ZOOM_LEVELS[zoomLevel];
+    const durations = filteredBookings
+      .map(booking => Math.max(15, durationToMinutes(booking.duration, booking.duration_unit)))
+      .filter(minutes => minutes > 0);
+
+    if (durations.length === 0) return zoom;
+
+    const needed = DETAILED_CELL_HEIGHT / Math.min(...durations);
+
+    return Math.min(MAX_PX_PER_MINUTE, Math.max(zoom, needed));
+  }, [zoomLevel, filteredBookings]);
 
   const knownRoomIds = useMemo(() => new Set(displaySpaces.map(s => s.id)), [displaySpaces]);
 

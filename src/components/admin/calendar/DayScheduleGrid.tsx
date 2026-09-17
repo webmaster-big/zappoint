@@ -36,6 +36,12 @@ const SLOT_HEIGHT = 40;
  * party size and what they owe. Below that the cell starts cutting its own text.
  */
 const MIN_PX_PER_MINUTE = 3;
+
+/** What a booked cell needs to carry its times, guest, package, party size and balance. */
+const DETAILED_CELL_HEIGHT = 88;
+
+/** However short the booking, the day is never stretched past this. */
+const MAX_PX_PER_MINUTE = 6;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
 
@@ -388,17 +394,32 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
   }, [columns, allDayBookings, bookings, columnKeyFor, roomWindows]);
 
+  const scaleForDay = useMemo(() => {
+    const durations = [...positioned.values()]
+      .flat()
+      .map(item => item.endMinutes - item.startMinutes)
+      .filter(minutes => minutes > 0);
+
+    if (durations.length === 0) return MIN_PX_PER_MINUTE;
+
+    const shortest = Math.min(...durations);
+
+    return Math.min(MAX_PX_PER_MINUTE, Math.max(MIN_PX_PER_MINUTE, DETAILED_CELL_HEIGHT / shortest));
+  }, [positioned]);
+
   const timeline = useMemo(
     () =>
       buildTimeline(
         windowData.open_minutes,
         windowData.close_minutes,
         windowData.interval_minutes,
-        // the slot is as tall as the interval needs to keep three pixels a minute
-        Math.max(SLOT_HEIGHT, Math.round(MIN_PX_PER_MINUTE * Math.max(5, windowData.interval_minutes || 30))),
+        // Stretch the whole day until even the SHORTEST booking on it can show its details. Growing
+        // one cell on its own would just push it over its neighbour; growing the timeline gives it
+        // real room and keeps every column, the time gutter and the now-line in step.
+        Math.round(scaleForDay * Math.max(5, windowData.interval_minutes || 30)),
         [...positioned.values()].flat()
       ),
-    [windowData, positioned]
+    [windowData, positioned, scaleForDay]
   );
 
   const showColumnLocation = useMemo(() => {
