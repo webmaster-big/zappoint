@@ -30,11 +30,31 @@ const WALK_IN_STEP_MINUTES = 5;
 const SLOT_HEIGHT = 40;
 
 /**
- * The least a cell can be and still name its booking: the time, the guest and the package, three
- * lines. Only the minutes a booking actually occupies are grown to reach it — an empty hour stays
- * the height of its slot, so the day does not sprawl just because one walk-in is short.
+ * The least a cell can be and still carry what the desk acts on: the time range, the guest, the
+ * package, and a line with the head count and what is still owed. Four lines cost 48.75px and the
+ * padding costs 8px, so 62 leaves a little slack.
+ *
+ * Only the minutes a booking actually occupies are grown to reach it — an empty hour stays the
+ * height of its slot, so the day does not sprawl just because one walk-in is short.
  */
-const DETAIL_HEIGHT = 54;
+const DETAIL_HEIGHT = 62;
+
+/** What the four always-on lines plus the block's own padding cost. */
+const BASE_CONTENT_HEIGHT = 57;
+
+/** A further line of detail — a note, a clash, the birthday child. */
+const EXTRA_LINE_HEIGHT = 12;
+
+/**
+ * How many of those lines a booking is GUARANTEED room for, however short it is. The three that
+ * earn it are the clash, the staff note and the guest note: on a tablet the hover card never
+ * opens, so a booking that only shows an icon for these says a thing exists and gives no way to
+ * find out what it is.
+ */
+const MAX_GUARANTEED_EXTRAS = 3;
+
+/** Past this much of a booking with nobody checked in, the desk needs telling. */
+const LATE_AFTER_MINUTES = 10;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
 
@@ -90,12 +110,14 @@ interface DayScheduleGridProps {
   fullColor?: string;
 }
 
+// one step stronger than the -50 tints these used to be: on a tablet held at arm's length in
+// daylight, green-50 and blue-50 are the same colour
 const STATUS_BG: Record<string, string> = {
-  confirmed: 'bg-green-50 border-green-400',
-  pending: 'bg-yellow-50 border-yellow-400',
-  'checked-in': 'bg-blue-50 border-blue-400',
-  completed: 'bg-gray-50 border-gray-400',
-  cancelled: 'bg-red-50 border-red-400',
+  confirmed: 'bg-green-100 border-green-500',
+  pending: 'bg-amber-100 border-amber-500',
+  'checked-in': 'bg-blue-100 border-blue-500',
+  completed: 'bg-gray-100 border-gray-400',
+  cancelled: 'bg-red-100 border-red-500',
 };
 
 export const durationMinutesOf = (booking: Pick<Booking, 'duration' | 'duration_unit'>): number => {
@@ -126,6 +148,17 @@ const formatSlotLabel = (minutes: number): string => {
 };
 
 const formatRange = (start: number, end: number): string => `${formatSlotLabel(start)} – ${formatSlotLabel(end)}`;
+
+/**
+ * The same range with one meridiem instead of two when both ends share it. "10:00–11:30 AM" is
+ * a quarter narrower than "10:00 AM – 11:30 AM", and that width is what pays for the head count
+ * and the balance sitting on the cell at all.
+ */
+const formatCompactRange = (start: number, end: number): string => {
+  const from = formatSlotLabel(start);
+  const to = formatSlotLabel(end);
+  return from.slice(-2) === to.slice(-2) ? `${from.slice(0, -3)}–${to}` : `${from}–${to}`;
+};
 
 const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   date,
@@ -388,15 +421,24 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   }, [columns, allDayBookings, bookings, columnKeyFor, roomWindows]);
 
   /**
-   * Only the minutes that hold a booking ask for room. A long booking is already tall enough and
-   * asks for nothing, so the stretch is paid for by short bookings alone and an empty stretch of
-   * the day keeps its normal, compact height.
+   * Only the minutes that hold a booking ask for room, and a booking carrying more to say asks for
+   * more. A long booking is already tall enough and asks for nothing, so the stretch is paid for by
+   * short, detail-heavy bookings alone and an empty stretch of the day keeps its compact height.
    */
   const detailSpans = useMemo<StretchSpan[]>(
     () =>
-      [...positioned.values()]
-        .flat()
-        .map(item => ({ startMinutes: item.startMinutes, endMinutes: item.endMinutes, minHeight: DETAIL_HEIGHT })),
+      [...positioned.values()].flat().map(item => {
+        let lines = 0;
+        if (item.conflicts.length > 0) lines += 1;
+        if (staffNoteOf(item.booking)) lines += 1;
+        if (guestNoteOf(item.booking)) lines += 1;
+
+        return {
+          startMinutes: item.startMinutes,
+          endMinutes: item.endMinutes,
+          minHeight: DETAIL_HEIGHT + Math.min(lines, MAX_GUARANTEED_EXTRAS) * EXTRA_LINE_HEIGHT,
+        };
+      }),
     [positioned]
   );
 
@@ -1202,6 +1244,42 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         )
                         .join(', ');
 
+                      const payment = resolvePaymentState(item.booking);
+                      const guestNote = guestNoteOf(item.booking);
+                      const staffNote = staffNoteOf(item.booking);
+                      const honoree = (item.booking.guest_of_honor_name ?? '').trim();
+                      const overCapacity =
+                        column.capacity != null && Number(item.booking.participants) > column.capacity;
+                      const arrived = item.booking.status === 'checked-in' || item.booking.status === 'completed';
+                      const settled = item.booking.status === 'cancelled' || arrived;
+                      const running = isViewingToday && nowMinutes >= item.startMinutes && nowMinutes < item.endMinutes;
+                      // a party that should be in the room and has not been checked in
+                      const late =
+                        isViewingToday &&
+                        !settled &&
+                        nowMinutes >= item.startMinutes + LATE_AFTER_MINUTES &&
+                        nowMinutes < item.endMinutes + LATE_AFTER_MINUTES;
+
+                      // extra lines in the order they earn their space, cut to what this block can hold
+                      const extras: { key: string; className: string; text: string }[] = [];
+                      if (clashing) {
+                        extras.push({
+                          key: 'clash',
+                          className: doubleBooked ? 'text-rose-700' : 'text-amber-700',
+                          text: `${doubleBooked ? 'Overlaps' : 'No gap'} ${overlapLabel}`,
+                        });
+                      }
+                      if (staffNote) extras.push({ key: 'staff', className: 'text-amber-800', text: `Staff: ${staffNote}` });
+                      if (guestNote) extras.push({ key: 'guest', className: 'text-blue-800', text: `Guest: ${guestNote}` });
+                      if (honoree) {
+                        extras.push({
+                          key: 'honoree',
+                          className: 'text-pink-700',
+                          text: `Birthday: ${honoree}${item.booking.guest_of_honor_age ? `, ${item.booking.guest_of_honor_age}` : ''}`,
+                        });
+                      }
+                      const extraRoom = Math.max(0, Math.floor((height - BASE_CONTENT_HEIGHT) / EXTRA_LINE_HEIGHT));
+
                       return (
                         <button
                           key={item.booking.id}
@@ -1242,31 +1320,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
                           }}
                         >
-                          {/* one rail in the corner: siblings, so nothing can paint over anything else */}
-                          {(clashing || noteFlags.guest || noteFlags.staff) && (
-                            <span className="absolute top-0 right-0 z-20 flex items-center gap-px rounded-bl bg-white/80 pl-px">
-                              <BookingNoteBadges flags={noteFlags} height={height} />
-                              {clashing && (
-                                <span
-                                  className={`flex items-center gap-0.5 rounded-bl px-1 py-px text-[8px] font-bold uppercase leading-tight text-white ${
-                                    doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
-                                  }`}
-                                >
-                                  <AlertTriangle className="h-2 w-2 shrink-0" />
-                                  {height >= 18 && !noteFlags.guest && !noteFlags.staff
-                                    ? doubleBooked
-                                      ? 'Overlap'
-                                      : 'No gap'
-                                    : null}
-                                </span>
-                              )}
-                            </span>
-                          )}
-
                           <span className="flex h-full min-w-0 flex-col">
                             {height < 48 ? (
-                              // who and when, then what they booked — the package drops only on a
-                              // sliver too short to hold a second line at all
+                              // a sliver, which only degenerate data can now produce: who and when
                               <>
                                 <span className="flex min-w-0 items-baseline gap-1 text-[11px] leading-tight">
                                   <span className="shrink-0 font-bold tabular-nums text-gray-700">
@@ -1284,28 +1340,77 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                               </>
                             ) : (
                               <>
-                                <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
-                                  {formatSlotLabel(item.startMinutes)}–{formatSlotLabel(item.endMinutes)}
+                                {/* when it runs, and the flags that need no reading — the badges sit
+                                    IN the line rather than over it, so nothing is painted on */}
+                                <span className="flex min-w-0 items-center gap-1 leading-tight">
+                                  <span className="truncate text-[9px] font-bold tabular-nums text-gray-700">
+                                    {formatCompactRange(item.startMinutes, item.endMinutes)}
+                                  </span>
+                                  <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                                    {late ? (
+                                      <span className="rounded bg-red-600 px-1 text-[8px] font-bold uppercase leading-tight text-white">
+                                        Late
+                                      </span>
+                                    ) : running && arrived ? (
+                                      <span className="rounded bg-emerald-500 px-1 text-[8px] font-bold uppercase leading-tight text-white">
+                                        In
+                                      </span>
+                                    ) : null}
+                                    {clashing && (
+                                      <AlertTriangle
+                                        className={`h-2.5 w-2.5 shrink-0 ${doubleBooked ? 'text-rose-600' : 'text-amber-600'}`}
+                                      />
+                                    )}
+                                    <BookingNoteBadges flags={noteFlags} />
+                                  </span>
                                 </span>
+
                                 <span className="truncate text-xs font-semibold leading-tight text-gray-900">
                                   {customerNameOf(item.booking)}
                                 </span>
+
                                 <span className="truncate text-[9px] leading-tight text-gray-600">
                                   {item.booking.package?.name || 'No package'}
                                 </span>
-                                {height >= 60 && (
-                                  <span className="truncate text-[9px] leading-tight text-gray-600">
-                                    {item.booking.participants} {item.booking.participants === 1 ? 'guest' : 'guests'}
+
+                                {/* how many, and what is still owed — the two numbers the desk acts on */}
+                                <span className="flex min-w-0 items-center justify-between gap-1 text-[9px] leading-tight">
+                                  <span
+                                    className={`shrink-0 tabular-nums ${overCapacity ? 'font-bold text-rose-700' : 'text-gray-600'}`}
+                                    title={
+                                      overCapacity
+                                        ? `${item.booking.participants} guests in a space for ${column.capacity}`
+                                        : `${item.booking.participants} guests`
+                                    }
+                                  >
+                                    {item.booking.participants}
+                                    {column.capacity ? `/${column.capacity}` : ''} pax
                                   </span>
-                                )}
-                                {height >= 74 && (
-                                  <span className="mt-auto flex items-center justify-between gap-1 pt-0.5 text-[9px] leading-tight">
-                                    <span className="truncate capitalize text-gray-500">{item.booking.status}</span>
-                                    <span className={`font-semibold ${resolvePaymentState(item.booking).amountClass}`}>
-                                      ${parseFloat(String(item.booking.total_amount || 0)).toFixed(2)}
-                                    </span>
+                                  <span
+                                    className={`truncate font-semibold ${
+                                      payment.isTerminal
+                                        ? 'text-slate-500'
+                                        : payment.balance > 0
+                                          ? 'text-red-600'
+                                          : 'text-green-600'
+                                    }`}
+                                  >
+                                    {payment.isTerminal
+                                      ? payment.label
+                                      : payment.balance > 0
+                                        ? `$${payment.balance.toFixed(2)} due`
+                                        : 'Paid'}
                                   </span>
-                                )}
+                                </span>
+
+                                {extras.slice(0, extraRoom).map(extra => (
+                                  <span
+                                    key={extra.key}
+                                    className={`truncate text-[9px] leading-tight ${extra.className}`}
+                                  >
+                                    {extra.text}
+                                  </span>
+                                ))}
                               </>
                             )}
                           </span>

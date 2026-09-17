@@ -4,7 +4,7 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIc
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
-import { matchesBookingSearch } from '../../../utils/bookingSearch';
+import { customerNameOf, matchesBookingSearch } from '../../../utils/bookingSearch';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -86,10 +86,28 @@ const dateKeyOf = (date: Date): string => {
 const ZOOM_LEVELS = [2.4, 3.6, 5.2];
 
 /**
- * The least a cell can be and still name its booking: the time, the guest and the package. Only the
- * minutes a booking occupies are grown to reach it, so an empty stretch of the day stays compact.
+ * The least a cell can be and still carry what the desk acts on: the time range, the guest, the
+ * package, and a line with the head count and what is still owed. Only the minutes a booking
+ * occupies are grown to reach it, so an empty stretch of the day stays compact.
  */
-const DETAIL_HEIGHT = 54;
+const DETAIL_HEIGHT = 62;
+
+/** What the four always-on lines plus the block's own padding cost. */
+const BASE_CONTENT_HEIGHT = 57;
+
+/** A further line of detail — a note, a clash, the birthday child. */
+const EXTRA_LINE_HEIGHT = 12;
+
+/**
+ * How many of those lines a booking is GUARANTEED room for, however short it is. The three that
+ * earn it are the clash, the staff note and the guest note: on a tablet the hover card never
+ * opens, so a booking that only shows an icon for these says a thing exists and gives no way to
+ * find out what it is.
+ */
+const MAX_GUARANTEED_EXTRAS = 3;
+
+/** Past this much of a booking with nobody checked in, the desk needs telling. */
+const LATE_AFTER_MINUTES = 10;
 const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';
@@ -186,29 +204,34 @@ interface BookingClash {
   overlapMinutes: number;
 }
 
+/**
+ * Side-by-side lanes for bookings that share a space at the same time. Worked out in MINUTES, not
+ * pixels, because how tall a block is drawn now depends on what it has to say — which is only
+ * known after the day's scale is built, and the scale needs the lanes' bookings first.
+ */
 const assignLanes = (list: PositionedBooking[]): void => {
-  list.sort((a, b) => a.top - b.top || b.height - a.height || a.booking.id - b.booking.id);
+  list.sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin || a.booking.id - b.booking.id);
   let clusterStart = 0;
-  let clusterMaxBottom = -1;
+  let clusterMaxEnd = -1;
   let laneEnds: number[] = [];
   const finishCluster = (end: number) => {
     const laneCount = Math.max(1, laneEnds.length);
     for (let i = clusterStart; i < end; i++) list[i].laneCount = laneCount;
   };
   list.forEach((item, index) => {
-    if (index > 0 && item.top >= clusterMaxBottom) {
+    if (index > 0 && item.startMin >= clusterMaxEnd) {
       finishCluster(index);
       clusterStart = index;
       laneEnds = [];
     }
-    let lane = laneEnds.findIndex(end => end <= item.top);
+    let lane = laneEnds.findIndex(end => end <= item.startMin);
     if (lane === -1) {
       lane = laneEnds.length;
       laneEnds.push(0);
     }
-    laneEnds[lane] = item.top + item.height;
+    laneEnds[lane] = item.endMin;
     item.lane = lane;
-    clusterMaxBottom = Math.max(clusterMaxBottom, item.top + item.height);
+    clusterMaxEnd = Math.max(clusterMaxEnd, item.endMin);
   });
   finishCluster(list.length);
 };
@@ -778,27 +801,7 @@ const SpaceSchedule = () => {
     return { start, end, total: end - start };
   }, [filteredBookings, roomBreaks, spaceClosures, isMichiganToday, nowMinutes, selectedDate, effectiveLocationId, dayWindow]);
 
-  /**
-   * Only booked minutes ask for room, and only when the zoom leaves them too short to be read. An
-   * hour with nothing in it keeps its normal height, so the day does not sprawl because one walk-in
-   * ran fifteen minutes.
-   */
-  const scale = useMemo(() => {
-    const spans: StretchSpan[] = filteredBookings.map(booking => {
-      const startMinutes = timeToMinutes(booking.booking_time);
-      return {
-        startMinutes,
-        endMinutes: startMinutes + Math.max(15, durationToMinutes(booking.duration, booking.duration_unit)),
-        minHeight: DETAIL_HEIGHT,
-      };
-    });
-
-    return buildMinuteScale(timeWindow.start, timeWindow.end, pxPerMinute, spans);
-  }, [timeWindow, pxPerMinute, filteredBookings]);
-
-  const bodyHeight = scale.height;
-
-  const positionedByColumn = useMemo(() => {
+  const arrangedByColumn = useMemo(() => {
     const map = new Map<string, PositionedBooking[]>();
     for (const column of columns) map.set(column.key, []);
     for (const b of filteredBookings) {
@@ -812,8 +815,8 @@ const SpaceSchedule = () => {
         booking: b,
         startMin,
         endMin,
-        top: scale.at(startMin),
-        height: Math.max(8, scale.spanHeight(startMin, endMin) - 2),
+        top: 0,
+        height: 0,
         lane: 0,
         laneCount: 1,
         clipped: rawEnd > timeWindow.end,
@@ -859,7 +862,47 @@ const SpaceSchedule = () => {
       }
     }
     return map;
-  }, [columns, filteredBookings, activeBookings, timeWindow, columnKeyFor, scale, dayWindow]);
+  }, [columns, filteredBookings, activeBookings, timeWindow, columnKeyFor, dayWindow]);
+
+  /**
+   * Only booked minutes ask for room, and a booking carrying more to say asks for more: a clash,
+   * a staff note and a guest note each buy a line, because on a tablet the hover card never opens
+   * and an icon alone says a thing exists without saying what it is. An hour with nothing in it
+   * keeps its normal height, so the day does not sprawl because one walk-in ran fifteen minutes.
+   */
+  const scale = useMemo(() => {
+    const spans: StretchSpan[] = [...arrangedByColumn.values()].flat().map(item => {
+      let lines = 0;
+      if (item.conflicts.length > 0) lines += 1;
+      if (staffNoteOf(item.booking)) lines += 1;
+      if (guestNoteOf(item.booking)) lines += 1;
+
+      return {
+        startMinutes: item.startMin,
+        endMinutes: item.endMin,
+        minHeight: DETAIL_HEIGHT + Math.min(lines, MAX_GUARANTEED_EXTRAS) * EXTRA_LINE_HEIGHT,
+      };
+    });
+
+    return buildMinuteScale(timeWindow.start, timeWindow.end, pxPerMinute, spans);
+  }, [arrangedByColumn, timeWindow, pxPerMinute]);
+
+  const bodyHeight = scale.height;
+
+  const positionedByColumn = useMemo(() => {
+    const map = new Map<string, PositionedBooking[]>();
+    for (const [key, list] of arrangedByColumn) {
+      map.set(
+        key,
+        list.map(item => ({
+          ...item,
+          top: scale.at(item.startMin),
+          height: Math.max(8, scale.spanHeight(item.startMin, item.endMin) - 2),
+        }))
+      );
+    }
+    return map;
+  }, [arrangedByColumn, scale]);
 
   /**
    * Every clashing pair on this day, derived from the live bookings rather than from the blocks
@@ -1132,27 +1175,77 @@ const SpaceSchedule = () => {
     }
   };
 
+  /** The space's own limit, so a party too big for the room shows up without opening anything. */
+  const capacityByRoom = useMemo(
+    () => new Map(displaySpaces.map(space => [space.id, space.capacity ?? null])),
+    [displaySpaces]
+  );
+
+  const spaceCapacityFor = (item: PositionedBooking): number | null =>
+    item.booking.room_id ? capacityByRoom.get(item.booking.room_id) ?? null : null;
+
   const renderBookingBlock = (item: PositionedBooking) => {
     const { booking } = item;
     const color = packageColorFor(booking.package?.name || '');
     const laneWidth = 100 / item.laneCount;
     // below one line of text there is no room for a label, so show the block alone
     const tiny = item.height < 30;
-    const compact = !tiny && item.height < 60;
-    const medium = item.height >= 60 && item.height < 140;
-    const timeLabel = `${formatTime12Hour(booking.booking_time)} – ${formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}`;
+    const endLabel = formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit));
+    const startLabel = formatTime12Hour(booking.booking_time);
+    const timeLabel = `${startLabel} – ${endLabel}`;
+    // one meridiem instead of two: the width that buys is what puts the head count and the
+    // balance on the cell at all
+    const compactTimeLabel =
+      startLabel.slice(-2) === endLabel.slice(-2) ? `${startLabel.slice(0, -3)}–${endLabel}` : `${startLabel}–${endLabel}`;
+    const guestLabel = customerNameOf(booking);
     const inProgress = isMichiganToday && nowMinutes >= item.startMin && nowMinutes < item.endMin;
-    const needsCheckIn = inProgress && booking.status !== 'checked-in';
+    const arrived = booking.status === 'checked-in' || booking.status === 'completed';
+    const settled = booking.status === 'cancelled' || arrived;
+    const needsCheckIn = inProgress && !arrived;
+    const late =
+      isMichiganToday &&
+      !settled &&
+      nowMinutes >= item.startMin + LATE_AFTER_MINUTES &&
+      nowMinutes < item.endMin + LATE_AFTER_MINUTES;
+    const payment = resolvePaymentState(booking);
+    const capacity = spaceCapacityFor(item);
+    const overCapacity = capacity != null && Number(booking.participants) > capacity;
+    const guestNote = guestNoteOf(booking);
+    const staffNote = staffNoteOf(booking);
+    const honoree = (booking.guest_of_honor_name ?? '').trim();
     const noteFlags = noteFlagsOf(booking);
     const noteSummary = noteSummaryOf(booking);
     const doubleBooked = item.conflicts.some(clash => clash.overlapMinutes > 0);
     const clashing = item.conflicts.length > 0;
     const overlapLabel = item.conflicts
       .map(clash =>
-        `${clash.booking.guest_name || 'Walk-in'} at ${formatTime12Hour(clash.booking.booking_time)}` +
+        `${customerNameOf(clash.booking)} at ${formatTime12Hour(clash.booking.booking_time)}` +
         (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
       )
       .join(', ');
+
+    // extra lines in the order they earn their space, cut to what this block can hold
+    const extras: { key: string; className: string; text: string }[] = [];
+    if (clashing) {
+      extras.push({
+        key: 'clash',
+        className: doubleBooked ? 'text-rose-700' : 'text-amber-700',
+        text: `${doubleBooked ? 'Overlaps' : 'No gap'} ${overlapLabel}`,
+      });
+    }
+    if (staffNote) extras.push({ key: 'staff', className: 'text-amber-800', text: `Staff: ${staffNote}` });
+    if (guestNote) extras.push({ key: 'guest', className: 'text-blue-800', text: `Guest: ${guestNote}` });
+    if (honoree) {
+      extras.push({
+        key: 'honoree',
+        className: 'text-pink-700',
+        text: `Birthday: ${honoree}${booking.guest_of_honor_age ? `, ${booking.guest_of_honor_age}` : ''}`,
+      });
+    }
+    if (booking.reference_number) {
+      extras.push({ key: 'ref', className: 'text-gray-500', text: `#${booking.reference_number.slice(-6)}` });
+    }
+    const extraRoom = Math.max(0, Math.floor((item.height - BASE_CONTENT_HEIGHT) / EXTRA_LINE_HEIGHT));
     return (
       <button
         key={booking.id}
@@ -1162,7 +1255,7 @@ const SpaceSchedule = () => {
           setHoverCard(null);
           setSelectedBooking(booking);
         }}
-        aria-label={`${booking.guest_name || 'Walk-in'}, ${timeLabel}${
+        aria-label={`${guestLabel}, ${timeLabel}${
           clashing ? `, ${doubleBooked ? 'overlaps' : 'no turnaround before'} ${overlapLabel}` : ''
         }${noteSummary ? `, ${noteSummary}` : ''}`}
         onMouseEnter={event =>
@@ -1192,94 +1285,80 @@ const SpaceSchedule = () => {
           width: `calc(${laneWidth}% - 6px)`,
         }}
       >
-        {/* one rail in the corner: siblings, so nothing can paint over anything else */}
-        {(clashing || noteFlags.guest || noteFlags.staff) && (
-          <span className="absolute top-0 right-0 z-20 flex items-center gap-px rounded-tr-lg rounded-bl bg-white/80 pl-px">
-            <BookingNoteBadges flags={noteFlags} height={item.height} />
-            {clashing && (
-              <span
-                className={`flex items-center gap-0.5 rounded-bl px-1 py-px text-[9px] font-bold uppercase leading-tight text-white ${
-                  doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
-                }`}
-              >
-                <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
-                {tiny || noteFlags.guest || noteFlags.staff ? null : doubleBooked ? 'Overlap' : 'No gap'}
-              </span>
-            )}
-          </span>
-        )}
-        <div className={`h-full flex flex-col ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
+        <div className={`h-full flex flex-col min-w-0 ${tiny ? 'px-1' : 'px-1.5 py-1'}`}>
           {tiny ? (
-            // two tight lines: who and when, then what they booked
-            <div className={`flex flex-col px-1 ${color.text} min-w-0`}>
-              <div className="flex items-baseline gap-1 text-[10px] leading-none min-w-0">
-                <span className="font-bold tabular-nums flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
-                <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
-              </div>
-              {item.height >= 26 && (
-                <span className="truncate text-[10px] leading-tight opacity-80">
-                  {booking.package?.name || 'No package'}
-                </span>
-              )}
-            </div>
-          ) : compact ? (
+            // a sliver, which only degenerate data can now produce: who and when
             <div className={`flex flex-col ${color.text} min-w-0`}>
-              <div className="flex items-center gap-1.5 text-xs min-w-0">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  booking.status === 'confirmed' ? 'bg-green-500' :
-                  booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
-                }`} />
-                <span className="font-bold tabular-nums flex-shrink-0 opacity-80">{formatTime12Hour(booking.booking_time)}</span>
-                <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+              <div className="flex items-baseline gap-1 text-[10px] leading-none min-w-0">
+                <span className="font-bold tabular-nums flex-shrink-0">{startLabel}</span>
+                <span className="font-semibold truncate">{guestLabel}</span>
               </div>
-              <span className="truncate text-[10px] leading-tight opacity-80">
-                {booking.package?.name || 'No package'}
-              </span>
             </div>
           ) : (
             <>
-              {!medium && (
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full text-white flex-shrink-0 ${
-                    booking.status === 'confirmed' ? 'bg-green-500' :
-                    booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
-                  }`}>
-                    {booking.status}
-                  </span>
-                  <span className={`text-[10px] font-medium ${color.text} opacity-70 truncate`}>
-                    #{booking.reference_number?.slice(-6)}
-                  </span>
-                </div>
-              )}
-              <div className={`font-bold text-xs ${color.text} flex items-center gap-1.5 truncate`}>
-                <span className="truncate">{timeLabel}</span>
-                {needsCheckIn && (
-                  <span className="flex items-center gap-0.5 px-1.5 py-px rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">
-                    <AlertCircle className="w-2.5 h-2.5" />
-                    Check in
-                  </span>
-                )}
-                {inProgress && !needsCheckIn && (
-                  <span className="px-1.5 py-px rounded-full bg-emerald-500 text-white text-[9px] font-bold uppercase">Now</span>
-                )}
-              </div>
-              <div className={`font-semibold text-sm ${color.text} truncate`}>{booking.guest_name || 'Walk-in'}</div>
-              {/* time, guest and package are the three a cell must always carry */}
-              <div className={`text-xs ${color.text} opacity-80 truncate`}>{booking.package?.name || 'N/A'}</div>
-              {!medium && (
-                <>
-                  <div className={`text-xs ${color.text} opacity-70 flex items-center gap-1`}>
-                    <Users className="w-3 h-3" />
-                    {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
-                  </div>
-                  <div className={`mt-auto pt-1 flex items-center justify-between text-xs`}>
-                    <span className={`font-bold ${color.text}`}>${Number(booking.total_amount || 0).toFixed(2)}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${resolvePaymentState(booking).pillClass}`}>
-                      {resolvePaymentState(booking).label}
+              {/* when it runs, and the flags that need no reading — the badges sit IN the line
+                  rather than over it, so nothing is painted on */}
+              <div className="flex min-w-0 items-center gap-1 leading-tight">
+                <span className={`truncate text-[9px] font-bold tabular-nums ${color.text} opacity-80`}>
+                  {compactTimeLabel}
+                </span>
+                <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                  {late ? (
+                    <span className="flex items-center gap-0.5 rounded bg-red-600 px-1 text-[8px] font-bold uppercase leading-tight text-white">
+                      <AlertCircle className="h-2 w-2 shrink-0" />
+                      Late
                     </span>
-                  </div>
-                </>
-              )}
+                  ) : inProgress && arrived ? (
+                    <span className="rounded bg-emerald-500 px-1 text-[8px] font-bold uppercase leading-tight text-white">
+                      In
+                    </span>
+                  ) : null}
+                  {clashing && (
+                    <AlertTriangle
+                      className={`h-2.5 w-2.5 shrink-0 ${doubleBooked ? 'text-rose-600' : 'text-amber-600'}`}
+                    />
+                  )}
+                  <BookingNoteBadges flags={noteFlags} />
+                </span>
+              </div>
+
+              <div className={`truncate text-xs font-semibold leading-tight ${color.text}`}>{guestLabel}</div>
+
+              <div className={`truncate text-[9px] leading-tight ${color.text} opacity-80`}>
+                {booking.package?.name || 'No package'}
+              </div>
+
+              {/* how many, and what is still owed — the two numbers the desk acts on */}
+              <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] leading-tight">
+                <span
+                  className={`shrink-0 tabular-nums ${overCapacity ? 'font-bold text-rose-700' : `${color.text} opacity-70`}`}
+                  title={
+                    overCapacity
+                      ? `${booking.participants} guests in a space for ${capacity}`
+                      : `${booking.participants} guests`
+                  }
+                >
+                  {booking.participants}
+                  {capacity ? `/${capacity}` : ''} pax
+                </span>
+                <span
+                  className={`truncate font-semibold ${
+                    payment.isTerminal ? 'text-slate-500' : payment.balance > 0 ? 'text-red-600' : 'text-green-600'
+                  }`}
+                >
+                  {payment.isTerminal
+                    ? payment.label
+                    : payment.balance > 0
+                      ? `$${payment.balance.toFixed(2)} due`
+                      : 'Paid'}
+                </span>
+              </div>
+
+              {extras.slice(0, extraRoom).map(extra => (
+                <div key={extra.key} className={`truncate text-[9px] leading-tight ${extra.className}`}>
+                  {extra.text}
+                </div>
+              ))}
             </>
           )}
         </div>
@@ -2165,11 +2244,11 @@ const SpaceSchedule = () => {
                     <ul className={`mt-1 max-h-32 space-y-0.5 overflow-y-auto pr-1 ${tone ? 'text-rose-800' : 'text-amber-800'}`}>
                       {overlapSummary.map(row => (
                         <li key={`${row.a.id}-${row.b.id}`} className="break-words">
-                          <span className="font-medium">{row.columnName}</span>: {row.a.guest_name || 'Walk-in'} at{' '}
+                          <span className="font-medium">{row.columnName}</span>: {customerNameOf(row.a)} at{' '}
                           {formatTime12Hour(row.a.booking_time)}{' '}
                           {row.overlapMinutes > 0
-                            ? `overlaps ${row.b.guest_name || 'Walk-in'} at ${formatTime12Hour(row.b.booking_time)} by ${row.overlapMinutes} min`
-                            : `ends as ${row.b.guest_name || 'Walk-in'} starts at ${formatTime12Hour(row.b.booking_time)} — no time to reset the space`}
+                            ? `overlaps ${customerNameOf(row.b)} at ${formatTime12Hour(row.b.booking_time)} by ${row.overlapMinutes} min`
+                            : `ends as ${customerNameOf(row.b)} starts at ${formatTime12Hour(row.b.booking_time)} — no time to reset the space`}
                         </li>
                       ))}
                     </ul>
@@ -2365,7 +2444,7 @@ const SpaceSchedule = () => {
         return (
           <BookingHoverCard
             anchor={hoverCard.rect}
-            guestName={hovered.guest_name || 'Walk-in'}
+            guestName={customerNameOf(hovered)}
             timeLabel={`${formatTime12Hour(hovered.booking_time)} – ${formatTime12Hour(
               calculateEndTime(hovered.booking_time, hovered.duration, hovered.duration_unit)
             )}`}
@@ -2380,7 +2459,7 @@ const SpaceSchedule = () => {
               item.conflicts.length > 0
                 ? item.conflicts
                     .map(clash =>
-                      `${clash.booking.guest_name || 'Walk-in'} at ${formatTime12Hour(clash.booking.booking_time)}` +
+                      `${customerNameOf(clash.booking)} at ${formatTime12Hour(clash.booking.booking_time)}` +
                       (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
                     )
                     .join(', ')
@@ -2458,7 +2537,7 @@ const SpaceSchedule = () => {
                 <dl className="rounded-lg border border-amber-200 bg-amber-50 divide-y divide-amber-200 text-sm mb-4">
                   <div className="flex justify-between gap-4 px-3 py-2">
                     <dt className="text-amber-800">Clashes with</dt>
-                    <dd className="font-semibold text-amber-900">{walkInPrompt.clash.guest_name || 'Walk-in'}</dd>
+                    <dd className="font-semibold text-amber-900">{customerNameOf(walkInPrompt.clash)}</dd>
                   </div>
                   <div className="flex justify-between gap-4 px-3 py-2">
                     <dt className="text-amber-800">Their booking</dt>

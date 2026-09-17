@@ -3,21 +3,15 @@ import type { BookingNoteFlags } from '../../../utils/bookingNotes';
 
 interface BookingNoteBadgesProps {
   flags: BookingNoteFlags;
-  /** how tall the block is, so a sliver does not try to carry an icon */
-  height: number;
 }
 
 /**
- * The note indicators on a day-view block. Icon only, never a label — the words live in the hover
- * card and the modal, and a label here would eat the guest name on a short booking.
+ * The note indicators on a day-view block. Icon only — the words themselves are printed on the
+ * block once it is tall enough, because the hover card that used to carry them never opens on a
+ * tablet or a phone, which is what the desk actually uses.
  */
-const BookingNoteBadges: React.FC<BookingNoteBadgesProps> = ({ flags, height }) => {
+const BookingNoteBadges: React.FC<BookingNoteBadgesProps> = ({ flags }) => {
   if (!flags.guest && !flags.staff) return null;
-  // below this the block's own text is already clipped, so an icon would only steal from it
-  if (height < 20) return null;
-
-  // a very short block has room for one: the staff note wins, being rarer and written for staff
-  const tight = height < 30 && flags.guest && flags.staff;
 
   return (
     <>
@@ -29,7 +23,7 @@ const BookingNoteBadges: React.FC<BookingNoteBadgesProps> = ({ flags, height }) 
           <StickyNote className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
         </span>
       )}
-      {flags.guest && !tight && (
+      {flags.guest && (
         <span
           className="flex items-center rounded bg-blue-100 px-0.5 py-px text-blue-700"
           title="Note from the guest"
