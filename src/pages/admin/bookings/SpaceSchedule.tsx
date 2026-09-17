@@ -1382,7 +1382,14 @@ const SpaceSchedule = () => {
    */
   const walkInFit = (
     column: ScheduleColumn
-  ): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null; areaClash: Booking | null } => {
+  ): {
+    fits: boolean;
+    freeFor: number;
+    shortest: number | null;
+    packageName: string | null;
+    areaClash: Booking | null;
+    blockedByClose: boolean;
+  } => {
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const until = usableFreeUntil(column, nowMinutes);
     const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
@@ -1390,10 +1397,13 @@ const SpaceSchedule = () => {
     // only packages the booking page will actually offer at this minute, and only those that can
     // still finish inside THEIR OWN schedule — the column closes when its latest package does
     const startable = new Set(packagesForSlot(column, nowMinutes));
-    const candidates = (dayWindow?.packages ?? [])
-      .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+    const running = (dayWindow?.packages ?? [])
+      .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0);
+    const candidates = running
       .filter(entry => nowMinutes + (entry.duration_minutes as number) <= entry.close_minutes)
       .sort((a, b) => (a.duration_minutes ?? 0) - (b.duration_minutes ?? 0));
+    // something runs here, but nothing short enough to finish before it closes
+    const blockedByClose = running.length > 0 && candidates.length === 0;
 
     const shortestEntry = candidates[0] ?? null;
     const shortest = shortestEntry?.duration_minutes ?? null;
@@ -1406,6 +1416,7 @@ const SpaceSchedule = () => {
       shortest,
       packageName: shortestEntry?.name ?? null,
       areaClash,
+      blockedByClose,
     };
   };
 
@@ -1415,7 +1426,7 @@ const SpaceSchedule = () => {
     // package's scheduled start times
     const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
 
-    if (fit.fits || (fit.shortest === null && fit.areaClash === null)) {
+    if (fit.fits || (fit.shortest === null && fit.areaClash === null && !fit.blockedByClose)) {
       navigateToSlot(column, walkInMinute);
       return;
     }
@@ -2302,7 +2313,9 @@ const SpaceSchedule = () => {
                   <h3 className="text-lg font-semibold text-gray-900">
                     {walkInPrompt.areaClash
                       ? 'Another space nearby starts too close to this'
-                      : 'This walk-in runs past the next booking'}
+                      : walkInPrompt.duration === 0
+                        ? 'Nothing here can finish before closing'
+                        : 'This walk-in runs past the next booking'}
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
                     {walkInPrompt.areaClash ? (
@@ -2310,6 +2323,11 @@ const SpaceSchedule = () => {
                         {walkInPrompt.column.name} shares an area with a space that already starts at{' '}
                         {formatTime12Hour(walkInPrompt.areaClash.booking_time)}. They have to start far enough apart for
                         staff to run both.
+                      </>
+                    ) : walkInPrompt.duration === 0 ? (
+                      <>
+                        Every package in {walkInPrompt.column.name} would still be running when it closes, so none of
+                        them can be started now.
                       </>
                     ) : (
                       <>

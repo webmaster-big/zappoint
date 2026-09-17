@@ -1551,6 +1551,11 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const resetForm = () => {
+    // an approval belongs to the booking it was given for. The page is not remounted between
+    // bookings, so without this one PIN would wave through every overlap for the rest of the shift.
+    overrideTokenRef.current = null;
+    sideEffectsAcceptedRef.current = false;
+    setOverrideGate(null);
     setSelectedPackage(null);
     setCustomFieldAnswers({});
     setPromoDiscount(0);

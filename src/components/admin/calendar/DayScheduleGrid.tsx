@@ -650,18 +650,28 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   );
 
   const walkInFit = React.useCallback(
-    (column: ScheduleColumn): { fits: boolean; freeFor: number; shortest: number | null; packageName: string | null; areaClash: Booking | null } => {
+    (column: ScheduleColumn): {
+      fits: boolean;
+      freeFor: number;
+      shortest: number | null;
+      packageName: string | null;
+      areaClash: Booking | null;
+      blockedByClose: boolean;
+    } => {
       const columnClose = column.closeMinutes ?? timeline.end;
       const until = usableFreeUntil(column, nowMinutes);
       const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
 
       // only packages the booking page will actually offer at this minute
       const startable = new Set(packagesForSlot(column, nowMinutes));
-      const candidates = (windowData.packages ?? [])
-        .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+      const running = (windowData.packages ?? [])
+        .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0);
+      const candidates = running
         // it must finish inside its OWN schedule; the column closes when its latest package does
         .filter(entry => nowMinutes + (entry.duration_minutes as number) <= entry.close_minutes)
         .sort((a, b) => (a.duration_minutes ?? 0) - (b.duration_minutes ?? 0));
+      // something runs here, but nothing short enough to finish before it closes
+      const blockedByClose = running.length > 0 && candidates.length === 0;
 
       const shortestEntry = candidates[0] ?? null;
       const shortest = shortestEntry?.duration_minutes ?? null;
@@ -674,6 +684,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         shortest,
         packageName: shortestEntry?.name ?? null,
         areaClash,
+        blockedByClose,
       };
     },
     [packagesForSlot, windowData, usableFreeUntil, timeline, nowMinutes, areaStaggerClash]
@@ -762,7 +773,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       // a walk-in records when the guests actually go in, on a 5-minute grid
       const walkInMinute = Math.floor(nowMinutes / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
 
-      if (fit.fits || (fit.shortest === null && fit.areaClash === null)) {
+      if (fit.fits || (fit.shortest === null && fit.areaClash === null && !fit.blockedByClose)) {
         goToBooking(column, walkInMinute);
         return;
       }
@@ -1328,7 +1339,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                   <h3 className="text-lg font-semibold text-gray-900">
                     {walkInPrompt.areaClash
                       ? 'Another space nearby starts too close to this'
-                      : 'This walk-in runs past the next booking'}
+                      : walkInPrompt.duration === 0
+                        ? 'Nothing here can finish before closing'
+                        : 'This walk-in runs past the next booking'}
                   </h3>
                   <p className="mt-1 text-sm text-gray-600">
                     {walkInPrompt.areaClash ? (
@@ -1336,6 +1349,11 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         {walkInPrompt.column.name} shares an area with a space that already starts at{' '}
                         {formatSlotLabel(startMinutesOf(walkInPrompt.areaClash))}. They have to start far enough apart
                         for staff to run both.
+                      </>
+                    ) : walkInPrompt.duration === 0 ? (
+                      <>
+                        Every package in {walkInPrompt.column.name} would still be running when it closes, so none of
+                        them can be started now.
                       </>
                     ) : (
                       <>
