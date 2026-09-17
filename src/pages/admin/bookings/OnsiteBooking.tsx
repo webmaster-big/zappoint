@@ -382,6 +382,54 @@ const OnsiteBooking: React.FC = () => {
     };
   }, [slotPrefill, selectedPackage, bookingData.date, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
 
+  /**
+   * Why the start carried over from the schedule could not be kept. walkInSlot bails for five
+   * different reasons and staff were told the same thing for all of them.
+   */
+  const walkInBlockedReason = useMemo<string | null>(() => {
+    if (!slotPrefill.walkIn || !slotPrefill.time || !selectedPackage) return null;
+    if (walkInSlot) return null;
+    if (!bookingData.date || bookingData.date !== slotPrefill.date) return null;
+
+    if (availableTimeSlots.some(slot => slot.start_time === slotPrefill.time)) return null;
+
+    if (slotPrefill.roomId && !packageServesRoom(selectedPackage, slotPrefill.roomId)) {
+      return `${selectedPackage.name} does not run in the space you picked, so its start time could not be kept.`;
+    }
+
+    const [hours, minutes] = slotPrefill.time.split(':').map(Number);
+    const startMinutes = slotPrefill.startMinutes ?? (Number.isFinite(hours) ? hours * 60 + minutes : 0);
+    const endAbsolute = startMinutes + packageDurationMinutes;
+
+    if (isTimeSlotRestricted(
+      slotPrefill.time,
+      `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`
+    )) {
+      return `The space is closed for part of ${formatTimeTo12Hour(slotPrefill.time)} to ${formatTimeTo12Hour(
+        `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`
+      )}, so that start could not be kept.`;
+    }
+
+    if (!slotPrefill.walkInOverride && slotPrefill.freeUntilKnown && endAbsolute > (slotPrefill.freeUntilMinutes ?? -1)) {
+      const over = endAbsolute - (slotPrefill.freeUntilMinutes ?? endAbsolute);
+      return `${formatTimeTo12Hour(slotPrefill.time)} would run ${over} min past what this space has free, so it was not kept. Start it from the schedule to approve the overlap.`;
+    }
+
+    if (!slotPrefill.freeUntilKnown) {
+      return `How long the space is free was not carried over, so ${formatTimeTo12Hour(slotPrefill.time)} could not be kept.`;
+    }
+
+    return null;
+  }, [
+    slotPrefill,
+    selectedPackage,
+    walkInSlot,
+    bookingData.date,
+    availableTimeSlots,
+    packageDurationMinutes,
+    dayOffsWithTime,
+  ]);
+
   /** A start staff picked from earlier today — availability no longer offers it, so say so plainly. */
   const walkInAlreadyStarted = useMemo(() => {
     if (!walkInSlot || !slotPrefill.date) return false;
@@ -1214,10 +1262,12 @@ const OnsiteBooking: React.FC = () => {
 
     setBookingData(prev => ({ ...prev, time: '' }));
     setToast({
-      message: 'That start time is no longer offered for this package — pick another below.',
-      type: 'info',
+      message:
+        walkInBlockedReason ??
+        'That start time is no longer offered for this package — pick another below.',
+      type: walkInBlockedReason ? 'error' : 'info',
     });
-  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, walkInOverlapMinutes, bookingData.date, selectedPackage]);
+  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, walkInOverlapMinutes, walkInBlockedReason, bookingData.date, selectedPackage]);
 
   const handleAttractionToggle = (attractionId: string) => {
     setBookingData(prev => {
@@ -1954,10 +2004,24 @@ const OnsiteBooking: React.FC = () => {
       resetForm();
     } catch (err) {
       console.error('❌ Error creating booking:', err);
+      const failure = (err as {
+        response?: { status?: number; data?: { message?: string; requires_override?: boolean; conflicts?: string[] } };
+      })?.response;
+
+      // the server found a clash the page could not see on its own — an area's spaces starting too
+      // close together, a break, a slot taken since the page loaded. Ask for the PIN rather than
+      // leaving staff with an error they cannot act on.
+      if (failure?.status === 409 && failure.data?.requires_override) {
+        setOverrideGate({
+          conflicts: (failure.data.conflicts ?? []).map(reason => `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`),
+          onlineSlotsLost: [],
+        });
+        return;
+      }
+
       // Say why: a rejected booking (capacity, a required confirmation) has a reason and
       // staff cannot act on "Please try again".
-      const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setToast({ message: serverMessage || 'Failed to create booking. Please try again.', type: 'error' });
+      setToast({ message: failure?.data?.message || 'Failed to create booking. Please try again.', type: 'error' });
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);

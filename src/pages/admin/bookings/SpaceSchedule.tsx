@@ -1358,10 +1358,12 @@ const SpaceSchedule = () => {
     const until = usableFreeUntil(column, nowMinutes);
     const freeFor = Math.max(0, (until ?? columnClose) - nowMinutes);
 
-    // only packages the booking page will actually offer at this minute
+    // only packages the booking page will actually offer at this minute, and only those that can
+    // still finish inside THEIR OWN schedule — the column closes when its latest package does
     const startable = new Set(packagesForSlot(column, nowMinutes));
     const candidates = (dayWindow?.packages ?? [])
       .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+      .filter(entry => nowMinutes + (entry.duration_minutes as number) <= entry.close_minutes)
       .sort((a, b) => (a.duration_minutes ?? 0) - (b.duration_minutes ?? 0));
 
     const shortestEntry = candidates[0] ?? null;

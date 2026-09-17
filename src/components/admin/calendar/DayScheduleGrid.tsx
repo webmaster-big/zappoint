@@ -630,6 +630,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       const startable = new Set(packagesForSlot(column, nowMinutes));
       const candidates = (windowData.packages ?? [])
         .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
+        // it must finish inside its OWN schedule; the column closes when its latest package does
+        .filter(entry => nowMinutes + (entry.duration_minutes as number) <= entry.close_minutes)
         .sort((a, b) => (a.duration_minutes ?? 0) - (b.duration_minutes ?? 0));
 
       const shortestEntry = candidates[0] ?? null;

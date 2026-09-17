@@ -25,6 +25,9 @@ export interface ScheduleRoomWindow {
   room_id: number;
   location_id: number;
   interval_minutes: number | null;
+  /** spaces in one area group must start apart from each other */
+  area_group?: string | null;
+  stagger_minutes?: number;
   open_minutes: number | null;
   close_minutes: number | null;
   closed_all_day: boolean;
