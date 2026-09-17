@@ -228,7 +228,7 @@ class BookingCacheService {
     const index = cachedBookings.findIndex(b => b.id === updatedBooking.id);
     
     if (index >= 0) {
-      cachedBookings[index] = updatedBooking;
+      cachedBookings[index] = { ...cachedBookings[index], ...updatedBooking };
     } else {
       cachedBookings.unshift(updatedBooking);
     }

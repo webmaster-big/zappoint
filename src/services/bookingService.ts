@@ -658,7 +658,7 @@ const bookingService = {
   async updateInternalNotes(bookingId: number, internalNotes: string): Promise<{
     success: boolean;
     message: string;
-    data?: Booking;
+    data?: Pick<Booking, 'id' | 'internal_notes'>;
   }> {
     const response = await api.patch(`/bookings/${bookingId}/internal-notes`, { internal_notes: internalNotes });
     return response.data;

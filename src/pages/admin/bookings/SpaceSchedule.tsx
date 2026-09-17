@@ -2541,6 +2541,14 @@ const SpaceSchedule = () => {
                             setSavingNotes(true);
                             try {
                               await bookingService.updateInternalNotes(selectedBooking.id, tempNotes);
+                              try {
+                                const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBooking.id));
+                                if (cachedBooking) {
+                                  await bookingCacheService.updateBookingInCache({ ...cachedBooking, internal_notes: tempNotes });
+                                }
+                              } catch (cacheErr) {
+                                console.error('Failed to patch cache for internal notes:', cacheErr);
+                              }
                               setSelectedBooking({ ...selectedBooking, internal_notes: tempNotes } as any);
                               setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, internal_notes: tempNotes } as any : b));
                               setEditingNotes(false);

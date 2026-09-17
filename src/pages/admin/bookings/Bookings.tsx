@@ -2577,20 +2577,16 @@ const Bookings: React.FC = () => {
         );
         setBookings(updatedBookings);
         
-        if (response.data) {
-          await bookingCacheService.updateBookingInCache(response.data);
-        } else {
-          try {
-            const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForNotes.id));
-            if (cachedBooking) {
-              await bookingCacheService.updateBookingInCache({
-                ...cachedBooking,
-                internal_notes: internalNotesText
-              });
-            }
-          } catch (cacheErr) {
-            console.error('[Bookings] Failed to patch cache for internal notes:', cacheErr);
+        try {
+          const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForNotes.id));
+          if (cachedBooking) {
+            await bookingCacheService.updateBookingInCache({
+              ...cachedBooking,
+              internal_notes: internalNotesText
+            });
           }
+        } catch (cacheErr) {
+          console.error('[Bookings] Failed to patch cache for internal notes:', cacheErr);
         }
         
         alert('Internal notes saved successfully!');
