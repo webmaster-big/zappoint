@@ -1176,9 +1176,11 @@ const SpaceSchedule = () => {
                 <span className="font-bold tabular-nums flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
                 <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
               </div>
-              <span className="mt-px truncate text-[9px] leading-none opacity-80">
-                {booking.package?.name || 'No package'}
-              </span>
+              {item.height >= 26 && (
+                <span className="truncate text-[10px] leading-tight opacity-80">
+                  {booking.package?.name || 'No package'}
+                </span>
+              )}
             </div>
           ) : compact ? (
             <div className={`flex flex-col ${color.text} min-w-0`}>
