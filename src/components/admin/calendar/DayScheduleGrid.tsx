@@ -1190,7 +1190,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                           onMouseLeave={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
                           onFocus={event => setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })}
                           onBlur={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
-                          className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 py-1 text-left shadow-sm transition hover:z-20 hover:shadow-lg hover:brightness-95 ${tone} ${
+                          className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 text-left shadow-sm transition hover:z-20 hover:shadow-lg hover:brightness-95 ${
+                            height < 30 ? 'py-0.5' : 'py-1'
+                          } ${tone} ${
                             doubleBooked ? 'ring-2 ring-rose-500' : clashing ? 'ring-2 ring-amber-400' : ''
                           }`}
                           style={{
@@ -1223,15 +1225,20 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
                           <span className="flex h-full min-w-0 flex-col">
                             {height < 30 ? (
-                              // a short package leaves one line, so spend it on the time AND the name
-                              <span className="flex min-w-0 items-baseline gap-1 text-[10px] leading-tight">
-                                <span className="shrink-0 font-bold tabular-nums text-gray-700">
-                                  {formatSlotLabel(item.startMinutes)}
+                              // two tight lines: who and when, then what they booked
+                              <>
+                                <span className="flex min-w-0 items-baseline gap-1 text-[10px] leading-none">
+                                  <span className="shrink-0 font-bold tabular-nums text-gray-700">
+                                    {formatSlotLabel(item.startMinutes)}
+                                  </span>
+                                  <span className="truncate font-semibold text-gray-900">
+                                    {customerNameOf(item.booking)}
+                                  </span>
                                 </span>
-                                <span className="truncate font-semibold text-gray-900">
-                                  {customerNameOf(item.booking)}
+                                <span className="mt-px truncate text-[9px] leading-none text-gray-600">
+                                  {item.booking.package?.name || 'No package'}
                                 </span>
-                              </span>
+                              </>
                             ) : (
                               <>
                                 <span className="truncate text-[9px] leading-tight font-bold tabular-nums text-gray-700">
@@ -1240,11 +1247,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                                 <span className="truncate text-xs font-semibold leading-tight text-gray-900">
                                   {customerNameOf(item.booking)}
                                 </span>
-                                {height >= 46 && (
-                                  <span className="truncate text-[9px] leading-tight text-gray-600">
-                                    {item.booking.package?.name || 'No package'}
-                                  </span>
-                                )}
+                                <span className="truncate text-[9px] leading-tight text-gray-600">
+                                  {item.booking.package?.name || 'No package'}
+                                </span>
                                 {height >= 60 && (
                                   <span className="truncate text-[9px] leading-tight text-gray-600">
                                     {item.booking.participants} {item.booking.participants === 1 ? 'guest' : 'guests'}

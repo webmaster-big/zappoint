@@ -1158,18 +1158,29 @@ const SpaceSchedule = () => {
         )}
         <div className={`h-full flex flex-col ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
           {tiny ? (
-            <div className={`flex items-baseline gap-1 px-1 text-[10px] leading-tight ${color.text} min-w-0`}>
-              <span className="font-bold tabular-nums flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
-              <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+            // two tight lines: who and when, then what they booked
+            <div className={`flex flex-col px-1 ${color.text} min-w-0`}>
+              <div className="flex items-baseline gap-1 text-[10px] leading-none min-w-0">
+                <span className="font-bold tabular-nums flex-shrink-0">{formatTime12Hour(booking.booking_time)}</span>
+                <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+              </div>
+              <span className="mt-px truncate text-[9px] leading-none opacity-80">
+                {booking.package?.name || 'No package'}
+              </span>
             </div>
           ) : compact ? (
-            <div className={`flex items-center gap-1.5 text-xs ${color.text} min-w-0`}>
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                booking.status === 'confirmed' ? 'bg-green-500' :
-                booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
-              }`} />
-              <span className="font-bold tabular-nums flex-shrink-0 opacity-80">{formatTime12Hour(booking.booking_time)}</span>
-              <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+            <div className={`flex flex-col ${color.text} min-w-0`}>
+              <div className="flex items-center gap-1.5 text-xs min-w-0">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  booking.status === 'confirmed' ? 'bg-green-500' :
+                  booking.status === 'pending' ? 'bg-yellow-500' : 'bg-blue-500'
+                }`} />
+                <span className="font-bold tabular-nums flex-shrink-0 opacity-80">{formatTime12Hour(booking.booking_time)}</span>
+                <span className="font-semibold truncate">{booking.guest_name || 'Walk-in'}</span>
+              </div>
+              <span className="truncate text-[10px] leading-tight opacity-80">
+                {booking.package?.name || 'No package'}
+              </span>
             </div>
           ) : (
             <>
