@@ -23,6 +23,7 @@ import type { SchedulePackageWindow } from '../../../services/ScheduleWindowServ
 import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayScheduleView';
 import BookingHoverCard from '../../../components/admin/calendar/BookingHoverCard';
 import BookingNoteBadges from '../../../components/admin/calendar/BookingNoteBadges';
+import { supportsHover } from '../../../utils/pointer';
 import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
@@ -1114,13 +1115,21 @@ const SpaceSchedule = () => {
       <button
         key={booking.id}
         type="button"
-        onClick={() => setSelectedBooking(booking)}
+        onClick={() => {
+          // a tap on a phone fires mouseenter first; clear it so the card cannot sit over the modal
+          setHoverCard(null);
+          setSelectedBooking(booking);
+        }}
         aria-label={`${booking.guest_name || 'Walk-in'}, ${timeLabel}${
           clashing ? `, ${doubleBooked ? 'overlaps' : 'no turnaround before'} ${overlapLabel}` : ''
         }${noteSummary ? `, ${noteSummary}` : ''}`}
-        onMouseEnter={event => setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+        onMouseEnter={event =>
+          supportsHover() && setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })
+        }
         onMouseLeave={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
-        onFocus={event => setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+        onFocus={event =>
+          supportsHover() && setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })
+        }
         onBlur={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
         className={`absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm overflow-hidden transition-shadow z-10 hover:z-20 hover:shadow-lg ${
           doubleBooked

@@ -23,6 +23,7 @@ import LocationChangeRequests from "./pages/admin/bookings/LocationChangeRequest
 import EditBooking from "./pages/admin/bookings/EditBooking"
 import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
+import ManualBooking from "./pages/admin/bookings/ManualBooking"
 import CheckIn from "./pages/admin/bookings/CheckIn"
 import CreateAttraction from "./pages/admin/attractions/CreateAttractions";
 import EditAttraction from "./pages/admin/attractions/EditAttraction";
@@ -292,8 +293,8 @@ function App() {
           <Route path="/bookings/calendar" element={<CalendarView />} />
           <Route path="/bookings/space-schedule" element={<SpaceSchedule />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
-          {/* manual booking now lives in the normal booking process; the old link keeps working */}
-          <Route path="/bookings/manual" element={<Navigate to="/bookings/create" replace />} />
+          {/* the flexible entry form: a booking recorded by hand, on any date, with its own fields */}
+          <Route path="/bookings/manual" element={<ManualBooking />} />
           <Route path="/check-in" element={<CheckIn />} />
           <Route path="/bookings/check-in" element={<Navigate to="/check-in" replace />} />
           

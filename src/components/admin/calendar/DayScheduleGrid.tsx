@@ -11,6 +11,7 @@ import { resolvePaymentState } from '../../../types/Bookings.types';
 import { buildBookingUrl } from '../../../utils/bookingPrefill';
 import BookingHoverCard from './BookingHoverCard';
 import BookingNoteBadges from './BookingNoteBadges';
+import { supportsHover } from '../../../utils/pointer';
 import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
 import type { TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
@@ -1176,7 +1177,11 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         <button
                           key={item.booking.id}
                           type="button"
-                          onClick={() => onSelectBooking?.(item.booking)}
+                          onClick={() => {
+                            // a tap on a phone fires mouseenter first; clear it before the modal opens
+                            setHoverCard(null);
+                            onSelectBooking?.(item.booking);
+                          }}
                           aria-label={[
                             customerNameOf(item.booking),
                             item.booking.package?.name ?? 'No package',
@@ -1186,9 +1191,15 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                           ]
                             .filter(Boolean)
                             .join(' · ')}
-                          onMouseEnter={event => setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+                          onMouseEnter={event =>
+                            supportsHover() &&
+                            setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })
+                          }
                           onMouseLeave={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
-                          onFocus={event => setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })}
+                          onFocus={event =>
+                            supportsHover() &&
+                            setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })
+                          }
                           onBlur={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
                           className={`absolute z-10 flex flex-col overflow-hidden rounded border-l-4 px-1.5 text-left shadow-sm transition hover:z-20 hover:shadow-lg hover:brightness-95 ${
                             height < 30 ? 'py-0.5' : 'py-1'
