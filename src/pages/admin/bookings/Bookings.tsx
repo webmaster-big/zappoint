@@ -2974,7 +2974,7 @@ const Bookings: React.FC = () => {
               variant="primary"
               size="md"
               icon={Plus}
-              onClick={() => navigate('/bookings/manual')}
+              onClick={() => navigate('/bookings/create')}
             >
               Manual Booking
             </StandardButton>

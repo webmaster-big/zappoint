@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { readBookingPrefill } from '../../../utils/bookingPrefill';
-import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
+import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin, AlertCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -35,6 +35,7 @@ interface DayOffWithTime {
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
 import { formatDurationDisplay, getMichiganNow, dateKey } from '../../../utils/timeFormat';
+import { verifyOverridePin } from '../../../services/OverridePinService';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -62,6 +63,10 @@ const parseLocalDate = (isoDateString: string): Date => {
 };
 
 interface ExtendedBookingData extends CreateBookingData {
+  /** proof that a manager approved saving this on top of a conflict */
+  overlap_override_token?: string;
+  /** a booking being written down after the fact, which used to need the separate manual page */
+  is_manual_entry?: boolean;
   additional_attractions?: Array<{
     attraction_id: number;
     quantity: number;
@@ -402,6 +407,10 @@ const OnsiteBooking: React.FC = () => {
    * Only the start staff actually picked on the schedule. The 5-minute freedom belongs to the
    * schedule click, not to this list — offering every 5-minute option here buried the real slots.
    */
+  // held in a ref so the re-submit right after approval sees it without waiting for a render
+  const overrideTokenRef = useRef<string | null>(null);
+  const [overrideGate, setOverrideGate] = useState<{ conflicts: string[] } | null>(null);
+
   const walkInSlots = useMemo<TimeSlot[]>(() => {
     if (!walkInSlot) return [];
     // the server may already list this minute for a different space; one tile per start time
@@ -414,6 +423,29 @@ const OnsiteBooking: React.FC = () => {
     (startTime: string) => walkInSlots.some(slot => slot.start_time === startTime),
     [walkInSlots]
   );
+
+  /**
+   * What this booking would run into, in plain words. Staff must see the reason and confirm before
+   * an overlapping booking is saved — and a manager's PIN is what lets it through.
+   */
+  const bookingConflicts = useMemo<string[]>(() => {
+    if (!bookingData.time || !selectedPackage) return [];
+
+    const reasons: string[] = [];
+
+    if (walkInOverlapMinutes > 0) {
+      reasons.push(`It runs ${walkInOverlapMinutes} min into the next booking in this space.`);
+    }
+
+    // the server lists a start only while a space is still free for it
+    const serverSlot = availableTimeSlots.find(slot => slot.start_time === bookingData.time);
+    if (serverSlot && selectedRoomId && (serverSlot.available_room_ids ?? []).length > 0
+      && !(serverSlot.available_room_ids ?? []).includes(selectedRoomId)) {
+      reasons.push('The space you picked is already taken at this time.');
+    }
+
+    return reasons;
+  }, [bookingData.time, selectedPackage, walkInOverlapMinutes, availableTimeSlots, selectedRoomId]);
 
   const displayedTimeSlots = useMemo(
     () =>
@@ -1470,6 +1502,13 @@ const OnsiteBooking: React.FC = () => {
     e.preventDefault();
     if (isSubmittingRef.current) return;
 
+    // an overlapping booking is never saved on a single click: the reason is shown and a manager
+    // has to approve it with their PIN
+    if (bookingConflicts.length > 0 && !overrideTokenRef.current) {
+      setOverrideGate({ conflicts: bookingConflicts });
+      return;
+    }
+
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < 3000) {
       console.warn('⚠️ Booking submission blocked (cooldown)');
@@ -1639,6 +1678,9 @@ const OnsiteBooking: React.FC = () => {
         location_id: resolvedLocationId,
         package_id: selectedPackage.id,
         room_id: selectedRoomId || undefined,
+        overlap_override_token: overrideTokenRef.current || undefined,
+        // recording a booking for a date that has passed is what the separate manual page was for
+        is_manual_entry: bookingData.date < dateKey(getMichiganNow().date) || undefined,
         type: 'package' as const,
         booking_date: bookingData.date,
         booking_time: bookingData.time,
@@ -3757,7 +3799,112 @@ const OnsiteBooking: React.FC = () => {
         isOpen={showEmptyModal}
         onClose={() => setShowEmptyModal(false)}
       />
+
+      {overrideGate && (
+        <OverlapOverrideDialog
+          conflicts={overrideGate.conflicts}
+          locationId={gatewayLocationId ?? effectiveLocationId ?? null}
+          onCancel={() => setOverrideGate(null)}
+          onApproved={(token, approvedBy) => {
+            overrideTokenRef.current = token;
+            setOverrideGate(null);
+            setToast({ message: `${approvedBy} approved the overlap — saving the booking.`, type: 'info' });
+            // the gate is satisfied; run the same submit path again
+            void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+          }}
+        />
+      )}
     </>
+  );
+};
+
+interface OverlapOverrideDialogProps {
+  conflicts: string[];
+  locationId: number | null;
+  onCancel: () => void;
+  onApproved: (token: string, approvedBy: string) => void;
+}
+
+/** Shows what the booking runs into and takes a manager's PIN before it can be saved. */
+const OverlapOverrideDialog: React.FC<OverlapOverrideDialogProps> = ({ conflicts, locationId, onCancel, onApproved }) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const submit = async () => {
+    if (!locationId) {
+      setError('This booking has no location yet, so it cannot be approved.');
+      return;
+    }
+
+    setChecking(true);
+    setError(null);
+
+    try {
+      const approval = await verifyOverridePin(pin, locationId, conflicts.join(' '));
+      onApproved(approval.token, approval.approved_by);
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(message || 'That PIN could not be checked. Try again.');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="w-full max-w-md rounded-lg bg-white shadow-xl" onClick={event => event.stopPropagation()}>
+        <div className="p-6">
+          <div className="mb-4 flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-6 w-6 shrink-0 text-rose-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">This booking overlaps something already in the space</h3>
+              <p className="mt-1 text-sm text-gray-600">A manager has to approve it before it can be saved.</p>
+            </div>
+          </div>
+
+          <ul className="mb-4 space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+            {conflicts.map(reason => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+
+          <label className="block text-sm font-medium text-gray-700" htmlFor="override-pin">
+            Manager override PIN
+          </label>
+          <input
+            id="override-pin"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            autoFocus
+            value={pin}
+            onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            onKeyDown={event => {
+              if (event.key === 'Enter' && pin.length >= 4 && !checking) void submit();
+            }}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-lg tracking-[0.4em] focus:border-gray-500 focus:outline-none"
+            placeholder="••••"
+          />
+
+          {error && <p className="mt-2 text-sm font-medium text-rose-700">{error}</p>}
+
+          <div className="mt-5 flex justify-end gap-2">
+            <StandardButton variant="secondary" size="md" onClick={onCancel} disabled={checking}>
+              Cancel
+            </StandardButton>
+            <StandardButton
+              variant="primary"
+              size="md"
+              onClick={() => void submit()}
+              disabled={pin.length < 4 || checking}
+            >
+              {checking ? 'Checking…' : 'Approve and save'}
+            </StandardButton>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
