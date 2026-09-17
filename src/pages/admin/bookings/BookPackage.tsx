@@ -1605,8 +1605,8 @@ const BookPackage: React.FC = () => {
                   <span className="font-medium text-gray-900">{participants}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-gray-600">Room:</span>
-                  <span className="font-medium text-gray-900">Auto-assigned</span>
+                  <span className="text-gray-600">Space:</span>
+                  <span className="font-medium text-gray-900">We&rsquo;ll assign one for you</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Duration:</span>
@@ -2081,7 +2081,7 @@ const BookPackage: React.FC = () => {
                               </label>
                             ))
                           ) : (
-                            <span className="text-xs text-gray-400 col-span-2">No available times for the selected date. Room will be auto-assigned.</span>
+                            <span className="text-xs text-gray-400 col-span-2">No start times left on this date. Please try another day.</span>
                           )}
                         </div>
                       )}
@@ -3027,8 +3027,8 @@ const BookPackage: React.FC = () => {
               
               {(pkg.rooms?.length ?? 0) > 0 && (
                 <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
-                  <span>Room Assignment</span>
-                  <span className="text-gray-500">Auto-assigned at booking</span>
+                  <span>Space</span>
+                  <span className="text-gray-500">We&rsquo;ll assign one for you</span>
                 </div>
               )}
               
@@ -3325,8 +3325,8 @@ const BookPackage: React.FC = () => {
 
                 {(pkg.rooms?.length ?? 0) > 0 && (
                   <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
-                    <span>Room Assignment</span>
-                    <span className="text-gray-500">Auto-assigned at booking</span>
+                    <span>Space</span>
+                    <span className="text-gray-500">We&rsquo;ll assign one for you</span>
                   </div>
                 )}
 

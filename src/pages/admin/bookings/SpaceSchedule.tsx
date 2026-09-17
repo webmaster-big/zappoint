@@ -1807,10 +1807,16 @@ const SpaceSchedule = () => {
           return (
             <div
               key={`turnaround-${item.booking.id}`}
-              className="absolute inset-x-0 z-[3] border-y border-amber-200 bg-amber-100/70"
+              className="absolute inset-x-0 z-[3] flex items-center justify-center overflow-hidden border-y border-amber-200 bg-amber-100/70"
               style={{ top: scale.at(from), height: scale.spanHeight(from, to) }}
               title={`Resetting ${column.name} — free again at ${formatTime12Hour(minutesToTime(to))}`}
-            />
+            >
+              {scale.spanHeight(from, to) >= 12 && (
+                <span className="truncate px-1 text-[8px] font-medium leading-none text-amber-700">
+                  Free {formatTime12Hour(minutesToTime(to))}
+                </span>
+              )}
+            </div>
           );
         })}
         {breaks.map((brk, i) => (
@@ -2064,6 +2070,10 @@ const SpaceSchedule = () => {
                       <Coffee className="w-1.5 h-1.5 text-gray-500" />
                     </div>
                     <span className="text-gray-600 text-xs">Break Time</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded border-y border-amber-200 bg-amber-100" />
+                    <span className="text-gray-600 text-xs">Turnaround — the space is being reset</span>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-0.5 bg-red-500 rounded" />

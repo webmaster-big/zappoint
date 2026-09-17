@@ -499,7 +499,7 @@ const Rooms: React.FC = () => {
             fetchRooms();
         } catch (error) {
             console.error('Error updating area group interval:', error);
-            showToast('Error updating booking interval', 'error');
+            showToast('Error updating turnaround', 'error');
         }
     };
 
@@ -799,8 +799,8 @@ const Rooms: React.FC = () => {
                                                     {room.booking_interval != null && (
                                                         <span className="text-xs text-gray-500">
                                                             {room.booking_interval > 0
-                                                                ? `${room.booking_interval} min between bookings`
-                                                                : 'back-to-back bookings'}
+                                                                ? `${room.booking_interval} min turnaround`
+                                                                : 'No turnaround'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -959,7 +959,7 @@ const Rooms: React.FC = () => {
                                         <div className="border-t border-gray-200 pt-4">
                                             <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                                                 <Layers className="w-4 h-4" />
-                                                Stagger Booking Settings
+                                                Turnaround &amp; area spacing
                                             </h4>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
@@ -974,11 +974,11 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="e.g., Zone A"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Rooms in the same group share stagger rules</p>
+                                                    <p className="text-xs text-gray-500 mt-1">Spaces in the same area are checked together, using the largest turnaround set on any of them.</p>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Booking Interval (min)
+                                                        Turnaround (min)
                                                     </label>
                                                     <input
                                                         type="number"
@@ -990,7 +990,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings &mdash; the gap after one booking ends before the next can start in this space.</p>
+                                                    <p className="text-xs text-gray-500 mt-1">How long this space stays closed after a booking ends, before the next one can start. It is never added to the length the customer is shown &mdash; a 2 hour party is still advertised as 2 hours.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1214,7 +1214,7 @@ const Rooms: React.FC = () => {
                                         <div className="border-t border-gray-200 pt-4">
                                             <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                                                 <Layers className="w-4 h-4" />
-                                                Stagger Booking Settings (applies to all)
+                                                Turnaround &amp; area spacing (applies to all)
                                             </h4>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
@@ -1228,11 +1228,11 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="e.g., Zone A"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Rooms in the same group share stagger rules</p>
+                                                    <p className="text-xs text-gray-500 mt-1">Spaces in the same area are checked together, using the largest turnaround set on any of them.</p>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Booking Interval (min)
+                                                        Turnaround (min)
                                                     </label>
                                                     <input
                                                         type="number"
@@ -1243,7 +1243,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings for spaces in this group.</p>
+                                                    <p className="text-xs text-gray-500 mt-1">How long each space stays closed after a booking ends. If these spaces share an area, it also means bookings across the area must start at least this far apart.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1473,7 +1473,7 @@ const Rooms: React.FC = () => {
                                 <div className="border-t border-gray-200 pt-4">
                                     <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                                         <Layers className="w-4 h-4" />
-                                        Stagger Booking Settings
+                                        Turnaround &amp; area spacing
                                     </h4>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -1488,11 +1488,11 @@ const Rooms: React.FC = () => {
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="e.g., Zone A"
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">Rooms in same group share stagger rules</p>
+                                            <p className="text-xs text-gray-500 mt-1">Spaces in the same area are checked together</p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Booking Interval (min)
+                                                Turnaround (min)
                                             </label>
                                             <input
                                                 type="number"
@@ -1504,7 +1504,7 @@ const Rooms: React.FC = () => {
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="15"
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">Minutes between bookings &mdash; the gap after one booking ends before the next can start in this space.</p>
+                                            <p className="text-xs text-gray-500 mt-1">How long this space stays closed after a booking ends, before the next one can start. It is never added to the length the customer is shown &mdash; a 2 hour party is still advertised as 2 hours.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1669,7 +1669,7 @@ const Rooms: React.FC = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-semibold text-gray-900">Area Group Settings</h2>
-                                    <p className="text-sm text-gray-500">Update booking interval for all spaces in an area group</p>
+                                    <p className="text-sm text-gray-500">Set one turnaround for every space in an area group</p>
                                 </div>
                             </div>
 
@@ -1732,7 +1732,7 @@ const Rooms: React.FC = () => {
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Booking Interval (minutes)
+                                                Turnaround for every space in this group (min)
                                             </label>
                                             <input
                                                 type="number"
@@ -1744,7 +1744,7 @@ const Rooms: React.FC = () => {
                                                 placeholder="15"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">
-                                                Time gap required between bookings in this area group. Set to 0 to allow simultaneous bookings.
+                                                Written to every space in this area. It sets how long each space stays closed after a booking, and how far apart bookings across the area must start. Set to 0 to let two spaces in the area start at the same time — two bookings in the SAME space can still never overlap.
                                             </p>
                                         </div>
                                     </>

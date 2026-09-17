@@ -13,8 +13,8 @@ interface StartTimeArgs {
 }
 
 /**
- * The schedule interval decides which start times are offered. A space's booking interval is
- * its turnaround AFTER a booking — it removes slots once one is taken, it never thins this list.
+ * The schedule interval decides which start times are offered. A space's turnaround applies AFTER
+ * a booking — it removes slots once one is taken, it never thins this list.
  */
 export const resolveStartTimes = ({ startTime, endTime, interval, durationMinutes }: StartTimeArgs): string[] =>
   generateTimeSlots(startTime, endTime, interval, durationMinutes);
@@ -34,14 +34,18 @@ export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () 
   if (!durationMinutes || !interval) return null;
 
   const spaces = spaceIntervals.filter(m => Number.isFinite(m) && m > 0);
-  const turnaround = spaces.length > 0 ? Math.min(...spaces) : null;
+  // Quote the LARGEST, never the smallest: where spaces share an area the server enforces the
+  // biggest turnaround in that area, so the smallest promises a gap the booking rules ignore.
+  const longest = spaces.length > 0 ? Math.max(...spaces) : null;
+  const shortest = spaces.length > 0 ? Math.min(...spaces) : null;
+  const sameEverywhere = longest === shortest;
 
-  const spaceNote = turnaround !== null && (
+  const spaceNote = longest !== null && (
     <>
-      {' '}Once a booking is taken, that space reopens {turnaround} min after it ends
-      {spaceIntervals.length > 1
-        ? `, and spaces sharing an area group also hold that ${turnaround} min apart from each other.`
-        : '.'}
+      {' '}Once a booking is taken, that space stays closed for its turnaround
+      {sameEverywhere ? ` of ${longest} min` : ` — up to ${longest} min across the spaces you picked`} before it can
+      take another.
+      {spaces.length > 1 ? ' Spaces sharing an area also hold their start times that far apart.' : ''}
     </>
   );
 

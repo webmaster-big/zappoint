@@ -2157,7 +2157,7 @@ const PurchaseEvent = () => {
 
                   <div className="flex flex-col sm:flex-row justify-center gap-3">
                     <StandardButton variant="secondary" size="md" onClick={() => navigate('/')}>Back to Home</StandardButton>
-                    <StandardButton variant="primary" size="md" onClick={() => navigate('/customer/attractions')}>View My Purchases</StandardButton>
+                    <StandardButton variant="primary" size="md" onClick={() => navigate('/customer/events')}>View My Events</StandardButton>
                   </div>
                 </div>
               )}
@@ -2254,7 +2254,7 @@ const PurchaseEvent = () => {
                   {event.max_bookings_per_slot && (
                     <div className="flex items-start gap-2">
                       <div className="p-2 bg-blue-50 rounded-xl"><Users className="h-4 w-4 text-blue-600" /></div>
-                      <div><p className="text-xs text-gray-400">Capacity</p><p className="text-sm font-medium text-gray-900">Up to {event.max_bookings_per_slot}</p></div>
+                      <div><p className="text-xs text-gray-400">Groups per time slot</p><p className="text-sm font-medium text-gray-900">Up to {event.max_bookings_per_slot}</p></div>
                     </div>
                   )}
                 </div>

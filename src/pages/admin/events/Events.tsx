@@ -261,7 +261,7 @@ const Events = () => {
     },
     {
       key: 'interval',
-      label: 'Slot Interval',
+      label: 'Time slot',
       group: 'Schedule',
       sortable: true,
       sortValue: e => e.interval_minutes ?? 0,

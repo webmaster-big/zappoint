@@ -1353,7 +1353,7 @@ const CreatePackage: React.FC = () => {
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Interval (min)</label>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Start every (min)</label>
                                                             <input
                                                                 type="number"
                                                                 value={schedule.time_slot_interval}
@@ -1485,7 +1485,7 @@ const CreatePackage: React.FC = () => {
                                         {form.rooms.length === rooms.length ? 'Deselect All' : 'Select All'}
                                     </StandardButton>
                                 </div>
-                                <p className="mb-4 text-sm text-neutral-500">Optional. Leave empty for no space limit. Choose one space to run one session at a time, or several to run that many sessions in parallel — slot times follow each space’s booking interval.</p>
+                                <p className="mb-4 text-sm text-neutral-500">Optional. Leave empty for no space limit. Choose one space to run one session at a time, or several to run that many sessions in parallel. Spaces do not change the start times above — they only take a start time off the list once it has been booked.</p>
                                 {(() => {
                                     const groupedRooms = rooms.reduce((acc, room) => {
                                         const group = room.area_group || 'Ungrouped';

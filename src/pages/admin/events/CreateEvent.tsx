@@ -412,7 +412,7 @@ const CreateEvent = () => {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Interval (minutes) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Time slot length (min) *</label>
               <input
                 type="number"
                 min={5}
@@ -421,6 +421,7 @@ const CreateEvent = () => {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
               />
+              <p className="mt-1 text-xs text-gray-500">Each session is this long, and the next one starts as soon as it ends.</p>
             </div>
           </div>
           )}
@@ -652,7 +653,7 @@ const CreateEvent = () => {
 
             <div className="mb-2 flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-gray-500" />
-              <span className="font-semibold">Interval:</span>
+              <span className="font-semibold">Time slot:</span>
               <span className="text-neutral-800 text-sm">{intervalMinutes} min</span>
             </div>
 

@@ -1222,10 +1222,17 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       return (
                         <div
                           key={`turnaround-${item.booking.id}`}
-                          className="pointer-events-none absolute inset-x-0 z-[3] border-y border-amber-200 bg-amber-100/70"
+                          className="pointer-events-none absolute inset-x-0 z-[3] flex items-center justify-center overflow-hidden border-y border-amber-200 bg-amber-100/70"
                           style={strip}
                           title={`Resetting ${column.name} — free again at ${formatSlotLabel(item.endMinutes + turnaround)}`}
-                        />
+                        >
+                          {/* a tablet never fires a tooltip, so the band has to say what it is */}
+                          {strip.height >= 12 && (
+                            <span className="truncate px-1 text-[8px] font-medium leading-none text-amber-700">
+                              Free {formatSlotLabel(item.endMinutes + turnaround)}
+                            </span>
+                          )}
+                        </div>
                       );
                     })}
 
