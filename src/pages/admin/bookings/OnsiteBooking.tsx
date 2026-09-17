@@ -409,7 +409,10 @@ const OnsiteBooking: React.FC = () => {
    */
   // held in a ref so the re-submit right after approval sees it without waiting for a render
   const overrideTokenRef = useRef<string | null>(null);
-  const [overrideGate, setOverrideGate] = useState<{ conflicts: string[] } | null>(null);
+  const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
+  // taking the last online slot is worth telling staff about, but it is not an overlap, so it is
+  // confirmed rather than approved by a manager
+  const sideEffectsAcceptedRef = useRef(false);
 
   const walkInSlots = useMemo<TimeSlot[]>(() => {
     if (!walkInSlot) return [];
@@ -428,13 +431,21 @@ const OnsiteBooking: React.FC = () => {
    * What this booking would run into, in plain words. Staff must see the reason and confirm before
    * an overlapping booking is saved — and a manager's PIN is what lets it through.
    */
-  const bookingConflicts = useMemo<string[]>(() => {
+  /** Things this booking would run into. These are what a manager's PIN has to approve. */
+  const overlapConflicts = useMemo<string[]>(() => {
     if (!bookingData.time || !selectedPackage) return [];
 
     const reasons: string[] = [];
 
     if (walkInOverlapMinutes > 0) {
-      reasons.push(`It runs ${walkInOverlapMinutes} min into the next booking in this space.`);
+      const nextStart = slotPrefill.nextBookingMinutes;
+      const when = nextStart == null
+        ? 'the next booking in this space'
+        : `the booking that starts at ${formatTimeTo12Hour(
+            `${String(Math.floor(nextStart / 60)).padStart(2, '0')}:${String(nextStart % 60).padStart(2, '0')}`
+          )} in this space`;
+
+      reasons.push(`It runs ${walkInOverlapMinutes} min into ${when}.`);
     }
 
     // the server lists a start only while a space is still free for it
@@ -445,7 +456,38 @@ const OnsiteBooking: React.FC = () => {
     }
 
     return reasons;
-  }, [bookingData.time, selectedPackage, walkInOverlapMinutes, availableTimeSlots, selectedRoomId]);
+  }, [bookingData.time, selectedPackage, walkInOverlapMinutes, slotPrefill.nextBookingMinutes, availableTimeSlots, selectedRoomId]);
+
+  /**
+   * Start times customers can still book online that this booking would take away — it holds the
+   * space through them, and for some it is the last space left.
+   */
+  const onlineSlotsLost = useMemo<string[]>(() => {
+    if (!bookingData.time || !selectedPackage || !selectedRoomId) return [];
+
+    const [h, m] = bookingData.time.split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return [];
+
+    const start = h * 60 + m;
+    const end = start + packageDurationMinutes;
+
+    return availableTimeSlots
+      .filter(slot => {
+        if (slot.start_time === bookingData.time) return false;
+
+        const [sh, sm] = slot.start_time.split(':').map(Number);
+        if (!Number.isFinite(sh) || !Number.isFinite(sm)) return false;
+
+        const slotStart = sh * 60 + sm;
+        // only a start this booking would actually sit across
+        if (!(slotStart < end && slotStart + packageDurationMinutes > start)) return false;
+
+        const rooms = slot.available_room_ids ?? [];
+        // it only disappears from the website when this was the last space free for it
+        return rooms.length === 1 && rooms[0] === selectedRoomId;
+      })
+      .map(slot => formatTimeTo12Hour(slot.start_time));
+  }, [bookingData.time, selectedPackage, selectedRoomId, packageDurationMinutes, availableTimeSlots]);
 
   const displayedTimeSlots = useMemo(
     () =>
@@ -1504,8 +1546,8 @@ const OnsiteBooking: React.FC = () => {
 
     // an overlapping booking is never saved on a single click: the reason is shown and a manager
     // has to approve it with their PIN
-    if (bookingConflicts.length > 0 && !overrideTokenRef.current) {
-      setOverrideGate({ conflicts: bookingConflicts });
+    if ((overlapConflicts.length > 0 || onlineSlotsLost.length > 0) && !overrideTokenRef.current && !sideEffectsAcceptedRef.current) {
+      setOverrideGate({ conflicts: overlapConflicts, onlineSlotsLost });
       return;
     }
 
@@ -3803,10 +3845,17 @@ const OnsiteBooking: React.FC = () => {
       {overrideGate && (
         <OverlapOverrideDialog
           conflicts={overrideGate.conflicts}
+          onlineSlotsLost={overrideGate.onlineSlotsLost}
           locationId={gatewayLocationId ?? effectiveLocationId ?? null}
           onCancel={() => setOverrideGate(null)}
+          onConfirm={() => {
+            sideEffectsAcceptedRef.current = true;
+            setOverrideGate(null);
+            void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+          }}
           onApproved={(token, approvedBy) => {
             overrideTokenRef.current = token;
+            sideEffectsAcceptedRef.current = true;
             setOverrideGate(null);
             setToast({ message: `${approvedBy} approved the overlap — saving the booking.`, type: 'info' });
             // the gate is satisfied; run the same submit path again
@@ -3820,13 +3869,24 @@ const OnsiteBooking: React.FC = () => {
 
 interface OverlapOverrideDialogProps {
   conflicts: string[];
+  onlineSlotsLost: string[];
   locationId: number | null;
   onCancel: () => void;
+  onConfirm: () => void;
   onApproved: (token: string, approvedBy: string) => void;
 }
 
 /** Shows what the booking runs into and takes a manager's PIN before it can be saved. */
-const OverlapOverrideDialog: React.FC<OverlapOverrideDialogProps> = ({ conflicts, locationId, onCancel, onApproved }) => {
+const OverlapOverrideDialog: React.FC<OverlapOverrideDialogProps> = ({
+  conflicts,
+  onlineSlotsLost,
+  locationId,
+  onCancel,
+  onConfirm,
+  onApproved,
+}) => {
+  // a manager is only needed for a real overlap; taking the last online slot is staff's own call
+  const needsManager = conflicts.length > 0;
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -3856,19 +3916,52 @@ const OverlapOverrideDialog: React.FC<OverlapOverrideDialogProps> = ({ conflicts
       <div className="w-full max-w-md rounded-lg bg-white shadow-xl" onClick={event => event.stopPropagation()}>
         <div className="p-6">
           <div className="mb-4 flex items-start gap-3">
-            <AlertCircle className="mt-0.5 h-6 w-6 shrink-0 text-rose-500" />
+            <AlertCircle className={`mt-0.5 h-6 w-6 shrink-0 ${needsManager ? 'text-rose-500' : 'text-amber-500'}`} />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">This booking overlaps something already in the space</h3>
-              <p className="mt-1 text-sm text-gray-600">A manager has to approve it before it can be saved.</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {needsManager ? 'This booking overlaps something already in the space' : 'Check this before you save'}
+              </h3>
+              <p className="mt-1 text-sm text-gray-600">
+                {needsManager
+                  ? 'A manager has to approve it before it can be saved.'
+                  : 'Nothing is double-booked, but this changes what customers can still book.'}
+              </p>
             </div>
           </div>
 
-          <ul className="mb-4 space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-            {conflicts.map(reason => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
+          {conflicts.length > 0 && (
+            <ul className="mb-4 space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+              {conflicts.map(reason => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          )}
 
+          {onlineSlotsLost.length > 0 && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                {onlineSlotsLost.length === 1 ? 'One online start time goes away' : `${onlineSlotsLost.length} online start times go away`}
+              </p>
+              <p className="mt-1">
+                This holds the last free space through {onlineSlotsLost.join(', ')}, so customers will no longer be
+                able to book {onlineSlotsLost.length === 1 ? 'it' : 'them'} online.
+              </p>
+            </div>
+          )}
+
+          {!needsManager && (
+            <div className="mt-5 flex justify-end gap-2">
+              <StandardButton variant="secondary" size="md" onClick={onCancel}>
+                Cancel
+              </StandardButton>
+              <StandardButton variant="primary" size="md" onClick={onConfirm}>
+                Save the booking
+              </StandardButton>
+            </div>
+          )}
+
+          {needsManager && (
+          <>
           <label className="block text-sm font-medium text-gray-700" htmlFor="override-pin">
             Manager override PIN
           </label>
@@ -3902,6 +3995,8 @@ const OverlapOverrideDialog: React.FC<OverlapOverrideDialogProps> = ({ conflicts
               {checking ? 'Checking…' : 'Approve and save'}
             </StandardButton>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
