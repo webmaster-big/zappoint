@@ -396,7 +396,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
   const showColumnLocation = useMemo(() => {
     if (!locationNames) return false;
-    const ids = new Set(columns.filter(column => !column.virtual).map(column => column.locationId));
+    const ids = new Set(columns.map(column => column.locationId).filter(id => id != null));
     return ids.size > 1;
   }, [locationNames, columns]);
 
@@ -1025,12 +1025,15 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         <AlertTriangle className="h-2.5 w-2.5" />
                         No room
                       </span>
-                    ) : showColumnLocation ? (
+                    ) : null}
+
+                    {/* which venue this space belongs to, whenever more than one is on screen */}
+                    {showColumnLocation && (
                       <span className="flex w-full items-center justify-center gap-1 text-[9px] leading-tight font-normal text-gray-500">
                         <MapPin className="h-2.5 w-2.5 shrink-0" />
                         <span className="truncate">{(column.locationId && locationNames?.[column.locationId]) || 'Unknown'}</span>
                       </span>
-                    ) : null}
+                    )}
                   </div>
 
                   <div className="relative bg-white" style={{ height: bodyHeight }}>

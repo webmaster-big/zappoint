@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle, AlertTriangle, MessageSquare, StickyNote } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, FileText, Save, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle, AlertTriangle, MessageSquare, StickyNote, MapPin } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
@@ -210,7 +210,7 @@ const assignLanes = (list: PositionedBooking[]): void => {
 const SpaceSchedule = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
-  const { effectiveLocationId } = useLocationScope();
+  const { effectiveLocationId, locations } = useLocationScope();
   const savedViewState = useRef(readViewState()).current;
   const [selectedDate, setSelectedDate] = useState(() => michiganToday());
   const [spaces, setSpaces] = useState<Room[]>([]);
@@ -232,6 +232,13 @@ const SpaceSchedule = () => {
   const [hoverCard, setHoverCard] = useState<{ bookingId: number; rect: DOMRect } | null>(null);
   // the legend used to open on hover alone, which a phone can never do
   const [showLegend, setShowLegend] = useState(false);
+
+  /** With every venue selected the same space name appears more than once, so say which venue it is. */
+  const locationNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const location of locations) map.set(Number(location.id), location.name);
+    return map;
+  }, [locations]);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => michiganToday());
   const spacesLoadedRef = useRef(false);
@@ -685,6 +692,12 @@ const SpaceSchedule = () => {
     const virtualColumns = [...virtualMap.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     return [...roomColumns, ...virtualColumns];
   }, [displaySpaces, filteredBookings, hideEmptySpaces, knownRoomIds, columnKeyFor, roomWindows, dayWindow]);
+
+  const showColumnLocation = useMemo(() => {
+    const ids = new Set(columns.map(column => column.locationId).filter(id => id != null));
+    return ids.size > 1;
+  }, [columns]);
+
 
   const roomBreaks = useMemo(() => {
     const map = new Map<number, Array<{ start: number; end: number }>>();
@@ -2167,6 +2180,14 @@ const SpaceSchedule = () => {
                           No room assigned
                         </span>
                       ) : null}
+                      {showColumnLocation && (
+                        <span className="flex w-full items-center justify-center gap-1 text-[10px] leading-tight font-normal text-gray-500">
+                          <MapPin className="h-2.5 w-2.5 shrink-0" />
+                          <span className="truncate">
+                            {(column.locationId && locationNameById.get(column.locationId)) || 'Unknown venue'}
+                          </span>
+                        </span>
+                      )}
                       {column.roomId && spaceClosures.has(column.roomId) && (
                         <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 leading-tight rounded-full">
                           {getSpaceClosureLabel(column.roomId)}
