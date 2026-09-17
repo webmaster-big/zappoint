@@ -2103,7 +2103,7 @@ const Bookings: React.FC = () => {
             <div className="relative group/customer">
               <Link
                 to={`/bookings/edit/${booking.id}?from=bookings`}
-                className="absolute -top-1 -right-1 p-1 rounded bg-white border border-gray-200 shadow-sm opacity-0 group-hover/customer:opacity-100 transition-opacity hover:bg-gray-50 hover:border-gray-300 z-10"
+                className="absolute -top-1 -right-1 p-1 rounded bg-white border border-gray-200 shadow-sm opacity-0 pointer-events-none group-hover/customer:opacity-100 group-hover/customer:pointer-events-auto transition-opacity hover:bg-gray-50 hover:border-gray-300 z-10"
                 title="Edit Booking"
                 onClick={(e) => e.stopPropagation()}
               >

@@ -2110,7 +2110,7 @@ const Settings = () => {
           className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
           onClick={() => setShowPinModal(false)}
         >
-          <div className="w-full max-w-md rounded-xl bg-white shadow-xl" onClick={event => event.stopPropagation()}>
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl bg-white shadow-xl" onClick={event => event.stopPropagation()}>
             <div className="p-6">
               <h3 className="text-xl font-bold text-gray-900">
                 {overridePinStatus?.has_pin ? 'Change your override PIN' : 'Set your override PIN'}

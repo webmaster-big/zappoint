@@ -1043,6 +1043,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         tabIndex={0}
                         onClick={event => openBookingForSlot(column, event, bandOrigin)}
                         onMouseMove={event =>
+                          supportsHover() &&
                           setHoverSlot(
                             (() => {
                               const minute = slotMinuteFor(column, rawMinuteFromPointer(event, bandOrigin));
@@ -1197,7 +1198,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                           }
                           onMouseLeave={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
                           onFocus={event =>
-                            supportsHover() &&
+                            (supportsHover() || event.currentTarget.matches(':focus-visible')) &&
                             setHoverCard({ bookingId: item.booking.id, rect: event.currentTarget.getBoundingClientRect() })
                           }
                           onBlur={() => setHoverCard(current => (current?.bookingId === item.booking.id ? null : current))}
@@ -1348,7 +1349,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setWalkInPrompt(null)}
         >
-          <div className="w-full max-w-md rounded-lg bg-white shadow-lg" onClick={event => event.stopPropagation()}>
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-lg" onClick={event => event.stopPropagation()}>
             <div className="p-6">
               <div className="mb-4 flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-amber-500" />

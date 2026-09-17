@@ -230,6 +230,8 @@ const SpaceSchedule = () => {
     areaClash: Booking | null;
   } | null>(null);
   const [hoverCard, setHoverCard] = useState<{ bookingId: number; rect: DOMRect } | null>(null);
+  // the legend used to open on hover alone, which a phone can never do
+  const [showLegend, setShowLegend] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => michiganToday());
   const spacesLoadedRef = useRef(false);
@@ -1128,7 +1130,8 @@ const SpaceSchedule = () => {
         }
         onMouseLeave={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
         onFocus={event =>
-          supportsHover() && setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })
+          (supportsHover() || event.currentTarget.matches(':focus-visible')) &&
+          setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })
         }
         onBlur={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
         className={`absolute text-left rounded-lg border ${color.bg} ${color.border} shadow-sm overflow-hidden transition-shadow z-10 hover:z-20 hover:shadow-lg ${
@@ -1884,10 +1887,30 @@ const SpaceSchedule = () => {
               <RotateCw className={`w-4 h-4 ${bookingsLoading ? 'animate-spin' : ''}`} />
             </button>
             <div className="relative group">
-              <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+              <button
+                type="button"
+                onClick={() => setShowLegend(open => !open)}
+                aria-expanded={showLegend}
+                aria-label="What the colours mean"
+                title="What the colours mean"
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              >
                 <Info className="w-5 h-5" />
               </button>
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              {showLegend && (
+                <div
+                  className="fixed inset-0 z-40"
+                  aria-hidden="true"
+                  onClick={() => setShowLegend(false)}
+                />
+              )}
+              <div
+                className={`absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 p-4 transition-all z-50 ${
+                  showLegend
+                    ? 'opacity-100 visible'
+                    : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
+                }`}
+              >
                 <div className="text-xs font-semibold text-gray-800 mb-3">Legend</div>
 
                 <div className="mb-3">
@@ -1971,7 +1994,8 @@ const SpaceSchedule = () => {
               totalCount={activeBookings.length}
             />
           </div>
-          <div className="flex items-center gap-1.5">
+          {/* wraps on a phone: without this the zoom and status controls are painted off the edge */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <CustomerSearch
               locationId={effectiveLocationId}
               onSelect={openBookingFromSearch}
@@ -2326,7 +2350,7 @@ const SpaceSchedule = () => {
 
       {walkInPrompt && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setWalkInPrompt(null)}>
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-start gap-3 mb-4">
                 <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />

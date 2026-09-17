@@ -4008,7 +4008,7 @@ const OverlapOverrideDialog: React.FC<OverlapOverrideDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
-      <div className="w-full max-w-md rounded-lg bg-white shadow-xl" onClick={event => event.stopPropagation()}>
+      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl" onClick={event => event.stopPropagation()}>
         <div className="p-6">
           <div className="mb-4 flex items-start gap-3">
             <AlertCircle className={`mt-0.5 h-6 w-6 shrink-0 ${needsManager ? 'text-rose-500' : 'text-amber-500'}`} />
