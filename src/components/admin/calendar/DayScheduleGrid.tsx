@@ -10,6 +10,8 @@ import { getMichiganNow, michiganToday, dateKey } from '../../../utils/timeForma
 import { resolvePaymentState } from '../../../types/Bookings.types';
 import { buildBookingUrl } from '../../../utils/bookingPrefill';
 import BookingHoverCard from './BookingHoverCard';
+import BookingNoteBadges from './BookingNoteBadges';
+import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
 import type { TimeRange } from '../../../utils/scheduleGeometry';
 import type { FreeState } from '../../../utils/scheduleGeometry';
 import {
@@ -1112,6 +1114,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       const { top, height } = blockGeometry(item, timeline, MIN_BLOCK_HEIGHT, 2);
                       const widthPercent = 100 / item.laneCount;
                       const tone = STATUS_BG[item.booking.status] ?? 'bg-gray-50 border-gray-400';
+                      const noteFlags = noteFlagsOf(item.booking);
+                      const noteSummary = noteSummaryOf(item.booking);
                       const doubleBooked = item.conflicts.some(clash => clash.overlapMinutes > 0);
                       const clashing = item.conflicts.length > 0;
                       const overlapLabel = item.conflicts
@@ -1131,6 +1135,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             item.booking.package?.name ?? 'No package',
                             formatRange(item.startMinutes, item.endMinutes),
                             clashing ? `${doubleBooked ? 'OVERLAPS' : 'NO TURNAROUND'}: ${overlapLabel}` : null,
+                            noteSummary,
                           ]
                             .filter(Boolean)
                             .join(' · ')}
@@ -1148,14 +1153,24 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                             width: `calc(${widthPercent}% - ${LANE_GAP + 2}px)`,
                           }}
                         >
-                          {clashing && (
-                            <span
-                              className={`absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-bl px-1 py-px text-[8px] font-bold uppercase leading-tight text-white ${
-                                doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
-                              }`}
-                            >
-                              <AlertTriangle className="h-2 w-2 shrink-0" />
-                              {height >= 18 ? (doubleBooked ? 'Overlap' : 'No gap') : null}
+                          {/* one rail in the corner: siblings, so nothing can paint over anything else */}
+                          {(clashing || noteFlags.guest || noteFlags.staff) && (
+                            <span className="absolute top-0 right-0 z-20 flex items-center gap-px rounded-bl bg-white/80 pl-px">
+                              <BookingNoteBadges flags={noteFlags} height={height} />
+                              {clashing && (
+                                <span
+                                  className={`flex items-center gap-0.5 rounded-bl px-1 py-px text-[8px] font-bold uppercase leading-tight text-white ${
+                                    doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
+                                  }`}
+                                >
+                                  <AlertTriangle className="h-2 w-2 shrink-0" />
+                                  {height >= 18 && !noteFlags.guest && !noteFlags.staff
+                                    ? doubleBooked
+                                      ? 'Overlap'
+                                      : 'No gap'
+                                    : null}
+                                </span>
+                              )}
                             </span>
                           )}
 
@@ -1259,6 +1274,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
             }
             overlapTitle={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'Overlaps' : 'No turnaround'}
             overlapTone={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'overlap' : 'tight'}
+            guestNote={guestNoteOf(hovered)}
+            staffNote={staffNoteOf(hovered)}
           />
         );
       })()}

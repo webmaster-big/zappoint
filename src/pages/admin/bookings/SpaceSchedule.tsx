@@ -22,6 +22,8 @@ import { resolvePaymentState } from '../../../types/Bookings.types';
 import type { SchedulePackageWindow } from '../../../services/ScheduleWindowService';
 import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayScheduleView';
 import BookingHoverCard from '../../../components/admin/calendar/BookingHoverCard';
+import BookingNoteBadges from '../../../components/admin/calendar/BookingNoteBadges';
+import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import type { FreeState, TimeRange } from '../../../utils/scheduleGeometry';
 import { freeState, freeUntilMinute, minuteAtOffset, nextFreeMinute } from '../../../utils/scheduleGeometry';
@@ -1097,6 +1099,8 @@ const SpaceSchedule = () => {
     const timeLabel = `${formatTime12Hour(booking.booking_time)} – ${formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}`;
     const inProgress = isMichiganToday && nowMinutes >= item.startMin && nowMinutes < item.endMin;
     const needsCheckIn = inProgress && booking.status !== 'checked-in';
+    const noteFlags = noteFlagsOf(booking);
+    const noteSummary = noteSummaryOf(booking);
     const doubleBooked = item.conflicts.some(clash => clash.overlapMinutes > 0);
     const clashing = item.conflicts.length > 0;
     const overlapLabel = item.conflicts
@@ -1112,7 +1116,7 @@ const SpaceSchedule = () => {
         onClick={() => setSelectedBooking(booking)}
         aria-label={`${booking.guest_name || 'Walk-in'}, ${timeLabel}${
           clashing ? `, ${doubleBooked ? 'overlaps' : 'no turnaround before'} ${overlapLabel}` : ''
-        }`}
+        }${noteSummary ? `, ${noteSummary}` : ''}`}
         onMouseEnter={event => setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })}
         onMouseLeave={() => setHoverCard(current => (current?.bookingId === booking.id ? null : current))}
         onFocus={event => setHoverCard({ bookingId: booking.id, rect: event.currentTarget.getBoundingClientRect() })}
@@ -1135,14 +1139,20 @@ const SpaceSchedule = () => {
           width: `calc(${laneWidth}% - 6px)`,
         }}
       >
-        {clashing && (
-          <span
-            className={`absolute top-0 right-0 z-20 flex items-center gap-0.5 rounded-tr-lg rounded-bl px-1 py-px text-[9px] font-bold uppercase leading-tight text-white ${
-              doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
-            }`}
-          >
-            <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
-            {tiny ? null : doubleBooked ? 'Overlap' : 'No gap'}
+        {/* one rail in the corner: siblings, so nothing can paint over anything else */}
+        {(clashing || noteFlags.guest || noteFlags.staff) && (
+          <span className="absolute top-0 right-0 z-20 flex items-center gap-px rounded-tr-lg rounded-bl bg-white/80 pl-px">
+            <BookingNoteBadges flags={noteFlags} height={item.height} />
+            {clashing && (
+              <span
+                className={`flex items-center gap-0.5 rounded-bl px-1 py-px text-[9px] font-bold uppercase leading-tight text-white ${
+                  doubleBooked ? 'bg-rose-500' : 'bg-amber-500'
+                }`}
+              >
+                <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                {tiny || noteFlags.guest || noteFlags.staff ? null : doubleBooked ? 'Overlap' : 'No gap'}
+              </span>
+            )}
           </span>
         )}
         <div className={`h-full flex flex-col ${tiny ? '' : compact ? 'px-2 py-0.5 justify-center' : 'p-2'}`}>
@@ -2234,6 +2244,8 @@ const SpaceSchedule = () => {
             }
             overlapTitle={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'Overlaps' : 'No turnaround'}
             overlapTone={item.conflicts.some(clash => clash.overlapMinutes > 0) ? 'overlap' : 'tight'}
+            guestNote={guestNoteOf(hovered)}
+            staffNote={staffNoteOf(hovered)}
             flag={
               running && hovered.status !== 'checked-in'
                 ? { label: 'Check in', tone: 'red' }

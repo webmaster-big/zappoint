@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Users } from 'lucide-react';
+import { AlertTriangle, MessageSquare, StickyNote, Users } from 'lucide-react';
 
 const CARD_WIDTH = 248;
 const GAP = 10;
@@ -19,6 +19,8 @@ export interface BookingHoverCardProps {
   overlapLabel?: string | null;
   overlapTitle?: string;
   overlapTone?: 'overlap' | 'tight';
+  guestNote?: string;
+  staffNote?: string;
   flag?: { label: string; tone: 'red' | 'emerald' } | null;
 }
 
@@ -49,6 +51,8 @@ const BookingHoverCard: React.FC<BookingHoverCardProps> = ({
   overlapLabel,
   overlapTitle = 'Overlaps',
   overlapTone = 'overlap',
+  guestNote,
+  staffNote,
   flag,
 }) => {
   if (typeof document === 'undefined') return null;
@@ -111,6 +115,26 @@ const BookingHoverCard: React.FC<BookingHoverCardProps> = ({
           <span>
             <span className="font-bold uppercase">{overlapTitle}</span> {overlapLabel}
           </span>
+        </p>
+      )}
+
+      {guestNote && (
+        <p className="mt-1.5 rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[10px] leading-snug break-words text-blue-900">
+          <span className="flex items-center gap-1 font-bold uppercase">
+            <MessageSquare className="h-3 w-3 shrink-0" />
+            From the guest
+          </span>
+          <span className="mt-0.5 line-clamp-3 block whitespace-pre-line">{guestNote}</span>
+        </p>
+      )}
+
+      {staffNote && (
+        <p className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[10px] leading-snug break-words text-amber-900">
+          <span className="flex items-center gap-1 font-bold uppercase">
+            <StickyNote className="h-3 w-3 shrink-0" />
+            Staff note
+          </span>
+          <span className="mt-0.5 line-clamp-3 block whitespace-pre-line">{staffNote}</span>
         </p>
       )}
 

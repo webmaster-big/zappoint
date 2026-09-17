@@ -62,6 +62,7 @@ import { matchesBookingSearch } from '../../utils/bookingSearch';
 import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime, michiganToday } from '../../utils/timeFormat';
+import { guestNoteOf } from '../../utils/bookingNotes';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { cardFromPayments } from '../../utils/cardLabel';
@@ -2144,11 +2145,11 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {selectedBooking.special_requests && (
+              {guestNoteOf(selectedBooking) && (
                 <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Special Requests</h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-900">{selectedBooking.special_requests}</p>
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">From the guest</h4>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm whitespace-pre-line text-blue-900">{guestNoteOf(selectedBooking)}</p>
                   </div>
                 </div>
               )}
