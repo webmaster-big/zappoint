@@ -631,9 +631,10 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
       if (!space?.area_group || gap <= 0) return null;
 
+      // the server checks the whole group INCLUDING this space, and scopes the group to one venue
       const peers = new Set(
         [...roomWindows.entries()]
-          .filter(([roomId, entry]) => entry.area_group === space.area_group && roomId !== column.roomId)
+          .filter(([, entry]) => entry.area_group === space.area_group && entry.location_id === space.location_id)
           .map(([roomId]) => roomId)
       );
 

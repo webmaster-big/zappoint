@@ -1360,9 +1360,10 @@ const SpaceSchedule = () => {
 
     if (!space?.area_group || gap <= 0) return null;
 
+    // the server checks the whole group INCLUDING this space, and scopes the group to one venue
     const peers = new Set(
       (dayWindow?.rooms ?? [])
-        .filter(entry => entry.area_group === space.area_group && entry.room_id !== column.roomId)
+        .filter(entry => entry.area_group === space.area_group && entry.location_id === space.location_id)
         .map(entry => entry.room_id)
     );
 
