@@ -83,7 +83,8 @@ const dateKeyOf = (date: Date): string => {
 
 // the tightest zoom still has to leave a short booking — a 20 minute escape room — enough
 // height to read its guest and time without opening the modal
-const ZOOM_LEVELS = [1.6, 2.4, 3.6];
+// even the tightest zoom has to leave a short booking room for its details rather than cut them
+const ZOOM_LEVELS = [2.4, 3.6, 5.2];
 const COLUMN_WIDTH = 150;
 const GUTTER_WIDTH = 76;
 const UNCATEGORISED_LABEL = 'No category';

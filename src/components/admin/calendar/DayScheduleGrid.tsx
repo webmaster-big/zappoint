@@ -28,8 +28,14 @@ import {
 
 const MINUTES_PER_DAY = 24 * 60;
 const WALK_IN_STEP_MINUTES = 5;
-// tall enough that a half-hour booking can name its package without the text being cut
 const SLOT_HEIGHT = 40;
+
+/**
+ * A booked cell has to be readable at a glance, so the grid is never drawn tighter than this. Three
+ * pixels a minute gives a half-hour booking 88px — room for its times, the guest, the package, the
+ * party size and what they owe. Below that the cell starts cutting its own text.
+ */
+const MIN_PX_PER_MINUTE = 3;
 const MIN_BLOCK_HEIGHT = 8;
 const LANE_GAP = 2;
 
@@ -388,7 +394,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         windowData.open_minutes,
         windowData.close_minutes,
         windowData.interval_minutes,
-        SLOT_HEIGHT,
+        // the slot is as tall as the interval needs to keep three pixels a minute
+        Math.max(SLOT_HEIGHT, Math.round(MIN_PX_PER_MINUTE * Math.max(5, windowData.interval_minutes || 30))),
         [...positioned.values()].flat()
       ),
     [windowData, positioned]
