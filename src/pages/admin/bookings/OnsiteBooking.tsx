@@ -388,17 +388,27 @@ const OnsiteBooking: React.FC = () => {
     return hours * 60 + minutes < now.hour * 60 + now.minute;
   }, [walkInSlot, slotPrefill.date]);
 
+  /**
+   * Measured against the next booking's own start. The free-until cap is pulled back by the space's
+   * reset time, so subtracting from it reported an overlap on walk-ins that have none.
+   */
   const walkInOverlapMinutes = useMemo(() => {
-    if (!walkInSlot || !slotPrefill.freeUntilKnown) return 0;
+    if (!walkInSlot || slotPrefill.nextBookingMinutes == null) return 0;
     const startMinutes = slotPrefill.startMinutes ?? 0;
-    return Math.max(0, startMinutes + packageDurationMinutes - (slotPrefill.freeUntilMinutes ?? 0));
-  }, [walkInSlot, slotPrefill.freeUntilKnown, slotPrefill.startMinutes, slotPrefill.freeUntilMinutes, packageDurationMinutes]);
+    return Math.max(0, startMinutes + packageDurationMinutes - slotPrefill.nextBookingMinutes);
+  }, [walkInSlot, slotPrefill.nextBookingMinutes, slotPrefill.startMinutes, packageDurationMinutes]);
 
   /**
    * Only the start staff actually picked on the schedule. The 5-minute freedom belongs to the
    * schedule click, not to this list — offering every 5-minute option here buried the real slots.
    */
-  const walkInSlots = useMemo<TimeSlot[]>(() => (walkInSlot ? [walkInSlot] : []), [walkInSlot]);
+  const walkInSlots = useMemo<TimeSlot[]>(() => {
+    if (!walkInSlot) return [];
+    // the server may already list this minute for a different space; one tile per start time
+    if (filteredTimeSlots.some(slot => slot.start_time === walkInSlot.start_time)) return [];
+
+    return [walkInSlot];
+  }, [walkInSlot, filteredTimeSlots]);
 
   const isWalkInStart = useCallback(
     (startTime: string) => walkInSlots.some(slot => slot.start_time === startTime),
@@ -1024,7 +1034,9 @@ const OnsiteBooking: React.FC = () => {
     }));
     setSelectedRoomId(null); // Reset selected room ID
 
-    if (slotPrefill.hasAny && !prefillLanded.current) {
+    // the date and time were carried over from the schedule: a change of package must not lose
+    // them, however many times staff go back and forth
+    if (slotPrefill.hasAny) {
       setBookingData(prev => ({
         ...prev,
         date: slotPrefill.date ?? prev.date,
@@ -2334,7 +2346,11 @@ const OnsiteBooking: React.FC = () => {
             <DatePicker
               selectedDate={bookingData.date}
               availableDates={availableDates}
-              onChange={(date) => setBookingData(prev => ({ ...prev, date }))}
+              onChange={(date) =>
+                // a time chosen for another date must not survive the change, or the form stays
+                // submittable with nothing selected in the list
+                setBookingData(prev => ({ ...prev, date, time: date === prev.date ? prev.time : '' }))
+              }
               dayOffs={filteredDayOffs}
               dayOffsWithTime={filteredDayOffsWithTime}
             />
@@ -2426,9 +2442,15 @@ const OnsiteBooking: React.FC = () => {
                 {walkInAlreadyStarted && ' That start time has already gone by, so it is no longer offered to customers.'}
                 {walkInOverlapMinutes > 0 && (
                   <>
-                    {' '}It runs <strong>{walkInOverlapMinutes} min</strong> past the next booking in this space
-                    {slotPrefill.freeUntil ? ` (free until ${formatTimeTo12Hour(slotPrefill.freeUntil)})` : ''} — the
-                    schedule will flag both bookings as overlapping.
+                    {' '}It runs <strong>{walkInOverlapMinutes} min</strong> into the next booking in this space
+                    {slotPrefill.nextBookingMinutes != null
+                      ? `, which starts at ${formatTimeTo12Hour(
+                          `${String(Math.floor(slotPrefill.nextBookingMinutes / 60)).padStart(2, '0')}:${String(
+                            slotPrefill.nextBookingMinutes % 60
+                          ).padStart(2, '0')}`
+                        )}`
+                      : ''}
+                    . The schedule will flag both bookings as overlapping.
                   </>
                 )}
               </span>

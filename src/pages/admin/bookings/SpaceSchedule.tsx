@@ -1266,6 +1266,15 @@ const SpaceSchedule = () => {
     ];
   };
 
+  /** The raw start of the next booking in this space, so an overlap can be stated truthfully. */
+  const nextBookingStartFrom = (column: ScheduleColumn, minute: number): number | null => {
+    const starts = bookingRangesFor(column)
+      .filter(range => range.endMinutes > minute)
+      .map(range => range.startMinutes);
+
+    return starts.length > 0 ? Math.min(...starts) : null;
+  };
+
   const blockedRangesFor = (column: ScheduleColumn): TimeRange[] => [
     ...bookingRangesFor(column),
     ...hardRangesFor(column),
@@ -1437,23 +1446,29 @@ const SpaceSchedule = () => {
     return durations.length > 0 ? Math.min(...durations) : WALK_IN_STEP_MINUTES;
   };
 
-  const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number => {
+  const slotMinuteFor = (column: ScheduleColumn, rawMinute: number): number | null => {
     const columnOpen = column.openMinutes ?? timeWindow.start;
     const columnClose = column.closeMinutes ?? timeWindow.end;
     const onFive = (minute: number) => Math.round(minute / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
     const floor = onFive(columnOpen);
+    // measured inside the column: rounding up to exactly the closing minute matches no package and
+    // would collapse the ceiling back to five minutes before close
+    const insideColumn = Math.min(onFive(rawMinute), columnClose - 1);
     // a booking still has to finish before the space closes, so the last start is a whole package
     // duration back from closing — not five minutes back
-    const ceiling = Math.max(floor, columnClose - shortestDurationAt(column, onFive(rawMinute)));
+    const ceiling = Math.max(floor, columnClose - shortestDurationAt(column, insideColumn));
 
     const snapped = Math.min(Math.max(onFive(rawMinute), floor), ceiling);
 
-    // only move if the click landed inside something already booked
     const free = nextFreeMinute(columnOpen, columnClose, blockedRangesFor(column), snapped);
 
-    if (free === null || free === snapped) return snapped;
+    // nothing is free between here and closing — never hand back a minute the grid knows is blocked
+    if (free === null) return null;
+    if (free === snapped) return snapped;
 
-    return Math.min(Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES, ceiling);
+    const fromFree = Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+
+    return fromFree > ceiling ? null : fromFree;
   };
 
   /**
@@ -1488,6 +1503,7 @@ const SpaceSchedule = () => {
         packageId: autoSelect,
         packageIds: candidates,
         freeUntilMinute: usableFreeUntil(column, minute),
+        nextBookingMinute: nextBookingStartFrom(column, minute),
         walkIn: isMichiganToday || offCustomerGrid,
         walkInOverride: (options?.walkInOverride ?? false) || alreadyStarted,
       })
@@ -1497,7 +1513,10 @@ const SpaceSchedule = () => {
   const openBookingForSlot = (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     const clickedMinute = minuteAtOffset(originMinute, event.clientY - bounds.top, pxPerMinute);
-    navigateToSlot(column, slotMinuteFor(column, clickedMinute));
+    const minute = slotMinuteFor(column, clickedMinute);
+    if (minute === null) return;
+
+    navigateToSlot(column, minute);
   };
 
   const renderColumnBackground = (column: ScheduleColumn) => {
@@ -1524,10 +1543,11 @@ const SpaceSchedule = () => {
                 ? event => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      navigateToSlot(
+                      const minute = slotMinuteFor(
                         column,
-                        slotMinuteFor(column, isMichiganToday ? Math.max(nowMinutes, availableFrom) : availableFrom)
+                        isMichiganToday ? Math.max(nowMinutes, availableFrom) : availableFrom
                       );
+                      if (minute !== null) navigateToSlot(column, minute);
                     }
                   }
                 : undefined

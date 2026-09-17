@@ -6,6 +6,8 @@ export interface SlotPrefill {
   packageId?: number | null;
   packageIds?: number[];
   freeUntilMinute?: number | null;
+  /** raw start of the next booking in this space, so an overlap can be stated truthfully */
+  nextBookingMinute?: number | null;
   walkIn?: boolean;
   /** staff saw the overlap warning and chose to go ahead anyway */
   walkInOverride?: boolean;
@@ -21,6 +23,7 @@ export interface BookingPrefill {
   freeUntil: string | null;
   freeUntilMinutes: number | null;
   freeUntilKnown: boolean;
+  nextBookingMinutes: number | null;
   startMinutes: number | null;
   walkIn: boolean;
   walkInOverride: boolean;
@@ -43,32 +46,6 @@ export function clockToMinutes(clock?: string | null): number | null {
   return minute >= 0 && minute < 1440 ? minute : null;
 }
 
-export function snapToInterval(minute: number, intervalMinutes: number, floorMinute?: number): number {
-  const interval = Math.max(1, Math.round(intervalMinutes) || 15);
-  const safe = Number.isFinite(minute) ? minute : 0;
-  let snapped = Math.floor(safe / interval) * interval;
-
-  if (floorMinute !== undefined && Number.isFinite(floorMinute) && snapped < floorMinute) {
-    snapped = Math.ceil(floorMinute / interval) * interval;
-  }
-
-  return Math.max(0, snapped);
-}
-
-/**
- * Snap to the nearest start the server actually offers. Interval snapping drifts off the
- * room-driven grid whenever duration+cleanup is not a whole number of intervals, and the
- * booking page then refuses the prefilled time.
- */
-export function snapToOfferedStart(starts: number[], minute: number, floorMinute?: number): number | null {
-  const usable = floorMinute === undefined ? starts : starts.filter(start => start >= floorMinute);
-  if (usable.length === 0) return null;
-
-  return usable.reduce((best, start) =>
-    Math.abs(start - minute) < Math.abs(best - minute) ? start : best
-  );
-}
-
 export function buildBookingUrl(prefill: SlotPrefill): string {
   const params = new URLSearchParams();
 
@@ -86,6 +63,10 @@ export function buildBookingUrl(prefill: SlotPrefill): string {
 
   if (prefill.freeUntilMinute != null && Number.isFinite(prefill.freeUntilMinute)) {
     params.set('free_until_minutes', String(Math.round(prefill.freeUntilMinute)));
+  }
+
+  if (prefill.nextBookingMinute != null && Number.isFinite(prefill.nextBookingMinute)) {
+    params.set('next_booking_minutes', String(Math.round(prefill.nextBookingMinute)));
   }
 
   if (prefill.walkIn) params.set('walk_in', '1');
@@ -132,6 +113,11 @@ export function readBookingPrefill(params: URLSearchParams): BookingPrefill {
       const raw = params.get('start_minutes');
       const n = raw === null ? NaN : Number(raw);
       return Number.isFinite(n) && n >= 0 ? Math.round(n) : minute;
+    })(),
+    nextBookingMinutes: (() => {
+      const raw = params.get('next_booking_minutes');
+      const n = raw === null ? NaN : Number(raw);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
     })(),
     walkIn: params.get('walk_in') === '1',
     walkInOverride: params.get('walk_in_override') === '1',

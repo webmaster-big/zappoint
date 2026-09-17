@@ -549,15 +549,16 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
    * admin schedule lands on a 5-minute grid and 4:05 or 4:10 is a perfectly good start.
    */
   const slotMinuteFor = React.useCallback(
-    (column: ScheduleColumn, rawMinute: number): number => {
+    (column: ScheduleColumn, rawMinute: number): number | null => {
       const columnOpen = column.openMinutes ?? timeline.start;
       const columnClose = column.closeMinutes ?? timeline.end;
       const onFive = (minute: number) => Math.round(minute / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
       const floor = onFive(columnOpen);
 
       // a booking still has to finish before the space closes, so the last start is a whole package
-      // duration back from closing — not five minutes back
-      const startable = new Set(packagesForSlot(column, onFive(rawMinute)));
+      // duration back from closing — not five minutes back. Measured inside the column, since
+      // rounding up to exactly the closing minute matches no package.
+      const startable = new Set(packagesForSlot(column, Math.min(onFive(rawMinute), columnClose - 1)));
       const durations = (windowData.packages ?? [])
         .filter(entry => startable.has(entry.package_id) && (entry.duration_minutes ?? 0) > 0)
         .map(entry => entry.duration_minutes as number);
@@ -571,12 +572,15 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
         ...column.closedRanges,
       ];
-      // only move if the click landed inside something already booked
       const free = nextFreeMinute(columnOpen, columnClose, blocked, snapped);
 
-      if (free === null || free === snapped) return snapped;
+      // nothing is free between here and closing — never hand back a minute the grid knows is blocked
+      if (free === null) return null;
+      if (free === snapped) return snapped;
 
-      return Math.min(Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES, ceiling);
+      const fromFree = Math.ceil(free / WALK_IN_STEP_MINUTES) * WALK_IN_STEP_MINUTES;
+
+      return fromFree > ceiling ? null : fromFree;
     },
     [occupancy, roomBreaks, timeline, packagesForSlot, windowData]
   );
@@ -699,12 +703,20 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           packageId: autoSelect,
           packageIds: candidates,
           freeUntilMinute: usableFreeUntil(column, minute),
+          // the raw start of the next booking, so an overlap can be stated truthfully
+          nextBookingMinute: (() => {
+            const starts = (occupancy.get(column.key) ?? [])
+              .filter(range => range.endMinutes > minute)
+              .map(range => range.startMinutes);
+
+            return starts.length > 0 ? Math.min(...starts) : null;
+          })(),
           walkIn: isViewingToday || offCustomerGrid,
           walkInOverride: (options?.walkInOverride ?? false) || alreadyStarted,
         })
       );
     },
-    [navigate, isViewingToday, windowData, date, offeredCandidates, usableFreeUntil]
+    [navigate, isViewingToday, windowData, date, offeredCandidates, usableFreeUntil, occupancy, offeredStartsFor, nowMinutes]
   );
 
   /** A walk-in that runs past the next booking is staff's call to make, but never a silent one. */
@@ -741,7 +753,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
   const openBookingForSlot = React.useCallback(
     (column: ScheduleColumn, event: React.MouseEvent<HTMLDivElement>, originMinute: number) => {
-      goToBooking(column, slotMinuteFor(column, rawMinuteFromPointer(event, originMinute)));
+      const minute = slotMinuteFor(column, rawMinuteFromPointer(event, originMinute));
+      if (minute !== null) goToBooking(column, minute);
     },
     [goToBooking, slotMinuteFor, rawMinuteFromPointer]
   );
@@ -980,38 +993,24 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                         tabIndex={0}
                         onClick={event => openBookingForSlot(column, event, bandOrigin)}
                         onMouseMove={event =>
-                          setHoverSlot({ key: column.key, minute: slotMinuteFor(column, rawMinuteFromPointer(event, bandOrigin)) })
+                          setHoverSlot(
+                            (() => {
+                              const minute = slotMinuteFor(column, rawMinuteFromPointer(event, bandOrigin));
+                              return minute === null ? null : { key: column.key, minute };
+                            })()
+                          )
                         }
                         onMouseLeave={() => setHoverSlot(prev => (prev?.key === column.key ? null : prev))}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            const keyboardMinute = slotMinuteFor(
+                            // the same path as a click, so the keyboard cannot drop the override
+                            // or the off-grid flag the mouse gets
+                            const minute = slotMinuteFor(
                               column,
                               isViewingToday ? Math.max(nowMinutes, bandOrigin) : bandOrigin
                             );
-                            const keyboardOffer = offeredCandidates(column, keyboardMinute);
-                            navigate(
-                              buildBookingUrl({
-                                locationId: column.locationId ?? windowData.location_id ?? null,
-                                date: dateKey(date),
-                                minute: keyboardMinute,
-                                roomId: column.roomId ?? null,
-                                packageId: keyboardOffer.autoSelect,
-                                packageIds: keyboardOffer.ids,
-                                freeUntilMinute: freeUntilMinute(
-                                  open,
-                                  close,
-                                  [
-                                    ...(occupancy.get(column.key) ?? []),
-                                    ...(column.roomId ? roomBreaks.get(column.roomId) ?? [] : []),
-                                    ...column.closedRanges,
-                                  ],
-                                  keyboardMinute
-                                ),
-                                walkIn: isViewingToday,
-                              })
-                            );
+                            if (minute !== null) goToBooking(column, minute);
                           }
                         }}
                         className="absolute inset-x-0 cursor-pointer bg-gray-100 transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
