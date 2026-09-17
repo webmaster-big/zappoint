@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import OverlapOverrideDialog from '../../../components/admin/bookings/OverlapOverrideDialog';
 import { ArrowLeft, Save, Plus, Minus, Calendar, Clock, CreditCard, DollarSign } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -54,6 +55,8 @@ interface DayOffWithTime {
 }
 
 interface ExtendedBookingData extends CreateBookingData {
+  /** proof that a manager approved saving this on top of a conflict */
+  overlap_override_token?: string;
   guest_of_honor_name?: string;
   guest_of_honor_age?: number;
   guest_of_honor_gender?: 'male' | 'female' | 'other';
@@ -98,6 +101,9 @@ const ManualBooking: React.FC = () => {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  // a booking saved on top of another needs a manager's PIN here too, not only on the onsite flow
+  const overrideTokenRef = useRef<string | null>(null);
+  const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
@@ -957,6 +963,7 @@ const ManualBooking: React.FC = () => {
       }
 
       const bookingData: ExtendedBookingData = {
+        overlap_override_token: overrideTokenRef.current || undefined,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
         guest_name: form.customerName,
         guest_email: form.email,
@@ -1184,6 +1191,23 @@ const ManualBooking: React.FC = () => {
       }, 1500);
     } catch (error: unknown) {
       console.error('❌ Error creating booking:', error);
+
+      const refused = (error as {
+        response?: { status?: number; data?: { requires_override?: boolean; conflicts?: string[] } };
+      })?.response;
+
+      // the space is taken: show what it clashes with and ask a manager to approve it
+      if (refused?.status === 409 && refused.data?.requires_override) {
+        setOverrideGate({
+          conflicts: (refused.data.conflicts ?? []).map(
+            reason => `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`
+          ),
+          onlineSlotsLost: [],
+        });
+        setLoading(false);
+        return;
+      }
+
       const err = error as { 
         response?: { 
           data?: { 
@@ -2360,6 +2384,22 @@ const ManualBooking: React.FC = () => {
         isOpen={showEmptyModal}
         onClose={() => setShowEmptyModal(false)}
       />
+
+      {overrideGate && (
+        <OverlapOverrideDialog
+          conflicts={overrideGate.conflicts}
+          onlineSlotsLost={overrideGate.onlineSlotsLost}
+          locationId={pkg?.location_id ?? effectiveLocationId ?? null}
+          onCancel={() => setOverrideGate(null)}
+          onConfirm={() => setOverrideGate(null)}
+          onApproved={(token, approvedBy) => {
+            overrideTokenRef.current = token;
+            setOverrideGate(null);
+            setToast({ message: `${approvedBy} approved the overlap — press Save to finish.`, type: 'info' });
+          }}
+        />
+      )}
+
     </div>
   );
 };
