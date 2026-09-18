@@ -4,7 +4,7 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIc
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
-import { customerNameOf, matchesBookingSearch } from '../../../utils/bookingSearch';
+import { customerNameOf, customerPhoneOf, matchesBookingSearch } from '../../../utils/bookingSearch';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -1176,6 +1176,19 @@ const SpaceSchedule = () => {
   };
 
   /** The space's own limit, so a party too big for the room shows up without opening anything. */
+  /**
+   * What the open booking runs into. Until now this sentence existed only inside the hover card,
+   * which never opens on a tablet — so a clash could be seen as a coloured ring and read nowhere.
+   */
+  const selectedClashes = useMemo(() => {
+    if (!selectedBooking) return [];
+    for (const list of positionedByColumn.values()) {
+      const found = list.find(item => item.booking.id === selectedBooking.id);
+      if (found) return found.conflicts;
+    }
+    return [];
+  }, [selectedBooking, positionedByColumn]);
+
   const capacityByRoom = useMemo(
     () => new Map(displaySpaces.map(space => [space.id, space.capacity ?? null])),
     [displaySpaces]
@@ -2596,18 +2609,46 @@ const SpaceSchedule = () => {
                 </StandardButton>
               </div>
 
+              {selectedClashes.length > 0 && (() => {
+                const doubleBooked = selectedClashes.some(clash => clash.overlapMinutes > 0);
+                return (
+                  <div
+                    className={`mb-6 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                      doubleBooked ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'
+                    }`}
+                  >
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      <span className="font-bold uppercase">{doubleBooked ? 'Overlaps' : 'No turnaround'}</span>{' '}
+                      {selectedClashes
+                        .map(clash =>
+                          `${customerNameOf(clash.booking)} at ${formatTime12Hour(clash.booking.booking_time)}` +
+                          (clash.overlapMinutes > 0 ? ` (${clash.overlapMinutes} min over)` : ' (no gap between them)')
+                        )
+                        .join(', ')}
+                    </span>
+                  </div>
+                );
+              })()}
+
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                   <div className="flex items-center">
                     <Users className="h-4 w-4 text-gray-400 mr-3" />
-                    <span className="font-medium text-gray-900">{selectedBooking.guest_name || 'Guest'}</span>
+                    <span className="font-medium text-gray-900">{customerNameOf(selectedBooking)}</span>
                   </div>
                   {selectedBooking.guest_email && (
                     <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_email}</div>
                   )}
-                  {selectedBooking.guest_phone && (
-                    <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_phone}</div>
+                  {/* a tablet is a phone: calling the late party should be one tap, not a retype */}
+                  {customerPhoneOf(selectedBooking) && (
+                    <a
+                      href={`tel:${customerPhoneOf(selectedBooking).replace(/[^0-9+]/g, '')}`}
+                      className="ml-7 flex min-h-[44px] items-center text-sm font-medium text-blue-700 hover:underline"
+                    >
+                      {customerPhoneOf(selectedBooking)}
+                    </a>
                   )}
                 </div>
               </div>

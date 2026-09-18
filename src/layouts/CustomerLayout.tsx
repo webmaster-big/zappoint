@@ -157,7 +157,7 @@ const CustomerLayout = () => {
                       to="/customer/reservations"
                       className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/reservations') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
                     >
-                      Reservations
+                      My Bookings
                     </Link>
                     <Link
                       to="/customer/attractions"
@@ -297,7 +297,7 @@ const CustomerLayout = () => {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/reservations') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
                       >
-                        Reservations
+                        My Bookings
                       </Link>
                       <Link
                         to="/customer/attractions"

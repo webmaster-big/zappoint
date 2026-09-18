@@ -207,9 +207,9 @@ const CustomerReservations = () => {
                   <div className="p-1.5 bg-white/10 backdrop-blur rounded-lg border border-white/10">
                     <Calendar className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-blue-200/70 text-xs font-semibold uppercase tracking-widest">Reservations</span>
+                  <span className="text-blue-200/70 text-xs font-semibold uppercase tracking-widest">Bookings</span>
                 </div>
-                <h1 className="text-xl font-bold" style={{ color: 'white' }}>My Reservations</h1>
+                <h1 className="text-xl font-bold" style={{ color: 'white' }}>My Bookings</h1>
                 <p className="text-blue-200/60 text-sm mt-0.5">View and manage your bookings</p>
               </div>
               {totalBookings > 0 && (
