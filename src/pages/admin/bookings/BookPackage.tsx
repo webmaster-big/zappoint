@@ -1679,7 +1679,7 @@ const BookPackage: React.FC = () => {
               )}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">{pkg?.pricing_type === 'per_person' ? `${participants} × $${Number(pkg?.price ?? 0).toFixed(2)} per ${(pkg?.participant_label || 'player').toLowerCase()}:` : 'Base Price:'}</span>
+                  <span className="text-gray-600">{pkg?.pricing_type === 'per_person' ? `${participants} × $${Number(pkg?.price ?? 0).toFixed(2)} per ${(pkg?.participant_label || 'participant').toLowerCase()}:` : 'Base Price:'}</span>
                   <span className="font-medium text-gray-900">${basePrice.toFixed(2)}</span>
                 </div>
                 {addOnsTotal > 0 && (
@@ -2143,12 +2143,12 @@ const BookPackage: React.FC = () => {
                     </StandardButton>
                     <span className="text-xs text-gray-500 w-full sm:w-auto mt-1 sm:mt-0">
                       {pkg.pricing_type === 'per_person'
-                        ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()} (${pkg.min_participants || 1}–${pkg.max_participants})`
+                        ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'participant').toLowerCase()} (${pkg.min_participants || 1}–${pkg.max_participants})`
                         : `${pkg.min_participants} included, +$${pkg.price_per_additional} per additional (Max: ${pkg.max_participants})`}
                     </span>
                     {selectedSlotRemaining != null && !selectedSlotExclusive && (
                       <span className={`text-xs font-semibold w-full sm:w-auto ${selectedSlotRemaining <= 3 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                        {selectedSlotRemaining} {(pkg.participant_label || 'ticket').toLowerCase()}{selectedSlotRemaining === 1 ? '' : 's'} left for this time
+                        {selectedSlotRemaining} {(pkg.participant_label || 'participant').toLowerCase()}{selectedSlotRemaining === 1 ? '' : 's'} left for this time
                       </span>
                     )}
                   </div>
@@ -2992,13 +2992,13 @@ const BookPackage: React.FC = () => {
             <div className="space-y-3 text-sm">
               <div className="bg-blue-50/70 rounded-xl p-3">
                 <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold text-gray-800">{pkg.pricing_type === 'per_person' ? `${participants} × ${(pkg.participant_label || 'Player')}${participants !== 1 ? 's' : ''}` : 'Base Package'}</span>
+                  <span className="font-semibold text-gray-800">{pkg.pricing_type === 'per_person' ? `${participants} × ${(pkg.participant_label || 'Participant')}${participants !== 1 ? 's' : ''}` : 'Base Package'}</span>
                   <span className="font-bold text-gray-900">${(pkg.pricing_type === 'per_person' ? Number(pkg.price) * participants : Number(pkg.price)).toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-gray-600">{pkg.name}</p>
                 <p className="text-xs text-gray-400 mt-1">
                   {pkg.pricing_type === 'per_person'
-                    ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()}`
+                    ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'participant').toLowerCase()}`
                     : `Includes up to ${pkg.min_participants || 1} participant${(pkg.min_participants || 1) > 1 ? 's' : ''}`}
                 </p>
                 <p className="text-xs text-gray-400">
@@ -3277,7 +3277,7 @@ const BookPackage: React.FC = () => {
                 description={pkg.description}
                 bullets={included.bullets}
                 facts={[
-                  { label: pkg.pricing_type === 'per_person' ? `Price per ${(pkg.participant_label || 'player').toLowerCase()}` : 'Base price', value: `$${Number(pkg.price).toFixed(2)}` },
+                  { label: pkg.pricing_type === 'per_person' ? `Price per ${(pkg.participant_label || 'participant').toLowerCase()}` : 'Base price', value: `$${Number(pkg.price).toFixed(2)}` },
                   { label: pkg.participant_label ? `${pkg.participant_label}s` : 'Participants', value: `${participants}${pkg.max_participants ? ` of ${pkg.max_participants}` : ''}` },
                   { label: 'Duration', value: formatDuration() },
                   ...(selectedDate ? [{ label: 'Date', value: selectedDate }] : []),
@@ -3290,13 +3290,13 @@ const BookPackage: React.FC = () => {
               <div className="space-y-3 text-sm">
                 <div className="bg-blue-50/70 rounded-xl p-3">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-semibold text-gray-800">{pkg.pricing_type === 'per_person' ? `${participants} × ${(pkg.participant_label || 'Player')}${participants !== 1 ? 's' : ''}` : 'Base Package'}</span>
+                    <span className="font-semibold text-gray-800">{pkg.pricing_type === 'per_person' ? `${participants} × ${(pkg.participant_label || 'Participant')}${participants !== 1 ? 's' : ''}` : 'Base Package'}</span>
                     <span className="font-bold text-gray-900">${(pkg.pricing_type === 'per_person' ? Number(pkg.price) * participants : Number(pkg.price)).toFixed(2)}</span>
                   </div>
                   <p className="text-xs text-gray-600">{pkg.name}</p>
                   <p className="text-xs text-gray-400 mt-1">
                     {pkg.pricing_type === 'per_person'
-                      ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'player').toLowerCase()}`
+                      ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'participant').toLowerCase()}`
                       : `Includes up to ${pkg.min_participants || 1} participant${(pkg.min_participants || 1) > 1 ? 's' : ''}`}
                   </p>
                   <p className="text-xs text-gray-400">

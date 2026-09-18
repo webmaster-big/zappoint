@@ -555,7 +555,9 @@ const LocationActivityLogs = () => {
       
       case 'Package Time Slot Deleted': {
         const timeSlotDetails = getMetaValue('time_slot_details') as { start_time?: string; end_time?: string } | undefined;
-        description = `Package time slot deleted`;
+        // package_time_slots rows carry booking_id and customer_id — this is a HELD slot being
+        // given back, not an availability rule being removed from the schedule
+        description = `A booked time slot was released`;
         if (timeSlotDetails?.start_time && timeSlotDetails?.end_time) {
           metadataDetails.push(`Time: ${timeSlotDetails.start_time} - ${timeSlotDetails.end_time}`);
         }

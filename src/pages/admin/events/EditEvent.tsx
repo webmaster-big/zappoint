@@ -541,7 +541,7 @@ const EditEvent = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Bookings per Slot</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max groups per time slot</label>
               <input
                 type="number"
                 min={1}
@@ -553,7 +553,7 @@ const EditEvent = () => {
               <p className="text-xs text-gray-400 mt-1">Leave empty for unlimited</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Tickets per Slot</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max people per time slot</label>
               <input
                 type="number"
                 min={1}

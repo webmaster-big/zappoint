@@ -186,7 +186,7 @@ type PackageViewFields = Pick<
 const packageViewFields = (src: PackageScalars): PackageViewFields => {
   const minGuests = src.min_participants || 1;
   const maxGuests = src.max_guests || minGuests;
-  const unit = (src.participant_label || 'guest').toLowerCase();
+  const unit = (src.participant_label || 'participant').toLowerCase();
   const participants = src.pricing_type === 'per_person'
     ? (maxGuests > minGuests ? `${minGuests}–${maxGuests} ${unit}s` : `${minGuests} ${unit}s`)
     : (maxGuests > minGuests
@@ -2062,7 +2062,7 @@ const EntertainmentLandingPage = () => {
                       if (sessions.length === 0) return null;
                       return (
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Upcoming Sessions ({easternTimeAbbr})</p>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">When you can book ({easternTimeAbbr})</p>
                           <div className="space-y-1.5">
                             {sessions.map((session, idx) => (
                               <div
@@ -2309,7 +2309,7 @@ const EntertainmentLandingPage = () => {
                       if (sessions.length === 0) return null;
                       return (
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Upcoming Sessions ({easternTimeAbbr})</p>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">When you can book ({easternTimeAbbr})</p>
                           <div className="space-y-1.5">
                             {sessions.map((session, idx) => (
                               <div

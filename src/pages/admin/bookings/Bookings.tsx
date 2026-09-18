@@ -231,8 +231,8 @@ const Bookings: React.FC = () => {
       }
     }
     return {
-      id: true,                    // Confirmation #
-      referenceNumber: false,      // Reference number (hidden by default)
+      id: false,                   // internal row id, not something to read out to a guest
+      referenceNumber: true,       // the number on the guest's confirmation, and what the scanner matches
       
       bookingDate: true,           // Booking date
       bookingTime: true,           // Booking time
@@ -510,8 +510,8 @@ const Bookings: React.FC = () => {
     label: string; 
     isVisible: () => boolean;
   }> = {
-    id: { label: 'Conf #', isVisible: () => columnVisibility.id },
-    referenceNumber: { label: 'Ref #', isVisible: () => columnVisibility.referenceNumber },
+    id: { label: 'ID', isVisible: () => columnVisibility.id },
+    referenceNumber: { label: 'Confirmation #', isVisible: () => columnVisibility.referenceNumber },
     dateTime: { label: 'Date/Time', isVisible: () => columnVisibility.bookingDate || columnVisibility.bookingTime },
     customer: { label: 'Customer', isVisible: () => columnVisibility.guestName || columnVisibility.guestEmail || columnVisibility.guestPhone },
     guestAddress: { label: 'Address', isVisible: () => columnVisibility.guestAddress },

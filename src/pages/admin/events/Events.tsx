@@ -271,7 +271,7 @@ const Events = () => {
     },
     {
       key: 'maxPerSlot',
-      label: 'Max Per Slot',
+      label: 'Max groups',
       group: 'Schedule',
       sortable: true,
       sortValue: e => e.max_bookings_per_slot ?? 0,
