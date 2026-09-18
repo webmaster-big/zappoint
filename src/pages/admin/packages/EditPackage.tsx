@@ -2153,7 +2153,7 @@ const EditPackage: React.FC = () => {
                         <div className="mb-2">
                             <span className="font-semibold">SPACE:</span> <span className="text-neutral-800 text-sm">{form.rooms.length > 0
                                 ? sortRoomsNumerically(form.rooms).join(", ")
-                                : "No rooms selected"}</span>
+                                : "No spaces selected"}</span>
                         </div>
                         <div className="mb-2">
                             <span className="font-semibold">Add-ons:</span> <span className="text-neutral-800 text-sm">{form.addOns.length > 0

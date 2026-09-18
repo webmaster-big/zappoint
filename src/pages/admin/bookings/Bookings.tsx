@@ -4232,7 +4232,7 @@ const Bookings: React.FC = () => {
                     <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
                   </div>
                 ) : availableRooms.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No rooms available</p>
+                  <p className="text-center text-gray-500 py-8">No spaces available</p>
                 ) : (
                   <div className="space-y-2">
                     {availableRooms
@@ -4339,7 +4339,7 @@ const Bookings: React.FC = () => {
                       {loadingDestinationRooms
                         ? 'Loading rooms...'
                         : (locationValue && destinationRooms.length === 0
-                          ? 'No rooms at this location'
+                          ? 'No spaces at this location'
                           : (selectedBookingForEdit.roomId ? 'Select a room' : 'Keep unassigned'))}
                     </option>
                     {destinationRooms

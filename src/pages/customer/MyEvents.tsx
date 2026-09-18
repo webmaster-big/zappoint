@@ -340,7 +340,7 @@ const MyEvents = () => {
                               title: `Zap Zone: ${purchase.event?.name ?? 'Event'}`,
                               date: purchase.purchase_date,
                               time: purchase.purchase_time,
-                              durationMinutes: 120,
+                              durationMinutes: purchase.event?.interval_minutes ?? 120,
                               location: purchase.location?.name,
                               description: `${purchase.quantity} ticket${purchase.quantity > 1 ? 's' : ''} for ${purchase.event?.name ?? 'your event'}.`,
                             }}

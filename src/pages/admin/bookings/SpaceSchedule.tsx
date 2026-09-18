@@ -2296,7 +2296,7 @@ const SpaceSchedule = () => {
                       <span className="text-[11px] font-semibold text-gray-700 leading-tight truncate max-w-full">{column.name}</span>
                       {column.virtual ? (
                         <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 leading-tight rounded-full">
-                          No room assigned
+                          No space assigned
                         </span>
                       ) : null}
                       {showColumnLocation && (

@@ -146,7 +146,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
   const commonItems: NavItem[] = [
     { label: 'Bookings', icon: Calendar, items: [
       { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-      { label: 'Room Schedule', href: '/bookings/room-schedule', icon: Dot },
+      { label: 'Space Schedule', href: '/bookings/space-schedule', icon: Dot },
       { label: 'Bookings', href: '/bookings', icon: Dot },
       { label: 'Location Requests', href: '/location-change-requests', icon: Dot },
       { label: 'Create Bookings', href: '/bookings/create', icon: Dot },

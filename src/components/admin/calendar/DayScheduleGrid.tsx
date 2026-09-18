@@ -1089,7 +1089,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     ) : column.virtual ? (
                       <span className="flex items-center gap-1 text-[9px] leading-tight font-normal text-amber-600">
                         <AlertTriangle className="h-2.5 w-2.5" />
-                        No room
+                        No space
                       </span>
                     ) : null}
 

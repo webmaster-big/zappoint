@@ -579,7 +579,7 @@ const Rooms: React.FC = () => {
                         size="md"
                         icon={Plus}
                     >
-                        Create Room
+                        Create Space
                     </StandardButton>
                 </div>
             </div>
@@ -821,7 +821,7 @@ const Rooms: React.FC = () => {
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">No Spaces found</h3>
                         <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
                             {searchTerm || filters.is_available !== undefined 
-                                ? 'No rooms match your search criteria. Try adjusting your filters.'
+                                ? 'No spaces match your search criteria. Try adjusting your filters.'
                                 : 'Get started by creating your first Space for package bookings'}
                         </p>
                         <StandardButton
@@ -832,7 +832,7 @@ const Rooms: React.FC = () => {
                             variant="primary"
                             size="md"
                         >
-                            Create Room
+                            Create Space
                         </StandardButton>
                     </div>
                 )}
@@ -862,7 +862,7 @@ const Rooms: React.FC = () => {
                                     size="sm"
                                     className="flex-1"
                                 >
-                                    Single Room
+                                    Single Space
                                 </StandardButton>
                                 <StandardButton
                                     type="button"
@@ -871,7 +871,7 @@ const Rooms: React.FC = () => {
                                     size="sm"
                                     className="flex-1"
                                 >
-                                    Multiple Rooms
+                                    Multiple Spaces
                                 </StandardButton>
                             </div>
 
@@ -1363,7 +1363,7 @@ const Rooms: React.FC = () => {
                                         {bulkFormData.baseName && generateRoomPreview().length > 0 && (
                                             <div className={`bg-${themeColor}-50 border border-${fullColor} rounded-lg p-4`}>
                                                 <p className="text-sm font-medium text-gray-700 mb-2">
-                                                    Preview ({generateRoomPreview().length} rooms):
+                                                    Preview ({generateRoomPreview().length} spaces):
                                                 </p>
                                                 <div className="flex flex-wrap gap-2">
                                                     {generateRoomPreview().slice(0, 10).map((name, idx) => (
@@ -1392,7 +1392,7 @@ const Rooms: React.FC = () => {
                                         size="md"
                                         className="flex-1"
                                     >
-                                        {creationMode === 'single' ? 'Create Room' : `Create ${generateRoomPreview().length} Rooms`}
+                                        {creationMode === 'single' ? 'Create Space' : `Create ${generateRoomPreview().length} Spaces`}
                                     </StandardButton>
                                     <StandardButton
                                         type="button"

@@ -23,6 +23,7 @@ import type { AttractionPurchase } from '../../services/AttractionPurchaseServic
 import { getImageUrl } from '../../utils/storage';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../utils/qrcode';
 import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
+import { bookingDurationMinutes } from '../../utils/calendarInvite';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 
@@ -367,7 +368,10 @@ const MyAttractions = () => {
                               title: `Zap Zone: ${purchase.attraction?.name ?? 'Attraction'}`,
                               date: purchase.scheduled_date || purchase.purchase_date,
                               time: purchase.scheduled_time,
-                              durationMinutes: 90,
+                              durationMinutes: bookingDurationMinutes(
+                                purchase.attraction?.duration,
+                                purchase.attraction?.duration_unit
+                              ),
                               location: purchase.attraction?.location?.name,
                               description: `${purchase.quantity} ticket${purchase.quantity > 1 ? 's' : ''} for ${purchase.attraction?.name ?? 'your attraction'}.`,
                             }}
