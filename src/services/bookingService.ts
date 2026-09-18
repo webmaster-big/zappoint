@@ -311,6 +311,9 @@ export interface UpdateBookingData {
     original_price: number;
     special_pricing_id: number | null;
   }> | null;
+
+  /** A manager's approval, when moving this booking onto a time that is already taken. */
+  overlap_override_token?: string;
 }
 
 export interface BookingFilters {

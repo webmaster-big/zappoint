@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Calendar, Package, User, Home, MapPin, AlertCircle, ArrowLeft, Bell, BellOff, Save, Plus, Minus, Gift } from 'lucide-react';
 import QRCode from 'qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import ChangeReasonModal from '../../../components/admin/bookings/ChangeReasonModal';
+import OverlapOverrideDialog from '../../../components/admin/bookings/OverlapOverrideDialog';
 import BookingChangeHistory from '../../../components/admin/bookings/BookingChangeHistory';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
@@ -799,6 +800,9 @@ const EditBooking: React.FC = () => {
     setShowReasonPrompt(true);
   };
 
+  const overrideTokenRef = useRef<string | null>(null);
+  const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; reason: string } | null>(null);
+
   const performSubmit = async (changeReason: string) => {
     if (!originalBooking) return;
 
@@ -833,7 +837,11 @@ const EditBooking: React.FC = () => {
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        overlap_override_token: overrideTokenRef.current || undefined,
       });
+
+      // one approval, one save: the server burns the token anyway, so never resend it
+      overrideTokenRef.current = null;
 
       if (response.success) {
         if (response.data) {
@@ -864,8 +872,29 @@ const EditBooking: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating booking:', error);
-      const message = (error as { response?: { data?: { errors?: { change_reason?: string[] } } } })
-        ?.response?.data?.errors?.change_reason?.[0];
+      const failure = (error as {
+        response?: { status?: number; data?: { message?: string; requires_override?: boolean; conflicts?: string[]; errors?: { change_reason?: string[] } } };
+      })?.response;
+
+      // the move runs into something the page could not see — a slot taken since it loaded, a
+      // break, another booking. Ask for the manager's PIN rather than leaving staff with an
+      // error they cannot act on.
+      if (failure?.status === 409 && failure.data?.requires_override) {
+        const reasons = (failure.data.conflicts ?? []).map(
+          reason => `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`
+        );
+        setOverrideGate({
+          // never leave the dialog with nothing to approve: with an empty list it would offer a
+          // plain Continue that closes without saving, and the edit would vanish silently
+          conflicts: reasons.length > 0 ? reasons : ['That space is not free at the new time.'],
+          reason: changeReason,
+        });
+        setSubmitting(false);
+        setShowReasonPrompt(false);
+        return;
+      }
+
+      const message = failure?.data?.errors?.change_reason?.[0] ?? failure?.data?.message;
       alert(message ?? 'Error updating booking. Please try again.');
       setSubmitting(false);
       setShowReasonPrompt(false);
@@ -1782,6 +1811,24 @@ const EditBooking: React.FC = () => {
         themeColor={themeColor}
         fullColor={fullColor}
       />
+
+      {overrideGate && (
+        <OverlapOverrideDialog
+          conflicts={overrideGate.conflicts}
+          onlineSlotsLost={[]}
+          locationId={formData.locationId || originalBooking?.location_id || null}
+          onCancel={() => setOverrideGate(null)}
+          onConfirm={() => setOverrideGate(null)}
+          onApproved={(token, approvedBy) => {
+            overrideTokenRef.current = token;
+            const reason = overrideGate.reason;
+            setOverrideGate(null);
+            console.log(`${approvedBy} approved moving this booking.`);
+            // the gate is satisfied; run the same save again, reason and all
+            void performSubmit(reason);
+          }}
+        />
+      )}
     </>
   );
 };
