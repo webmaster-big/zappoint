@@ -157,6 +157,9 @@ const PhotoSettings = () => {
         slideshow_enabled: settings.setting.slideshow_enabled,
         kiosk_countdown_seconds: settings.setting.kiosk_countdown_seconds,
         slideshow_duration_seconds: settings.setting.slideshow_duration_seconds,
+        slideshow_requires_approval: settings.setting.slideshow_requires_approval,
+        slideshow_auto_add_kiosk: settings.setting.slideshow_auto_add_kiosk,
+        slideshow_auto_add_staff: settings.setting.slideshow_auto_add_staff,
         retention_days: settings.setting.retention_days,
         date_format: settings.setting.date_format,
         date_position: settings.setting.date_position,
@@ -590,6 +593,67 @@ const PhotoSettings = () => {
                     ))}
                   </select>
                 </div>
+              </div>
+            </section>
+
+            <section className="bg-white border border-gray-200 rounded-2xl p-5">
+              <h2 className="font-semibold text-gray-900 mb-4">What reaches the venue screen</h2>
+
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 rounded-xl border border-gray-100 p-4">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.slideshow_requires_approval)}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, slideshow_requires_approval: e.target.checked }))
+                    }
+                    className={`mt-0.5 h-4 w-4 accent-${themeColor}-700`}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-900">
+                      A staff member approves each photo before it appears
+                    </span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Photos wait in the slideshow queue until someone approves them. Turn this off to push every
+                      photo straight to the screen — anything already waiting is released as soon as you save.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 rounded-xl border border-gray-100 p-4">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.slideshow_auto_add_kiosk)}
+                    onChange={(e) => setForm((prev) => ({ ...prev, slideshow_auto_add_kiosk: e.target.checked }))}
+                    className={`mt-0.5 h-4 w-4 accent-${themeColor}-700`}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-900">
+                      Add kiosk photos to the slideshow automatically
+                    </span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      The kiosk asks the customer with this box already ticked. A customer who unticks it is always
+                      kept off the screen.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 rounded-xl border border-gray-100 p-4">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.slideshow_auto_add_staff)}
+                    onChange={(e) => setForm((prev) => ({ ...prev, slideshow_auto_add_staff: e.target.checked }))}
+                    className={`mt-0.5 h-4 w-4 accent-${themeColor}-700`}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-900">
+                      Add photos taken on a staff phone to the slideshow automatically
+                    </span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Photos from the capture screen join the queue at delivery time without anyone ticking the box.
+                    </span>
+                  </span>
+                </label>
               </div>
             </section>
 

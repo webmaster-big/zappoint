@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  Check,
   Clock,
   Copy,
   Eye,
@@ -12,19 +13,37 @@ import {
   Pause,
   Play,
   RefreshCcw,
+  ShieldCheck,
   Trash2,
   Wifi,
   WifiOff,
+  X,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import type { SlideshowQueueResponse } from '../../../types/photo.types';
+import type { PhotoRecord, SlideshowQueueResponse } from '../../../types/photo.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+
+const statusChip = (photo: PhotoRecord): { label: string; className: string } => {
+  if (photo.slideshow_approval_status === 'rejected') {
+    return { label: 'rejected', className: 'bg-red-50 text-red-700 border-red-200' };
+  }
+  if (photo.awaiting_approval) {
+    return { label: 'waiting for approval', className: 'bg-amber-50 text-amber-800 border-amber-200' };
+  }
+  if (!photo.slideshow_eligible) {
+    return { label: 'not on slideshow', className: 'bg-gray-50 text-gray-600 border-gray-200' };
+  }
+  if (photo.slideshow_state !== 'visible') {
+    return { label: photo.slideshow_state, className: 'bg-gray-50 text-gray-600 border-gray-200' };
+  }
+  return { label: 'on screen', className: 'bg-green-50 text-green-700 border-green-200' };
+};
 
 const SlideshowQueuePage = () => {
   const { themeColor } = useThemeColor();
@@ -89,6 +108,36 @@ const SlideshowQueuePage = () => {
     [data, load],
   );
 
+  const decideApproval = useCallback(
+    async (photoId: number, status: 'approved' | 'rejected') => {
+      setBusy(true);
+      try {
+        const { message } = await photoService.setPhotoApproval(photoId, status);
+        setToast({ message, type: 'success' });
+        await load();
+      } catch (e) {
+        setToast({ message: errorMessage(e, 'That photo could not be updated.'), type: 'error' });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load],
+  );
+
+  const approveEverythingWaiting = useCallback(async () => {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const { message } = await photoService.approvePendingPhotos(data.active.id);
+      setToast({ message, type: 'success' });
+      await load();
+    } catch (e) {
+      setToast({ message: errorMessage(e, 'Those photos could not be approved.'), type: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  }, [data, load]);
+
   const togglePause = useCallback(async () => {
     if (!data) return;
     setBusy(true);
@@ -139,8 +188,10 @@ const SlideshowQueuePage = () => {
               Slideshow queue
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              Kiosk photos join today&apos;s queue the moment the customer accepts them. The queue closes at{' '}
-              {data?.cutoff_hour ?? 6}:00 AM location time and a fresh one opens.
+              {data?.settings.slideshow_requires_approval === false
+                ? 'Approval is off, so every photo added to the queue goes straight to the screen.'
+                : 'Photos wait here until a staff member approves them. Nothing reaches the screen unapproved.'}{' '}
+              The queue closes at {data?.cutoff_hour ?? 6}:00 AM location time and a fresh one opens.
             </p>
           </div>
           <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={() => void load()} loading={loading}>
@@ -157,6 +208,12 @@ const SlideshowQueuePage = () => {
                 <p className="text-sm text-gray-600 mt-1">
                   {data.active.visible_photos} showing of {data.active.total_photos} stored
                 </p>
+                {data.active.awaiting_approval > 0 && (
+                  <p className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-amber-800">
+                    <ShieldCheck className="w-4 h-4" />
+                    {data.active.awaiting_approval} waiting for approval
+                  </p>
+                )}
                 {data.active.closes_at && (
                   <p className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500">
                     <Clock className="w-3.5 h-3.5" />
@@ -245,6 +302,82 @@ const SlideshowQueuePage = () => {
               </div>
             </div>
 
+            {data.active.photos.some((photo) => photo.awaiting_approval) && (
+              <div className="bg-white border border-amber-200 rounded-2xl overflow-hidden mb-6">
+                <div className="px-5 py-4 border-b border-amber-100 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-amber-900 flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5" />
+                      Waiting for approval ({data.active.photos.filter((photo) => photo.awaiting_approval).length})
+                    </h2>
+                    <p className="text-sm text-amber-800 mt-1">
+                      None of these are on the screen. Approve the ones that can be shown in public.
+                    </p>
+                  </div>
+                  <StandardButton
+                    size="sm"
+                    variant="primary"
+                    icon={Check}
+                    onClick={() => void approveEverythingWaiting()}
+                    disabled={busy}
+                  >
+                    Approve all
+                  </StandardButton>
+                </div>
+
+                <ul className="divide-y divide-gray-100">
+                  {data.active.photos
+                    .filter((photo) => photo.awaiting_approval)
+                    .map((photo) => (
+                      <li key={photo.id} className="flex flex-wrap items-center gap-4 px-5 py-3">
+                        {photo.thumbnail_url ? (
+                          <a
+                            href={photo.slideshow_url ?? photo.thumbnail_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Open the full photo"
+                          >
+                            <img
+                              src={photo.thumbnail_url}
+                              alt={`Photo ${photo.id}`}
+                              className="h-20 w-20 rounded-lg object-cover bg-gray-100"
+                            />
+                          </a>
+                        ) : (
+                          <div className="h-20 w-20 rounded-lg bg-gray-100" />
+                        )}
+                        <div className="flex-1 min-w-[10rem]">
+                          <p className="text-sm text-gray-900">
+                            {photo.captured_at ? new Date(photo.captured_at).toLocaleTimeString() : '—'}
+                          </p>
+                          <p className="text-xs text-gray-500 capitalize">{photo.session_source ?? photo.source}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StandardButton
+                            size="sm"
+                            variant="primary"
+                            icon={Check}
+                            onClick={() => void decideApproval(photo.id, 'approved')}
+                            disabled={busy}
+                          >
+                            Approve
+                          </StandardButton>
+                          <button
+                            type="button"
+                            onClick={() => void decideApproval(photo.id, 'rejected')}
+                            disabled={busy}
+                            className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-red-50 text-red-700 disabled:opacity-40"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Photos in today&apos;s rotation</h2>
@@ -253,7 +386,8 @@ const SlideshowQueuePage = () => {
               {data.active.photos.length === 0 ? (
                 <div className="p-8 text-center text-gray-500 text-sm">
                   Nothing in the queue yet. Kiosk photos land here as soon as a customer accepts one with the slideshow
-                  box ticked.
+                  box ticked
+                  {data.settings.slideshow_requires_approval ? ', and wait there for a staff approval.' : '.'}
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100">
@@ -273,9 +407,16 @@ const SlideshowQueuePage = () => {
                         <p className="text-sm text-gray-900">
                           {photo.captured_at ? new Date(photo.captured_at).toLocaleTimeString() : '—'}
                         </p>
-                        <p className="text-xs text-gray-500 capitalize">
-                          {photo.session_source ?? photo.source} ·{' '}
-                          {photo.slideshow_eligible ? photo.slideshow_state : 'not eligible'}
+                        <p className="text-xs text-gray-500 capitalize flex flex-wrap items-center gap-1.5">
+                          {photo.session_source ?? photo.source}
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${statusChip(photo).className}`}
+                          >
+                            {statusChip(photo).label}
+                          </span>
+                          {photo.slideshow_approved_by_name && (
+                            <span className="normal-case text-gray-400">by {photo.slideshow_approved_by_name}</span>
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
@@ -297,6 +438,27 @@ const SlideshowQueuePage = () => {
                         >
                           <ArrowDown className="w-4 h-4 text-gray-600" />
                         </button>
+                        {photo.awaiting_approval || photo.slideshow_approval_status === 'rejected' ? (
+                          <button
+                            type="button"
+                            onClick={() => void decideApproval(photo.id, 'approved')}
+                            disabled={busy}
+                            className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-green-50 text-green-700 disabled:opacity-40"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Approve
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void decideApproval(photo.id, 'rejected')}
+                            disabled={busy}
+                            className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-red-50 text-red-700 disabled:opacity-40"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        )}
                         {photo.slideshow_state === 'visible' ? (
                           <button
                             type="button"

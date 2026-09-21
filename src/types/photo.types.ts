@@ -10,6 +10,8 @@ export type PhotoProcessingStatus = 'pending' | 'processing' | 'ready' | 'failed
 
 export type SlideshowState = 'visible' | 'hidden' | 'removed';
 
+export type SlideshowApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 export type PhotoChannel = 'email' | 'sms';
 
 export type PhotoDeliveryKind = 'immediate' | 'next_day' | 'kiosk' | 'backend';
@@ -42,6 +44,11 @@ export interface PhotoRecord {
   operating_day: string | null;
   slideshow_eligible: boolean;
   slideshow_state: SlideshowState;
+  slideshow_approval_status: SlideshowApprovalStatus;
+  slideshow_approved_at: string | null;
+  slideshow_approved_by_name: string | null;
+  shows_in_slideshow: boolean;
+  awaiting_approval: boolean;
   slideshow_priority: number;
   download_count: number;
   purged: boolean;
@@ -155,6 +162,9 @@ export interface PhotoCaptureContext {
   active_overlay: { id: number; name: string } | null;
   has_overlay: boolean;
   slideshow_queue_id: number;
+  slideshow_enabled: boolean;
+  slideshow_requires_approval: boolean;
+  slideshow_auto_add_staff: boolean;
   limits: {
     staff_max_photos: number;
     kiosk_max_photos: number;
@@ -193,6 +203,7 @@ export interface SlideshowQueueRecord {
   closes_at: string | null;
   total_photos: number;
   visible_photos: number;
+  awaiting_approval: number;
   photos: PhotoRecord[];
 }
 
@@ -201,6 +212,9 @@ export interface SlideshowQueueResponse {
   past: SlideshowQueueRecord[];
   settings: {
     slideshow_enabled: boolean;
+    slideshow_requires_approval: boolean;
+    slideshow_auto_add_kiosk: boolean;
+    slideshow_auto_add_staff: boolean;
     slideshow_duration_seconds: number;
     slideshow_url: string;
     slideshow_passcode: string;
@@ -255,6 +269,9 @@ export interface LocationPhotoSettingRecord {
   slideshow_url: string;
   kiosk_countdown_seconds: number;
   slideshow_duration_seconds: number;
+  slideshow_requires_approval: boolean;
+  slideshow_auto_add_kiosk: boolean;
+  slideshow_auto_add_staff: boolean;
   retention_days: number;
   date_format: string;
   date_position: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right';
@@ -316,6 +333,9 @@ export interface KioskContext {
   has_overlay: boolean;
   overlay_name: string | null;
   capture_date_label: string;
+  slideshow_offered: boolean;
+  slideshow_default_on: boolean;
+  slideshow_requires_approval: boolean;
   slideshow_tooltip: string;
   consent_text: string;
 }

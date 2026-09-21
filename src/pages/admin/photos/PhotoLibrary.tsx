@@ -141,7 +141,7 @@ const PhotoLibrary = () => {
 
   const toggleSlideshow = useCallback(
     async (photo: PhotoRecord) => {
-      const include = !(photo.slideshow_eligible && photo.slideshow_state === 'visible');
+      const include = !photo.shows_in_slideshow;
       setSlideshowBusyId(photo.id);
       try {
         const message = await photoService.setPhotoOnSlideshow(photo.id, include);
@@ -336,12 +336,18 @@ const PhotoLibrary = () => {
                         <span className="text-[11px] rounded-full bg-gray-100 px-2 py-0.5 text-gray-700 capitalize">
                           {photo.session?.source ?? photo.session_source ?? photo.source}
                         </span>
-                        {photo.slideshow_eligible ? (
+                        {photo.awaiting_approval ? (
+                          <span className="text-[11px] rounded-full px-2 py-0.5 bg-amber-100 text-amber-800">
+                            waiting for approval
+                          </span>
+                        ) : photo.slideshow_approval_status === 'rejected' ? (
+                          <span className="text-[11px] rounded-full px-2 py-0.5 bg-red-100 text-red-800">
+                            slideshow rejected
+                          </span>
+                        ) : photo.slideshow_eligible ? (
                           <span
                             className={`text-[11px] rounded-full px-2 py-0.5 ${
-                              photo.slideshow_state === 'visible'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-200 text-gray-700'
+                              photo.shows_in_slideshow ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
                             }`}
                           >
                             slideshow {photo.slideshow_state}
@@ -395,22 +401,22 @@ const PhotoLibrary = () => {
                           onClick={() => void toggleSlideshow(photo)}
                           disabled={slideshowBusyId === photo.id}
                           title={
-                            photo.slideshow_eligible && photo.slideshow_state === 'visible'
+                            photo.shows_in_slideshow
                               ? 'Take off the venue slideshow'
-                              : 'Show on the venue slideshow'
+                              : 'Approve and show on the venue slideshow'
                           }
                           aria-label={
-                            photo.slideshow_eligible && photo.slideshow_state === 'visible'
+                            photo.shows_in_slideshow
                               ? `Take photo ${photo.id} off the slideshow`
-                              : `Show photo ${photo.id} on the slideshow`
+                              : `Approve photo ${photo.id} and show it on the slideshow`
                           }
                           className={`inline-flex items-center justify-center text-xs border rounded-lg px-2 py-1.5 disabled:opacity-40 ${
-                            photo.slideshow_eligible && photo.slideshow_state === 'visible'
+                            photo.shows_in_slideshow
                               ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100'
                               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                           }`}
                         >
-                          {photo.slideshow_eligible && photo.slideshow_state === 'visible' ? (
+                          {photo.shows_in_slideshow ? (
                             <MonitorOff className="w-3.5 h-3.5" />
                           ) : (
                             <MonitorPlay className="w-3.5 h-3.5" />
@@ -488,9 +494,11 @@ const PhotoLibrary = () => {
                   {confirmDelete.photos.length === 1 ? 'it' : 'them'}, and downloads will no longer work.
                 </li>
                 <li>
-                  {confirmDelete.photos.some((p) => p.slideshow_eligible)
+                  {confirmDelete.photos.some((p) => p.shows_in_slideshow)
                     ? 'It also comes off the venue slideshow straight away.'
-                    : 'Nothing here is currently on the venue slideshow.'}
+                    : confirmDelete.photos.some((p) => p.awaiting_approval)
+                      ? 'It also leaves the slideshow approval queue.'
+                      : 'Nothing here is currently on the venue slideshow.'}
                 </li>
                 <li>The delivery record and activity log are kept, so the history stays intact.</li>
               </ul>

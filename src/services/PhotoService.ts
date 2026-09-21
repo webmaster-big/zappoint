@@ -19,7 +19,9 @@ import type {
   PhotoTemplatesResponse,
   PhotoWaiverMatch,
   QrResolution,
+  SlideshowApprovalStatus,
   SlideshowFeed,
+  SlideshowQueueRecord,
   SlideshowQueueResponse,
 } from '../types/photo.types';
 
@@ -170,6 +172,21 @@ const photoService = {
     photoId: number,
     payload: { slideshow_state?: string; slideshow_priority?: number },
   ): Promise<PhotoRecord> => (await api.patch(`/slideshow-photos/${photoId}`, payload)).data.data,
+
+  setPhotoApproval: async (
+    photoId: number,
+    status: SlideshowApprovalStatus,
+  ): Promise<{ message: string; photo: PhotoRecord }> => {
+    const { data } = await api.post(`/slideshow-photos/${photoId}/approval`, { status });
+    return { message: data.message, photo: data.data };
+  },
+
+  approvePendingPhotos: async (
+    queueId: number,
+  ): Promise<{ message: string; queue: SlideshowQueueRecord }> => {
+    const { data } = await api.post(`/slideshow-queues/${queueId}/approve-pending`);
+    return { message: data.message, queue: data.data };
+  },
 
   reorderSlideshow: async (queueId: number, order: number[]) =>
     (await api.post(`/slideshow-queues/${queueId}/reorder`, { order })).data.data,

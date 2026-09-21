@@ -58,6 +58,7 @@ const PhotoCapture = () => {
   const camera = usePhotoCamera({ facingMode: 'environment' });
   const { start: startCamera, stop: stopCamera, capture: capturePhoto } = camera;
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const slideshowDefaultRef = useRef(false);
 
   const photoCount = session?.photos.length ?? 0;
   const maxPhotos = session?.max_photos ?? context?.limits.staff_max_photos ?? 3;
@@ -77,7 +78,11 @@ const PhotoCapture = () => {
     (async () => {
       try {
         const ctx = await photoService.getCaptureContext(effectiveLocationId);
-        if (!cancelled) setContext(ctx);
+        if (!cancelled) {
+          setContext(ctx);
+          slideshowDefaultRef.current = ctx.slideshow_enabled && ctx.slideshow_auto_add_staff;
+          setSlideshowOptIn(slideshowDefaultRef.current);
+        }
       } catch (e) {
         if (!cancelled) setToast({ message: errorMessage(e, 'Could not load this location.'), type: 'error' });
       }
@@ -225,7 +230,7 @@ const PhotoCapture = () => {
     setSearched(false);
     setSelected([]);
     setDeliveryNote(null);
-    setSlideshowOptIn(false);
+    setSlideshowOptIn(slideshowDefaultRef.current);
   }, [stopCamera]);
 
   const discard = useCallback(async () => {
@@ -686,9 +691,10 @@ const PhotoCapture = () => {
                   Also show these photos on the venue slideshow
                 </span>
                 <span className="block text-xs text-gray-500 mt-0.5">
-                  They appear on the public screen within a few seconds. Please ask the customer first, and leave this
-                  unticked if they would rather not be shown. You can add or remove any photo later from the photo
-                  library.
+                  {context?.slideshow_requires_approval
+                    ? 'They join the slideshow queue and appear on the public screen once a staff member approves them. Please ask the customer first, and leave this unticked if they would rather not be shown.'
+                    : 'They appear on the public screen within a few seconds. Please ask the customer first, and leave this unticked if they would rather not be shown.'}{' '}
+                  You can add or remove any photo later from the photo library.
                 </span>
               </span>
             </label>

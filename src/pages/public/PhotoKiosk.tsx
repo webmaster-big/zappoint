@@ -61,6 +61,7 @@ const PhotoKiosk = () => {
   const idleTimer = useRef<number | null>(null);
   const countdownTimer = useRef<number | null>(null);
   const handleRef = useRef<KioskSessionHandle | null>(null);
+  const slideshowDefaultRef = useRef(true);
   const screenRef = useRef<Screen>('locked');
   const capturingRef = useRef(false);
 
@@ -87,7 +88,7 @@ const PhotoKiosk = () => {
       setCountdown(null);
       setPreviewUrl(null);
       setQrUrl(null);
-      setSlideshowOptIn(true);
+      setSlideshowOptIn(slideshowDefaultRef.current);
       capturingRef.current = false;
       stopCamera();
 
@@ -145,6 +146,8 @@ const PhotoKiosk = () => {
         const ctx = await photoService.getKioskContext(locationId);
         if (cancelled) return;
         setContext(ctx);
+        slideshowDefaultRef.current = ctx.slideshow_offered !== false && ctx.slideshow_default_on !== false;
+        setSlideshowOptIn(slideshowDefaultRef.current);
         setScreen('welcome');
       } catch (e) {
         const status = (e as { response?: { status?: number } })?.response?.status;
@@ -172,6 +175,9 @@ const PhotoKiosk = () => {
     try {
       const payload = await photoService.unlockKiosk(locationId, passcode.trim());
       setContext(payload.context);
+      slideshowDefaultRef.current =
+        payload.context.slideshow_offered !== false && payload.context.slideshow_default_on !== false;
+      setSlideshowOptIn(slideshowDefaultRef.current);
       setPasscode('');
       setScreen('welcome');
     } catch (e) {
@@ -492,7 +498,11 @@ const PhotoKiosk = () => {
                 <img src={previewUrl} alt="Your photo" className="w-full block" />
               </div>
 
-              <label className="mt-6 flex items-start gap-3 rounded-2xl bg-zinc-900 border border-zinc-800 p-4 cursor-pointer">
+              <label
+                className={`mt-6 flex items-start gap-3 rounded-2xl bg-zinc-900 border border-zinc-800 p-4 cursor-pointer ${
+                  context?.slideshow_offered === false ? 'hidden' : ''
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={slideshowOptIn}
