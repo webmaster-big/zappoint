@@ -112,7 +112,7 @@ const LATE_AFTER_MINUTES = 10;
 const COLUMN_WIDTH = 132;
 const GUTTER_WIDTH = 64;
 const UNCATEGORISED_LABEL = 'No category';
-const VIEW_STATE_KEY = 'spaceScheduleViewState:v2';
+const VIEW_STATE_KEY = 'spaceScheduleViewState:v3';
 
 interface ScheduleViewState {
   categoryFilter?: string;
@@ -1801,10 +1801,13 @@ const SpaceSchedule = () => {
           return (
             <div
               key={`closure-${i}`}
-              className="absolute left-0.5 right-0.5 bg-red-50/90 border border-dashed border-red-200 rounded z-[5] flex items-center justify-center"
+              className="absolute left-0.5 right-0.5 bg-red-50/90 border border-dashed border-red-200 rounded z-[5] flex items-center justify-center overflow-hidden"
               style={{ top: scale.at(start), height: scale.spanHeight(start, end) }}
+              title={`Closed ${formatTime12Hour(minutesToTime(start))} \u2013 ${formatTime12Hour(minutesToTime(end))}`}
             >
-              <span className="text-[10px] font-medium text-red-500">Closed</span>
+              {scale.spanHeight(start, end) >= 12 && (
+                <span className="text-[10px] font-medium text-red-500">Closed</span>
+              )}
             </div>
           );
         })}
@@ -1830,16 +1833,25 @@ const SpaceSchedule = () => {
             </div>
           );
         })}
-        {breaks.map((brk, i) => (
-          <div
-            key={`break-${i}`}
-            className="absolute left-0.5 right-0.5 bg-gray-300/70 border-2 border-dashed border-gray-400 rounded z-[4] flex flex-col items-center justify-center"
-            style={{ top: scale.at(brk.start), height: scale.spanHeight(brk.start, brk.end) }}
-          >
-            <Coffee className="w-4 h-4 text-gray-600" />
-            <span className="text-[10px] font-semibold text-gray-700 mt-0.5">Break</span>
-          </div>
-        ))}
+        {breaks.map((brk, i) => {
+          const breakHeight = scale.spanHeight(brk.start, brk.end);
+          return (
+            <div
+              key={`break-${i}`}
+              className="absolute left-0.5 right-0.5 bg-gray-300/70 border-2 border-dashed border-gray-400 rounded z-[4] flex flex-col items-center justify-center overflow-hidden"
+              style={{ top: scale.at(brk.start), height: breakHeight }}
+              title={`On break ${formatTime12Hour(minutesToTime(brk.start))} \u2013 ${formatTime12Hour(minutesToTime(brk.end))}`}
+            >
+              {breakHeight >= 34 && (
+                <>
+                  <Coffee className="w-4 h-4 text-gray-600" />
+                  <span className="text-[10px] font-semibold text-gray-700 mt-0.5">Break</span>
+                </>
+              )}
+              {breakHeight >= 16 && breakHeight < 34 && <Coffee className="w-4 h-4 text-gray-600" />}
+            </div>
+          );
+        })}
       </>
     );
   };
