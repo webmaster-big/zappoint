@@ -14,6 +14,7 @@ const METADATA_KEY_CANDIDATES = [
   '/api/rooms/metadata',
   '/api/metrics/metadata',
   '/api/memberships/metadata',
+  '/api/waivers/metadata',
 ] as const;
 
 // Public storefront catalogs hold no per-user data, so they must survive the

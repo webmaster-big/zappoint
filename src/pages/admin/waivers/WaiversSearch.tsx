@@ -23,12 +23,14 @@ import {
   Fingerprint,
   ListChecks,
   UserCog,
+  Tablet,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import waiverService from '../../../services/waiverService';
+import waiverCacheService from '../../../services/WaiverCacheService';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
 import attractionPurchaseService from '../../../services/AttractionPurchaseService';
@@ -38,6 +40,7 @@ import type { EventPurchase } from '../../../types/event.types';
 import type { Waiver, WaiverSearchFilters, WaiverSettings, WaiverTemplate, ActivityType, WaiverStatus, WaiverTimeframe, WaiverPeriodSummary } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
 import EmailInput from '../../../components/ui/EmailInput';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
@@ -136,13 +139,40 @@ const WaiversSearch = () => {
   const [detail, setDetail] = useState<{ waiver: Waiver; rendered_body: string } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+
+  // Kiosk launcher. Templates are fetched on click, not on mount — this page makes exactly two
+  // calls today and the desk should not pay for a list it may never open.
+  const [showKiosk, setShowKiosk] = useState(false);
+  const [kioskTemplates, setKioskTemplates] = useState<WaiverTemplate[]>([]);
+  const [kioskLoading, setKioskLoading] = useState(false);
+
+  const openKiosk = async () => {
+    if (kioskTemplates.length > 0) { setShowKiosk(true); return; }
+    setKioskLoading(true);
+    try {
+      const res = await waiverService.listTemplates({ per_page: 100 });
+      const list = res.success ? ((res.data.waiver_templates as WaiverTemplate[]) || []) : [];
+      if (list.length === 0) {
+        setToast({ message: 'No waiver templates exist yet — create one first.', type: 'error' });
+        return;
+      }
+      setKioskTemplates(list);
+      setShowKiosk(true);
+    } catch {
+      setToast({ message: 'Could not load waiver templates.', type: 'error' });
+    } finally {
+      setKioskLoading(false);
+    }
+  };
   const [deleteTarget, setDeleteTarget] = useState<Waiver | null>(null);
 
   const refreshSeconds = settings?.search_auto_refresh_seconds || 30;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
-      setLoading(true);
+      // A forced read is a refresh of rows already on screen — auto-refresh fires every 30s, and
+      // dropping the table into a spinner that often is the exact stutter this screen was slow for.
+      if (!force) setLoading(true);
       const base: WaiverSearchFilters = { per_page: 200 };
 
       if (scopeTimeframe === 'all_time') {
@@ -172,18 +202,23 @@ const WaiversSearch = () => {
           if (request === summaryRequest.current) setPeriodSummary(null);
         });
 
-      const collected: Waiver[] = [];
-      let currentPage = 1;
-      let lastPage = 1;
-      do {
-        const res = await waiverService.list({ ...base, page: currentPage });
-        if (!res.success) break;
-        collected.push(...((res.data.waivers as Waiver[]) || []));
-        lastPage = res.data.pagination?.last_page ?? 1;
-        currentPage++;
-      } while (currentPage <= lastPage);
+      // Paint from cache first. The full list is walked page by page, so a cold fetch on a busy
+      // period is several sequential round-trips — the desk should not watch a spinner for that
+      // when yesterday's rows are already on disk and only the tail has changed.
+      if (!force) {
+        const cached = await waiverCacheService.getCachedWaivers(base);
+        if (cached && cached.length > 0) {
+          setWaivers(cached);
+          setLoading(false);
+        }
+      }
 
-      setWaivers(collected);
+      // Auto-refresh asks for the network on purpose — going through the staleness window would
+      // make a 30s timer a no-op against a 60s cache and quietly disable the toggle.
+      const fresh = force
+        ? await waiverCacheService.forceRefresh(base)
+        : await waiverCacheService.fetchAndCacheWaivers(base);
+      setWaivers(fresh);
     } catch {
       setToast({ message: 'Failed to load waivers', type: 'error' });
     } finally {
@@ -201,7 +236,7 @@ const WaiversSearch = () => {
 
   useEffect(() => {
     if (autoRefresh && refreshSeconds > 0) {
-      refreshTimer.current = setInterval(() => load(), refreshSeconds * 1000);
+      refreshTimer.current = setInterval(() => load(true), refreshSeconds * 1000);
     }
     return () => {
       if (refreshTimer.current) clearInterval(refreshTimer.current);
@@ -518,6 +553,7 @@ const WaiversSearch = () => {
     try {
       await waiverService.checkIn(w.id);
       setToast({ message: `${adultName(w) || 'Waiver'} checked in`, type: 'success' });
+      await waiverCacheService.clearCache();
       load();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -529,6 +565,7 @@ const WaiversSearch = () => {
     try {
       await waiverService.undoCheckIn(w.id);
       setToast({ message: 'Check-in undone', type: 'info' });
+      await waiverCacheService.clearCache();
       load();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -542,6 +579,7 @@ const WaiversSearch = () => {
       await waiverService.remove(deleteTarget.id, reason);
       setToast({ message: 'Waiver deleted', type: 'success' });
       setDeleteTarget(null);
+      await waiverCacheService.clearCache();
       load();
     } catch {
       setToast({ message: 'Failed to delete waiver', type: 'error' });
@@ -608,6 +646,17 @@ const WaiversSearch = () => {
               { label: 'Settings', icon: SettingsIcon, onClick: () => navigate('/waivers/settings'), hidden: !isAdmin },
             ]}
           />
+          </span>
+          <span data-tour="waivers-kiosk-btn">
+          <StandardButton
+            variant="secondary"
+            size="md"
+            icon={kioskLoading ? Loader2 : Tablet}
+            disabled={kioskLoading}
+            onClick={openKiosk}
+          >
+            {kioskLoading ? 'Loading…' : 'Launch Kiosk'}
+          </StandardButton>
           </span>
           {!isAttendant && (
           <span data-tour="waivers-assign-btn">
@@ -727,7 +776,7 @@ const WaiversSearch = () => {
         <AdminTableToolbar
           table={table}
           searchPlaceholder="Search waivers by name, email, phone, minor, reference…"
-          onRefresh={load}
+          onRefresh={() => load(true)}
           actions={
             <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleExport}>Export</StandardButton>
           }
@@ -779,7 +828,10 @@ const WaiversSearch = () => {
           canPrint={!isAttendant}
         />
       )}
-      {showAssign && <AssignWaiverModal onClose={() => setShowAssign(false)} onSaved={() => { setShowAssign(false); load(); setToast({ message: 'Waiver assigned & link sent', type: 'success' }); }} themeColor={themeColor} />}
+      {showKiosk && (
+        <KioskSessionModal templates={kioskTemplates} staffReturn onClose={() => setShowKiosk(false)} />
+      )}
+      {showAssign && <AssignWaiverModal onClose={() => setShowAssign(false)} onSaved={() => { setShowAssign(false); waiverCacheService.clearCache().then(() => load()); setToast({ message: 'Waiver assigned & link sent', type: 'success' }); }} themeColor={themeColor} />}
       {deleteTarget && <DeleteWaiverModal waiver={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

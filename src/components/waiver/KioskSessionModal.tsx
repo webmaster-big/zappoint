@@ -15,6 +15,7 @@ import { eventCacheService } from '../../services/EventCacheService';
 import type { Package } from '../../services/PackageService';
 import type { Attraction } from '../../services/AttractionService';
 import type { Event, EventPurchase } from '../../types/event.types';
+import type { WaiverTemplate } from '../../types/waiver.types';
 import type { Booking } from '../../services/bookingService';
 import type { AttractionPurchase } from '../../services/AttractionPurchaseService';
 
@@ -26,11 +27,15 @@ type SearchResult =
   | { kind: 'event_purchase'; data: EventPurchase };
 
 interface Props {
-  templateId: number;
-  isPreview: boolean;
+  templateId?: number;
+  isPreview?: boolean;
   assignedPackageIds?: number[] | null;
   assignedAttractionIds?: number[] | null;
   assignedEventIds?: number[] | null;
+  /** When the caller has no template in hand, pass the choices and let the modal ask. */
+  templates?: WaiverTemplate[];
+  /** Launched by staff from the desk — the kiosk then offers a way back to check-in. */
+  staffReturn?: boolean;
   onClose: () => void;
 }
 
@@ -55,6 +60,8 @@ export default function KioskSessionModal({
   assignedPackageIds,
   assignedAttractionIds,
   assignedEventIds,
+  templates,
+  staffReturn,
   onClose,
 }: Props) {
   const { themeColor, fullColor } = useThemeColor();
@@ -64,6 +71,22 @@ export default function KioskSessionModal({
   const isCompanyAdmin = storedUser?.role === 'company_admin';
   const userLocationId: number | null = storedUser?.location_id ?? null;
   const userLocationName: string = storedUser?.location_name ?? '';
+
+  // The templates list is only passed when the caller had no template in hand (the records page).
+  // Default to the active catch-all so the common desk case is one tap, but keep the choice visible —
+  // a kiosk launched against the wrong template collects a legally wrong signature.
+  const [pickedTemplateId, setPickedTemplateId] = useState<number | ''>(() => {
+    if (templateId != null) return templateId;
+    const active = (templates ?? []).filter((t) => t.status === 'active');
+    return active.find((t) => t.is_default)?.id ?? active[0]?.id ?? '';
+  });
+  const picked = templateId == null ? (templates ?? []).find((t) => t.id === pickedTemplateId) ?? null : null;
+
+  const effectiveTemplateId = templateId ?? (pickedTemplateId === '' ? null : Number(pickedTemplateId));
+  const effectiveIsPreview = templateId != null ? !!isPreview : picked != null && picked.status !== 'active';
+  const effectivePackageIds = templateId != null ? assignedPackageIds : picked?.assigned_package_ids;
+  const effectiveAttractionIds = templateId != null ? assignedAttractionIds : picked?.assigned_attraction_ids;
+  const effectiveEventIds = templateId != null ? assignedEventIds : picked?.assigned_event_ids;
 
   const [mode, setMode] = useState<'generic' | 'bound'>('generic');
   const [sourceType, setSourceType] = useState<SourceType>('booking');
@@ -94,11 +117,11 @@ export default function KioskSessionModal({
         attractionCacheService.getAttractions().catch(() => [] as Attraction[]),
         eventCacheService.getEvents().catch(() => [] as Event[]),
       ]);
-      setPackages(assignedPackageIds != null ? pkgs.filter((p) => assignedPackageIds.includes(p.id)) : pkgs);
-      setAttractions(assignedAttractionIds != null ? attrs.filter((a) => assignedAttractionIds.includes(a.id)) : attrs);
-      setEvents(assignedEventIds != null ? evts.filter((e) => assignedEventIds.includes(e.id)) : evts);
+      setPackages(effectivePackageIds != null ? pkgs.filter((p) => effectivePackageIds.includes(p.id)) : pkgs);
+      setAttractions(effectiveAttractionIds != null ? attrs.filter((a) => effectiveAttractionIds.includes(a.id)) : attrs);
+      setEvents(effectiveEventIds != null ? evts.filter((e) => effectiveEventIds.includes(e.id)) : evts);
     })();
-  }, [assignedPackageIds, assignedAttractionIds, assignedEventIds]);
+  }, [effectivePackageIds, effectiveAttractionIds, effectiveEventIds]);
 
   useEffect(() => {
     if (scopedLocations.length > 0) {
@@ -192,6 +215,7 @@ export default function KioskSessionModal({
     : userLocationId;
 
   const canLaunch = () => {
+    if (!effectiveTemplateId) return false;
     if (mode === 'generic') {
       if (isCompanyAdmin && selectedLocationId === '') return false;
       return true;
@@ -202,12 +226,18 @@ export default function KioskSessionModal({
 
   const launch = async () => {
     setError(null);
+    if (!effectiveTemplateId) {
+      setError('Choose a waiver template first.');
+      return;
+    }
     if (mode === 'generic') {
       const params = new URLSearchParams();
-      if (isPreview) params.set('preview', '1');
+      if (effectiveIsPreview) params.set('preview', '1');
       if (resolvedLocationId != null) params.set('location_id', String(resolvedLocationId));
+      if (staffReturn) params.set('staff', '1');
       const qs = params.toString();
-      window.open(`/waiver/kiosk/${templateId}${qs ? `?${qs}` : ''}`, '_blank', 'noopener');
+      // named window so a shift does not end with eight kiosk tabs open
+      window.open(`/waiver/kiosk/${effectiveTemplateId}${qs ? `?${qs}` : ''}`, 'zapzone-waiver-kiosk', 'noopener');
       onClose();
       return;
     }
@@ -217,9 +247,12 @@ export default function KioskSessionModal({
         ? selectedResult!.data.id
         : Number(selectedActivityId);
 
-      const res = await waiverService.createKioskSession(sourceType, sourceId, { template_id: templateId });
+      const res = await waiverService.createKioskSession(sourceType, sourceId, { template_id: effectiveTemplateId });
       if (!res.success || !res.data?.kiosk_url) throw new Error(res.data?.status ?? 'Failed to create session');
-      window.open(res.data.kiosk_url, '_blank', 'noopener');
+      const boundUrl = staffReturn
+        ? `${res.data.kiosk_url}${res.data.kiosk_url.includes('?') ? '&' : '?'}staff=1`
+        : res.data.kiosk_url;
+      window.open(boundUrl, 'zapzone-waiver-kiosk', 'noopener');
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to launch kiosk session');
@@ -232,9 +265,9 @@ export default function KioskSessionModal({
   const activityOptions = sourceType === 'package' ? packages : sourceType === 'attraction' ? attractions : events;
 
   const visibleActivityOptions = ACTIVITY_SOURCE_OPTIONS.filter((opt) => {
-    if (opt.value === 'package') return assignedPackageIds == null || assignedPackageIds.length > 0;
-    if (opt.value === 'attraction') return assignedAttractionIds == null || assignedAttractionIds.length > 0;
-    if (opt.value === 'event') return assignedEventIds == null || assignedEventIds.length > 0;
+    if (opt.value === 'package') return effectivePackageIds == null || effectivePackageIds.length > 0;
+    if (opt.value === 'attraction') return effectiveAttractionIds == null || effectiveAttractionIds.length > 0;
+    if (opt.value === 'event') return effectiveEventIds == null || effectiveEventIds.length > 0;
     return true;
   });
 
@@ -245,7 +278,7 @@ export default function KioskSessionModal({
           <div className="flex items-center gap-2">
             <Tablet className={`w-5 h-5 text-${fullColor}`} />
             <h2 className="text-base font-semibold text-gray-900">Launch Kiosk</h2>
-            {isPreview && (
+            {effectiveIsPreview && (
               <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Preview mode</span>
             )}
           </div>
@@ -255,7 +288,7 @@ export default function KioskSessionModal({
         </div>
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[72vh]">
-          {isPreview && (
+          {effectiveIsPreview && (
             <div className="flex gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
               <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -265,6 +298,29 @@ export default function KioskSessionModal({
               </p>
             </div>
           )}
+          {templateId == null && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Waiver template</label>
+              <select
+                value={pickedTemplateId}
+                onChange={(e) => setPickedTemplateId(e.target.value === '' ? '' : Number(e.target.value))}
+                className={fieldCls}
+              >
+                <option value="">Select a template…</option>
+                {(templates ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                    {t.status !== 'active' ? ' (inactive — preview only)' : ''}
+                    {t.is_default ? ' · default' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1">
+                The guest signs whichever template you launch — check it matches the activity.
+              </p>
+            </div>
+          )}
+
           {/* Mode toggle */}
           <div className="grid grid-cols-2 gap-3">
             <button

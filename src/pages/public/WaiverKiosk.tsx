@@ -13,6 +13,7 @@ import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError } from '../../components/waiver/WaiverStates';
 import WaiverReturningPanel, { WaiverReturningSummary } from '../../components/waiver/WaiverReturningPanel';
 import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
+import StaffReturnControl from '../../components/waiver/StaffReturnControl';
 
 // long enough for a guest to actually read the confirmation and scan the QR
 const SUCCESS_HOLD_SECONDS = 25;
@@ -21,6 +22,8 @@ const WaiverKiosk = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const preview = searchParams.get('preview') === '1';
+  // Set only by the staff launcher. It marks a kiosk the desk opened, so the desk can get back out.
+  const staffLaunched = searchParams.get('staff') === '1';
   const templateId = Number(id);
   const locationParam = searchParams.get('location_id');
   const locationId = locationParam ? Number(locationParam) : null;
@@ -200,6 +203,7 @@ const WaiverKiosk = () => {
         title={context.template?.title || 'Waiver'}
         subtitle={phase === 'lookup' ? 'Returning customer' : 'Please review your saved information'}
       >
+        {staffLaunched && <StaffReturnControl />}
         <WaiverReturningPanel
           key={profile?.id ?? 'lookup'}
           templateId={templateId}
@@ -228,6 +232,7 @@ const WaiverKiosk = () => {
 
   return (
     <WaiverShell title={context.template?.title || 'Waiver'} subtitle="Please complete the waiver below to continue">
+      {staffLaunched && <StaffReturnControl />}
       {preview && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
           <p className="text-sm font-semibold text-amber-800">Preview mode</p>

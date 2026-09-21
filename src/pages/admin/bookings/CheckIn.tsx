@@ -21,7 +21,9 @@ import {
   Eye,
   Home,
   FileSignature,
-  ScanLine
+  ScanLine,
+  Tablet,
+  FileText
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -34,8 +36,10 @@ import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import { useNavigate } from 'react-router-dom';
+import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
 import waiverService from '../../../services/waiverService';
-import type { ScannedWaiver, Waiver } from '../../../types/waiver.types';
+import type { ScannedWaiver, Waiver, WaiverTemplate } from '../../../types/waiver.types';
 import { resolveScannedCode, KIND_LABELS } from '../../../utils/scanCode';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import ticketOrderService, { type TicketOrder } from '../../../services/TicketOrderService';
@@ -80,6 +84,33 @@ const CheckIn: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [scanning, setScanning] = useState(false);
+  const navigate = useNavigate();
+
+  // Waiver access from the desk. The kiosk opens in a named tab, so check-in stays exactly where
+  // it was behind it and a second launch reuses that tab instead of stacking new ones.
+  const [showKiosk, setShowKiosk] = useState(false);
+  const [kioskTemplates, setKioskTemplates] = useState<WaiverTemplate[]>([]);
+  const [kioskLoading, setKioskLoading] = useState(false);
+
+  const openKiosk = async () => {
+    if (kioskTemplates.length > 0) { setShowKiosk(true); return; }
+    setKioskLoading(true);
+    try {
+      const res = await waiverService.listTemplates({ per_page: 100 });
+      const list = res.success ? ((res.data.waiver_templates as WaiverTemplate[]) || []) : [];
+      if (list.length === 0) {
+        setToast({ message: 'No waiver templates exist yet — create one first.', type: 'error' });
+        return;
+      }
+      setKioskTemplates(list);
+      setShowKiosk(true);
+    } catch {
+      setToast({ message: 'Could not load waiver templates.', type: 'error' });
+    } finally {
+      setKioskLoading(false);
+    }
+  };
+
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -953,10 +984,31 @@ const CheckIn: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <ScanLine className="h-6 w-6" />
-            Check-In / Waivers
-          </h1>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <ScanLine className="h-6 w-6" />
+              Check-In / Waivers
+            </h1>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={openKiosk}
+                disabled={kioskLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Tablet className="h-4 w-4" />
+                {kioskLoading ? 'Loading…' : 'Launch Kiosk'}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/waivers')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              >
+                <FileText className="h-4 w-4" />
+                Waiver Records
+              </button>
+            </div>
+          </div>
           <p className="text-gray-600 mt-1">
             One place to check anyone in &mdash; scan a booking, attraction ticket, bulk order, membership or waiver
             code, or find the guest by name.
@@ -2689,6 +2741,10 @@ const CheckIn: React.FC = () => {
             onClose={() => setToast(null)}
           />
         </div>
+      )}
+
+      {showKiosk && (
+        <KioskSessionModal templates={kioskTemplates} staffReturn onClose={() => setShowKiosk(false)} />
       )}
     </div>
   );
