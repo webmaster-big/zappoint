@@ -44,10 +44,40 @@ const notify = (message: string, type: 'error' | 'warning' = 'error') => {
 
 const isAuthEndpoint = (url?: string) => !!url && /\/auth\/(login|register|me)/.test(url);
 
-const ADMIN_ROUTE_PREFIXES = ['/admin', '/manager', '/attendant', '/accounts', '/dashboard'];
+const ADMIN_ROUTE_PREFIXES = [
+  '/admin',
+  '/manager',
+  '/attendant',
+  '/accounts',
+  '/dashboard',
+  '/packages',
+  '/attractions',
+  '/edit-attraction',
+  '/events',
+  '/bookings',
+  '/orders',
+  '/customers',
+  '/customer-concerns',
+  '/payments',
+  '/memberships',
+  '/special-pricings',
+  '/fee-supports',
+  '/waivers',
+  '/check-in',
+  '/settings',
+  '/company',
+  '/notifications',
+  '/visitor-tracking',
+  '/location-change-requests',
+  '/photos',
+];
 
-const isAdminRoute = (path: string): boolean =>
-  ADMIN_ROUTE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+const PUBLIC_PATH_PREFIXES = ['/photos/kiosk', '/photos/slideshow', '/photos/qr'];
+
+const isAdminRoute = (path: string): boolean => {
+  if (PUBLIC_PATH_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return false;
+  return ADMIN_ROUTE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+};
 
 const handleAuthError = (error: any) => {
   const status = error?.response?.status;

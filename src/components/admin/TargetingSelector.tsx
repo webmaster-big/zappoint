@@ -5,6 +5,7 @@ import { packageService } from '../../services/PackageService';
 import { attractionService } from '../../services/AttractionService';
 import { eventService } from '../../services/EventService';
 import { useLocationScope } from '../../contexts/LocationContext';
+import { getStoredUser } from '../../utils/storage';
 
 export interface TargetingValue {
   location_ids: number[] | null;
@@ -22,7 +23,10 @@ interface Option {
 interface Props {
   value: TargetingValue;
   onChange: (value: TargetingValue) => void;
+  lockToOwnLocation?: boolean;
 }
+
+const MULTI_LOCATION_ROLES = ['company_admin', 'admin'];
 
 type Axis = 'location_ids' | 'package_ids' | 'attraction_ids' | 'event_ids';
 type ItemKey = 'package' | 'attraction' | 'event';
@@ -79,8 +83,10 @@ async function ensureItems(kind: ItemKey, ids: number[]): Promise<Option[]> {
   return peekItems(kind, ids);
 }
 
-export default function TargetingSelector({ value, onChange }: Props) {
-  const { locations: scopeLocations } = useLocationScope();
+export default function TargetingSelector({ value, onChange, lockToOwnLocation = false }: Props) {
+  const { locations: scopeLocations, effectiveLocationId } = useLocationScope();
+  const canChooseLocations =
+    !lockToOwnLocation || MULTI_LOCATION_ROLES.includes(String(getStoredUser()?.role));
   const [fallbackLocations, setFallbackLocations] = useState<Option[]>([]);
 
   const [allPackages, setAllPackages] = useState<Option[]>([]);
@@ -101,6 +107,13 @@ export default function TargetingSelector({ value, onChange }: Props) {
     }
     return fallbackLocations;
   }, [scopeLocations, fallbackLocations]);
+
+  useEffect(() => {
+    if (canChooseLocations || !effectiveLocationId) return;
+    const current = value.location_ids ?? [];
+    if (current.length === 1 && current[0] === effectiveLocationId) return;
+    onChange({ ...value, location_ids: [effectiveLocationId] });
+  }, [canChooseLocations, effectiveLocationId, value, onChange]);
 
   const locationNameById = useMemo(
     () => Object.fromEntries(locations.map((l) => [l.id, l.name])) as Record<number, string>,
@@ -217,18 +230,33 @@ export default function TargetingSelector({ value, onChange }: Props) {
         <span className="font-semibold">Applies to:</span> {summary}
       </div>
 
-      <AxisSection
-        icon={<MapPin className="w-4 h-4" />}
-        title="Locations"
-        allLabel="All locations"
-        emptyLabel="No locations available."
-        specific={modes.location}
-        options={locations}
-        selected={value.location_ids}
-        onSetAll={() => setAll('location_ids', 'location')}
-        onSetSpecific={() => setSpecific('location')}
-        onToggle={(id) => toggleId('location_ids', id)}
-      />
+      {canChooseLocations ? (
+        <AxisSection
+          icon={<MapPin className="w-4 h-4" />}
+          title="Locations"
+          allLabel="All locations"
+          emptyLabel="No locations available."
+          specific={modes.location}
+          options={locations}
+          selected={value.location_ids}
+          onSetAll={() => setAll('location_ids', 'location')}
+          onSetSpecific={() => setSpecific('location')}
+          onToggle={(id) => toggleId('location_ids', id)}
+        />
+      ) : (
+        <div className="border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-1">
+            <MapPin className="w-4 h-4" />
+            Locations
+          </div>
+          <p className="text-sm text-gray-700">
+            {effectiveLocationId ? locationNameById[effectiveLocationId] ?? 'Your location' : 'Your location'}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            This code only works at your location. Ask a company admin for one that covers more than one location.
+          </p>
+        </div>
+      )}
 
       <AxisSection
         icon={<PackageIcon className="w-4 h-4" />}

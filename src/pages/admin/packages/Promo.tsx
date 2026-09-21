@@ -11,6 +11,12 @@ import BatchListTab from "../../../components/admin/promos/BatchListTab";
 import BatchDetailView from "../../../components/admin/promos/BatchDetailView";
 import TargetingSelector, { type TargetingValue } from "../../../components/admin/TargetingSelector";
 
+const apiErrorMessage = (error: unknown, fallback: string): string => {
+  const body = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
+  const firstFieldError = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+  return firstFieldError || body?.message || fallback;
+};
+
 const EMPTY_TARGETING: TargetingValue = {
   location_ids: null,
   package_ids: null,
@@ -89,7 +95,7 @@ const Promo: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading promos:', error);
-      showToast('Error loading promo codes', 'error');
+      showToast(apiErrorMessage(error, 'Error loading promo codes'), 'error');
     } finally {
       setLoading(false);
     }
@@ -164,7 +170,7 @@ const Promo: React.FC = () => {
       setShowModal(false);
     } catch (error) {
       console.error('Error creating promo:', error);
-      showToast('Error creating promo code', 'error');
+      showToast(apiErrorMessage(error, 'Error creating promo code'), 'error');
     } finally {
       setLoading(false);
     }
@@ -223,8 +229,14 @@ const Promo: React.FC = () => {
       if (editForm.value !== undefined) updateData.value = Number(editForm.value);
       if (editForm.start_date !== undefined) updateData.start_date = editForm.start_date;
       if (editForm.end_date !== undefined) updateData.end_date = editForm.end_date;
-      if (editForm.usage_limit_total !== undefined) updateData.usage_limit_total = Number(editForm.usage_limit_total);
-      if (editForm.usage_limit_per_user !== undefined) updateData.usage_limit_per_user = Number(editForm.usage_limit_per_user);
+      if (editForm.usage_limit_total !== undefined) {
+        const total = Number(editForm.usage_limit_total);
+        updateData.usage_limit_total = Number.isFinite(total) && total > 0 ? total : null;
+      }
+      if (editForm.usage_limit_per_user !== undefined) {
+        const perUser = Number(editForm.usage_limit_per_user);
+        updateData.usage_limit_per_user = Number.isFinite(perUser) && perUser > 0 ? perUser : 1;
+      }
       if (editForm.status) updateData.status = editForm.status;
       if (editForm.description !== undefined) updateData.description = editForm.description;
       updateData.location_ids = editTargeting.location_ids;
@@ -238,7 +250,7 @@ const Promo: React.FC = () => {
       closeEditModal();
     } catch (error) {
       console.error('Error updating promo:', error);
-      showToast('Error updating promo', 'error');
+      showToast(apiErrorMessage(error, 'Error updating promo'), 'error');
     } finally {
       setLoading(false);
     }
@@ -253,7 +265,7 @@ const Promo: React.FC = () => {
       await loadPromos();
     } catch (error) {
       console.error('Error toggling promo:', error);
-      showToast('Error updating promo status', 'error');
+      showToast(apiErrorMessage(error, 'Error updating promo status'), 'error');
     }
   };
 
@@ -266,7 +278,7 @@ const Promo: React.FC = () => {
       await loadPromos();
     } catch (error) {
       console.error('Error toggling promo:', error);
-      showToast('Error updating promo status', 'error');
+      showToast(apiErrorMessage(error, 'Error updating promo status'), 'error');
     }
   };
 
@@ -284,7 +296,7 @@ const Promo: React.FC = () => {
       await loadPromos();
     } catch (error) {
       console.error('Error deleting promo:', error);
-      showToast('Error deleting promo', 'error');
+      showToast(apiErrorMessage(error, 'Error deleting promo'), 'error');
     } finally {
       setLoading(false);
     }
@@ -730,7 +742,7 @@ const Promo: React.FC = () => {
                 </div>
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-800 mb-2">Where this promo applies</p>
-                  <TargetingSelector value={targeting} onChange={setTargeting} />
+                  <TargetingSelector value={targeting} onChange={setTargeting} lockToOwnLocation />
                 </div>
                 <StandardButton
                   type="submit"
@@ -856,7 +868,7 @@ const Promo: React.FC = () => {
                 </div>
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-800 mb-2">Where this promo applies</p>
-                  <TargetingSelector value={editTargeting} onChange={setEditTargeting} />
+                  <TargetingSelector value={editTargeting} onChange={setEditTargeting} lockToOwnLocation />
                 </div>
                 <div className="flex gap-3 mt-6">
                   <StandardButton
