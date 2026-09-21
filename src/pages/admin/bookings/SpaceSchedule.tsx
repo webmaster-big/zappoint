@@ -1100,6 +1100,25 @@ const SpaceSchedule = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [initialLoading, selectedBooking, showCalendar, showPaymentModal, selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * What the open booking runs into. Until now this sentence existed only inside the hover card,
+   * which never opens on a tablet — so a clash could be seen as a coloured ring and read nowhere.
+   */
+  const selectedClashes = useMemo(() => {
+    if (!selectedBooking) return [];
+    for (const list of positionedByColumn.values()) {
+      const found = list.find(item => item.booking.id === selectedBooking.id);
+      if (found) return found.conflicts;
+    }
+    return [];
+  }, [selectedBooking, positionedByColumn]);
+
+  /** The space's own limit, so a party too big for the room shows up without opening anything. */
+  const capacityByRoom = useMemo(
+    () => new Map(displaySpaces.map(space => [space.id, space.capacity ?? null])),
+    [displaySpaces]
+  );
+
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -1174,25 +1193,6 @@ const SpaceSchedule = () => {
       setProcessingPayment(false);
     }
   };
-
-  /** The space's own limit, so a party too big for the room shows up without opening anything. */
-  /**
-   * What the open booking runs into. Until now this sentence existed only inside the hover card,
-   * which never opens on a tablet — so a clash could be seen as a coloured ring and read nowhere.
-   */
-  const selectedClashes = useMemo(() => {
-    if (!selectedBooking) return [];
-    for (const list of positionedByColumn.values()) {
-      const found = list.find(item => item.booking.id === selectedBooking.id);
-      if (found) return found.conflicts;
-    }
-    return [];
-  }, [selectedBooking, positionedByColumn]);
-
-  const capacityByRoom = useMemo(
-    () => new Map(displaySpaces.map(space => [space.id, space.capacity ?? null])),
-    [displaySpaces]
-  );
 
   const spaceCapacityFor = (item: PositionedBooking): number | null =>
     item.booking.room_id ? capacityByRoom.get(item.booking.room_id) ?? null : null;
