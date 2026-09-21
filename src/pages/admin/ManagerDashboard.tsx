@@ -22,9 +22,7 @@ import {
   CalendarDays,
   Eye,
   Edit,
-  FileText,
   LogIn,
-  Save,
   Loader2,
   FileSignature,
   EyeOff,
@@ -68,6 +66,7 @@ import { roomCacheService } from '../../services/RoomCacheService';
 import { cardFromPayments } from '../../utils/cardLabel';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { resolvePaymentState } from '../../types/Bookings.types';
+import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
 
 const LocationManagerDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -100,9 +99,6 @@ const LocationManagerDashboard: React.FC = () => {
 
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [tempNotes, setTempNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -1918,6 +1914,13 @@ const LocationManagerDashboard: React.FC = () => {
                   <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_phone || selectedBooking.customer?.phone || 'No phone provided'}</div>
                 </div>
               </div>
+              {/* directly under the customer, because it is what the desk needs before they speak */}
+              <div className="mb-6">
+                <InternalNotesLog
+                  bookingId={Number(selectedBooking.id)}
+                  compact
+                />
+              </div>
 
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
@@ -2154,80 +2157,13 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
-                  <FileText size={14} /> Internal Notes
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  {editingNotes ? (
-                    <div className="space-y-3">
-                      <textarea
-                        value={tempNotes}
-                        onChange={(e) => setTempNotes(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                        rows={3}
-                        placeholder="Add internal notes..."
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <StandardButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => { setEditingNotes(false); setTempNotes(selectedBooking.internal_notes || ''); }}
-                        >
-                          Cancel
-                        </StandardButton>
-                        <StandardButton
-                          variant="primary"
-                          size="sm"
-                          icon={savingNotes ? Loader2 : Save}
-                          disabled={savingNotes}
-                          onClick={async () => {
-                            setSavingNotes(true);
-                            try {
-                              await bookingService.updateInternalNotes(selectedBooking.id, tempNotes);
-                              try {
-                                const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBooking.id));
-                                if (cachedBooking) {
-                                  await bookingCacheService.updateBookingInCache({ ...cachedBooking, internal_notes: tempNotes });
-                                }
-                              } catch (cacheErr) {
-                                console.error('Failed to patch cache for internal notes:', cacheErr);
-                              }
-                              setSelectedBooking({ ...selectedBooking, internal_notes: tempNotes });
-                              setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, internal_notes: tempNotes } : b));
-                              setEditingNotes(false);
-                            } catch (err) {
-                              console.error('Failed to save notes:', err);
-                            } finally {
-                              setSavingNotes(false);
-                            }
-                          }}
-                        >
-                          {savingNotes ? 'Saving...' : 'Save'}
-                        </StandardButton>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className="cursor-pointer hover:bg-gray-100 rounded p-2 -m-2 transition-colors"
-                      onClick={() => { setTempNotes(selectedBooking.internal_notes || ''); setEditingNotes(true); }}
-                    >
-                      {selectedBooking.internal_notes ? (
-                        <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedBooking.internal_notes}</p>
-                      ) : (
-                        <p className="text-sm text-gray-400 italic">Click to add internal notes...</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
 
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex gap-2">
                   <Link
                     to={`/bookings/${selectedBooking.id}?from=dashboard`}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
+                    onClick={() => { setSelectedBooking(null); }}
                   >
                     <Eye size={15} />
                     View
@@ -2235,7 +2171,7 @@ const LocationManagerDashboard: React.FC = () => {
                   <Link
                     to={`/bookings/edit/${selectedBooking.id}?from=dashboard`}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
+                    onClick={() => { setSelectedBooking(null); }}
                   >
                     <Edit size={15} />
                     Edit
@@ -2303,7 +2239,7 @@ const LocationManagerDashboard: React.FC = () => {
                 )}
 
                 <StandardButton
-                  onClick={() => { setSelectedBooking(null); setEditingNotes(false); setShowCheckInConfirm(false); }}
+                  onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }}
                   variant="secondary"
                   size="md"
                   className="w-full"

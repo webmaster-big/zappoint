@@ -316,6 +316,32 @@ export interface UpdateBookingData {
   overlap_override_token?: string;
 }
 
+/** A version of a note that has since been corrected. */
+export interface InternalNoteRevision {
+  id: number;
+  body: string;
+  category: string | null;
+  category_label: string | null;
+  edited_by_name: string;
+  created_at: string | null;
+}
+
+/** One entry in a booking's internal log. */
+export interface InternalNote {
+  id: number;
+  body: string;
+  category: string | null;
+  category_label: string | null;
+  employee_name: string;
+  employee_role: string | null;
+  created_at: string | null;
+  edited_at: string | null;
+  edited_by_name: string | null;
+  /** Whether this signed-in employee may correct it. */
+  can_edit: boolean;
+  revisions: InternalNoteRevision[];
+}
+
 export interface BookingFilters {
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   location_id?: number;
@@ -658,12 +684,46 @@ const bookingService = {
     return response.data;
   },
 
-  async updateInternalNotes(bookingId: number, internalNotes: string): Promise<{
+  /**
+   * A booking's internal log, newest first.
+   *
+   * A note can be corrected, and the version it replaces is kept and returned with it. Nothing is
+   * ever deleted — that is the part that is permanent.
+   */
+  async getInternalNotes(bookingId: number): Promise<{
+    success: boolean;
+    data?: { notes: InternalNote[]; categories: Record<string, string> };
+  }> {
+    const response = await api.get(`/bookings/${bookingId}/internal-notes`);
+    return response.data;
+  },
+
+  async addInternalNote(bookingId: number, body: string, category?: string | null): Promise<{
     success: boolean;
     message: string;
-    data?: Pick<Booking, 'id' | 'internal_notes'>;
+    data?: InternalNote & { internal_notes?: string | null };
   }> {
-    const response = await api.patch(`/bookings/${bookingId}/internal-notes`, { internal_notes: internalNotes });
+    const response = await api.post(`/bookings/${bookingId}/internal-notes`, {
+      body,
+      category: category || null,
+    });
+    return response.data;
+  },
+
+  async updateInternalNote(
+    bookingId: number,
+    noteId: number,
+    body: string,
+    category?: string | null
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data?: InternalNote & { internal_notes?: string | null };
+  }> {
+    const response = await api.put(`/bookings/${bookingId}/internal-notes/${noteId}`, {
+      body,
+      category: category || null,
+    });
     return response.data;
   },
 

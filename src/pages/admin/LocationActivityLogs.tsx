@@ -187,9 +187,27 @@ const LocationActivityLogs = () => {
         break;
       }
       
+      // kept for rows written before notes became a permanent log
       case 'Booking Internal Notes Updated': {
         const refNum = getMetaValue('reference_number') as string;
         description = `Internal notes updated for booking ${refNum || ''}`;
+        break;
+      }
+
+      case 'Booking Internal Note Added': {
+        const refNum = getMetaValue('reference_number') as string;
+        const noteCategory = getMetaValue('note_category') as string | null;
+        description = `Internal note added to booking ${refNum || ''}`;
+        if (noteCategory) metadataDetails.push(`About: ${noteCategory.replace(/_/g, ' ')}`);
+        break;
+      }
+
+      case 'Booking Internal Note Edited': {
+        const refNum = getMetaValue('reference_number') as string;
+        const noteCategory = getMetaValue('note_category') as string | null;
+        description = `Internal note corrected on booking ${refNum || ''}`;
+        if (noteCategory) metadataDetails.push(`About: ${noteCategory.replace(/_/g, ' ')}`);
+        metadataDetails.push('The version it replaced is kept on the note');
         break;
       }
       

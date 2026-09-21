@@ -27,6 +27,7 @@ import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDate
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import BookingChangeHistory from '../../../components/admin/bookings/BookingChangeHistory';
+import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 import { normalizeCategory } from '../../../utils/venueCategories';
@@ -279,6 +280,13 @@ const ViewBooking: React.FC = () => {
                   {booking.guest_phone && <p className="text-sm text-gray-600">{booking.guest_phone}</p>}
                 </div>
               </div>
+
+              {/* right under the customer, because it is what the desk needs before they speak */}
+              {booking.id && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                  <InternalNotesLog bookingId={Number(booking.id)} />
+                </div>
+              )}
 
               {booking.package ? (
                 <div className="flex items-start gap-3">
@@ -725,17 +733,6 @@ const ViewBooking: React.FC = () => {
                   <p className="text-gray-700">{booking.notes}</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {booking.internal_notes && (
-            <div className="p-6 bg-amber-50/50 border-t border-amber-100">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle size={16} className="text-amber-600" />
-                <h3 className="font-medium text-gray-900">Internal Staff Notes</h3>
-                <span className="text-xs text-amber-600 font-medium bg-amber-100 px-2 py-0.5 rounded">Staff Only</span>
-              </div>
-              <p className="text-gray-700">{booking.internal_notes}</p>
             </div>
           )}
 

@@ -30,7 +30,6 @@ import {
   RotateCcw,
   Archive,
   Upload,
-  Loader2,
   CreditCard
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -61,6 +60,7 @@ import { roomCacheService } from '../../../services/RoomCacheService';
 import BulkImportModal from '../../../components/admin/bookings/BulkImportModal';
 import CategoryTabs from '../../../components/admin/CategoryTabs';
 import { toCsv } from '../../../components/admin/table';
+import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
 
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -213,9 +213,6 @@ const Bookings: React.FC = () => {
   const [customerSearchDebounce, setCustomerSearchDebounce] = useState<NodeJS.Timeout | null>(null);
   const [showInternalNotesModal, setShowInternalNotesModal] = useState(false);
   const [selectedBookingForNotes, setSelectedBookingForNotes] = useState<BookingsPageBooking | null>(null);
-  const [internalNotesText, setInternalNotesText] = useState('');
-  const [savingInternalNotes, setSavingInternalNotes] = useState(false);
-  const [loadingInternalNotes, setLoadingInternalNotes] = useState(false);
   
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
@@ -2536,71 +2533,17 @@ const Bookings: React.FC = () => {
     setPaymentNotes('');
   };
 
-  const handleOpenInternalNotesModal = async (booking: BookingsPageBooking) => {
+  // the log fetches its own notes, so there is nothing to prefetch and nothing to go stale
+  const handleOpenInternalNotesModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForNotes(booking);
-    setInternalNotesText(booking.internal_notes || '');
     setShowInternalNotesModal(true);
-    setLoadingInternalNotes(true);
-    try {
-      const response = await bookingService.getBookingById(Number(booking.id));
-      if (response.success && response.data) {
-        setInternalNotesText(response.data.internal_notes || '');
-      }
-    } catch (error) {
-      console.error('Error fetching booking details:', error);
-    } finally {
-      setLoadingInternalNotes(false);
-    }
   };
 
   const handleCloseInternalNotesModal = () => {
     setShowInternalNotesModal(false);
     setSelectedBookingForNotes(null);
-    setInternalNotesText('');
   };
 
-  const handleSaveInternalNotes = async () => {
-    if (!selectedBookingForNotes) return;
-    
-    try {
-      setSavingInternalNotes(true);
-      const response = await bookingService.updateInternalNotes(
-        Number(selectedBookingForNotes.id), 
-        internalNotesText
-      );
-      
-      if (response.success) {
-        const updatedBookings = bookings.map(booking =>
-          booking.id === selectedBookingForNotes.id 
-            ? { ...booking, internal_notes: internalNotesText } 
-            : booking
-        );
-        setBookings(updatedBookings);
-        
-        try {
-          const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForNotes.id));
-          if (cachedBooking) {
-            await bookingCacheService.updateBookingInCache({
-              ...cachedBooking,
-              internal_notes: internalNotesText
-            });
-          }
-        } catch (cacheErr) {
-          console.error('[Bookings] Failed to patch cache for internal notes:', cacheErr);
-        }
-        
-        alert('Internal notes saved successfully!');
-        handleCloseInternalNotesModal();
-      } else {
-        alert(response.message || 'Failed to save internal notes');
-      }
-    } catch (error) {
-      console.error('Error saving internal notes:', error);
-      alert('Failed to save internal notes. Please try again.');
-    } finally {
-      setSavingInternalNotes(false);
-    }
-  };
 
   const searchCustomersForExport = async (searchTerm: string) => {
     if (customerSearchDebounce) {
@@ -4103,44 +4046,23 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6">
-                {loadingInternalNotes ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
-                    <span className="ml-2 text-sm text-gray-500">Loading notes...</span>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={internalNotesText}
-                      onChange={(e) => setInternalNotesText(e.target.value)}
-                      rows={8}
-                      className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-sm`}
-                      placeholder="Add internal notes about this booking...&#10;&#10;Examples:&#10;- Customer requested quiet area&#10;- VIP - provide extra attention&#10;- Follow up required after service"
-                    />
-                  </div>
-                )}
+                <InternalNotesLog
+                  bookingId={Number(selectedBookingForNotes.id)}
+                  onNoteAdded={summary => {
+                    setBookings(current =>
+                      current.map(booking =>
+                        booking.id === selectedBookingForNotes.id
+                          ? { ...booking, internal_notes: summary ?? undefined }
+                          : booking
+                      )
+                    );
+                  }}
+                />
               </div>
 
-              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
-                <StandardButton
-                  variant="secondary"
-                  size="md"
-                  onClick={handleCloseInternalNotesModal}
-                  disabled={savingInternalNotes || loadingInternalNotes}
-                >
-                  Cancel
-                </StandardButton>
-                <StandardButton
-                  variant="primary"
-                  size="md"
-                  onClick={handleSaveInternalNotes}
-                  disabled={savingInternalNotes || loadingInternalNotes}
-                  loading={savingInternalNotes}
-                >
-                  {savingInternalNotes ? 'Saving...' : 'Save Notes'}
+              <div className="p-6 border-t border-gray-100 flex justify-end">
+                <StandardButton variant="secondary" size="md" onClick={handleCloseInternalNotesModal}>
+                  Close
                 </StandardButton>
               </div>
             </div>

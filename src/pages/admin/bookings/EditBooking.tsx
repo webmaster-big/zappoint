@@ -6,6 +6,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import ChangeReasonModal from '../../../components/admin/bookings/ChangeReasonModal';
 import OverlapOverrideDialog from '../../../components/admin/bookings/OverlapOverrideDialog';
+import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
 import BookingChangeHistory from '../../../components/admin/bookings/BookingChangeHistory';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
@@ -97,7 +98,6 @@ const EditBooking: React.FC = () => {
     packageId: null as number | null,
     roomId: null as number | null,
     notes: '',
-    internalNotes: '',
     sendNotification: true,
     guestOfHonorName: '',
     guestOfHonorAge: '',
@@ -235,7 +235,6 @@ const EditBooking: React.FC = () => {
           packageId: bookingData.package_id || null,
           roomId: bookingData.room_id || null,
           notes: bookingData.notes || '',
-          internalNotes: bookingData.internal_notes || '',
           sendNotification: true,
           guestOfHonorName: bookingData.guest_of_honor_name || '',
           guestOfHonorAge: bookingData.guest_of_honor_age ? String(bookingData.guest_of_honor_age) : '',
@@ -825,7 +824,6 @@ const EditBooking: React.FC = () => {
         package_id: formData.packageId || undefined,
         room_id: formData.roomId || null,
         notes: formData.notes,
-        internal_notes: formData.internalNotes,
         send_notification: formData.sendNotification,
         ...(addOnsChanged && { additional_addons: additionalAddons }),
         ...(isPackageChanged && { additional_attractions: [] }),
@@ -1442,21 +1440,8 @@ const EditBooking: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <AlertCircle className={`w-5 h-5 text-amber-600`} />
-                <h3 className="text-xl font-bold text-neutral-900">Internal Staff Notes</h3>
-                <span className="text-xs text-amber-700 font-medium bg-amber-100 px-2 py-0.5 rounded">Staff Only</span>
-              </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-3">Private notes visible only to staff. Never shown to customers.</p>
-                <textarea
-                  name="internalNotes"
-                  rows={3}
-                  value={formData.internalNotes}
-                  onChange={handleInputChange}
-                  className={`w-full rounded-md border border-amber-200 px-4 py-2 focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none bg-white text-base placeholder:text-gray-400`}
-                  placeholder="e.g., VIP customer, dietary restrictions, special arrangements..."
-                />
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                {originalBooking && <InternalNotesLog bookingId={Number(originalBooking.id)} />}
               </div>
             </div>
 
@@ -1598,16 +1583,6 @@ const EditBooking: React.FC = () => {
               <div className="pb-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500 mb-1">Customer Notes</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{formData.notes}</p>
-              </div>
-            )}
-
-            {formData.internalNotes && (
-              <div className="pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm text-gray-500">Internal Notes</p>
-                  <span className="text-xs text-amber-700 font-medium bg-amber-100 px-1.5 py-0.5 rounded">Staff Only</span>
-                </div>
-                <p className="text-sm text-amber-800 bg-amber-50 p-2 rounded whitespace-pre-wrap">{formData.internalNotes}</p>
               </div>
             )}
 
