@@ -1526,6 +1526,20 @@ const CalendarView: React.FC = () => {
                   <InternalNotesLog
                     bookingId={Number(selectedBooking.id)}
                     compact
+                    onNoteAdded={summary => {
+                      setSelectedBooking(current =>
+                        current && current.id === selectedBooking.id
+                          ? ({ ...current, internal_notes: summary ?? undefined } as Booking)
+                          : current
+                      );
+                      setBookings(prev =>
+                        prev.map(booking =>
+                          booking.id === selectedBooking.id
+                            ? ({ ...booking, internal_notes: summary ?? undefined } as Booking)
+                            : booking
+                        )
+                      );
+                    }}
                   />
                 </div>
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { History, Lock, Pencil, Plus, StickyNote } from 'lucide-react';
 import bookingService, { type InternalNote } from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 
 interface InternalNotesLogProps {
   bookingId: number;
@@ -74,6 +75,23 @@ const InternalNotesLog: React.FC<InternalNotesLogProps> = ({ bookingId, compact 
   const failureText = (err: unknown, fallback: string): string =>
     (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
 
+  const publishSummary = useCallback(
+    async (summary: string | null | undefined) => {
+      if (summary === undefined) return;
+      onNoteAdded?.(summary);
+
+      try {
+        const cached = await bookingCacheService.getBookingFromCache(bookingId);
+        if (cached) {
+          await bookingCacheService.updateBookingInCache({ ...cached, internal_notes: summary ?? undefined });
+        }
+      } catch {
+        // the note is already saved; a stale badge elsewhere is not worth failing the save over
+      }
+    },
+    [bookingId, onNoteAdded]
+  );
+
   const save = async () => {
     const text = body.trim();
     if (!text || saving) return;
@@ -87,7 +105,7 @@ const InternalNotesLog: React.FC<InternalNotesLogProps> = ({ bookingId, compact 
         setBody('');
         setCategory('');
         setAdding(false);
-        onNoteAdded?.(response.data.internal_notes ?? null);
+        await publishSummary(response.data.internal_notes ?? null);
       } else {
         setError(response.message || 'The note could not be saved.');
       }
@@ -117,7 +135,7 @@ const InternalNotesLog: React.FC<InternalNotesLogProps> = ({ bookingId, compact 
         const updated = response.data as InternalNote;
         setNotes(current => current.map(note => (note.id === noteId ? updated : note)));
         setEditingId(null);
-        onNoteAdded?.(response.data.internal_notes ?? null);
+        await publishSummary(response.data.internal_notes ?? null);
       } else {
         setError(response.message || 'The change could not be saved.');
       }

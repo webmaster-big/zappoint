@@ -1171,6 +1171,12 @@ const EditBooking: React.FC = () => {
             </div>
 
             <div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                {originalBooking && <InternalNotesLog bookingId={Number(originalBooking.id)} />}
+              </div>
+            </div>
+
+            <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Booking Details
               </h3>
@@ -1437,12 +1443,6 @@ const EditBooking: React.FC = () => {
                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400 resize-none`}
                 placeholder="Special requests or notes from the customer..."
               />
-            </div>
-
-            <div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
-                {originalBooking && <InternalNotesLog bookingId={Number(originalBooking.id)} />}
-              </div>
             </div>
 
             <div>

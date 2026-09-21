@@ -1508,6 +1508,20 @@ const AttendantDashboard: React.FC = () => {
                    <InternalNotesLog
                      bookingId={Number(selectedBooking.id)}
                      compact
+                     onNoteAdded={summary => {
+                       setSelectedBooking((current: any) =>
+                         current && current.id === selectedBooking.id
+                           ? ({ ...current, internal_notes: summary ?? undefined })
+                           : current
+                       );
+                       setAllBookings(prev =>
+                         prev.map((booking: any) =>
+                           booking.id === selectedBooking.id
+                             ? ({ ...booking, internal_notes: summary ?? undefined })
+                             : booking
+                         )
+                       );
+                     }}
                    />
                  </div>
 
