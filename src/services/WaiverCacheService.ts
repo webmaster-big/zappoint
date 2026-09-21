@@ -4,6 +4,13 @@ import type { Waiver, WaiverSearchFilters } from '../types/waiver.types';
 const CACHE_NAME = 'zapzone-waivers-cache-v1';
 const CACHE_METADATA_KEY = '/api/waivers/metadata';
 
+// The endpoint puts no ceiling on per_page, so ask for a lot and make few calls.
+const PER_PAGE = 1000;
+// Bounded fan-out: a venue with a very long history should not open 100 sockets at once.
+const CONCURRENCY = 5;
+// A hard stop so an enormous "all time" range cannot hang the screen indefinitely.
+const MAX_PAGES = 40;
+
 interface CacheMetadata {
   lastUpdated: number;
   userId?: number;
@@ -134,17 +141,25 @@ class WaiverCacheService {
 
     this.syncPromise = (async () => {
       try {
-        const collected: Waiver[] = [];
-        let currentPage = 1;
-        let lastPage = 1;
+        // Page one tells us how many there are; the rest go out together. Walking them one at a
+        // time was the whole delay — 3k waivers at 200/page is 16 sequential round-trips, each
+        // paying Laravel boot and ~130ms of eager-loaded query before the next one even starts.
+        const first = await waiverService.list({ ...filters, per_page: PER_PAGE, page: 1 });
+        if (!first.success) return [];
 
-        do {
-          const res = await waiverService.list({ ...filters, per_page: 200, page: currentPage });
-          if (!res.success) break;
-          collected.push(...((res.data.waivers as Waiver[]) || []));
-          lastPage = res.data.pagination?.last_page ?? 1;
-          currentPage++;
-        } while (currentPage <= lastPage);
+        const collected: Waiver[] = [...((first.data.waivers as Waiver[]) || [])];
+        const lastPage = Math.min(first.data.pagination?.last_page ?? 1, MAX_PAGES);
+
+        for (let page = 2; page <= lastPage; page += CONCURRENCY) {
+          const batch = [];
+          for (let i = page; i < page + CONCURRENCY && i <= lastPage; i++) {
+            batch.push(waiverService.list({ ...filters, per_page: PER_PAGE, page: i }));
+          }
+          const results = await Promise.all(batch);
+          for (const res of results) {
+            if (res.success) collected.push(...((res.data.waivers as Waiver[]) || []));
+          }
+        }
 
         await this.cacheWaivers(collected, filters);
 
