@@ -157,7 +157,7 @@ const Rooms: React.FC = () => {
                 location_id: isCompanyAdmin && selectedLocationId ? selectedLocationId : undefined
             };
             
-            if (currentPage === 1 && !searchTerm && !filters.is_available) {
+            if (currentPage === 1 && !searchTerm && filters.is_available === undefined) {
                 const cachedRooms = await roomCacheService.getFilteredRoomsFromCache(
                     isCompanyAdmin && selectedLocationId ? { location_id: selectedLocationId } : {}
                 );
@@ -386,11 +386,13 @@ const Rooms: React.FC = () => {
         try {
             const updateResponse = await roomService.updateRoom(selectedRoom.id, {
                 name: formData.name,
-                capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
+                capacity: formData.capacity ? parseInt(formData.capacity) : null,
                 is_available: formData.is_available,
-                break_time: formData.break_time.length > 0 ? formData.break_time : undefined,
-                area_group: formData.area_group || undefined,
-                booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
+                break_time: formData.break_time,
+                area_group: formData.area_group.trim() || null,
+                ...(formData.booking_interval.trim() === ''
+                    ? {}
+                    : { booking_interval: parseInt(formData.booking_interval) })
             });
             
             if (updateResponse.data) {
@@ -1488,7 +1490,10 @@ const Rooms: React.FC = () => {
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                 placeholder="e.g., Zone A"
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">Spaces in the same area are checked together</p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Spaces in the same area are checked together. Clear this box to ungroup
+                                                this space, so its times stop being staggered against the others.
+                                            </p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1692,9 +1697,11 @@ const Rooms: React.FC = () => {
                                         onChange={(e) => {
                                             setSelectedAreaGroup(e.target.value);
                                             const roomInGroup = rooms.find(r => r.area_group === e.target.value);
-                                            if (roomInGroup?.booking_interval) {
-                                                setAreaGroupInterval(roomInGroup.booking_interval.toString());
-                                            }
+                                            setAreaGroupInterval(
+                                                roomInGroup && roomInGroup.booking_interval != null
+                                                    ? String(roomInGroup.booking_interval)
+                                                    : '15'
+                                            );
                                         }}
                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                     >

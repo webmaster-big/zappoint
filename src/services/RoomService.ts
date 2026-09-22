@@ -63,7 +63,11 @@ export interface CreateRoomData {
   booking_interval?: number;
 }
 
-export type UpdateRoomData = Partial<CreateRoomData>;
+export type UpdateRoomData = Partial<Omit<CreateRoomData, 'capacity' | 'break_time' | 'area_group'>> & {
+  capacity?: number | null;
+  break_time?: BreakTime[] | null;
+  area_group?: string | null;
+};
 
 export interface ApiResponse<T> {
   success: boolean;
