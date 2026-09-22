@@ -57,6 +57,13 @@ import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
 import MetricsService, { type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
+import {
+  TIMEFRAME_VALUES,
+  createdWithinTimeframe,
+  readStoredTimeframe,
+  storeTimeframe,
+  timeframeLabel,
+} from '../../utils/dashboardTimeframe';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import { parseLocalDate, convertTo12Hour, formatDurationDisplay, formatLocalDateTime, michiganToday } from '../../utils/timeFormat';
 import { guestNoteOf } from '../../utils/bookingNotes';
@@ -83,8 +90,13 @@ const AttendantDashboard: React.FC = () => {
    const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
    const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
    
-   const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_24h');
-   const [timeframeDescription, setTimeframeDescription] = useState('Last 24 Hours');
+   const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>(readStoredTimeframe);
+   const timeframeDescription = timeframeLabel(metricsTimeframe);
+
+   const handleTimeframeChange = (timeframe: TimeframeType) => {
+     setMetricsTimeframe(timeframe);
+     storeTimeframe(timeframe);
+   };
    const [customDateFrom, setCustomDateFrom] = useState('');
    const [customDateTo, setCustomDateTo] = useState('');
    
@@ -93,6 +105,7 @@ const AttendantDashboard: React.FC = () => {
    const [dayLoading, setDayLoading] = useState(true);
    
    const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings for this location
+   const [recentlyCreatedBookings, setRecentlyCreatedBookings] = useState<any[]>([]);
    const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
    const [dailyBookings, setDailyBookings] = useState<any[]>([]);
    const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
@@ -161,6 +174,14 @@ const AttendantDashboard: React.FC = () => {
          
          setAllBookings(bookings);
          bookingCacheService.syncInBackground();
+
+         const recentResponse = await bookingService.getBookings({
+           location_id: locationId,
+           sort_by: 'created_at',
+           sort_order: 'desc',
+           per_page: 100,
+         });
+         setRecentlyCreatedBookings(recentResponse.data.bookings || []);
        } catch (error) {
          console.error('⚠️ [AttendantDashboard] Error loading bookings:', error);
        } finally {
@@ -202,57 +223,21 @@ const AttendantDashboard: React.FC = () => {
      fetchRooms();
    }, [locationId]);
 
-   const getTimeframeCutoffDate = (): Date | null => {
-     const now = new Date();
-     switch (metricsTimeframe) {
-       case 'last_24h': {
-         const d = new Date(now);
-         d.setDate(now.getDate() - 1);
-         return d;
-       }
-       case 'last_7d': {
-         const d = new Date(now);
-         d.setDate(now.getDate() - 7);
-         return d;
-       }
-       case 'last_30d': {
-         const d = new Date(now);
-         d.setDate(now.getDate() - 30);
-         return d;
-       }
-       case 'custom': {
-         if (customDateFrom) return new Date(customDateFrom);
-         return null;
-       }
-       case 'all_time':
-       default:
-         return null;
-     }
-   };
-
    useEffect(() => {
-     if (allBookings.length === 0) {
+     if (recentlyCreatedBookings.length === 0) {
        setNewBookings([]);
        return;
      }
-     
-     const cutoff = getTimeframeCutoffDate();
-     
-     if (!cutoff) {
-       setNewBookings(allBookings);
-       console.log('📅 [AttendantDashboard] New bookings (all time):', allBookings.length);
-       return;
-     }
-     
-     const recentlyCreated = allBookings.filter((booking: any) => {
-       const createdAt = new Date(booking.created_at);
-       return createdAt >= cutoff;
-     });
-     
+
+     const recentlyCreated = recentlyCreatedBookings.filter((booking: any) =>
+       String(booking.status).toLowerCase() !== 'cancelled' &&
+       createdWithinTimeframe(booking.created_at, metricsTimeframe, customDateFrom, customDateTo)
+     );
+
      setNewBookings(recentlyCreated);
      console.log(`📅 [AttendantDashboard] New bookings (${timeframeDescription}) derived:`, recentlyCreated.length);
      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [allBookings, metricsTimeframe, customDateFrom, customDateTo]);
+   }, [recentlyCreatedBookings, metricsTimeframe, customDateFrom, customDateTo]);
 
    useEffect(() => {
      const fetchMetricsData = async () => {
@@ -289,10 +274,6 @@ const AttendantDashboard: React.FC = () => {
          const metricsResponse = await MetricsService.getAttendantMetrics(metricsParams);
          
          console.log('📊 Attendant Metrics Response:', metricsResponse);
-         
-         if (metricsResponse.timeframe) {
-           setTimeframeDescription(metricsResponse.timeframe.description);
-         }
          
          setMetrics(metricsResponse.metrics);
          setTicketPurchases(metricsResponse.recentPurchases || []);
@@ -814,14 +795,12 @@ const AttendantDashboard: React.FC = () => {
                <Clock size={16} className="text-gray-500" />
                <select
                  value={metricsTimeframe}
-                 onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
+                 onChange={(e) => handleTimeframeChange(e.target.value as TimeframeType)}
                  className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                >
-                 <option value="last_24h">Last 24 Hours</option>
-                 <option value="last_7d">Last 7 Days</option>
-                 <option value="last_30d">Last 30 Days</option>
-                 <option value="all_time">All Time</option>
-                 <option value="custom">Custom Range</option>
+                 {TIMEFRAME_VALUES.map(value => (
+                   <option key={value} value={value}>{timeframeLabel(value)}</option>
+                 ))}
                </select>
                {metricsLoading && (
                  <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>

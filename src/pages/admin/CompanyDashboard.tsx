@@ -45,6 +45,13 @@ import { bookingCacheService } from '../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import { metricsService, type TimeframeType, type DashboardMetrics } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
+import {
+  TIMEFRAME_VALUES,
+  createdWithinTimeframe,
+  readStoredTimeframe,
+  storeTimeframe,
+  timeframeLabel,
+} from '../../utils/dashboardTimeframe';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime, michiganToday } from '../../utils/timeFormat';
 import { guestNoteOf } from '../../utils/bookingNotes';
 import { roomService, type Room } from '../../services/RoomService';
@@ -102,19 +109,8 @@ const CompanyDashboard: React.FC = () => {
   const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
-  const getDefaultTimeframe = (): TimeframeType => {
-    const user = getStoredUser();
-    const key = user?.id ? `dashboard_timeframe_${user.id}` : 'dashboard_timeframe';
-    const saved = localStorage.getItem(key);
-    if (saved && ['today','last_24h','last_7d','last_30d','all_time','custom'].includes(saved)) {
-      return saved as TimeframeType;
-    }
-    return 'today';
-  };
-  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>(getDefaultTimeframe);
-  const [timeframeDescription, setTimeframeDescription] = useState(() =>
-    getDefaultTimeframe() === 'today' ? 'Today' : 'All Time'
-  );
+  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>(readStoredTimeframe);
+  const timeframeDescription = timeframeLabel(metricsTimeframe);
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
   
@@ -467,58 +463,17 @@ const CompanyDashboard: React.FC = () => {
     fetchRooms();
   }, [effectiveLocationId]);
 
-  const getTimeframeCutoffDate = (): Date | null => {
-    const now = new Date();
-    switch (metricsTimeframe) {
-      case 'today': {
-        const d = new Date(now);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
-      case 'last_24h': {
-        const d = new Date(now);
-        d.setDate(now.getDate() - 1);
-        return d;
-      }
-      case 'last_7d': {
-        const d = new Date(now);
-        d.setDate(now.getDate() - 7);
-        return d;
-      }
-      case 'last_30d': {
-        const d = new Date(now);
-        d.setDate(now.getDate() - 30);
-        return d;
-      }
-      case 'custom': {
-        if (customDateFrom) return new Date(customDateFrom);
-        return null;
-      }
-      case 'all_time':
-      default:
-        return null;
-    }
-  };
-
   useEffect(() => {
     if (allBookings.length === 0) {
       setNewBookings([]);
       return;
     }
-    
-    const cutoff = getTimeframeCutoffDate();
-    
-    if (!cutoff) {
-      setNewBookings(allBookings);
-      console.log('📅 [CompanyDashboard] New bookings (all time):', allBookings.length);
-      return;
-    }
-    
-    const recentlyCreated = allBookings.filter((booking: any) => {
-      const createdAt = new Date(booking.created_at);
-      return createdAt >= cutoff;
-    });
-    
+
+    const recentlyCreated = allBookings.filter((booking: any) =>
+      String(booking.status).toLowerCase() !== 'cancelled' &&
+      createdWithinTimeframe(booking.created_at, metricsTimeframe, customDateFrom, customDateTo)
+    );
+
     setNewBookings(recentlyCreated);
     console.log(`📅 [CompanyDashboard] New bookings (${timeframeDescription}) derived:`, recentlyCreated.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -641,10 +596,6 @@ const CompanyDashboard: React.FC = () => {
           setDashboardBreakdowns(metricsResponse.breakdowns);
         }
 
-        if (metricsResponse.timeframe) {
-          setTimeframeDescription(metricsResponse.timeframe.description);
-        }
-        
         if (metricsResponse.locationStats) {
           setApiLocationStats(metricsResponse.locationStats);
           console.log('📍 Location stats from API (company_admin):', Object.keys(metricsResponse.locationStats).length, 'locations');
@@ -947,9 +898,7 @@ const CompanyDashboard: React.FC = () => {
 
   const handleTimeframeChange = (tf: TimeframeType) => {
     setMetricsTimeframe(tf);
-    const user = getStoredUser();
-    const key = user?.id ? `dashboard_timeframe_${user.id}` : 'dashboard_timeframe';
-    localStorage.setItem(key, tf);
+    storeTimeframe(tf);
   };
 
   const updateCardVisibility = (card: string, visible: boolean) => {
@@ -1048,12 +997,9 @@ const CompanyDashboard: React.FC = () => {
                 onChange={(e) => handleTimeframeChange(e.target.value as TimeframeType)}
                 className={`appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-transparent cursor-pointer`}
               >
-                <option value="today">Today</option>
-                <option value="last_24h">Last 24 Hours</option>
-                <option value="last_7d">Last 7 Days</option>
-                <option value="last_30d">Last 30 Days</option>
-                <option value="all_time">All Time</option>
-                <option value="custom">Custom Range</option>
+                {TIMEFRAME_VALUES.map(value => (
+                  <option key={value} value={value}>{timeframeLabel(value)}</option>
+                ))}
               </select>
               <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>

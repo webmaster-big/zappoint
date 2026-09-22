@@ -1,3 +1,4 @@
+import { michiganTodayKey } from '../utils/dashboardTimeframe';
 
 const CACHE_NAME = 'metrics-cache-v1';
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -37,7 +38,9 @@ class MetricsCacheService {
   private memoryCache: Map<string, CachedMetricsData<any>> = new Map();
 
   private getCacheKey(dashboardType: DashboardType, locationId?: number | 'all', timeframe?: string): string {
-    return `metrics_${dashboardType}_${locationId || 'all'}_${timeframe || 'last_30d'}`;
+    const resolved = timeframe || 'last_30d';
+    const daySuffix = resolved === 'today' ? `_${michiganTodayKey()}` : '';
+    return `metrics_${dashboardType}_${locationId || 'all'}_${resolved}${daySuffix}`;
   }
 
   private isCacheValid(timestamp: number): boolean {
