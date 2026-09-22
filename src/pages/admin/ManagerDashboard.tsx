@@ -707,8 +707,10 @@ const LocationManagerDashboard: React.FC = () => {
     },
     {
       title: 'Waivers',
-      value: (metrics.totalWaivers ?? 0).toString(),
-      change: `${metrics.completedWaivers ?? 0} signed • ${metrics.pendingWaivers ?? 0} pending • ${timeframeDescription}`,
+      value: metrics.waiverMetricsAvailable === false ? '—' : (metrics.totalWaivers ?? 0).toString(),
+      change: metrics.waiverMetricsAvailable === false
+        ? 'Could not be counted — see the server log'
+        : `${metrics.completedWaivers ?? 0} signed • ${metrics.pendingWaivers ?? 0} pending • ${timeframeDescription}`,
       icon: FileSignature,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       explanation: 'Waivers covering visit days in this period, counted on the day they cover — the same rule the Waiver Records page uses, so the numbers agree.',
@@ -1466,7 +1468,7 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
-            No ticket purchases found for this week
+            No ticket purchases found for {timeframeDescription.toLowerCase()}
           </div>
         )}
       </div>
