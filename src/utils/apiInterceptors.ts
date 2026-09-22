@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import { isReportingEndpoint, reportClientError } from './errorLogger';
 import { enforceCacheOwnership, purgeAllZapzoneCaches } from './cacheGuard';
 
 const SCOPE_LEAK_KEYS = ['user_id', 'userId'] as const;
@@ -83,6 +84,16 @@ const handleAuthError = (error: any) => {
   const status = error?.response?.status;
   const url: string | undefined = error?.config?.url;
   const message: string | undefined = error?.response?.data?.message;
+
+  if (!isReportingEndpoint(url)) {
+    reportClientError({
+      kind: 'api',
+      status,
+      message: message || error?.message || 'Request failed',
+      action: `${String(error?.config?.method || 'get').toUpperCase()} ${url || 'unknown'}`,
+      requestId: error?.response?.headers?.['x-request-id'],
+    });
+  }
 
   if (status === 401 && !isAuthEndpoint(url)) {
     let hadSession = false;
