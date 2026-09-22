@@ -50,7 +50,7 @@ export interface Promo {
 }
 
 export interface PromoFilters {
-  status?: 'active' | 'inactive' | 'expired' | 'exhausted';
+  status?: 'active' | 'inactive' | 'expired' | 'exhausted' | 'all';
   type?: 'fixed' | 'percentage';
   location_id?: number;
   search?: string;

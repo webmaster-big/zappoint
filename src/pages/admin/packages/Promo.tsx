@@ -11,6 +11,11 @@ import BatchListTab from "../../../components/admin/promos/BatchListTab";
 import BatchDetailView from "../../../components/admin/promos/BatchDetailView";
 import TargetingSelector, { type TargetingValue } from "../../../components/admin/TargetingSelector";
 
+const suggestedCodeFrom = (error: unknown): string | null => {
+  const body = (error as { response?: { data?: { suggested_code?: string } } })?.response?.data;
+  return typeof body?.suggested_code === 'string' && body.suggested_code.length > 0 ? body.suggested_code : null;
+};
+
 const apiErrorMessage = (error: unknown, fallback: string): string => {
   const body = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
   const firstFieldError = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
@@ -64,9 +69,10 @@ const Promo: React.FC = () => {
   const loadPromos = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await promoService.getPromos(
-        effectiveLocationId ? { location_id: effectiveLocationId } : undefined
-      );
+      const response = await promoService.getPromos({
+        status: 'all',
+        ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
+      });
 
       if (response.data && response.data.promos) {
         const formattedPromos: PromoItem[] = response.data.promos
@@ -170,6 +176,10 @@ const Promo: React.FC = () => {
       setShowModal(false);
     } catch (error) {
       console.error('Error creating promo:', error);
+      const suggestion = suggestedCodeFrom(error);
+      if (suggestion) {
+        setForm((prev) => ({ ...prev, code: suggestion }));
+      }
       showToast(apiErrorMessage(error, 'Error creating promo code'), 'error');
     } finally {
       setLoading(false);
