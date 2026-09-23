@@ -832,9 +832,9 @@ const EditBooking: React.FC = () => {
           discount_amount: quote.discount_amount,
           applied_fees: quote.persist_fees.length > 0 ? quote.persist_fees : null,
         }),
-        guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
-        guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
-        guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        guest_of_honor_name: packageDetails?.has_guest_of_honor ? (formData.guestOfHonorName.trim() || null) : undefined,
+        guest_of_honor_age: packageDetails?.has_guest_of_honor ? (formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : null) : undefined,
+        guest_of_honor_gender: packageDetails?.has_guest_of_honor ? ((formData.guestOfHonorGender as 'male' | 'female' | 'other') || null) : undefined,
         overlap_override_token: overrideTokenRef.current || undefined,
       });
 

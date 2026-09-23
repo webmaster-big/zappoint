@@ -378,20 +378,20 @@ const EditPurchase: React.FC = () => {
         ? {
             scheduled_date: scheduledDate,
             scheduled_time: scheduledTime,
-            notes: notes || undefined,
+            notes: notes || null,
           }
         : {
             attraction_id: attractionId ?? undefined,
             guest_name: guestName || undefined,
             guest_email: guestEmail || undefined,
-            guest_phone: guestPhone || undefined,
+            guest_phone: guestPhone || null,
             quantity,
             scheduled_date: scheduledDate,
             scheduled_time: scheduledTime,
             status,
             payment_method: paymentMethod,
             amount_paid: amountPaid,
-            notes: notes || undefined,
+            notes: notes || null,
             applied_fees: appliedFees.length > 0 ? appliedFees : null,
             applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
             discount_amount: discountAmount,
