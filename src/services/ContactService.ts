@@ -102,21 +102,21 @@ export interface ContactCreateData {
 
 export interface ContactUpdateData {
   location_id?: number;
-  email?: string;
-  first_name?: string;
-  last_name?: string;
-  phone?: string;
-  date_of_birth?: string;
-  company_name?: string;
-  job_title?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  country?: string;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  date_of_birth?: string | null;
+  company_name?: string | null;
+  job_title?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  country?: string | null;
   tags?: string[];
-  source?: string;
-  notes?: string;
+  source?: string | null;
+  notes?: string | null;
   status?: 'active' | 'inactive';
   sms_consent?: boolean;
 }

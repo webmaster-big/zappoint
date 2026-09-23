@@ -31,7 +31,7 @@ export interface GiftCard {
   max_usage: number;
   description?: string;
   status: 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
-  expiry_date?: string | null;
+  expiry_date?: string;
   created_by: number;
   location_id?: number;
   location_ids?: number[] | null;

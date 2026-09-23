@@ -499,20 +499,20 @@ const CustomerListing: React.FC = () => {
     setSavingViewEdit(true);
     try {
       const updateData: Record<string, string | null | undefined> = {};
-      if (viewEditData.first_name !== undefined) updateData.first_name = viewEditData.first_name || undefined;
-      if (viewEditData.last_name !== undefined) updateData.last_name = viewEditData.last_name || undefined;
-      if (viewEditData.email !== undefined) updateData.email = viewEditData.email || undefined;
-      if (viewEditData.phone !== undefined) updateData.phone = viewEditData.phone || undefined;
+      if (viewEditData.first_name !== undefined) updateData.first_name = viewEditData.first_name || null;
+      if (viewEditData.last_name !== undefined) updateData.last_name = viewEditData.last_name || null;
+      if (viewEditData.email !== undefined) updateData.email = viewEditData.email || null;
+      if (viewEditData.phone !== undefined) updateData.phone = viewEditData.phone || null;
       if (viewEditData.date_of_birth !== undefined) updateData.date_of_birth = viewEditData.date_of_birth || null;
-      if (viewEditData.company_name !== undefined) updateData.company_name = viewEditData.company_name || undefined;
-      if (viewEditData.job_title !== undefined) updateData.job_title = viewEditData.job_title || undefined;
+      if (viewEditData.company_name !== undefined) updateData.company_name = viewEditData.company_name || null;
+      if (viewEditData.job_title !== undefined) updateData.job_title = viewEditData.job_title || null;
       if (viewEditData.address !== undefined) updateData.address = viewEditData.address || null;
       if (viewEditData.city !== undefined) updateData.city = viewEditData.city || null;
       if (viewEditData.state !== undefined) updateData.state = viewEditData.state || null;
       if (viewEditData.zip !== undefined) updateData.zip = viewEditData.zip || null;
-      if (viewEditData.country !== undefined) updateData.country = viewEditData.country || undefined;
-      if (viewEditData.notes !== undefined) updateData.notes = viewEditData.notes || undefined;
-      if (viewEditData.source !== undefined) updateData.source = viewEditData.source || undefined;
+      if (viewEditData.country !== undefined) updateData.country = viewEditData.country || null;
+      if (viewEditData.notes !== undefined) updateData.notes = viewEditData.notes || null;
+      if (viewEditData.source !== undefined) updateData.source = viewEditData.source || null;
       if (viewEditData.status !== undefined) updateData.status = viewEditData.status;
 
       const response = await contactService.updateContact(selectedContactForView.id, updateData);

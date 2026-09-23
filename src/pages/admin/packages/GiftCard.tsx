@@ -41,6 +41,18 @@ const EMPTY_SELL_FORM: SellForm = {
   payment_method: 'cash',
 };
 
+const tomorrowIso = (): string => {
+  const now = new Date();
+  now.setDate(now.getDate() + 1);
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/Detroit' });
+};
+
+const apiErrorMessage = (error: unknown, fallback: string): string => {
+  const body = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
+  const firstFieldError = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+  return firstFieldError || body?.message || fallback;
+};
+
 const GiftCard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const { effectiveLocationId, locations, isCompanyAdmin } = useLocationScope();
@@ -158,6 +170,13 @@ const GiftCard: React.FC = () => {
       showToast('Please enter a valid max usage', 'error');
       return;
     }
+    if (form.expiry_date) {
+      const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Detroit' });
+      if (form.expiry_date <= todayIso) {
+        showToast('An expiry date has to be after today. Leave it blank for a card that never expires.', 'error');
+        return;
+      }
+    }
     
     try {
       setLoading(true);
@@ -186,7 +205,7 @@ const GiftCard: React.FC = () => {
       setShowModal(false);
     } catch (error) {
       console.error('Error creating gift card:', error);
-      showToast('Error creating gift card', 'error');
+      showToast(apiErrorMessage(error, 'Error creating gift card'), 'error');
     } finally {
       setLoading(false);
     }
@@ -739,8 +758,10 @@ const GiftCard: React.FC = () => {
                     name="expiry_date" 
                     value={form.expiry_date} 
                     onChange={handleChange} 
+                    min={tomorrowIso()}
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   />
+                  <p className="mt-1 text-xs text-gray-500">Leave blank for a card that never expires.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-800 mb-1">Description</label>
