@@ -265,7 +265,7 @@ const EditEvent = () => {
       const payload: Record<string, unknown> = {
         location_id: parseInt(selectedLocation) || undefined,
         name: name.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() || null,
         date_type: dateType,
         start_date: startDate,
         end_date: dateType === 'date_range' ? endDate : undefined,

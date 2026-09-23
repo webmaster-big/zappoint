@@ -138,8 +138,8 @@ export interface CreatePackageData {
   image?: string;
   status?: 'active' | 'inactive';
   is_active?: boolean;
-  partial_payment_percentage?: number;
-  partial_payment_fixed?: number;
+  partial_payment_percentage?: number | null;
+  partial_payment_fixed?: number | null;
   has_guest_of_honor?: boolean;
   customer_notes?: string;
   invitation_download_link?: string | null;

@@ -91,7 +91,7 @@ export interface EventPurchaseAddOnPivot {
 export interface CreateEventData {
   location_id: number;
   name: string;
-  description?: string;
+  description?: string | null;
   image?: string;
   date_type: 'one_time' | 'date_range';
   start_date: string;
@@ -115,9 +115,9 @@ export interface CreateEventPurchaseData {
   event_id: number;
   customer_id?: number | null;
   location_id: number;
-  guest_name?: string;
-  guest_email?: string;
-  guest_phone?: string;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  guest_phone?: string | null;
   sms_consent?: boolean;
   purchase_date: string;
   purchase_time: string;
@@ -136,8 +136,8 @@ export interface CreateEventPurchaseData {
   payment_status?: string;
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   transaction_id?: string;
-  notes?: string;
-  special_requests?: string;
+  notes?: string | null;
+  special_requests?: string | null;
   send_email?: boolean;
   applied_fees?: Array<{
     fee_name: string;

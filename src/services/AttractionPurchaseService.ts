@@ -121,13 +121,13 @@ export interface CreatePurchaseData {
   customer_id?: number;
   guest_name?: string;
   guest_email?: string;
-  guest_phone?: string;
+  guest_phone?: string | null;
   quantity: number;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   purchase_date: string;
   scheduled_date?: string; // Customer's chosen date
   scheduled_time?: string; // Customer's chosen time slot
-  notes?: string;
+  notes?: string | null;
   amount?: number;
   total_amount?: number; // Total amount including fees
   amount_paid?: number;

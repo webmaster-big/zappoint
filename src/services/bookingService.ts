@@ -282,9 +282,9 @@ export interface UpdateBookingData {
   notes?: string;
   internal_notes?: string; // Staff-only notes, never shown to customer
   special_requests?: string;
-  guest_of_honor_name?: string;
-  guest_of_honor_age?: number;
-  guest_of_honor_gender?: 'male' | 'female' | 'other';
+  guest_of_honor_name?: string | null;
+  guest_of_honor_age?: number | null;
+  guest_of_honor_gender?: 'male' | 'female' | 'other' | null;
   send_notification?: boolean; // Control whether to send customer notification on update
   transaction_id?: string; // Payment transaction ID from Authorize.Net
   additional_attractions?: Array<{

@@ -359,13 +359,13 @@ const EditEventPurchase: React.FC = () => {
         ? {
             purchase_date: purchaseDate,
             purchase_time: purchaseTime,
-            notes: notes || undefined,
-            special_requests: specialRequests || undefined,
+            notes: notes || null,
+            special_requests: specialRequests || null,
           }
         : {
-            guest_name: guestName || undefined,
-            guest_email: guestEmail || undefined,
-            guest_phone: guestPhone || undefined,
+            guest_name: guestName || null,
+            guest_email: guestEmail || null,
+            guest_phone: guestPhone || null,
             quantity,
             purchase_date: purchaseDate,
             purchase_time: purchaseTime,
@@ -377,8 +377,8 @@ const EditEventPurchase: React.FC = () => {
             discount_amount: discountAmount,
             applied_fees: appliedFees.length > 0 ? appliedFees : null,
             applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
-            notes: notes || undefined,
-            special_requests: specialRequests || undefined,
+            notes: notes || null,
+            special_requests: specialRequests || null,
             add_ons: buildAddOns(),
           };
 
