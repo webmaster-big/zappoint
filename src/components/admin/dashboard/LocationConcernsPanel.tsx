@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowRight,
   CalendarX2,
   CheckCircle2,
@@ -126,10 +127,13 @@ const LocationConcernsPanel = ({ locationId, locationName, limit = 5 }: Location
 
   const counters = [
     { label: 'Needs a call', value: stats?.open ?? 0, icon: PhoneCall, className: 'bg-amber-50 text-amber-700 border-amber-200' },
-    { label: 'Schedule help', value: stats?.schedule_help ?? 0, icon: CalendarX2, className: 'bg-blue-50 text-blue-700 border-blue-200' },
-    { label: 'Call to book', value: stats?.call_to_book ?? 0, icon: Phone, className: 'bg-teal-50 text-teal-700 border-teal-200' },
-    { label: 'Left unfinished', value: stats?.abandoned_checkout ?? 0, icon: ShoppingCart, className: 'bg-purple-50 text-purple-700 border-purple-200' },
-    { label: 'Today', value: stats?.today ?? 0, icon: Inbox, className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    { label: 'Received today', value: stats?.today ?? 0, icon: Inbox, className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  ];
+
+  const byReason = [
+    { label: 'Schedule help', value: stats?.schedule_help ?? 0, icon: CalendarX2 },
+    { label: 'Call to book', value: stats?.call_to_book ?? 0, icon: Phone },
+    { label: 'Left unfinished', value: stats?.abandoned_checkout ?? 0, icon: ShoppingCart },
   ];
 
   return (
@@ -161,7 +165,7 @@ const LocationConcernsPanel = ({ locationId, locationName, limit = 5 }: Location
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-2">
         {counters.map(counter => {
           const Icon = counter.icon;
           return (
@@ -176,13 +180,47 @@ const LocationConcernsPanel = ({ locationId, locationName, limit = 5 }: Location
         })}
       </div>
 
-      {error && <p className="text-xs text-rose-600 mb-3">{error}</p>}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">All time by reason</span>
+        {byReason.map(reason => {
+          const Icon = reason.icon;
+          return (
+            <span key={reason.label} className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+              <Icon size={11} className="text-gray-400" />
+              {reason.label}
+              <span className="font-semibold text-gray-700">{reason.value}</span>
+            </span>
+          );
+        })}
+      </div>
+
+      {error && concerns.length > 0 && <p className="text-xs text-rose-600 mb-3">{error}</p>}
 
       {loading && concerns.length === 0 ? (
         <div className="space-y-2">
           {[0, 1, 2].map(row => (
             <div key={row} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
           ))}
+        </div>
+      ) : error && concerns.length === 0 ? (
+        <div className="text-center py-6 border border-rose-100 bg-rose-50/50 rounded-lg">
+          <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+          <p className="text-sm font-medium text-gray-700">{error}</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            This is not an all-clear — open the full page to check who is waiting.
+          </p>
+          <div className="flex items-center justify-center gap-3 mt-2">
+            <button
+              type="button"
+              onClick={() => load()}
+              className={`text-xs font-medium text-${themeColor}-700 hover:underline`}
+            >
+              Try again
+            </button>
+            <Link to="/customer-concerns" className="text-xs font-medium text-gray-600 hover:underline">
+              Open Customer Concerns
+            </Link>
+          </div>
         </div>
       ) : concerns.length === 0 ? (
         <div className="text-center py-6">

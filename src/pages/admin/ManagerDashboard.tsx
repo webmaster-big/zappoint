@@ -776,8 +776,8 @@ const LocationManagerDashboard: React.FC = () => {
       sections: metrics.waiverMetricsAvailable === false ? [] : [
         { title: 'By status', items: dashboardBreakdowns?.waiverStatusBreakdown ?? [], showTotal: false },
         { title: 'By source', items: dashboardBreakdowns?.waiverBreakdown ?? [] },
-        { title: 'Adult age brackets (signed)', items: dashboardBreakdowns?.waiverAgeBreakdown ?? [] },
-        { title: 'Minor age brackets (at signing)', items: dashboardBreakdowns?.waiverMinorAgeBreakdown ?? [] },
+        { title: 'Adult age brackets (signed)', items: dashboardBreakdowns?.waiverAgeBreakdown ?? [], totalLabel: 'Adults with a birthdate' },
+        { title: 'Minor age brackets (at signing)', items: dashboardBreakdowns?.waiverMinorAgeBreakdown ?? [], totalLabel: 'Minors with a birthdate' },
       ],
     },
   ];
@@ -939,52 +939,6 @@ const LocationManagerDashboard: React.FC = () => {
       </div>
 
       <MetricCardGrid cards={metricsCards} columns={7} loading={loading} />
-
-      <LocationConcernsPanel locationId={locationId} locationName={locationName} />
-
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Zap className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
-        </h2>
-        {canEditQuickActions && (
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500 mr-1">Shown to staff:</span>
-            {allQuickActions.map((a) => {
-              const shown = !hiddenQuickActions.includes(a.title);
-              return (
-                <button
-                  key={`qa-toggle-${a.title}`}
-                  type="button"
-                  onClick={() => void toggleQuickAction(a.title)}
-                  className={`text-xs px-2 py-1 rounded-full border transition ${
-                    shown
-                      ? 'bg-white border-gray-300 text-gray-700'
-                      : 'bg-gray-100 border-gray-200 text-gray-400 line-through'
-                  }`}
-                  title={shown ? `Hide ${a.title} from staff` : `Show ${a.title} to staff`}
-                >
-                  {a.title}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-          {quickActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={index}
-                to={action.link}
-                className={`flex flex-col items-center justify-center bg-${fullColor} text-white py-2.5 px-1.5 rounded-lg text-xs font-medium transition hover:opacity-90 hover:scale-[1.02] active:scale-95`}
-              >
-                <Icon size={16} />
-                <span className="mt-1 text-center leading-tight">{action.title}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
 
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -1664,6 +1618,52 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         )}
       </div>}
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Zap className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
+        </h2>
+        {canEditQuickActions && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500 mr-1">Shown to staff:</span>
+            {allQuickActions.map((a) => {
+              const shown = !hiddenQuickActions.includes(a.title);
+              return (
+                <button
+                  key={`qa-toggle-${a.title}`}
+                  type="button"
+                  onClick={() => void toggleQuickAction(a.title)}
+                  className={`text-xs px-2 py-1 rounded-full border transition ${
+                    shown
+                      ? 'bg-white border-gray-300 text-gray-700'
+                      : 'bg-gray-100 border-gray-200 text-gray-400 line-through'
+                  }`}
+                  title={shown ? `Hide ${a.title} from staff` : `Show ${a.title} to staff`}
+                >
+                  {a.title}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="grid grid-cols-4 sm:grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2">
+          {quickActions.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={index}
+                to={action.link}
+                className={`flex flex-col items-center justify-center bg-${fullColor} text-white py-2.5 px-1.5 rounded-lg text-xs font-medium transition hover:opacity-90 hover:scale-[1.02] active:scale-95`}
+              >
+                <Icon size={16} />
+                <span className="mt-1 text-center leading-tight">{action.title}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      <LocationConcernsPanel locationId={locationId} locationName={locationName} />
 
       {selectedTimeSlot && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setSelectedTimeSlot(null)}>

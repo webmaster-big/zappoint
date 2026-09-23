@@ -1854,7 +1854,7 @@ const AttendantDashboard: React.FC = () => {
                })}
              </div>
            )}
-           <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+           <div className="grid grid-cols-4 sm:grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2">
              {quickActions.map((action, index) => {
                const Icon = action.icon;
                return (

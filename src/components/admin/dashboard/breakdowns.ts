@@ -10,7 +10,8 @@ export const buildBreakdown = (rows: Array<{ label: string; count: number }>): B
     .map(row => ({ label: row.label, count: row.count, percentage: percentageOf(row.count, total) }));
 };
 
-export const rescaleBreakdown = (items: BreakdownItem[] | undefined, labels: string[]): BreakdownItem[] => {
-  const picked = (items ?? []).filter(item => labels.includes(item.label));
+export const rescaleBreakdown = (items: BreakdownItem[] | undefined, keys: string[]): BreakdownItem[] => {
+  const wanted = keys.map(k => k.toLowerCase());
+  const picked = (items ?? []).filter(item => wanted.includes(String(item.status ?? item.label).toLowerCase()));
   return buildBreakdown(picked.map(item => ({ label: item.label, count: item.count })));
 };
