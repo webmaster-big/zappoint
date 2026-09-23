@@ -71,6 +71,7 @@ const Promo: React.FC = () => {
       setLoading(true);
       const response = await promoService.getPromos({
         status: 'all',
+        per_page: 200,
         ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
       });
 
