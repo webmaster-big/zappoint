@@ -153,6 +153,7 @@ export interface AttendantResponse {
   recentPurchases: RecentPurchase[];
   recentEventPurchases?: RecentEventPurchase[];
   recentBookings: RecentBooking[];
+  breakdowns?: DashboardBreakdowns;
 }
 
 class MetricsService {

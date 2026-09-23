@@ -29,7 +29,6 @@ import {
   FileSignature,
   EyeOff,
 } from 'lucide-react';
-import CounterAnimation from '../../components/ui/CounterAnimation';
 import StandardButton from '../../components/ui/StandardButton';
 import DateRangeCalendar from '../../components/ui/DateRangeCalendar';
 import { getStoredUser } from '../../utils/storage';
@@ -55,7 +54,7 @@ import { useHideEmptySpaces, useScheduleDayWindow } from '../../components/admin
 import CustomerSearch from '../../components/admin/calendar/CustomerSearch';
 import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
-import MetricsService, { type TimeframeType } from '../../services/MetricsService';
+import MetricsService, { type TimeframeType, type DashboardBreakdowns } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import {
   TIMEFRAME_VALUES,
@@ -73,6 +72,8 @@ import { cardFromPayments } from '../../utils/cardLabel';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { resolvePaymentState } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
+import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
+import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
 
 const AttendantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -137,7 +138,8 @@ const AttendantDashboard: React.FC = () => {
      eventPurchaseRevenue: 0,
      totalEventPurchases: 0,
      totalEventTickets: 0,
-   });
+   } as import('../../services/MetricsService').DashboardMetrics);
+   const [dashboardBreakdowns, setDashboardBreakdowns] = useState<DashboardBreakdowns | null>(null);
 
    useEffect(() => {
      const user = getStoredUser();
@@ -251,6 +253,9 @@ const AttendantDashboard: React.FC = () => {
          if (cachedData) {
            console.log('📦 [AttendantDashboard] Loaded metrics from cache for timeframe:', metricsTimeframe);
            setMetrics(cachedData.metrics);
+           if (cachedData.breakdowns) {
+             setDashboardBreakdowns(cachedData.breakdowns);
+           }
            setTicketPurchases(cachedData.recentPurchases || []);
            setRecentBookings(cachedData.recentBookings || []);
            if (cachedData.recentEventPurchases) {
@@ -276,6 +281,9 @@ const AttendantDashboard: React.FC = () => {
          console.log('📊 Attendant Metrics Response:', metricsResponse);
          
          setMetrics(metricsResponse.metrics);
+         if (metricsResponse.breakdowns) {
+           setDashboardBreakdowns(metricsResponse.breakdowns);
+         }
          setTicketPurchases(metricsResponse.recentPurchases || []);
          setRecentBookings(metricsResponse.recentBookings || []);
          if (metricsResponse.recentEventPurchases) {
@@ -291,6 +299,7 @@ const AttendantDashboard: React.FC = () => {
            recentPurchases: metricsResponse.recentPurchases || [],
            recentBookings: metricsResponse.recentBookings || [],
            recentEventPurchases: metricsResponse.recentEventPurchases || [],
+           breakdowns: metricsResponse.breakdowns,
          }, locationId, metricsTimeframe);
          
          console.log('✅ [AttendantDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
@@ -539,48 +548,97 @@ const AttendantDashboard: React.FC = () => {
    const getAttractionsForDay = (date: Date) => attractionsForDate(scheduledAttractions, date);
    const getEventsForDay = (date: Date) => eventsForDate(scheduledEvents, date);
 
-   const metricsCards = [
+   const newBookingStatusCounts = new Map<string, number>();
+   const newBookingPackageCounts = new Map<string, number>();
+   newBookings.forEach((booking: any) => {
+     const rawStatus = String(booking.status || 'pending').toLowerCase();
+     const statusLabel = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+     newBookingStatusCounts.set(statusLabel, (newBookingStatusCounts.get(statusLabel) ?? 0) + 1);
+
+     const packageLabel = booking.package?.name || booking.package_name || 'Other';
+     newBookingPackageCounts.set(packageLabel, (newBookingPackageCounts.get(packageLabel) ?? 0) + 1);
+   });
+
+   const revenueBreakdown = buildBreakdown([
+     { label: 'Package bookings', count: Number(metrics.bookingRevenue || 0) },
+     { label: 'Attraction tickets', count: Number(metrics.purchaseRevenue || 0) },
+     { label: 'Event tickets', count: Number(metrics.eventPurchaseRevenue || 0) },
+   ]);
+
+   const asMoney = (value: number) => `$${value.toFixed(2)}`;
+
+   const metricsCards: MetricCardDef[] = [
      {
+       key: 'totalBookings',
        title: 'Total Bookings',
        value: metrics.totalBookings.toString(),
-       change: `${metrics.totalParticipants} participants • ${timeframeDescription}`,
+       change: `${metrics.totalParticipants} participants`,
        icon: Calendar,
        accent: `bg-${themeColor}-100 text-${fullColor}`,
+       explanation: 'Package bookings placed in the period (counted by the date the booking was made), excluding cancelled ones. The subtitle shows total participants across those bookings.',
+       sections: [
+         { title: 'By status', items: dashboardBreakdowns?.packageStatusBreakdown ?? [] },
+         { title: 'By package', items: dashboardBreakdowns?.packageBreakdown ?? [] },
+       ],
      },
      {
+       key: 'newBookings',
        title: 'New Bookings',
        value: newBookings.length.toString(),
-       change: `Created • ${timeframeDescription}`,
+       change: 'Created in this period',
        icon: Sparkles,
        accent: 'bg-blue-100 text-blue-600',
+       explanation: 'Bookings created within the selected timeframe, based on the loaded booking list.',
+       sections: [
+         { title: 'By status', items: buildBreakdown(Array.from(newBookingStatusCounts, ([label, count]) => ({ label, count }))) },
+         { title: 'By package', items: buildBreakdown(Array.from(newBookingPackageCounts, ([label, count]) => ({ label, count }))) },
+       ],
      },
      {
+       key: 'pendingApprovals',
        title: 'Pending Approvals',
        value: metrics.pendingBookings.toString(),
-       change: `Require attention • ${timeframeDescription}`,
+       change: `Require attention`,
        icon: AlertTriangle,
        accent: 'bg-amber-100 text-amber-600',
+       explanation: 'Bookings still sitting at pending for this location in the period. They are included in Total Bookings.',
      },
      {
+       key: 'confirmed',
        title: 'Confirmed',
        value: metrics.confirmedBookings.toString(),
-       change: `Completed: ${metrics.completedBookings} • ${timeframeDescription}`,
+       change: `Completed: ${metrics.completedBookings}`,
        icon: CheckCircle,
        accent: 'bg-emerald-100 text-emerald-600',
+       explanation: 'Package bookings that were confirmed, including those that have since checked in or completed. The subtitle shows how many of them are fully completed.',
+       sections: [
+         { title: 'How far along', items: rescaleBreakdown(dashboardBreakdowns?.packageStatusBreakdown, ['Confirmed', 'Checked-in', 'Completed']) },
+       ],
      },
      {
+       key: 'totalRevenue',
        title: 'Total Revenue',
        value: `$${metrics.totalRevenue.toFixed(2)}`,
-       change: `Bookings: $${metrics.bookingRevenue.toFixed(2)}${metrics.eventPurchaseRevenue > 0 ? ` • Events: $${metrics.eventPurchaseRevenue.toFixed(2)}` : ''} • ${timeframeDescription}`,
+       change: `Bkgs: $${Math.round(metrics.bookingRevenue)} • Tix: $${Math.round(metrics.purchaseRevenue)}${metrics.eventPurchaseRevenue > 0 ? ` • Events: $${Math.round(metrics.eventPurchaseRevenue)}` : ''}`,
        icon: DollarSign,
        accent: 'bg-green-100 text-green-600',
+       explanation: 'Money actually collected (amount paid) on package bookings, attraction orders, and event orders placed in the period. Cancelled/refunded orders are excluded. Outstanding balances are not included.',
+       sections: [
+         { title: 'Where it came from', items: revenueBreakdown, formatValue: asMoney, totalLabel: 'Collected' },
+       ],
      },
      {
+       key: 'ticketSales',
        title: 'Ticket Sales',
        value: metrics.totalPurchases.toString(),
-       change: `Revenue: $${metrics.purchaseRevenue.toFixed(2)}${metrics.totalEventTickets > 0 ? ` • ${metrics.totalEventTickets} event tickets` : ''} • ${timeframeDescription}`,
+       change: `${metrics.totalAttractionTickets ?? 0} tickets • $${metrics.purchaseRevenue.toFixed(2)}`,
        icon: Ticket,
        accent: 'bg-purple-100 text-purple-600',
+       explanation: 'Attraction orders placed in the period, counted by purchase date. Cancelled and refunded orders are excluded. The card counts orders; the breakdown counts the tickets inside them.',
+       sections: [
+         { title: 'Attraction tickets by category', items: dashboardBreakdowns?.attractionBreakdown ?? [], totalLabel: 'Tickets' },
+         { title: 'Event tickets', items: dashboardBreakdowns?.eventBreakdown ?? [], totalLabel: 'Tickets' },
+       ],
      },
    ];
 
@@ -822,35 +880,7 @@ const AttendantDashboard: React.FC = () => {
            </div>
          </div>
 
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-           {metricsCards.map((metric, index) => {
-             const Icon = metric.icon;
-             return (
-               <div
-                 key={index}
-                 className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
-               >
-                 <div className="flex items-center gap-2">
-                   <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={20} /></div>
-                   <span className="text-base font-semibold text-gray-800">{metric.title}</span>
-                 </div>
-                 {loading ? (
-                   <div className="animate-pulse space-y-2 mt-2">
-                     <div className="h-8 bg-gray-200 rounded w-16"></div>
-                     <div className="h-3 bg-gray-200 rounded w-20"></div>
-                   </div>
-                 ) : (
-                   <>
-                     <div className="flex items-end gap-2 mt-2">
-                       <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
-                     </div>
-                     <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
-                   </>
-                 )}
-               </div>
-             );
-           })}
-         </div>
+         <MetricCardGrid cards={metricsCards} columns={6} loading={loading} />
 
          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
