@@ -392,7 +392,7 @@ const EditAttraction = () => {
         duration: formData.duration === '' || formData.duration === '0' || Number(formData.duration) === 0 ? 0 : Number(formData.duration),
         duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
-        image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
+        image: formData.images, // Send all images as array; an empty array removes them
         is_active: isActive,
         addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
         add_ons_order: selectedAddOns,

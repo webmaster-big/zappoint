@@ -652,9 +652,9 @@ const EditPackage: React.FC = () => {
         }
 
         const price = parseFloat(form.price);
-        const minParticipants = form.minParticipants ? parseInt(form.minParticipants) : undefined;
+        const minParticipants = form.minParticipants ? parseInt(form.minParticipants) : null;
         const pricePerAdditional = parseFloat(form.pricePerAdditional || '0');
-        const maxParticipants = form.maxParticipants ? parseInt(form.maxParticipants) : undefined;
+        const maxParticipants = form.maxParticipants ? parseInt(form.maxParticipants) : null;
 
         let duration: number;
         if (form.durationUnit === 'hours and minutes') {
@@ -679,7 +679,7 @@ const EditPackage: React.FC = () => {
             return;
         }
 
-        if (form.maxParticipants && maxParticipants !== undefined && (isNaN(maxParticipants) || maxParticipants < 1)) {
+        if (form.maxParticipants && maxParticipants !== null && (isNaN(maxParticipants) || maxParticipants < 1)) {
             showToast("Please enter a valid max participants (minimum 1)", "error");
             return;
         }

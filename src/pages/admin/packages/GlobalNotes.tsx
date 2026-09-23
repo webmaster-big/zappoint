@@ -108,9 +108,9 @@ const GlobalNotes: React.FC = () => {
     setSubmitting(true);
     try {
       const submitData = {
-        title: formData.title.trim() || undefined,
+        title: formData.title.trim() || null,
         content: formData.content.trim(),
-        package_ids: formData.package_ids.length > 0 ? formData.package_ids : undefined,
+        package_ids: formData.package_ids.length > 0 ? formData.package_ids : null,
         is_active: formData.is_active,
         display_order: formData.display_order
       };

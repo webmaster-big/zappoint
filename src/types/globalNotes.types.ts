@@ -11,17 +11,17 @@ export interface GlobalNote {
 }
 
 export interface CreateGlobalNoteData {
-  title?: string;
+  title?: string | null;
   content: string;
-  package_ids?: number[];
+  package_ids?: number[] | null;
   is_active?: boolean;
   display_order?: number;
 }
 
 export interface UpdateGlobalNoteData {
-  title?: string;
+  title?: string | null;
   content?: string;
-  package_ids?: number[];
+  package_ids?: number[] | null;
   is_active?: boolean;
   display_order?: number;
 }

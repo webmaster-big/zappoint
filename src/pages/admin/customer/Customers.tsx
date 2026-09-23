@@ -498,18 +498,18 @@ const CustomerListing: React.FC = () => {
 
     setSavingViewEdit(true);
     try {
-      const updateData: Record<string, string | undefined> = {};
+      const updateData: Record<string, string | null | undefined> = {};
       if (viewEditData.first_name !== undefined) updateData.first_name = viewEditData.first_name || undefined;
       if (viewEditData.last_name !== undefined) updateData.last_name = viewEditData.last_name || undefined;
       if (viewEditData.email !== undefined) updateData.email = viewEditData.email || undefined;
       if (viewEditData.phone !== undefined) updateData.phone = viewEditData.phone || undefined;
-      if (viewEditData.date_of_birth !== undefined) updateData.date_of_birth = viewEditData.date_of_birth || undefined;
+      if (viewEditData.date_of_birth !== undefined) updateData.date_of_birth = viewEditData.date_of_birth || null;
       if (viewEditData.company_name !== undefined) updateData.company_name = viewEditData.company_name || undefined;
       if (viewEditData.job_title !== undefined) updateData.job_title = viewEditData.job_title || undefined;
-      if (viewEditData.address !== undefined) updateData.address = viewEditData.address || undefined;
-      if (viewEditData.city !== undefined) updateData.city = viewEditData.city || undefined;
-      if (viewEditData.state !== undefined) updateData.state = viewEditData.state || undefined;
-      if (viewEditData.zip !== undefined) updateData.zip = viewEditData.zip || undefined;
+      if (viewEditData.address !== undefined) updateData.address = viewEditData.address || null;
+      if (viewEditData.city !== undefined) updateData.city = viewEditData.city || null;
+      if (viewEditData.state !== undefined) updateData.state = viewEditData.state || null;
+      if (viewEditData.zip !== undefined) updateData.zip = viewEditData.zip || null;
       if (viewEditData.country !== undefined) updateData.country = viewEditData.country || undefined;
       if (viewEditData.notes !== undefined) updateData.notes = viewEditData.notes || undefined;
       if (viewEditData.source !== undefined) updateData.source = viewEditData.source || undefined;

@@ -350,7 +350,7 @@ const ManageAddons = () => {
           description: formData.description || '',
           is_active: true,
           min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : 1,
-          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : undefined,
+          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
           is_force_add_on: formData.is_force_add_on,
           price_each_packages: formData.is_force_add_on ? formData.price_each_packages : null,
         };

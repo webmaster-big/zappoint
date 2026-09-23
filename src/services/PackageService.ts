@@ -121,8 +121,8 @@ export interface CreatePackageData {
   price: number;
   pricing_type?: 'base' | 'per_person';
   price_per_additional?: number;
-  max_participants: number;
-  min_participants?: number;
+  max_participants: number | null;
+  min_participants?: number | null;
   max_tickets_per_slot?: number | null;
   participant_label?: string | null;
   display_label?: string | null;

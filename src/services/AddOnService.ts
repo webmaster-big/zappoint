@@ -64,7 +64,7 @@ export interface CreateAddOnData {
   image?: string;
   is_active?: boolean;
   min_quantity?: number;
-  max_quantity?: number;
+  max_quantity?: number | null;
   is_force_add_on?: boolean;
   price_each_packages?: PackageSpecificPrice[] | null;
 }
