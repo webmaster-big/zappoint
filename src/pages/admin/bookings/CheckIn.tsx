@@ -23,7 +23,9 @@ import {
   FileSignature,
   ScanLine,
   Tablet,
-  FileText
+  FileText,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -34,7 +36,8 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
-import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatDateLong, formatDateTimeET, michiganToday, dateKey } from '../../../utils/timeFormat';
+import CalendarDatePicker from '../../../components/admin/calendar/CalendarDatePicker';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import { useNavigate } from 'react-router-dom';
 import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
@@ -126,7 +129,7 @@ const CheckIn: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => dateKey(michiganToday()));
   const [scanning, setScanning] = useState(false);
   const navigate = useNavigate();
 
@@ -394,6 +397,23 @@ const CheckIn: React.FC = () => {
       });
     });
   }, [waivers, searchTerm]);
+
+  const selectedDateObj = React.useMemo(() => parseLocalDate(selectedDate), [selectedDate]);
+
+  const selectedDateLabel = React.useMemo(
+    () => selectedDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }),
+    [selectedDateObj],
+  );
+
+  const jumpToDate = (date: Date) => setSelectedDate(dateKey(date));
+
+  const shiftSelectedDay = (delta: number) => {
+    const next = parseLocalDate(selectedDate);
+    next.setDate(next.getDate() + delta);
+    setSelectedDate(dateKey(next));
+  };
+
+  const isOnToday = selectedDate === dateKey(michiganToday());
 
   const scopeLabel = React.useMemo(() => {
     if (!effectiveLocationId) return 'All Locations';
@@ -1383,12 +1403,51 @@ const CheckIn: React.FC = () => {
                 <Calendar className="inline mr-2 h-4 w-4" />
                 Date
               </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
-              />
+              <div className="flex items-center gap-2">
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronLeft}
+                  onClick={() => shiftSelectedDay(-1)}
+                  title="Previous day"
+                />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                  aria-label="Date"
+                  className={`min-w-0 flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+                />
+                <CalendarDatePicker
+                  value={selectedDateObj}
+                  onChange={jumpToDate}
+                  label=""
+                  highlight="day"
+                  themeColor={themeColor}
+                  fullColor={fullColor}
+                  align="right"
+                  buttonClassName={`flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-800 hover:bg-${themeColor}-50 transition-colors`}
+                />
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronRight}
+                  onClick={() => shiftSelectedDay(1)}
+                  title="Next day"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-500 truncate">{selectedDateLabel}</span>
+                {!isOnToday && (
+                  <button
+                    type="button"
+                    onClick={() => jumpToDate(michiganToday())}
+                    className={`text-xs font-medium text-${themeColor}-700 hover:underline shrink-0`}
+                  >
+                    Back to today
+                  </button>
+                )}
+              </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-800 mb-2">
