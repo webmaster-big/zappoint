@@ -15,7 +15,7 @@ type SearchableBooking = Partial<Booking>;
 
 const MIN_PHONE_DIGITS = 3;
 
-const digitsOnly = (value: string): string => value.replace(/\D+/g, '');
+export const digitsOnly = (value: string): string => value.replace(/\D+/g, '');
 
 const customerOf = (booking: SearchableBooking): CustomerRef | null => {
   const customer = booking.customer;

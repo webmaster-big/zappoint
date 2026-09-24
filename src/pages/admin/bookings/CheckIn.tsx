@@ -39,6 +39,7 @@ import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPa
 import { useNavigate } from 'react-router-dom';
 import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
 import waiverService from '../../../services/waiverService';
+import waiverCacheService from '../../../services/WaiverCacheService';
 import type { ScannedWaiver, Waiver, WaiverTemplate } from '../../../types/waiver.types';
 import { resolveScannedCode, KIND_LABELS } from '../../../utils/scanCode';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
@@ -50,6 +51,38 @@ import type { MembershipScanResponse } from '../../../types/Membership.types';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { resolvePaymentState } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
+import { matchesBookingSearch, digitsOnly } from '../../../utils/bookingSearch';
+import axios from 'axios';
+
+const LIST_TAB_KEY = 'zapzone_checkin_list_tab';
+const WAIVER_PAGE_SIZE = 200;
+const MIN_PHONE_DIGITS = 3;
+
+const readStoredTab = (): 'waivers' | 'bookings' => {
+  try {
+    return sessionStorage.getItem(LIST_TAB_KEY) === 'bookings' ? 'bookings' : 'waivers';
+  } catch {
+    return 'waivers';
+  }
+};
+
+const writeStoredTab = (tab: 'waivers' | 'bookings') => {
+  try {
+    sessionStorage.setItem(LIST_TAB_KEY, tab);
+  } catch {
+    return;
+  }
+};
+
+const messageFrom = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined;
+    if (data?.message) return data.message;
+    const first = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
+    if (first) return first;
+  }
+  return fallback;
+};
 
 interface ScanResult {
   bookingId: number;
@@ -57,6 +90,17 @@ interface ScanResult {
   success: boolean;
   message: string;
 }
+
+const waiverSignerName = (w: Waiver) =>
+  [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || 'Signer';
+
+const waiverLinkLabel = (w: Waiver) => {
+  if (w.booking?.reference_number) return `Booking ${w.booking.reference_number}`;
+  if (w.booking?.id) return `Booking #${w.booking.id}`;
+  if (w.attraction_purchase?.id) return `Ticket #${w.attraction_purchase.id}`;
+  if (w.event?.name) return w.event.name;
+  return null;
+};
 
 interface DetailProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -126,7 +170,7 @@ const CheckIn: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
-  const { effectiveLocationId } = useLocationScope();
+  const { effectiveLocationId, locations, isCompanyAdmin } = useLocationScope();
   const [scannedTicket, setScannedTicket] = useState<AttractionPurchase | null>(null);
   const [scannedOrder, setScannedOrder] = useState<TicketOrder | null>(null);
   const [scannedMembership, setScannedMembership] = useState<MembershipScanResponse | null>(null);
@@ -140,88 +184,223 @@ const CheckIn: React.FC = () => {
   const [guestOrders, setGuestOrders] = useState<TicketOrder[]>([]);
   const [guestEvents, setGuestEvents] = useState<EventPurchase[]>([]);
   const [guestSearched, setGuestSearched] = useState(false);
+  const [waivers, setWaivers] = useState<Waiver[]>([]);
+  const [waiverTotal, setWaiverTotal] = useState(0);
+  const [waiversLoading, setWaiversLoading] = useState(false);
+  const [waiverRowBusy, setWaiverRowBusy] = useState<number | null>(null);
+  const [waiverTruncated, setWaiverTruncated] = useState(false);
+  const [bookingTruncated, setBookingTruncated] = useState(false);
+  const [bookingTotal, setBookingTotal] = useState(0);
+  const [unsignedComplete, setUnsignedComplete] = useState(true);
+  const [listTab, setListTab] = useState<'waivers' | 'bookings'>(readStoredTab);
   const [scannedWaiver, setScannedWaiver] = useState<ScannedWaiver | null>(null);
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [waiverProcessing, setWaiverProcessing] = useState(false);
+  const bookingRequest = useRef(0);
+  const waiverRequest = useRef(0);
+  const bookingScope = useRef('');
+  const waiverScope = useRef('');
+  const liveScope = useRef(`${selectedDate}|${effectiveLocationId ?? 'all'}`);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const reArmOnModalClose = useRef(false);
   const cameraWasRunning = useRef(false);
   const processingRef = useRef(false);
 
   const loadBookings = useCallback(async () => {
+    const request = ++bookingRequest.current;
+    const scopeKey = `${selectedDate}|${effectiveLocationId ?? 'all'}`;
+    if (bookingScope.current !== scopeKey) {
+      setBookings([]);
+      setBookingTotal(0);
+      setBookingTruncated(false);
+    }
     try {
       setLoading(true);
-      
-      const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+
+      const scoped = {
         booking_date: selectedDate,
         user_id: getStoredUser()?.id,
-      });
-      
+        ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
+      };
+
+      const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(scoped);
+      if (request !== bookingRequest.current || scopeKey !== liveScope.current) return;
+
       if (cachedBookings && cachedBookings.length > 0) {
+        bookingScope.current = scopeKey;
         setBookings(cachedBookings);
+        setBookingTotal(cachedBookings.length);
+        setBookingTruncated(false);
         setLoading(false);
         bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
-      
-      const response = await bookingService.getBookings({
-        booking_date: selectedDate,
-        per_page: 100,
-        user_id: getStoredUser()?.id,
-      });
-      
+
+      const response = await bookingService.getBookings({ ...scoped, per_page: 100 });
+      if (request !== bookingRequest.current || scopeKey !== liveScope.current) return;
+
       if (response.success && response.data) {
-        setBookings(response.data.bookings);
+        const fetched = response.data.bookings;
+        const total = response.data.pagination?.total ?? fetched.length;
+        bookingScope.current = scopeKey;
+        setBookings(fetched);
+        setBookingTotal(total);
+        setBookingTruncated(fetched.length < total);
         bookingCacheService.syncInBackground();
+      } else {
+        setBookings([]);
+        setBookingTotal(0);
+        setBookingTruncated(false);
       }
     } catch (error) {
+      if (request !== bookingRequest.current) return;
       console.error('Error loading bookings:', error);
       setToast({ message: 'Failed to load bookings', type: 'error' });
     } finally {
-      setLoading(false);
+      if (request === bookingRequest.current) setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, effectiveLocationId]);
+
+  const loadWaivers = useCallback(async () => {
+    const request = ++waiverRequest.current;
+    const scopeKey = `${selectedDate}|${effectiveLocationId ?? 'all'}`;
+    if (waiverScope.current !== scopeKey) {
+      setWaivers([]);
+      setWaiverTotal(0);
+      setWaiverTruncated(false);
+      setUnsignedComplete(true);
+    }
+    try {
+      setWaiversLoading(true);
+      const base = {
+        date: selectedDate,
+        per_page: WAIVER_PAGE_SIZE,
+        ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
+      };
+
+      const [unsignedRes, signedRes] = await Promise.allSettled([
+        waiverService.list({ ...base, status: 'pending' }),
+        waiverService.list({ ...base, status: 'completed' }),
+      ]);
+      if (request !== waiverRequest.current || scopeKey !== liveScope.current) return;
+
+      if (unsignedRes.status === 'rejected' && signedRes.status === 'rejected') {
+        throw unsignedRes.reason;
+      }
+
+      const unsigned = unsignedRes.status === 'fulfilled' ? (unsignedRes.value?.data?.waivers ?? []) : [];
+      const signed = signedRes.status === 'fulfilled' ? (signedRes.value?.data?.waivers ?? []) : [];
+      const unsignedTotal = unsignedRes.status === 'fulfilled'
+        ? (unsignedRes.value?.data?.pagination?.total ?? unsigned.length)
+        : unsigned.length;
+      const signedTotal = signedRes.status === 'fulfilled'
+        ? (signedRes.value?.data?.pagination?.total ?? signed.length)
+        : signed.length;
+
+      const unsignedOk = unsignedRes.status === 'fulfilled' && unsigned.length >= unsignedTotal;
+
+      waiverScope.current = scopeKey;
+      setWaivers([...unsigned, ...signed]);
+      setWaiverTotal(unsignedTotal + signedTotal);
+      setWaiverTruncated(!unsignedOk || signed.length < signedTotal);
+      setUnsignedComplete(unsignedOk);
+
+      if (unsignedRes.status === 'rejected') {
+        setToast({ message: 'Unsigned waivers could not be loaded — this list is incomplete.', type: 'error' });
+      } else if (signedRes.status === 'rejected') {
+        setToast({ message: 'Signed waivers could not be loaded — this list is incomplete.', type: 'error' });
+      }
+    } catch (error) {
+      if (request !== waiverRequest.current) return;
+      console.error('Error loading waivers:', error);
+      setToast({ message: messageFrom(error, 'Failed to load waivers'), type: 'error' });
+    } finally {
+      if (request === waiverRequest.current) setWaiversLoading(false);
+    }
+  }, [selectedDate, effectiveLocationId]);
+
+  useEffect(() => {
+    liveScope.current = `${selectedDate}|${effectiveLocationId ?? 'all'}`;
+  }, [selectedDate, effectiveLocationId]);
 
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);
 
   useEffect(() => {
+    loadWaivers();
+  }, [loadWaivers]);
+
+  useEffect(() => {
+    writeStoredTab(listTab);
+  }, [listTab]);
+
+  useEffect(() => {
+    const scopeKey = `${selectedDate}|${effectiveLocationId ?? 'all'}`;
     const unsubscribe = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
-      if (event.detail?.source === 'api') {
-        const cached = await bookingCacheService.getFilteredBookingsFromCache({
-          booking_date: selectedDate,
-          user_id: getStoredUser()?.id,
-        });
-        if (cached && cached.length > 0) {
-          setBookings(cached);
-        }
+      if (event.detail?.source !== 'api') return;
+      const cached = await bookingCacheService.getFilteredBookingsFromCache({
+        booking_date: selectedDate,
+        user_id: getStoredUser()?.id,
+        ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
+      });
+      if (liveScope.current !== scopeKey) return;
+      if (cached && cached.length > 0) {
+        bookingScope.current = scopeKey;
+        setBookings(cached);
+        setBookingTotal(cached.length);
+        setBookingTruncated(false);
       }
     });
     return () => unsubscribe();
-  }, [selectedDate]);
+  }, [selectedDate, effectiveLocationId]);
 
   useEffect(() => {
-    let result = bookings.filter(booking => 
+    let result = bookings.filter(booking =>
       booking.status === 'confirmed' || booking.status === 'checked-in'
     );
 
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(booking =>
-        booking.guest_name?.toLowerCase().includes(term) ||
-        booking.guest_email?.toLowerCase().includes(term) ||
-        booking.guest_phone?.includes(term) ||
-        booking.reference_number.toLowerCase().includes(term) ||
-        booking.package?.name?.toLowerCase().includes(term)
-      );
+      result = result.filter(booking => matchesBookingSearch(booking, searchTerm));
     }
 
-    console.log('Filtered bookings:', result);
-    console.log('Selected date:', selectedDate);
-
     setFilteredBookings(result);
-  }, [bookings, searchTerm, selectedDate]);
+  }, [bookings, searchTerm]);
+
+  const filteredWaivers = React.useMemo(() => {
+    const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return waivers;
+
+    return waivers.filter((waiver) => {
+      const text = [
+        waiverSignerName(waiver),
+        waiver.adult_email,
+        waiver.adult_phone,
+        waiver.reference_number,
+        waiver.template?.title,
+        waiver.location?.name,
+        waiver.booking?.reference_number,
+        ...(waiver.minors ?? []).map((m) => `${m.first_name ?? ''} ${m.last_name ?? ''}`),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const phoneDigits = digitsOnly(waiver.adult_phone ?? '');
+
+      return terms.every((term) => {
+        if (text.includes(term)) return true;
+        const termDigits = digitsOnly(term);
+        return termDigits.length >= MIN_PHONE_DIGITS && phoneDigits.includes(termDigits);
+      });
+    });
+  }, [waivers, searchTerm]);
+
+  const scopeLabel = React.useMemo(() => {
+    if (!effectiveLocationId) return 'All Locations';
+    return locations.find((l) => l.id === effectiveLocationId)?.name
+      || getStoredUser()?.location_name
+      || `Location #${effectiveLocationId}`;
+  }, [effectiveLocationId, locations]);
 
   const startScanning = async () => {
     try {
@@ -302,12 +481,14 @@ const CheckIn: React.FC = () => {
     setGuestSearching(true);
     setGuestSearched(true);
     try {
+      const locationFilter = effectiveLocationId ? { location_id: effectiveLocationId } : {};
+
       const [bookingRes, waiverRes, ticketRes, orderRes, eventRes] = await Promise.allSettled([
-        bookingService.getBookings({ search: term, per_page: 25, user_id: getStoredUser()?.id }),
-        waiverService.list({ search: term, per_page: 25, all: true }),
-        attractionPurchaseService.getPurchases({ search: term, per_page: 25 }),
-        ticketOrderService.list({ search: term, per_page: 25 }),
-        eventPurchaseService.getPurchases({ search: term, per_page: 25 }),
+        bookingService.getBookings({ search: term, per_page: 25, user_id: getStoredUser()?.id, ...locationFilter }),
+        waiverService.list({ search: term, per_page: 25, all: true, status: 'all', ...locationFilter }),
+        attractionPurchaseService.getPurchases({ search: term, per_page: 25, ...locationFilter }),
+        ticketOrderService.list({ search: term, per_page: 25, ...locationFilter }),
+        eventPurchaseService.getPurchases({ search: term, per_page: 25, ...locationFilter }),
       ]);
 
       setGuestBookings(
@@ -369,6 +550,7 @@ const CheckIn: React.FC = () => {
     setScannedOrder(null);
     setScannedMembership(null);
     setScannedEvent(null);
+    void loadWaivers();
     if (cameraWasRunning.current) await startScanning();
   };
 
@@ -540,12 +722,13 @@ const CheckIn: React.FC = () => {
         setToast({ message: `${scannedWaiver.adult_name} checked in`, type: 'success' });
         setShowWaiverModal(false);
         setScannedWaiver(null);
+        void waiverCacheService.clearCache().then(loadWaivers);
         if (cameraWasRunning.current) await startScanning();
       } else {
         setToast({ message: response.message || 'Could not check in that waiver.', type: 'error' });
       }
-    } catch {
-      setToast({ message: 'Could not check in that waiver.', type: 'error' });
+    } catch (error) {
+      setToast({ message: messageFrom(error, 'Could not check in that waiver.'), type: 'error' });
     } finally {
       setWaiverProcessing(false);
     }
@@ -555,6 +738,44 @@ const CheckIn: React.FC = () => {
     setShowWaiverModal(false);
     setScannedWaiver(null);
     if (cameraWasRunning.current) await startScanning();
+  };
+
+  const checkInWaiverRow = async (waiver: Waiver) => {
+    try {
+      setWaiverRowBusy(waiver.id);
+      const response = await waiverService.checkIn(waiver.id);
+      if (response.success) {
+        setToast({ message: `${waiverSignerName(waiver)} checked in`, type: 'success' });
+        await waiverCacheService.clearCache();
+        await loadWaivers();
+      } else {
+        setToast({ message: response.message || 'Could not check in that waiver.', type: 'error' });
+      }
+    } catch (error) {
+      setToast({ message: messageFrom(error, 'Could not check in that waiver.'), type: 'error' });
+      await loadWaivers();
+    } finally {
+      setWaiverRowBusy((current) => (current === waiver.id ? null : current));
+    }
+  };
+
+  const undoWaiverRow = async (waiver: Waiver) => {
+    try {
+      setWaiverRowBusy(waiver.id);
+      const response = await waiverService.undoCheckIn(waiver.id);
+      if (response.success) {
+        setToast({ message: `Check-in reverted for ${waiverSignerName(waiver)}`, type: 'success' });
+        await waiverCacheService.clearCache();
+        await loadWaivers();
+      } else {
+        setToast({ message: response.message || 'Could not undo that check-in.', type: 'error' });
+      }
+    } catch (error) {
+      setToast({ message: messageFrom(error, 'Could not undo that check-in.'), type: 'error' });
+      await loadWaivers();
+    } finally {
+      setWaiverRowBusy((current) => (current === waiver.id ? null : current));
+    }
   };
 
   const onScanSuccess = async (decodedText: string) => {
@@ -761,6 +982,7 @@ const CheckIn: React.FC = () => {
         setShowVerificationModal(false);
         setVerifiedBooking(null);
         loadBookings();
+        loadWaivers();
         if (reArmOnModalClose.current) {
           reArmOnModalClose.current = false;
           void startScanning();
@@ -799,6 +1021,7 @@ const CheckIn: React.FC = () => {
         
         setToast({ message: 'Check-in successful!', type: 'success' });
         loadBookings();
+        loadWaivers();
       } else {
         setToast({ message: 'Check-in failed. Please try again.', type: 'error' });
       }
@@ -1013,6 +1236,13 @@ const CheckIn: React.FC = () => {
             One place to check anyone in &mdash; scan a booking, attraction ticket, bulk order, membership or waiver
             code, or find the guest by name.
           </p>
+
+          {scopeLabel && (
+            <p className="text-sm text-gray-500 mt-1">
+              Showing <span className="font-medium text-gray-700">{scopeLabel}</span>
+              {!effectiveLocationId && isCompanyAdmin ? ' — pick a location in the sidebar to narrow this down' : ''}
+            </p>
+          )}
           
           <div className="mt-3 flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <Smartphone className="h-5 w-5 text-blue-600 flex-shrink-0" />
@@ -1128,7 +1358,7 @@ const CheckIn: React.FC = () => {
               <StandardButton
                 variant="danger"
                 size="md"
-                onClick={stopScanning}
+                onClick={() => { cameraWasRunning.current = false; void stopScanning(); }}
               >
                 Stop Camera
               </StandardButton>
@@ -1163,12 +1393,12 @@ const CheckIn: React.FC = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-800 mb-2">
                 <Search className="inline mr-2 h-4 w-4" />
-                Filter today&rsquo;s bookings
+                Filter the list below
               </label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Narrow the list below by name, email, phone or reference..."
+                  placeholder="Narrow the waivers and bookings below by name, email, phone or reference..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className={`w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
@@ -1187,7 +1417,7 @@ const CheckIn: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
-              placeholder="Name, phone or email — any date, any location"
+              placeholder={`Name, phone or email — any date${effectiveLocationId && scopeLabel ? `, ${scopeLabel} only` : ''}`}
               value={guestQuery}
               onChange={(e) => setGuestQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void runGuestSearch(); }}
@@ -1342,7 +1572,180 @@ const CheckIn: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-          {loading ? (
+          <div className="flex items-center gap-1 border-b border-gray-200 px-3 pt-3 overflow-x-auto">
+            {([
+              { key: 'waivers' as const, label: 'Waivers', count: `${filteredWaivers.length}${waiverTruncated && !searchTerm ? '+' : ''}` },
+              { key: 'bookings' as const, label: 'Bookings', count: `${filteredBookings.length}${bookingTruncated && !searchTerm ? '+' : ''}` },
+            ]).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setListTab(t.key)}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px whitespace-nowrap ${
+                  listTab === t.key
+                    ? `border-${themeColor}-600 text-${themeColor}-700 bg-${themeColor}-50`
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t.label}
+                <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 tabular-nums">
+                  {t.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {listTab === 'waivers' && (waiversLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className={`h-8 w-8 text-${themeColor}-600 animate-spin`} />
+              <span className="ml-3 text-gray-600">Loading waivers...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reference / Signer
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Waiver
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Visit Date
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      People Covered
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredWaivers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                        {waivers.length === 0
+                          ? 'No waivers found for selected date'
+                          : `No waivers match “${searchTerm}”`}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredWaivers.map((waiver) => {
+                      const signed = waiver.status === 'completed';
+                      const checkedIn = Boolean(waiver.checked_in_at);
+                      const minors = waiver.minors?.length ?? 0;
+                      const link = waiverLinkLabel(waiver);
+                      return (
+                        <tr key={waiver.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4">
+                            <div className="text-xs font-medium text-gray-500 font-mono">
+                              {waiver.reference_number || `#${waiver.id}`}
+                            </div>
+                            <div className="text-sm font-medium text-gray-900">{waiverSignerName(waiver)}</div>
+                            <div className="text-xs text-gray-500">Email: {waiver.adult_email || 'N/A'}</div>
+                            <div className="text-xs text-gray-500">Phone: {waiver.adult_phone || 'N/A'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{waiver.template?.title || 'Waiver'}</div>
+                            {link && <div className="text-xs text-gray-500">{link}</div>}
+                            {!effectiveLocationId && waiver.location?.name && (
+                              <div className="text-xs text-gray-500">{waiver.location.name}</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {waiver.selected_date ? formatDateLong(waiver.selected_date) : '—'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {waiver.submitted_at ? `Signed ${formatDateTimeET(waiver.submitted_at)}` : 'Not signed yet'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {1 + minors}
+                            <span className="text-xs text-gray-500 ml-1">
+                              {minors === 0 ? '(adult)' : `(adult + ${minors} minor${minors === 1 ? '' : 's'})`}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              checkedIn
+                                ? 'bg-green-100 text-green-800'
+                                : signed
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {checkedIn ? 'Checked In' : signed ? 'Signed' : 'Not Signed'}
+                            </span>
+                            {checkedIn && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {formatDateTimeET(waiver.checked_in_at)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-2">
+                              {signed && !checkedIn && (
+                                <StandardButton
+                                  variant="success"
+                                  size="sm"
+                                  icon={CheckCircle}
+                                  onClick={() => void checkInWaiverRow(waiver)}
+                                  disabled={waiverRowBusy === waiver.id}
+                                >
+                                  Check In
+                                </StandardButton>
+                              )}
+                              {checkedIn && (
+                                <StandardButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => void undoWaiverRow(waiver)}
+                                  disabled={waiverRowBusy === waiver.id}
+                                >
+                                  Undo
+                                </StandardButton>
+                              )}
+                              <StandardButton
+                                variant="primary"
+                                size="sm"
+                                icon={Eye}
+                                onClick={() => void openGuestWaiver(waiver)}
+                              >
+                                Details
+                              </StandardButton>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+              {waiverTruncated && (
+                <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-600 flex items-center justify-between gap-3">
+                  <span>
+                    {unsignedComplete
+                      ? `Loaded ${waivers.length} of ${waiverTotal} waivers for this day — every unsigned one is included, the rest are the most recently signed.`
+                      : `Loaded ${waivers.length} of ${waiverTotal} waivers for this day — some unsigned ones are not listed here.`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/waivers')}
+                    className={`font-medium text-${themeColor}-700 hover:underline`}
+                  >
+                    Open Waiver Records
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {listTab === 'bookings' && (loading ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className={`h-8 w-8 text-${themeColor}-600 animate-spin`} />
               <span className="ml-3 text-gray-600">Loading bookings...</span>
@@ -1440,8 +1843,20 @@ const CheckIn: React.FC = () => {
                   )}
                 </tbody>
               </table>
+              {bookingTruncated && (
+                <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-600 flex items-center justify-between gap-3">
+                  <span>Loaded {bookings.length} of {bookingTotal} bookings for this day.</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/bookings')}
+                    className={`font-medium text-${themeColor}-700 hover:underline`}
+                  >
+                    Open Bookings
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          ))}
         </div>
 
         {showVerificationModal && verifiedBooking && (
