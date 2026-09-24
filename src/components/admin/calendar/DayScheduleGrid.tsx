@@ -213,9 +213,17 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   );
 
   const packageWindows = useMemo(() => {
-    const map = new Map<number, { open: number; close: number }>();
+    const map = new Map<number, { open: number; close: number; closedRanges: ScheduleColumn['closedRanges'] }>();
     for (const entry of windowData.packages ?? []) {
-      map.set(entry.package_id, { open: entry.open_minutes, close: entry.close_minutes });
+      map.set(entry.package_id, {
+        open: entry.open_minutes,
+        close: entry.close_minutes,
+        closedRanges: (entry.closed_ranges ?? []).map(r => ({
+          startMinutes: r.start_minutes,
+          endMinutes: r.end_minutes,
+          reason: r.reason,
+        })),
+      });
     }
     return map;
   }, [windowData]);
@@ -268,7 +276,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           closedReason: null,
           bookable: !windowData.location_closed,
           windowKnown: true,
-          closedRanges: [],
+          closedRanges: packageWindow?.closedRanges ?? [],
         });
       }
     }
@@ -295,7 +303,11 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           closedReason: null,
           bookable: !windowData.location_closed,
           windowKnown: true,
-          closedRanges: [],
+          closedRanges: (entry.closed_ranges ?? []).map(r => ({
+            startMinutes: r.start_minutes,
+            endMinutes: r.end_minutes,
+            reason: r.reason,
+          })),
         });
       }
     }
@@ -548,7 +560,11 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       }
 
       const id = Number(column.key.replace('pkg-', ''));
-      return Number.isInteger(id) && id > 0 ? [id] : [];
+      if (!Number.isInteger(id) || id <= 0) return [];
+      const closedNow = column.closedRanges.some(
+        range => minute >= range.startMinutes && minute < range.endMinutes
+      );
+      return closedNow ? [] : [id];
     },
     [windowData]
   );

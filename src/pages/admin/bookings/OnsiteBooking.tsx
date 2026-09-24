@@ -23,6 +23,7 @@ import timeSlotService, { type TimeSlot } from '../../../services/timeSlotServic
 import customerService from '../../../services/CustomerService';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
 import { packagePriceForParticipants, participantLabelFor } from '../../../utils/packagePricing';
 
@@ -266,48 +267,26 @@ const OnsiteBooking: React.FC = () => {
 
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
     if (!bookingData.date || dayOffsWithTime.length === 0 || !selectedPackage) return false;
-    
+
     const selectedDateObj = parseLocalDate(bookingData.date);
-    const partialDayOff = dayOffsWithTime.find(dayOff => {
+    const closures = dayOffsWithTime.filter(dayOff => {
       if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
           dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
           dayOff.date.getDate() !== selectedDateObj.getDate()) {
         return false;
       }
-      
       if (dayOff.package_ids && dayOff.package_ids.length > 0) {
-        if (!dayOff.package_ids.includes(selectedPackage.id)) {
-          return false;
-        }
-      } else if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+        return dayOff.package_ids.includes(selectedPackage.id);
+      }
+      if (dayOff.room_ids && dayOff.room_ids.length > 0) {
         return false;
       }
-      
       return true;
     });
-    
-    if (!partialDayOff) return false;
-    
-    const toMinutes = (timeStr: string): number => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
-    
-    const slotStart = toMinutes(slotStartTime);
-    const slotEnd = toMinutes(slotEndTime);
-    
-    if (partialDayOff.time_start) {
-      const closesAt = toMinutes(partialDayOff.time_start);
-      if (slotStart >= closesAt) return true;
-      if (slotEnd > closesAt) return true;
-    }
-    
-    if (partialDayOff.time_end) {
-      const opensAt = toMinutes(partialDayOff.time_end);
-      if (slotStart < opensAt) return true;
-    }
-    
-    return false;
+
+    if (closures.length === 0) return false;
+
+    return isSlotBlockedByClosure(slotStartTime, slotEndTime, closures);
   };
 
   const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null; room_ids?: number[] | null }, packageId: number): boolean => {

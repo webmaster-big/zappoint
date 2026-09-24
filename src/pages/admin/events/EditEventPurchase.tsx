@@ -87,6 +87,7 @@ const EditEventPurchase: React.FC = () => {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
+  const [partialDayOffDates, setPartialDayOffDates] = useState<Set<string>>(new Set());
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
@@ -282,26 +283,37 @@ const EditEventPurchase: React.FC = () => {
         const response = await dayOffService.getDayOffsByLocation(locationId);
         if (response.success && response.data) {
           const blocked = new Set<string>();
+          const partial = new Set<string>();
           const now = new Date();
           now.setHours(0, 0, 0, 0);
+          const toDateStr = (d: Date) =>
+            `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
           response.data.forEach((dayOff: DayOff) => {
             const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
             const appliesToEvent = !!dayOff.event_ids?.includes(eventId);
             if (!isLocationWide && !appliesToEvent) return;
             const normalizedDate = dayOff.date.split('T')[0];
             const offDate = new Date(normalizedDate + 'T00:00:00');
-            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
-            if (hasTimeRestriction) return;
+            const hasTimeRestriction = !!(dayOff.time_start || dayOff.time_end);
+            const targetDates: string[] = [];
             if (dayOff.is_recurring) {
               const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
-              if (currYear >= now) blocked.add(`${currYear.getFullYear()}-${(currYear.getMonth() + 1).toString().padStart(2, '0')}-${currYear.getDate().toString().padStart(2, '0')}`);
-              blocked.add(`${nextYear.getFullYear()}-${(nextYear.getMonth() + 1).toString().padStart(2, '0')}-${nextYear.getDate().toString().padStart(2, '0')}`);
-            } else {
-              if (offDate >= now) blocked.add(normalizedDate);
+              if (currYear >= now) targetDates.push(toDateStr(currYear));
+              targetDates.push(toDateStr(nextYear));
+            } else if (offDate >= now) {
+              targetDates.push(normalizedDate);
             }
+            targetDates.forEach(dateStr => {
+              if (hasTimeRestriction) {
+                partial.add(dateStr);
+              } else {
+                blocked.add(dateStr);
+              }
+            });
           });
           setDayOffDates(blocked);
+          setPartialDayOffDates(partial);
         }
       } catch {
       }
@@ -559,6 +571,7 @@ const EditEventPurchase: React.FC = () => {
                 <ScheduleCalendar
                   availability={scheduleAvailability}
                   dayOffDates={effectiveDayOffDates}
+                  partialDayOffDates={partialDayOffDates}
                   scheduledDate={purchaseDate}
                   scheduledTime={purchaseTime}
                   availableTimeSlots={availableTimeSlots}

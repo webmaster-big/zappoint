@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { normalizeCategory } from '../../../utils/venueCategories';
 import { 
   ShoppingCart, 
@@ -57,6 +57,8 @@ import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { generateTimeSlots } from '../../../utils/timeSlots';
+import { isSlotBlockedByClosure, type PartialClosure } from '../../../utils/dayOffClosure';
+import { addMinutesToTime } from '../../../utils/attractionSchedule';
 
 const CreatePurchase = () => {
   const { themeColor } = useThemeColor();
@@ -104,6 +106,8 @@ const CreatePurchase = () => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
+  const [partialDayOffs, setPartialDayOffs] = useState<Record<string, PartialClosure[]>>({});
+  const partialDayOffDateSet = useMemo(() => new Set(Object.keys(partialDayOffs)), [partialDayOffs]);
   
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [orderLines, setOrderLines] = useState<CartItem[]>([]);
@@ -490,6 +494,7 @@ const CreatePurchase = () => {
     const fetchDayOffs = async () => {
       if (!selectedAttraction) {
         setDayOffDates(new Set());
+        setPartialDayOffs({});
         return;
       }
       const locationId = selectedAttraction.locationId || selectedLocation;
@@ -498,26 +503,38 @@ const CreatePurchase = () => {
         const response = await dayOffService.getDayOffsByLocation(locationId);
         if (response.success && response.data) {
           const blocked = new Set<string>();
+          const partial: Record<string, PartialClosure[]> = {};
           const now = new Date();
           now.setHours(0, 0, 0, 0);
+          const toDateStr = (d: Date) =>
+            `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
           response.data.forEach((dayOff: DayOff) => {
             const isLocationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
             const appliesToAttraction = !!dayOff.attraction_ids?.includes(Number(selectedAttraction.id));
             if (!isLocationWide && !appliesToAttraction) return;
             const normalizedDate = dayOff.date.split('T')[0];
             const offDate = new Date(normalizedDate + 'T00:00:00');
-            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
-            if (hasTimeRestriction) return;
+            const hasTimeRestriction = !!(dayOff.time_start || dayOff.time_end);
+            const targetDates: string[] = [];
             if (dayOff.is_recurring) {
               const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
-              if (currYear >= now) blocked.add(`${currYear.getFullYear()}-${(currYear.getMonth() + 1).toString().padStart(2, '0')}-${currYear.getDate().toString().padStart(2, '0')}`);
-              blocked.add(`${nextYear.getFullYear()}-${(nextYear.getMonth() + 1).toString().padStart(2, '0')}-${nextYear.getDate().toString().padStart(2, '0')}`);
-            } else {
-              if (offDate >= now) blocked.add(normalizedDate);
+              if (currYear >= now) targetDates.push(toDateStr(currYear));
+              targetDates.push(toDateStr(nextYear));
+            } else if (offDate >= now) {
+              targetDates.push(normalizedDate);
             }
+            targetDates.forEach(dateStr => {
+              if (hasTimeRestriction) {
+                if (!partial[dateStr]) partial[dateStr] = [];
+                partial[dateStr].push({ time_start: dayOff.time_start, time_end: dayOff.time_end });
+              } else {
+                blocked.add(dateStr);
+              }
+            });
           });
           setDayOffDates(blocked);
+          setPartialDayOffs(partial);
         }
       } catch {
       }
@@ -535,14 +552,16 @@ const CreatePurchase = () => {
     const availability = getAttractionAvailability();
     const daySlot = availability.find(slot => slot.days.map(d => d.toLowerCase()).includes(dayName));
     if (daySlot) {
-      const slots = generateTimeSlots(daySlot.start_time, daySlot.end_time, 60);
+      const closures = partialDayOffs[scheduledDate] || [];
+      const slots = generateTimeSlots(daySlot.start_time, daySlot.end_time, 60)
+        .filter(slot => !isSlotBlockedByClosure(slot, addMinutesToTime(slot, 60), closures));
       setAvailableTimeSlots(slots);
       if (!slots.includes(scheduledTime)) setScheduledTime('');
     } else {
       setAvailableTimeSlots([]);
       setScheduledTime('');
     }
-  }, [scheduledDate, selectedAttraction]);
+  }, [scheduledDate, selectedAttraction, partialDayOffs]);
 
   useEffect(() => {
     if (!scheduledDate || !selectedAttraction?.id) {
@@ -1561,6 +1580,7 @@ const CreatePurchase = () => {
                     <ScheduleCalendar
                       availability={getAttractionAvailability()}
                       dayOffDates={dayOffDates}
+                      partialDayOffDates={partialDayOffDateSet}
                       scheduledDate={scheduledDate}
                       scheduledTime={scheduledTime}
                       availableTimeSlots={availableTimeSlots}

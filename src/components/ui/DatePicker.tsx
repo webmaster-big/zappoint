@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react';
+import { describeClosure, isFullDayClosure } from '../../utils/dayOffClosure';
 
 interface BreakTime {
   days: string[];
@@ -9,8 +10,8 @@ interface BreakTime {
 
 interface DayOffInfo {
   date: Date;
-  time_start?: string | null;  // Closes at this time (e.g., "16:00")
-  time_end?: string | null;    // Opens at this time (e.g., "12:00")
+  time_start?: string | null;
+  time_end?: string | null;
   reason?: string;
 }
 
@@ -66,36 +67,24 @@ const DatePicker: React.FC<DatePickerProps> = ({
     });
   };
 
+  const closuresForDate = (date: Date): DayOffInfo[] =>
+    dayOffsWithTime.filter(d => d.date.toDateString() === date.toDateString());
+
   const isFullDayOff = (date: Date): boolean => {
     if (isDayOff(date)) return true;
-    
-    const dayOffInfo = dayOffsWithTime.find(d => d.date.toDateString() === date.toDateString());
-    if (dayOffInfo) {
-      return !dayOffInfo.time_start && !dayOffInfo.time_end;
-    }
-    return false;
+    return closuresForDate(date).some(isFullDayClosure);
   };
 
   const hasPartialDayOff = (date: Date): DayOffInfo | null => {
-    const dayOffInfo = dayOffsWithTime.find(d => d.date.toDateString() === date.toDateString());
-    if (dayOffInfo && (dayOffInfo.time_start || dayOffInfo.time_end)) {
-      return dayOffInfo;
-    }
-    return null;
+    if (isFullDayOff(date)) return null;
+    return closuresForDate(date).find(d => d.time_start || d.time_end) ?? null;
   };
 
   const getPartialDayOffInfo = (date: Date): string | null => {
-    const partial = hasPartialDayOff(date);
-    if (!partial) return null;
-    
-    if (partial.time_start && partial.time_end) {
-      return `Closed ${formatTime12Hour(partial.time_start)} - ${formatTime12Hour(partial.time_end)}`;
-    } else if (partial.time_start) {
-      return `Closes at ${formatTime12Hour(partial.time_start)}`;
-    } else if (partial.time_end) {
-      return `Opens at ${formatTime12Hour(partial.time_end)}`;
-    }
-    return null;
+    if (isFullDayOff(date)) return null;
+    const partials = closuresForDate(date).filter(d => d.time_start || d.time_end);
+    if (partials.length === 0) return null;
+    return partials.map(describeClosure).join(' · ');
   };
 
   const getDayName = (date: Date): string => {

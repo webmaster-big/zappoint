@@ -12,6 +12,7 @@ import { bookingCacheService } from '../../../services/BookingCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import StandardButton from '../../../components/ui/StandardButton';
 import roomService from '../../../services/RoomService';
@@ -190,46 +191,26 @@ const ManualBooking: React.FC = () => {
 
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
     if (!form.bookingDate || dayOffsWithTime.length === 0 || !pkg) return false;
-    
+
     const selectedDateObj = parseLocalDate(form.bookingDate);
-    const partialDayOff = dayOffsWithTime.find(dayOff => {
+    const closures = dayOffsWithTime.filter(dayOff => {
       if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
           dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
           dayOff.date.getDate() !== selectedDateObj.getDate()) {
         return false;
       }
       if (dayOff.package_ids && dayOff.package_ids.length > 0) {
-        if (!dayOff.package_ids.includes(pkg.id)) {
-          return false;
-        }
-      } else if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+        return dayOff.package_ids.includes(pkg.id);
+      }
+      if (dayOff.room_ids && dayOff.room_ids.length > 0) {
         return false;
       }
       return true;
     });
-    
-    if (!partialDayOff) return false;
-    
-    const toMinutes = (timeStr: string): number => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
-    
-    const slotStart = toMinutes(slotStartTime);
-    const slotEnd = toMinutes(slotEndTime);
-    
-    if (partialDayOff.time_start) {
-      const closesAt = toMinutes(partialDayOff.time_start);
-      if (slotStart >= closesAt) return true;
-      if (slotEnd > closesAt) return true;
-    }
-    
-    if (partialDayOff.time_end) {
-      const opensAt = toMinutes(partialDayOff.time_end);
-      if (slotStart < opensAt) return true;
-    }
-    
-    return false;
+
+    if (closures.length === 0) return false;
+
+    return isSlotBlockedByClosure(slotStartTime, slotEndTime, closures);
   };
 
   const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? pkg?.min_participants ?? 1));
@@ -237,6 +218,18 @@ const ManualBooking: React.FC = () => {
   const filteredTimeSlots = availableTimeSlots.filter(slot =>
     !isTimeSlotRestricted(slot.start_time, slot.end_time)
   );
+
+  const flexibleClosureWarning = React.useMemo(() => {
+    if (bookingMode !== 'flexible' || !form.bookingDate || !form.bookingTime || !pkg) return null;
+    const raw = Number(pkg.duration) || 0;
+    const minutes = pkg.duration_unit === 'minutes' ? Math.round(raw) : Math.round(raw * 60);
+    const [h, m] = form.bookingTime.split(':').map(Number);
+    if (Number.isNaN(h)) return null;
+    const endTotal = (h * 60 + (m || 0) + minutes) % (24 * 60);
+    const end = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`;
+    if (!isTimeSlotRestricted(form.bookingTime, end)) return null;
+    return 'The venue is closed at this time, so this booking will be refused on save.';
+  }, [bookingMode, form.bookingDate, form.bookingTime, pkg, dayOffsWithTime]);
 
   const filteredDayOffsWithTime = pkg
     ? dayOffsWithTime.filter(d => (d.package_ids && d.package_ids.length > 0) ? d.package_ids.includes(pkg.id) : !(d.room_ids && d.room_ids.length > 0))
@@ -1662,6 +1655,9 @@ const ManualBooking: React.FC = () => {
                               required
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                             />
+                            {flexibleClosureWarning && (
+                              <p className="text-[10px] text-amber-700 mt-0.5">{flexibleClosureWarning}</p>
+                            )}
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Participants *</label>

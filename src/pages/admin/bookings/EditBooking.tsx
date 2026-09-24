@@ -19,6 +19,7 @@ import { roomCacheService } from '../../../services/RoomCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import locationService, { type Location } from '../../../services/LocationService';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -442,40 +443,24 @@ const EditBooking: React.FC = () => {
     if (!formData.date || dayOffsWithTime.length === 0 || !packageDetails) return false;
 
     const selectedDateObj = parseLocalDate(formData.date);
-    const partialDayOff = dayOffsWithTime.find(dayOff => {
+    const closures = dayOffsWithTime.filter(dayOff => {
       if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
           dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
           dayOff.date.getDate() !== selectedDateObj.getDate()) {
         return false;
       }
       if (dayOff.package_ids && dayOff.package_ids.length > 0) {
-        if (!dayOff.package_ids.includes(packageDetails.id)) return false;
-      } else if (dayOff.room_ids && dayOff.room_ids.length > 0) {
+        return dayOff.package_ids.includes(packageDetails.id);
+      }
+      if (dayOff.room_ids && dayOff.room_ids.length > 0) {
         return false;
       }
       return true;
     });
 
-    if (!partialDayOff) return false;
+    if (closures.length === 0) return false;
 
-    const toMinutes = (timeStr: string): number => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
-
-    const slotStart = toMinutes(slotStartTime);
-    const slotEnd = toMinutes(slotEndTime);
-
-    if (partialDayOff.time_start) {
-      const closesAt = toMinutes(partialDayOff.time_start);
-      if (slotStart >= closesAt) return true;
-      if (slotEnd > closesAt) return true;
-    }
-    if (partialDayOff.time_end) {
-      const opensAt = toMinutes(partialDayOff.time_end);
-      if (slotStart < opensAt) return true;
-    }
-    return false;
+    return isSlotBlockedByClosure(slotStartTime, slotEndTime, closures);
   };
 
   const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null; room_ids?: number[] | null }, packageId: number): boolean => {
@@ -637,6 +622,7 @@ const EditBooking: React.FC = () => {
     if (!formData.time) return filteredTimeSlots;
     if (filteredTimeSlots.some(slot => slot.start_time === formData.time)) return filteredTimeSlots;
     if (originalBooking?.booking_time?.slice(0, 5) !== formData.time) return filteredTimeSlots;
+    if (originalBooking?.booking_date?.split('T')[0] !== formData.date) return filteredTimeSlots;
 
     const unit = originalBooking.duration_unit || 'hours';
     const raw = Number(originalBooking.duration) || 0;
@@ -651,6 +637,8 @@ const EditBooking: React.FC = () => {
       duration_unit: unit,
       room_id: originalBooking.room_id ?? null,
     };
+
+    if (isTimeSlotRestricted(current.start_time, current.end_time)) return filteredTimeSlots;
 
     return [current, ...filteredTimeSlots].sort((a, b) => a.start_time.localeCompare(b.start_time));
   })();

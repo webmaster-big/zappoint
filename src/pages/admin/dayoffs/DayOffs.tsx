@@ -7,6 +7,7 @@ import { dayOffService, packageService, roomService, attractionService } from '.
 import { eventService } from '../../../services/EventService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import type { DayOff, DayOffFilters, BlockingScope } from '../../../services/DayOffService';
+import { describeClosure, closureRangeIsValid } from '../../../utils/dayOffClosure';
 import type { Package } from '../../../services/PackageService';
 import type { Room } from '../../../services/RoomService';
 import type { Attraction } from '../../../services/AttractionService';
@@ -262,6 +263,11 @@ const DayOffs: React.FC = () => {
             return;
         }
 
+        if (closureRangeIsInvalid(formData.time_start, formData.time_end)) {
+            showToast('"Closed Until" has to be later than "Closed From"', 'error');
+            return;
+        }
+
         try {
 
             let package_ids: number[] | null = null;
@@ -330,6 +336,11 @@ const DayOffs: React.FC = () => {
         }
         if (blockingScope === 'events' && selectedEventIds.length === 0) {
             showToast('Please select at least one event', 'error');
+            return;
+        }
+
+        if (closureRangeIsInvalid(formData.time_start, formData.time_end)) {
+            showToast('"Closed Until" has to be later than "Closed From"', 'error');
             return;
         }
 
@@ -418,11 +429,7 @@ const DayOffs: React.FC = () => {
             if (!dayOff) return;
 
             await dayOffService.updateDayOff(editingCell.dayOffId, {
-                date: dayOff.date.split('T')[0],
                 reason: editingCell.field === 'reason' ? editValue : dayOff.reason,
-                is_recurring: dayOff.is_recurring,
-                time_start: sanitizeTimeValue(dayOff.time_start) ?? undefined,
-                time_end: sanitizeTimeValue(dayOff.time_end) ?? undefined,
             });
 
             setDayOffs(prev => prev.map(d => 
@@ -431,8 +438,10 @@ const DayOffs: React.FC = () => {
                     : d
             ));
             showToast('Updated successfully!', 'success');
-        } catch {
-            showToast('Error updating day off', 'error');
+        } catch (error: unknown) {
+            const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+                || 'Error updating day off';
+            showToast(message, 'error');
         } finally {
             setSavingCell(null);
             setEditingCell(null);
@@ -704,29 +713,33 @@ const DayOffs: React.FC = () => {
         return trimmed.substring(0, 5);
     };
 
-    const formatTime = (time: string | null | undefined): string => {
-        if (!time) return '';
-        const [hours, minutes] = time.split(':');
-        const h = parseInt(hours);
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        return `${h12}:${minutes} ${ampm}`;
-    };
+    const closureRangeIsInvalid = (start: string, end: string): boolean =>
+        !!start && !!end && !closureRangeIsValid({ time_start: start, time_end: end });
+
+    const closurePreview = (start: string, end: string): string =>
+        describeClosure({ time_start: start || null, time_end: end || null });
 
     const getClosureTypeLabel = (dayOff: DayOff): { label: string; color: string } | null => {
-        const hasStart = dayOff.time_start && dayOff.time_start !== '';
-        const hasEnd = dayOff.time_end && dayOff.time_end !== '';
-        
+        const hasStart = !!dayOff.time_start && dayOff.time_start !== '';
+        const hasEnd = !!dayOff.time_end && dayOff.time_end !== '';
+
         if (!hasStart && !hasEnd) {
-            return null; // Full day - no special label needed
+            return null;
+        }
+
+        const closure = { time_start: dayOff.time_start ?? null, time_end: dayOff.time_end ?? null };
+        const label = describeClosure(closure);
+
+        if (!closureRangeIsValid(closure)) {
+            return { label: `${label} (invalid range)`, color: 'bg-red-100 text-red-700' };
         }
         if (hasStart && !hasEnd) {
-            return { label: `Closes at ${formatTime(dayOff.time_start)}`, color: 'bg-orange-100 text-orange-700' };
+            return { label, color: 'bg-orange-100 text-orange-700' };
         }
         if (!hasStart && hasEnd) {
-            return { label: `Opens at ${formatTime(dayOff.time_end)}`, color: 'bg-blue-100 text-blue-700' };
+            return { label, color: 'bg-blue-100 text-blue-700' };
         }
-        return { label: `${formatTime(dayOff.time_start)} - ${formatTime(dayOff.time_end)}`, color: 'bg-yellow-100 text-yellow-700' };
+        return { label, color: 'bg-yellow-100 text-yellow-700' };
     };
 
     const renderItemLocation = (locationId?: number, nestedName?: string) => {
@@ -834,6 +847,12 @@ const DayOffs: React.FC = () => {
                     : 'Your account has no location assigned, so closures cannot be created',
                 type: 'error',
             });
+            return;
+        }
+
+        if (closureRangeIsInvalid(bulkTimeStart, bulkTimeEnd)) {
+            setBulkCreating(false);
+            setToast({ message: '"Closed Until" has to be later than "Closed From"', type: 'error' });
             return;
         }
 
@@ -1136,7 +1155,7 @@ const DayOffs: React.FC = () => {
                                 {dayOffs.map((dayOff) => {
                                     const closureType = getClosureTypeLabel(dayOff);
                                     const blockingScopeBadge = getBlockingScopeBadge(dayOff);
-                                    const isPast = isPastDate(dayOff.date);
+                                    const isPast = isPastDate(dayOff.date) && !dayOff.is_recurring;
                                     
                                     return (
                                         <div 
@@ -1298,7 +1317,7 @@ const DayOffs: React.FC = () => {
                                             {dayOffs.map((dayOff) => {
                                                 const closureType = getClosureTypeLabel(dayOff);
                                                 const blockingScopeBadge = getBlockingScopeBadge(dayOff);
-                                                const isPast = isPastDate(dayOff.date);
+                                                const isPast = isPastDate(dayOff.date) && !dayOff.is_recurring;
                                                 
                                                 return (
                                                     <tr 
@@ -1797,37 +1816,12 @@ const DayOffs: React.FC = () => {
                                         Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
                                     </label>
                                     <p className="text-xs text-gray-500 mb-3">
-                                        Leave both empty for full day closure. Set one or both for partial closures.
+                                        These times mark the window that is <span className="font-medium">closed</span>. Leave both empty to close the whole day. Set only &quot;Closed Until&quot; for a delayed opening &mdash; that is the time it reopens.
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Delayed Opening Until
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="time"
-                                                    name="time_end"
-                                                    value={formData.time_end}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                />
-                                                {formData.time_end && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        title="Clear time"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Closed until this time</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Close Starting At
+                                                Closed From
                                             </label>
                                             <div className="relative">
                                                 <input
@@ -1848,9 +1842,43 @@ const DayOffs: React.FC = () => {
                                                     </button>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-gray-400 mt-1">Closed from this time</p>
+                                            <p className="text-xs text-gray-400 mt-1">Blank means closed from opening time</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Closed Until
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="time"
+                                                    name="time_end"
+                                                    value={formData.time_end}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                                {formData.time_end && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        title="Clear time"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">Reopens at this time; blank means closed for the rest of the day</p>
                                         </div>
                                     </div>
+                                    {closureRangeIsInvalid(formData.time_start, formData.time_end) ? (
+                                        <p className="text-xs text-red-600 mt-2">
+                                            &quot;Closed Until&quot; has to be later than &quot;Closed From&quot;.
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            {closurePreview(formData.time_start, formData.time_end)}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center">
@@ -2187,37 +2215,12 @@ const DayOffs: React.FC = () => {
                                         Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
                                     </label>
                                     <p className="text-xs text-gray-500 mb-3">
-                                        Leave both empty for full day closure. Set one or both for partial closures.
+                                        These times mark the window that is <span className="font-medium">closed</span>. Leave both empty to close the whole day. Set only &quot;Closed Until&quot; for a delayed opening &mdash; that is the time it reopens.
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Delayed Opening Until
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="time"
-                                                    name="time_end"
-                                                    value={formData.time_end}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                />
-                                                {formData.time_end && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        title="Clear time"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Closed until this time</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Close Starting At
+                                                Closed From
                                             </label>
                                             <div className="relative">
                                                 <input
@@ -2238,9 +2241,43 @@ const DayOffs: React.FC = () => {
                                                     </button>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-gray-400 mt-1">Closed from this time</p>
+                                            <p className="text-xs text-gray-400 mt-1">Blank means closed from opening time</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Closed Until
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="time"
+                                                    name="time_end"
+                                                    value={formData.time_end}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                                {formData.time_end && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        title="Clear time"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">Reopens at this time; blank means closed for the rest of the day</p>
                                         </div>
                                     </div>
+                                    {closureRangeIsInvalid(formData.time_start, formData.time_end) ? (
+                                        <p className="text-xs text-red-600 mt-2">
+                                            &quot;Closed Until&quot; has to be later than &quot;Closed From&quot;.
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            {closurePreview(formData.time_start, formData.time_end)}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center">
@@ -2693,37 +2730,12 @@ const DayOffs: React.FC = () => {
                                             Partial Day Closure <span className="text-xs text-gray-500">(Optional - applies to all selected dates)</span>
                                         </label>
                                         <p className="text-xs text-gray-500 mb-3">
-                                            Leave both empty for full day closure. Set one or both for partial closures.
+                                            These times mark the window that is <span className="font-medium">closed</span>. Leave both empty to close the whole day. Set only &quot;Closed Until&quot; for a delayed opening &mdash; that is the time it reopens.
                                         </p>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                    Delayed Opening Until
-                                                </label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="time"
-                                                        value={bulkTimeEnd}
-                                                        onChange={(e) => setBulkTimeEnd(e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                        disabled={bulkCreating}
-                                                    />
-                                                    {bulkTimeEnd && !bulkCreating && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setBulkTimeEnd('')}
-                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                            title="Clear time"
-                                                        >
-                                                            <X className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-gray-400 mt-1">Closed until this time</p>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                    Close Starting At
+                                                    Closed From
                                                 </label>
                                                 <div className="relative">
                                                     <input
@@ -2744,9 +2756,43 @@ const DayOffs: React.FC = () => {
                                                         </button>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-gray-400 mt-1">Closed from this time</p>
+                                                <p className="text-xs text-gray-400 mt-1">Blank means closed from opening time</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                    Closed Until
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="time"
+                                                        value={bulkTimeEnd}
+                                                        onChange={(e) => setBulkTimeEnd(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        disabled={bulkCreating}
+                                                    />
+                                                    {bulkTimeEnd && !bulkCreating && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setBulkTimeEnd('')}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                            title="Clear time"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-400 mt-1">Reopens at this time; blank means closed for the rest of the day</p>
                                             </div>
                                         </div>
+                                        {closureRangeIsInvalid(bulkTimeStart, bulkTimeEnd) ? (
+                                            <p className="text-xs text-red-600 mt-2">
+                                                &quot;Closed Until&quot; has to be later than &quot;Closed From&quot;.
+                                            </p>
+                                        ) : (
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                {closurePreview(bulkTimeStart, bulkTimeEnd)}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center">

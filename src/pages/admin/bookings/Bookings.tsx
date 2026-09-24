@@ -1373,7 +1373,7 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating duration:', error);
-      alert('Failed to update duration. Please try again.');
+      alert(bookingUpdateError(error, 'Failed to update duration. Please try again.'));
     } finally {
       setSavingDuration(false);
     }
@@ -1390,6 +1390,9 @@ const Bookings: React.FC = () => {
     setSelectedBookingForEdit(null);
     setDateValue('');
   };
+
+  const bookingUpdateError = (error: unknown, fallback: string): string =>
+    (error as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
 
   const handleSaveDate = async () => {
     if (!selectedBookingForEdit || !dateValue) return;
@@ -1430,7 +1433,7 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating date:', error);
-      alert('Failed to update date. Please try again.');
+      alert(bookingUpdateError(error, 'Failed to update date. Please try again.'));
     } finally {
       setSavingDate(false);
     }
@@ -1480,7 +1483,7 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating time:', error);
-      alert('Failed to update time. Please try again.');
+      alert(bookingUpdateError(error, 'Failed to update time. Please try again.'));
     } finally {
       setSavingTime(false);
     }

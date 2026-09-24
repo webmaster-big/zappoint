@@ -1,15 +1,15 @@
 import { generateTimeSlots } from './timeSlots';
 import type { DayOff } from '../services/DayOffService';
+import { isSlotBlockedByClosure, closureTimeToMinutes } from './dayOffClosure';
+import type { PartialClosure } from './dayOffClosure';
+
+export { isSlotBlockedByClosure };
+export type { PartialClosure };
 
 export interface AvailabilitySlot {
   days: string[];
   start_time: string;
   end_time: string;
-}
-
-export interface PartialClosure {
-  time_start?: string | null;
-  time_end?: string | null;
 }
 
 export interface DayOffSets {
@@ -19,39 +19,13 @@ export interface DayOffSets {
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const timeToMinutes = (time: string): number => {
-  const [h, m] = time.split(':').map(Number);
-  return h * 60 + (m || 0);
-};
+const timeToMinutes = closureTimeToMinutes;
 
 export const addMinutesToTime = (time: string, minutes: number): string => {
   const total = timeToMinutes(time) + minutes;
   const h = Math.floor(total / 60);
   const m = total % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-};
-
-export const isSlotBlockedByClosure = (
-  slotStart: string,
-  slotEnd: string,
-  closures: PartialClosure[],
-): boolean => {
-  const start = timeToMinutes(slotStart);
-  const end = timeToMinutes(slotEnd);
-  return closures.some(({ time_start, time_end }) => {
-    if (!time_start && !time_end) return true;
-    if (time_start && !time_end) {
-      const close = timeToMinutes(time_start);
-      return start >= close || end > close;
-    }
-    if (!time_start && time_end) {
-      const open = timeToMinutes(time_end);
-      return start < open;
-    }
-    const rangeStart = timeToMinutes(time_start as string);
-    const rangeEnd = timeToMinutes(time_end as string);
-    return start < rangeEnd && end > rangeStart;
-  });
 };
 
 export const normalizeAvailability = (raw: unknown): AvailabilitySlot[] => {

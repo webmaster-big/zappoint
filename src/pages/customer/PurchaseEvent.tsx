@@ -17,6 +17,7 @@ import {
 import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { dayOffService, type DayOff } from '../../services/DayOffService';
+import { isSlotBlockedByClosure } from '../../utils/dayOffClosure';
 import { customerService, type Customer } from '../../services/CustomerService';
 import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import ScheduleHelpModal from '../../components/customer/ScheduleHelpModal';
@@ -529,18 +530,8 @@ const PurchaseEvent = () => {
           if (cur + interval > endM) break;
           eventSlots.push(fromMinutes(cur));
         }
-        const isSlotBlocked = (slotStart: string, slotEnd: string, closures: Array<{ time_start?: string | null; time_end?: string | null }>) => {
-          const start = toMinutes(slotStart);
-          const end = toMinutes(slotEnd);
-          return closures.some(({ time_start, time_end }) => {
-            if (!time_start && !time_end) return true;
-            if (time_start && !time_end) { const close = toMinutes(time_start); return start >= close || end > close; }
-            if (!time_start && time_end) { const open = toMinutes(time_end); return start < open; }
-            const rangeStart = toMinutes(time_start as string);
-            const rangeEnd = toMinutes(time_end as string);
-            return start < rangeEnd && end > rangeStart;
-          });
-        };
+        const isSlotBlocked = (slotStart: string, slotEnd: string, closures: Array<{ time_start?: string | null; time_end?: string | null }>) =>
+          isSlotBlockedByClosure(slotStart, slotEnd, closures);
         const partialByDate: Record<string, Array<{ time_start?: string | null; time_end?: string | null }>> = {};
         const fullDay = new Set<string>();
         response.data.forEach((dayOff: DayOff) => {

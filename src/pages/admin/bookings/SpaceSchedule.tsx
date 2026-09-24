@@ -11,6 +11,7 @@ import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { roomService } from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import { closureRangeIsValid } from '../../../utils/dayOffClosure';
 import { getStoredUser } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
 import CategoryTabs from '../../../components/admin/CategoryTabs';
@@ -400,13 +401,16 @@ const SpaceSchedule = () => {
       const c = spaceClosures.get(spaceId);
       if (!c) return null;
       if (c.fullDay) return 'Closed all day';
-      const parts = c.ranges.map(r => {
-        if (r.time_start && r.time_end) return `${formatTime12Hour(r.time_start)}–${formatTime12Hour(r.time_end)}`;
-        if (r.time_start) return `after ${formatTime12Hour(r.time_start)}`;
-        if (r.time_end) return `until ${formatTime12Hour(r.time_end)}`;
-        return '';
-      }).filter(Boolean);
-      return parts.length ? `Closed ${parts.join(', ')}` : 'Closed';
+      const parts = c.ranges
+        .filter(r => closureRangeIsValid({ time_start: r.time_start, time_end: r.time_end }))
+        .map(r => {
+          if (r.time_start && r.time_end) return `${formatTime12Hour(r.time_start)}–${formatTime12Hour(r.time_end)}`;
+          if (r.time_start) return `after ${formatTime12Hour(r.time_start)}`;
+          if (r.time_end) return `until ${formatTime12Hour(r.time_end)}`;
+          return '';
+        })
+        .filter(Boolean);
+      return parts.length ? `Closed ${parts.join(', ')}` : null;
     },
     [spaceClosures]
   );
@@ -653,7 +657,14 @@ const SpaceSchedule = () => {
   const roomWindows = useMemo(() => {
     const map = new Map<
       number,
-      { open: number | null; close: number | null; closed: boolean; bookable: boolean; reason: string | null }
+      {
+        open: number | null;
+        close: number | null;
+        closed: boolean;
+        bookable: boolean;
+        reason: string | null;
+        closedRanges: { startMinutes: number; endMinutes: number; reason: string | null }[];
+      }
     >();
     for (const entry of dayWindow?.rooms ?? []) {
       map.set(entry.room_id, {
@@ -662,6 +673,11 @@ const SpaceSchedule = () => {
         closed: entry.closed_all_day,
         bookable: entry.bookable !== false,
         reason: entry.reason,
+        closedRanges: (entry.closed_ranges ?? []).map(r => ({
+          startMinutes: r.start_minutes,
+          endMinutes: r.end_minutes,
+          reason: r.reason,
+        })),
       });
     }
     return map;
@@ -946,6 +962,34 @@ const SpaceSchedule = () => {
     return rows.sort((x, y) => y.overlapMinutes - x.overlapMinutes);
   }, [columns, activeBookings, columnKeyFor, dayWindow]);
 
+  const closedMinuteRangesFor = useCallback(
+    (spaceId: number | undefined) => {
+      if (spaceId === undefined) return [] as { start: number; end: number; reason: string }[];
+      const out: { start: number; end: number; reason: string }[] = [];
+      const seen = new Set<string>();
+      const push = (start: number, end: number, reason: string) => {
+        if (!(end > start)) return;
+        const key = `${start}-${end}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push({ start, end, reason });
+      };
+      for (const r of spaceClosures.get(spaceId)?.ranges ?? []) {
+        if (!closureRangeIsValid({ time_start: r.time_start, time_end: r.time_end })) continue;
+        push(
+          r.time_start ? timeToMinutes(r.time_start) : timeWindow.start,
+          r.time_end ? timeToMinutes(r.time_end) : timeWindow.end,
+          'Closed'
+        );
+      }
+      for (const r of roomWindows.get(spaceId)?.closedRanges ?? []) {
+        push(r.startMinutes, r.endMinutes, r.reason ?? 'Closed');
+      }
+      return out;
+    },
+    [spaceClosures, roomWindows, timeWindow]
+  );
+
   const freeFromByColumn = useMemo(() => {
     const map = new Map<string, FreeState>();
 
@@ -974,10 +1018,10 @@ const SpaceSchedule = () => {
             };
           }),
         ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end, reason: 'On break' })) : []),
-        ...(closure?.ranges || []).map(r => ({
-          startMinutes: r.time_start ? timeToMinutes(r.time_start) : (open ?? timeWindow.start),
-          endMinutes: r.time_end ? timeToMinutes(r.time_end) : (close ?? timeWindow.end),
-          reason: 'Closed',
+        ...closedMinuteRangesFor(column.roomId).map(r => ({
+          startMinutes: r.start,
+          endMinutes: r.end,
+          reason: r.reason,
         })),
       ];
 
@@ -1420,15 +1464,11 @@ const SpaceSchedule = () => {
 
   /** Breaks and closures. The server buffers neither, so neither may the grid. */
   const hardRangesFor = (column: ScheduleColumn): TimeRange[] => {
-    const closure = column.roomId ? spaceClosures.get(column.roomId) : undefined;
-    const open = column.openMinutes ?? timeWindow.start;
-    const close = column.closeMinutes ?? timeWindow.end;
-
     return [
       ...(column.roomId ? (roomBreaks.get(column.roomId) || []).map(b => ({ startMinutes: b.start, endMinutes: b.end })) : []),
-      ...(closure?.ranges || []).map(r => ({
-        startMinutes: r.time_start ? timeToMinutes(r.time_start) : open,
-        endMinutes: r.time_end ? timeToMinutes(r.time_end) : close,
+      ...closedMinuteRangesFor(column.roomId).map(r => ({
+        startMinutes: r.start,
+        endMinutes: r.end,
       })),
     ];
   };
@@ -1794,9 +1834,9 @@ const SpaceSchedule = () => {
             <span className="text-[10px] font-semibold text-red-500 bg-white/80 border border-red-200 rounded-full px-2 py-0.5">Closed all day</span>
           </div>
         )}
-        {!closure?.fullDay && closure?.ranges.map((r, i) => {
-          const start = Math.max(r.time_start ? timeToMinutes(r.time_start) : timeWindow.start, timeWindow.start);
-          const end = Math.min(r.time_end ? timeToMinutes(r.time_end) : timeWindow.end, timeWindow.end);
+        {!closure?.fullDay && closedMinuteRangesFor(column.roomId).map((range, i) => {
+          const start = Math.max(range.start, timeWindow.start);
+          const end = Math.min(range.end, timeWindow.end);
           if (end <= start) return null;
           return (
             <div
@@ -2330,7 +2370,7 @@ const SpaceSchedule = () => {
                           </span>
                         </span>
                       )}
-                      {column.roomId && spaceClosures.has(column.roomId) && (
+                      {column.roomId && getSpaceClosureLabel(column.roomId) && (
                         <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 leading-tight rounded-full">
                           {getSpaceClosureLabel(column.roomId)}
                         </span>
