@@ -14,6 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import InfoTooltip from '../../ui/InfoTooltip';
+import CalendarDatePicker from '../calendar/CalendarDatePicker';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import { AttractionScheduleCard, EventScheduleCard, attractionsForDate, eventsForDate, formatDateKey } from '../calendar/ScheduledActivity';
 import { fetchDayBookings } from '../calendar/fetchDayBookings';
 import { convertTo12Hour, michiganToday } from '../../../utils/timeFormat';
@@ -354,6 +356,7 @@ const CategoryActivityPanel: React.FC<CategoryActivityPanelProps> = ({
   onSelectBooking,
   className,
 }) => {
+  const { themeColor, fullColor } = useThemeColor();
   const [date, setDate] = useState(() => michiganToday());
   const [openBucket, setOpenBucket] = useState<ActivityBucketKey | null>(null);
 
@@ -381,6 +384,11 @@ const CategoryActivityPanel: React.FC<CategoryActivityPanelProps> = ({
       next.setDate(next.getDate() + days);
       return next;
     });
+  }, []);
+
+  const jumpToDate = useCallback((next: Date) => {
+    setOpenBucket(null);
+    setDate(next);
   }, []);
 
   const todayKey = formatDateKey(michiganToday());
@@ -430,7 +438,15 @@ const CategoryActivityPanel: React.FC<CategoryActivityPanelProps> = ({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-sm font-medium text-gray-800 min-w-[8.5rem] text-center tabular-nums">{dateLabel}</span>
+          <CalendarDatePicker
+            value={date}
+            onChange={jumpToDate}
+            label={dateLabel}
+            highlight="day"
+            themeColor={themeColor}
+            fullColor={fullColor}
+            buttonClassName={`flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 tabular-nums hover:bg-${themeColor}-50 transition-colors min-w-[10.5rem]`}
+          />
           <button
             type="button"
             onClick={() => shiftDay(1)}
