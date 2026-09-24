@@ -73,6 +73,7 @@ import { attractionPurchaseCacheService } from '../../services/AttractionPurchas
 import { resolvePaymentState } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
+import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
 import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
 import LocationConcernsPanel from '../../components/admin/dashboard/LocationConcernsPanel';
 
@@ -939,6 +940,12 @@ const LocationManagerDashboard: React.FC = () => {
       </div>
 
       <MetricCardGrid cards={metricsCards} columns={7} loading={loading} />
+
+      <CategoryActivityPanel
+        locationId={locationId}
+        scopeLabel={locationName ? `${locationName} only` : 'Your location only'}
+        onSelectBooking={setSelectedBooking}
+      />
 
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">

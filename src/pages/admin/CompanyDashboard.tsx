@@ -72,6 +72,7 @@ import {
   EventScheduleCard,
 } from '../../components/admin/calendar/ScheduledActivity';
 import { buildCalendarCategories, useCategoryFilter } from '../../components/admin/calendar/useCategoryFilter';
+import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
 import CalendarCategoryTabs from '../../components/admin/calendar/CategoryFilter';
 import CalendarDatePicker from '../../components/admin/calendar/CalendarDatePicker';
 import { fetchDayBookings } from '../../components/admin/calendar/fetchDayBookings';
@@ -1215,6 +1216,16 @@ const CompanyDashboard: React.FC = () => {
           })}
         </div>
       )}
+
+      <CategoryActivityPanel
+        locationId={effectiveLocationId}
+        scopeLabel={
+          effectiveLocationId
+            ? `${locationNames[effectiveLocationId] ?? 'Selected location'} only`
+            : 'All locations combined — pick one in the sidebar to see a single store'
+        }
+        onSelectBooking={setSelectedBooking}
+      />
 
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">

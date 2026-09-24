@@ -8,7 +8,15 @@ export function isScheduleBooking(booking: Pick<Booking, 'status'>): boolean {
   return SCHEDULE_STATUSES.includes(String(booking.status || '').toLowerCase());
 }
 
-export async function fetchDayBookings(dateKey: string, locationId?: number | null): Promise<Booking[]> {
+export interface DayBookingOptions {
+  allStatuses?: boolean;
+}
+
+export async function fetchDayBookings(
+  dateKey: string,
+  locationId?: number | null,
+  options: DayBookingOptions = {},
+): Promise<Booking[]> {
   const collected: Booking[] = [];
   let page = 1;
   let lastPage = 1;
@@ -29,5 +37,7 @@ export async function fetchDayBookings(dateKey: string, locationId?: number | nu
 
   const unique = new Map();
   for (const booking of collected) unique.set(booking.id, booking);
-  return [...unique.values()].filter(isScheduleBooking);
+  const list: Booking[] = [...unique.values()];
+
+  return options.allStatuses ? list : list.filter(isScheduleBooking);
 }

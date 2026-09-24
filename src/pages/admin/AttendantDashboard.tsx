@@ -73,6 +73,7 @@ import { attractionPurchaseCacheService } from '../../services/AttractionPurchas
 import { resolvePaymentState } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
+import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
 import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
 
 const AttendantDashboard: React.FC = () => {
@@ -881,6 +882,12 @@ const AttendantDashboard: React.FC = () => {
          </div>
 
          <MetricCardGrid cards={metricsCards} columns={6} loading={loading} />
+
+         <CategoryActivityPanel
+           locationId={locationId}
+           scopeLabel="Your location only"
+           onSelectBooking={setSelectedBooking}
+         />
 
          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
