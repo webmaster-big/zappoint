@@ -83,10 +83,16 @@ export const matchesBookingSearch = (booking: SearchableBooking, rawTerm: string
   return terms.every(term => matchesTerm(text, phones, term));
 };
 
+export const localPhoneDigits = (value?: string | null): string => {
+  const digits = digitsOnly(String(value ?? ''));
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+};
+
+export const isCompletePhone = (value?: string | null): boolean => localPhoneDigits(value).length === 10;
+
 export const formatPhoneForDisplay = (value?: string | null): string => {
   if (!value) return '';
-  const digits = digitsOnly(value);
-  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  const local = localPhoneDigits(value);
   if (local.length !== 10) return value;
   return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
 };

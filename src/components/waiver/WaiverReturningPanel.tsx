@@ -9,6 +9,7 @@ import waiverService from '../../services/waiverService';
 import DateOfBirthSelect from './DateOfBirthSelect';
 import RelationshipSelect from './RelationshipSelect';
 import { calculateAge, isFutureDate } from '../../utils/age';
+import { formatPhoneForDisplay, isCompletePhone } from '../../utils/bookingSearch';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -145,7 +146,7 @@ const WaiverReturningPanel = ({
       setLookupError('Please enter your phone number.');
       return;
     }
-    if (value.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '').length !== 10) {
+    if (!isCompletePhone(value)) {
       setLookupError('Please enter your full 10-digit phone number.');
       return;
     }
@@ -225,57 +226,25 @@ const WaiverReturningPanel = ({
   };
 
   if (!profile) {
-    if (outcome === 'needs_staff') {
+    if (outcome === 'not_found' || outcome === 'needs_staff') {
       return (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-10 sm:px-10">
           <div className="max-w-md mx-auto text-center">
-            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-            <p className="text-base font-semibold text-gray-900">Please see the front desk</p>
+            <p className="text-lg font-bold text-gray-900">Number Not Found</p>
             <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-              We need a Location Manager or Admin to help with this phone number before you can continue. They will get
-              you signed in right away.
+              We could not find a waiver on file for that phone number. Double-check the number, or start a new waiver
+              — it only takes a minute.
             </p>
             <div className="mt-6 space-y-3">
-              <button type="button" onClick={tryAgain} className={primaryButtonClass}>
-                Use a Different Number
-              </button>
-              <button type="button" onClick={onCancel} className={secondaryButtonClass}>
-                Back to Start
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (outcome === 'not_found') {
-      return (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-10 sm:px-10">
-          <div className="max-w-md mx-auto text-center">
-            <p className="text-lg font-bold text-gray-900">No Record Found</p>
-            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-              We could not find a waiver on file for that phone number. Double-check the number, or continue as a new
-              customer — it only takes a minute.
-            </p>
-            <div className="mt-6 space-y-3">
-              <button type="button" onClick={tryAgain} className={primaryButtonClass}>
-                Try Again
+              <button type="button" onClick={onNewCustomer} className={primaryButtonClass}>
+                Start a New Waiver
               </button>
               <button
                 type="button"
-                onClick={onNewCustomer}
+                onClick={tryAgain}
                 className="w-full py-4 bg-white text-blue-700 text-base font-semibold rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
               >
-                New Customer
+                Try Again
               </button>
               <button type="button" onClick={onCancel} className={secondaryButtonClass}>
                 Back to Start
@@ -306,6 +275,7 @@ const WaiverReturningPanel = ({
                 setPhone(e.target.value);
                 setLookupError(null);
               }}
+              onBlur={() => setPhone((current) => formatPhoneForDisplay(current) || current)}
               className={`${inputClass} py-3 text-base ${lookupError ? 'border-red-300' : ''}`}
             />
           </div>
