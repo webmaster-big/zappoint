@@ -88,7 +88,11 @@ export const localPhoneDigits = (value?: string | null): string => {
   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
 };
 
-export const isCompletePhone = (value?: string | null): boolean => localPhoneDigits(value).length === 10;
+export const isCompletePhone = (value?: string | null): boolean => {
+  const raw = String(value ?? '').trim();
+  if (localPhoneDigits(raw).length === 10) return true;
+  return raw.startsWith('+') && digitsOnly(raw).length >= 8;
+};
 
 export const formatPhoneForDisplay = (value?: string | null): string => {
   if (!value) return '';
