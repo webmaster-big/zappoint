@@ -183,13 +183,13 @@ const WaiverKiosk = () => {
               onClick={() => setPhase('form')}
               className="w-full py-5 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
             >
-              New Customer
+              New Guest
             </button>
             <button
               onClick={() => setPhase('lookup')}
               className="w-full py-5 bg-white text-blue-700 text-lg font-semibold rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
             >
-              Returning Customer
+              Returning Guest
             </button>
           </div>
         </div>
@@ -201,7 +201,7 @@ const WaiverKiosk = () => {
     return (
       <WaiverShell
         title={context.template?.title || 'Waiver'}
-        subtitle={phase === 'lookup' ? 'Returning customer' : 'Please review your saved information'}
+        subtitle={phase === 'lookup' ? 'Returning guest' : 'Please review your saved information'}
       >
         {staffLaunched && <StaffReturnControl />}
         <WaiverReturningPanel
