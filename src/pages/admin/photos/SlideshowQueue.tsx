@@ -22,6 +22,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
+import { confirmPhotoRelease, releaseConfirmMessage } from '../../../utils/photoRelease';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PhotoRecord, SlideshowQueueResponse } from '../../../types/photo.types';
@@ -75,7 +76,14 @@ const SlideshowQueuePage = () => {
     async (photoId: number, slideshowState: 'visible' | 'hidden' | 'removed') => {
       setBusy(true);
       try {
-        await photoService.updateSlideshowPhoto(photoId, { slideshow_state: slideshowState });
+        try {
+          await photoService.updateSlideshowPhoto(photoId, { slideshow_state: slideshowState });
+        } catch (e) {
+          const ask = releaseConfirmMessage(e);
+          if (!ask) throw e;
+          if (!confirmPhotoRelease(ask)) return;
+          await photoService.updateSlideshowPhoto(photoId, { slideshow_state: slideshowState, confirm_release: true });
+        }
         await load();
       } catch (e) {
         setToast({ message: errorMessage(e, 'That change could not be saved.'), type: 'error' });
@@ -112,8 +120,16 @@ const SlideshowQueuePage = () => {
     async (photoId: number, status: 'approved' | 'rejected') => {
       setBusy(true);
       try {
-        const { message } = await photoService.setPhotoApproval(photoId, status);
-        setToast({ message, type: 'success' });
+        let result: { message: string };
+        try {
+          result = await photoService.setPhotoApproval(photoId, status);
+        } catch (e) {
+          const ask = releaseConfirmMessage(e);
+          if (!ask) throw e;
+          if (!confirmPhotoRelease(ask)) return;
+          result = await photoService.setPhotoApproval(photoId, status, true);
+        }
+        setToast({ message: result.message, type: 'success' });
         await load();
       } catch (e) {
         setToast({ message: errorMessage(e, 'That photo could not be updated.'), type: 'error' });

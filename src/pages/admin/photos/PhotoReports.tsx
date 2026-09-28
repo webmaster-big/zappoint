@@ -68,6 +68,10 @@ const PhotoReports = () => {
   const auditEntries = (result?.entries as PhotoAuditEntry[] | undefined) ?? [];
   const byDay = (result?.by_day as Array<{ operating_day: string; photos: number; downloads: number }> | undefined) ?? [];
   const conflicts = (result?.conflicts as PhotoOverlayConflict[] | undefined) ?? [];
+  const byRoom =
+    (result?.escape_room_by_room as
+      | Array<{ room: string; games: number; escaped: number; not_escaped: number; escape_rate: number; average_finish_time: string; best_finish_time: string }>
+      | undefined) ?? [];
 
   return (
     <div className="min-h-screen px-4 sm:px-6 py-8">
@@ -132,6 +136,43 @@ const PhotoReports = () => {
                       <td className="px-4 py-2 text-gray-900">{row.operating_day}</td>
                       <td className="px-4 py-2 tabular-nums text-gray-700">{row.photos}</td>
                       <td className="px-4 py-2 tabular-nums text-gray-700">{row.downloads}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {byRoom.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900">Escape rooms by room</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Finished games in this date range. Finish times only count games where the group escaped.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Room</th>
+                    <th className="px-4 py-3">Games</th>
+                    <th className="px-4 py-3">Escaped</th>
+                    <th className="px-4 py-3">Didn't escape</th>
+                    <th className="px-4 py-3">Escape rate</th>
+                    <th className="px-4 py-3">Average time</th>
+                    <th className="px-4 py-3">Best time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {byRoom.map((row) => (
+                    <tr key={row.room}>
+                      <td className="px-4 py-2 text-gray-900 whitespace-nowrap">{row.room}</td>
+                      <td className="px-4 py-2 tabular-nums text-gray-700">{row.games}</td>
+                      <td className="px-4 py-2 tabular-nums text-gray-700">{row.escaped}</td>
+                      <td className="px-4 py-2 tabular-nums text-gray-700">{row.not_escaped}</td>
+                      <td className="px-4 py-2 tabular-nums text-gray-700">{row.escape_rate}%</td>
+                      <td className="px-4 py-2 tabular-nums text-gray-700">{row.average_finish_time || '—'}</td>
+                      <td className="px-4 py-2 tabular-nums text-gray-700">{row.best_finish_time || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

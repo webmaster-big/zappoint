@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical, CalendarDays } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical, CalendarDays, DoorOpen } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -26,6 +26,7 @@ const Packages: React.FC = () => {
   const [packages, setPackages] = useState<Package[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [escapeOnly, setEscapeOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -180,11 +181,18 @@ const Packages: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  const escapeRoomCount = packages.filter(pkg => pkg.is_escape_room === true && (!effectiveLocationId || pkg.location_id === effectiveLocationId)).length;
+  const escapeFilterOn = escapeOnly && escapeRoomCount > 0;
+
   useEffect(() => {
     let result = [...packages];
 
     if (effectiveLocationId) {
       result = result.filter(pkg => pkg.location_id === effectiveLocationId);
+    }
+
+    if (escapeFilterOn) {
+      result = result.filter(pkg => pkg.is_escape_room === true);
     }
 
     if (filterCategory !== "all") {
@@ -231,7 +239,7 @@ const Packages: React.FC = () => {
     });
 
     setFilteredPackages(result);
-  }, [packages, filterCategory, effectiveLocationId, searchTerm, sortBy, sortOrder]);
+  }, [packages, filterCategory, escapeFilterOn, effectiveLocationId, searchTerm, sortBy, sortOrder]);
 
   const categories = ["all", ...new Set(packages.map(pkg => normalizeCategory(pkg.category)).filter(Boolean))];
 
@@ -363,6 +371,7 @@ const Packages: React.FC = () => {
           available_month_days: cleanPkg.available_month_days,
           image: cleanPkg.image,
           is_active: cleanPkg.is_active !== false,
+          is_escape_room: cleanPkg.is_escape_room === true,
           attraction_ids: cleanPkg.attraction_ids || [],
           addon_ids: cleanPkg.addon_ids || [],
           room_ids: cleanPkg.room_ids || [],
@@ -471,6 +480,7 @@ const Packages: React.FC = () => {
         participant_label: original.participant_label,
         max_tickets_per_slot: original.max_tickets_per_slot,
         display_label: original.display_label,
+        is_escape_room: original.is_escape_room,
         display_order: original.display_order,
         duration: original.duration,
         duration_unit: original.duration_unit,
@@ -713,9 +723,9 @@ const Packages: React.FC = () => {
             </div>
           </div>
 
-          {categories.length > 1 && (
+          {(categories.length > 1 || escapeRoomCount > 0) && (
             <div className="flex items-center gap-2 flex-wrap mt-3">
-              {categories.map((category) => (
+              {categories.length > 1 && categories.map((category) => (
                 <StandardButton 
                   key={category}
                   variant={filterCategory === category ? "primary" : "secondary"}
@@ -726,6 +736,18 @@ const Packages: React.FC = () => {
                   {category === "all" ? "All Categories" : category}
                 </StandardButton>
               ))}
+              {escapeRoomCount > 0 && (
+                <StandardButton
+                  variant={escapeFilterOn ? "primary" : "secondary"}
+                  size="sm"
+                  icon={DoorOpen}
+                  onClick={() => setEscapeOnly(!escapeFilterOn)}
+                  className="rounded-full"
+                  title="Packages with 'This package is an escape room' switched on: players sign in by room and time and get the group photo by email. The Category does not do this."
+                >
+                  Escape-room check-in ({escapeRoomCount})
+                </StandardButton>
+              )}
             </div>
           )}
 
@@ -825,6 +847,12 @@ const Packages: React.FC = () => {
                       <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
                         {normalizeCategory(pkg.category) || "Uncategorized"}
                       </span>
+                      {pkg.is_escape_room && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-violet-100 text-violet-700">
+                          <DoorOpen className="w-3 h-3" />
+                          Escape room
+                        </span>
+                      )}
                       {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <Clock className="w-3 h-3" />
@@ -897,11 +925,11 @@ const Packages: React.FC = () => {
               {searchTerm
                 ? `No packages match "${searchTerm}"`
                 : filterCategory !== "all"
-                  ? `No packages in the "${filterCategory}" category`
+                  ? `No ${escapeFilterOn ? "escape rooms" : "packages"} in the "${filterCategory}" category`
                   : "Create your first package to get started"
               }
             </p>
-            {(searchTerm || filterCategory !== "all") && (
+            {(searchTerm || filterCategory !== "all" || escapeFilterOn) && (
               <StandardButton
                 variant="secondary"
                 size="md"
@@ -909,6 +937,7 @@ const Packages: React.FC = () => {
                 onClick={() => {
                   setSearchTerm("");
                   setFilterCategory("all");
+                  setEscapeOnly(false);
                 }}
               >
                 Clear Filters

@@ -14,7 +14,7 @@ export type SlideshowApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export type PhotoChannel = 'email' | 'sms';
 
-export type PhotoDeliveryKind = 'immediate' | 'next_day' | 'kiosk' | 'backend';
+export type PhotoDeliveryKind = 'immediate' | 'next_day' | 'kiosk' | 'backend' | 'escape_room';
 
 export type PhotoDeliveryStatus = 'queued' | 'scheduled' | 'sent' | 'failed' | 'canceled' | 'skipped';
 
@@ -89,6 +89,15 @@ export interface PhotoDeliveryRecord {
   session_delivery_status?: SessionDeliveryStatus | null;
   photo_link?: string | null;
   sent_by_name?: string | null;
+  escape_room?: {
+    id: number;
+    room_id: number;
+    room_name: string | null;
+    session_date: string;
+    session_time: string;
+    completed: boolean;
+    completion_label: string;
+  } | null;
 }
 
 export interface PhotoSessionRecord {
@@ -120,6 +129,15 @@ export interface PhotoSessionRecord {
   operating_day: string | null;
   created_by_name: string | null;
   created_at: string | null;
+  escape_room?: {
+    id: number;
+    room_id: number;
+    room_name: string | null;
+    session_date: string;
+    session_time: string;
+    completed: boolean;
+    completion_label: string;
+  } | null;
   kiosk_contact?: {
     name: string | null;
     email: string | null;
@@ -230,6 +248,8 @@ export interface SlideshowQueueResponse {
 export interface PhotoOverlayRecord {
   id: number;
   location_id: number;
+  package_id?: number | null;
+  room_name?: string | null;
   name: string;
   image_url: string | null;
   starts_at: string | null;
@@ -307,7 +327,7 @@ export interface PhotoSettingsResponse {
 export interface PhotoMessageTemplateRecord {
   id: number;
   company_id: number | null;
-  kind: 'immediate' | 'next_day' | 'kiosk';
+  kind: 'immediate' | 'next_day' | 'kiosk' | 'escape_room';
   email_subject: string;
   email_body: string;
   sms_body: string;
@@ -317,6 +337,7 @@ export interface PhotoMessageTemplateRecord {
 export interface PhotoTemplatesResponse {
   templates: PhotoMessageTemplateRecord[];
   variables: string[];
+  variables_by_kind?: Record<string, string[]>;
   kinds: string[];
 }
 
@@ -397,6 +418,15 @@ export interface CustomerPhotoPage {
   expires_on_label?: string;
   allow_download_all?: boolean;
   photos?: Array<{ id: number; url: string; width: number | null; height: number | null }>;
+  escape_room?: {
+    room_name: string | null;
+    session_date: string | null;
+    session_time: string | null;
+    completed: boolean;
+    escaped: boolean | null;
+    completion_label: string;
+    result: string;
+  } | null;
 }
 
 export interface PhotoActivityReport {

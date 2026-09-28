@@ -25,7 +25,8 @@ import {
   Tablet,
   FileText,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  DoorOpen
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -36,12 +37,13 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
-import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatDateLong, formatDateTimeET, michiganToday, dateKey } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatDateLong, formatDateTimeET, michiganToday, dateKey, escapeRoomGameLabel } from '../../../utils/timeFormat';
 import CalendarDatePicker from '../../../components/admin/calendar/CalendarDatePicker';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import { useNavigate } from 'react-router-dom';
 import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
 import waiverService from '../../../services/waiverService';
+import escapeRoomService from '../../../services/EscapeRoomService';
 import waiverCacheService from '../../../services/WaiverCacheService';
 import type { ScannedWaiver, Waiver, WaiverTemplate } from '../../../types/waiver.types';
 import { resolveScannedCode, KIND_LABELS } from '../../../utils/scanCode';
@@ -98,8 +100,10 @@ const waiverSignerName = (w: Waiver) =>
   [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ') || 'Signer';
 
 const waiverLinkLabel = (w: Waiver) => {
-  if (w.booking?.reference_number) return `Booking ${w.booking.reference_number}`;
-  if (w.booking?.id) return `Booking #${w.booking.id}`;
+  const game = w.escape_room_session ? escapeRoomGameLabel(w.escape_room_session) : '';
+  if (w.booking?.reference_number) return [`Booking ${w.booking.reference_number}`, game].filter(Boolean).join(' · ');
+  if (w.booking?.id) return [`Booking #${w.booking.id}`, game].filter(Boolean).join(' · ');
+  if (game) return game;
   if (w.attraction_purchase?.id) return `Ticket #${w.attraction_purchase.id}`;
   if (w.event?.name) return w.event.name;
   return null;
@@ -144,9 +148,15 @@ const CheckIn: React.FC = () => {
     setKioskLoading(true);
     try {
       const res = await waiverService.listTemplates({ per_page: 100 });
-      const list = res.success ? ((res.data.waiver_templates as WaiverTemplate[]) || []) : [];
+      const all = res.success ? ((res.data.waiver_templates as WaiverTemplate[]) || []) : [];
+      const list = all.filter((t) => t.kind !== 'escape_room');
       if (list.length === 0) {
-        setToast({ message: 'No waiver templates exist yet — create one first.', type: 'error' });
+        setToast({
+          message: all.length > 0
+            ? 'Escape-room waivers are signed from Photos › Escape Rooms › Guest check-in. Create a standard waiver to use this kiosk.'
+            : 'No waiver templates exist yet — create one first.',
+          type: all.length > 0 ? 'info' : 'error',
+        });
         return;
       }
       setKioskTemplates(list);
@@ -174,6 +184,24 @@ const CheckIn: React.FC = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const { effectiveLocationId, locations, isCompanyAdmin } = useLocationScope();
+  const [hasEscapeRooms, setHasEscapeRooms] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setHasEscapeRooms(false);
+    if (!effectiveLocationId) return;
+    escapeRoomService
+      .getRooms(effectiveLocationId)
+      .then((rooms) => {
+        if (alive) setHasEscapeRooms(Array.isArray(rooms) && rooms.some((room) => room.is_active));
+      })
+      .catch(() => {
+        if (alive) setHasEscapeRooms(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [effectiveLocationId]);
   const [scannedTicket, setScannedTicket] = useState<AttractionPurchase | null>(null);
   const [scannedOrder, setScannedOrder] = useState<TicketOrder | null>(null);
   const [scannedMembership, setScannedMembership] = useState<MembershipScanResponse | null>(null);
@@ -1232,7 +1260,7 @@ const CheckIn: React.FC = () => {
               <ScanLine className="h-6 w-6" />
               Check-In / Waivers
             </h1>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               <button
                 type="button"
                 onClick={openKiosk}
@@ -1250,6 +1278,16 @@ const CheckIn: React.FC = () => {
                 <FileText className="h-4 w-4" />
                 Waiver Records
               </button>
+              {hasEscapeRooms && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/photos/escape-rooms')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                >
+                  <DoorOpen className="h-4 w-4" />
+                  Escape Rooms
+                </button>
+              )}
             </div>
           </div>
           <p className="text-gray-600 mt-1">

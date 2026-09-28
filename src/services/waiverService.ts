@@ -6,6 +6,7 @@ import type {
   Waiver,
   WaiverTemplate,
   WaiverTemplatePayload,
+  WaiverTemplateKind,
   WaiverFormContext,
   WaiverSubmission,
   BulkChaperoneView,
@@ -198,7 +199,7 @@ const waiverService = {
     (await api.post('/waivers/kiosk-session', { source_type: sourceType, source_id: sourceId, ...opts })).data,
 
   // ---- staff: templates (builder) ----
-  listTemplates: async (params: { status?: string; search?: string; per_page?: number; page?: number } = {}): Promise<Paginated<WaiverTemplate>> =>
+  listTemplates: async (params: { status?: string; search?: string; per_page?: number; page?: number; kind?: WaiverTemplateKind } = {}): Promise<Paginated<WaiverTemplate>> =>
     (await api.get('/waiver-templates', { params })).data,
 
   listTrashedTemplates: async (): Promise<Paginated<WaiverTemplate>> =>
@@ -231,9 +232,9 @@ const waiverService = {
   contentTokens: async (): Promise<ApiResponse<Record<string, string>>> =>
     (await api.get('/waiver-templates/content-tokens')).data,
 
-  availableActivities: async (type: ActivityType, exceptTemplateId?: number): Promise<ApiResponse<AvailableActivities>> =>
+  availableActivities: async (type: ActivityType, exceptTemplateId?: number, kind?: WaiverTemplateKind): Promise<ApiResponse<AvailableActivities>> =>
     (await api.get('/waiver-templates/available-activities', {
-      params: { type, except_template_id: exceptTemplateId },
+      params: { type, except_template_id: exceptTemplateId, ...(kind ? { kind } : {}) },
     })).data,
 
   // ---- staff: bulk invites ----

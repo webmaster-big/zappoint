@@ -5,6 +5,7 @@ import waiverService from '../../services/waiverService';
 import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError, WaiverCompleted, WaiverSuccess } from '../../components/waiver/WaiverStates';
 import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
+import EscapeRoomGameBanner from '../../components/waiver/EscapeRoomGameBanner';
 
 const WaiverKioskSession = () => {
   const { token } = useParams<{ token: string }>();
@@ -106,6 +107,7 @@ const WaiverKioskSession = () => {
             waiverReference={completedWaiverRef}
             nextLabel="Done"
             closingText="Closing"
+            note={context?.escape_room ? 'Your group photo will be emailed to you after the game.' : undefined}
           />
         )}
       </>
@@ -115,6 +117,7 @@ const WaiverKioskSession = () => {
 
   return (
     <WaiverShell title={context.template?.title || 'Waiver'} subtitle="Please review and complete the waiver below">
+      <EscapeRoomGameBanner escapeRoom={context.escape_room} />
       <WaiverFormBody
         key={formKey}
         context={context}

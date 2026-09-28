@@ -72,15 +72,17 @@ export default function KioskSessionModal({
   const userLocationId: number | null = storedUser?.location_id ?? null;
   const userLocationName: string = storedUser?.location_name ?? '';
 
+  const standardTemplates = (templates ?? []).filter((t) => t.kind !== 'escape_room');
+
   // The templates list is only passed when the caller had no template in hand (the records page).
   // Default to the active catch-all so the common desk case is one tap, but keep the choice visible —
   // a kiosk launched against the wrong template collects a legally wrong signature.
   const [pickedTemplateId, setPickedTemplateId] = useState<number | ''>(() => {
     if (templateId != null) return templateId;
-    const active = (templates ?? []).filter((t) => t.status === 'active');
+    const active = standardTemplates.filter((t) => t.status === 'active');
     return active.find((t) => t.is_default)?.id ?? active[0]?.id ?? '';
   });
-  const picked = templateId == null ? (templates ?? []).find((t) => t.id === pickedTemplateId) ?? null : null;
+  const picked = templateId == null ? standardTemplates.find((t) => t.id === pickedTemplateId) ?? null : null;
 
   const effectiveTemplateId = templateId ?? (pickedTemplateId === '' ? null : Number(pickedTemplateId));
   const effectiveIsPreview = templateId != null ? !!isPreview : picked != null && picked.status !== 'active';
@@ -307,7 +309,7 @@ export default function KioskSessionModal({
                 className={fieldCls}
               >
                 <option value="">Select a template…</option>
-                {(templates ?? []).map((t) => (
+                {standardTemplates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.title}
                     {t.status !== 'active' ? ' (inactive — preview only)' : ''}

@@ -228,6 +228,7 @@ const CreatePackage: React.FC = () => {
         maxTicketsPerSlot: "",
         participantLabel: "",
         displayLabel: "",
+        isEscapeRoom: false,
         duration: "",
         durationUnit: "hours" as "hours" | "minutes" | "hours and minutes",
         durationHours: "",
@@ -638,6 +639,7 @@ const CreatePackage: React.FC = () => {
                 max_tickets_per_slot: form.maxTicketsPerSlot ? parseInt(form.maxTicketsPerSlot) : null,
                 participant_label: form.participantLabel.trim() || null,
                 display_label: form.displayLabel.trim() || null,
+                is_escape_room: form.isEscapeRoom,
                 duration: duration,
                 duration_unit: form.durationUnit,
                 image: form.image,
@@ -710,6 +712,7 @@ const CreatePackage: React.FC = () => {
                 maxTicketsPerSlot: "",
                 participantLabel: "",
                 displayLabel: "",
+                isEscapeRoom: false,
                 duration: "",
                 durationUnit: "hours",
                 durationHours: "",
@@ -1006,6 +1009,19 @@ const CreatePackage: React.FC = () => {
                                             />
                                             <p className="text-xs text-gray-500 mt-1">Seats sellable per slot per day. Customers see the live count.</p>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center space-x-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={form.isEscapeRoom}
+                                                onChange={(e) => setForm(prev => ({ ...prev, isEscapeRoom: e.target.checked }))}
+                                                className={`w-5 h-5 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                                            />
+                                            <span className="text-base text-neutral-800">This package is an escape room</span>
+                                        </label>
+                                        <p className="text-xs text-gray-500 mt-2">Turn this on for each escape room. Guests can check in to it, and online bookings get the escape-room waiver, once an active escape-room waiver covers it (Waivers › Templates › New Template, Waiver type: Escape room). Staff then run each game from Photos › Escape Rooms. The Category field does not do this.</p>
                                     </div>
 
                     {form.maxParticipants && form.pricingType !== 'per_person' && (
@@ -2005,6 +2021,7 @@ const CreatePackage: React.FC = () => {
                                         maxTicketsPerSlot: "",
                                         participantLabel: "",
                                         displayLabel: "",
+                                        isEscapeRoom: false,
                                         duration: "",
                                         durationUnit: "hours",
                                         durationHours: "",

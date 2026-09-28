@@ -28,11 +28,14 @@ interface Props {
   locationId: number | null;
   autoCloseSeconds?: number;
   onStartNext: () => void;
+  onAutoClose?: () => void;
   ad?: KioskAd | null;
   waiverId?: number | null;
   waiverReference?: string | null;
   nextLabel?: string;
   closingText?: string;
+  note?: string;
+  persist?: boolean;
 }
 
 type LearnMoreStep = 'idle' | 'choose' | 'sending' | 'done';
@@ -206,7 +209,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   };
 };
 
-const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, ad = null, waiverId = null, waiverReference = null, nextLabel = 'Start Next Waiver', closingText = 'Returning to the start screen' }: Props) => {
+const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, onAutoClose, ad = null, waiverId = null, waiverReference = null, nextLabel = 'Start Next Waiver', closingText, note, persist = false }: Props) => {
   const [takeaway, setTakeaway] = useState<Takeaway | null>(null);
   const [beatDone, setBeatDone] = useState(false);
   const [handingOver, setHandingOver] = useState(false);
@@ -236,12 +239,13 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
   }, []);
 
   useEffect(() => {
+    if (persist) return;
     const tick = setInterval(() => setSecondsLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(tick);
-  }, []);
+  }, [persist]);
 
   useEffect(() => {
-    if (secondsLeft === 0 && learnMoreStep !== 'sending') onStartNext();
+    if (secondsLeft === 0 && learnMoreStep !== 'sending') (onAutoClose ?? onStartNext)();
   }, [secondsLeft, learnMoreStep]);
 
   const openLearnMore = () => {
@@ -290,6 +294,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
                 Waiver signed{signerFirstName ? ` — thanks, ${signerFirstName}` : ''}
               </p>
             </div>
+            {note && <p className="px-7 pt-3 text-sm text-gray-700 leading-relaxed">{note}</p>}
 
             <img
               src={getImageUrl(ad.image_path)}
@@ -350,9 +355,11 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
               >
                 {nextLabel}
               </button>
-              <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
-                {secondsLeft > 0 ? `${closingText} in ${secondsLeft}s` : `${closingText}…`}
-              </p>
+              {!persist && (
+                <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
+                  {secondsLeft > 0 ? `${closingText ?? 'Returning to the start screen'} in ${secondsLeft}s` : `${closingText ?? 'Returning to the start screen'}…`}
+                </p>
+              )}
             </div>
           </div>
         ) : !showTakeaway ? (
@@ -369,6 +376,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
             <p className="text-sm text-gray-500 mt-2 leading-relaxed">
               Your waiver is signed and saved{takeaway?.locationName ? ` at ${takeaway.locationName}` : ''}.
             </p>
+            {note && <p className="text-sm text-gray-700 mt-2 leading-relaxed">{note}</p>}
 
             {waiverReference && (
               <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -386,7 +394,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
                 onClick={onStartNext}
                 className="zz-step-in mt-8 w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
               >
-                Start Next Waiver
+                {nextLabel}
               </button>
             )}
           </div>
@@ -402,6 +410,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
                 Waiver signed{signerFirstName ? ` — thanks, ${signerFirstName}` : ''}
               </p>
             </div>
+            {note && <p className="text-sm text-gray-700 mt-3 leading-relaxed">{note}</p>}
 
             {waiverReference && (
               <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-3.5 mt-4">
@@ -463,11 +472,15 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
               onClick={onStartNext}
               className="mt-5 w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
             >
-              Start Next Waiver
+              {nextLabel}
             </button>
-            <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
-              {secondsLeft > 0 ? `Returning to a new waiver in ${secondsLeft}s` : 'Returning to a new waiver…'}
-            </p>
+            {!persist && (
+              <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
+                {secondsLeft > 0
+                  ? `${closingText ?? 'Returning to a new waiver'} in ${secondsLeft}s`
+                  : `${closingText ?? 'Returning to a new waiver'}…`}
+              </p>
+            )}
           </div>
         )}
       </div>

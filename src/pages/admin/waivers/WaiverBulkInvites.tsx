@@ -148,7 +148,7 @@ const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClos
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    waiverService.listTemplates({ status: 'active', per_page: 100 }).then((r) => r.success && setTemplates((r.data.waiver_templates as WaiverTemplate[]) || [])).catch(() => {});
+    waiverService.listTemplates({ status: 'active', per_page: 100 }).then((r) => r.success && setTemplates(((r.data.waiver_templates as WaiverTemplate[]) || []).filter((t) => t.kind !== 'escape_room'))).catch(() => {});
   }, []);
 
   const submit = async (e: React.FormEvent) => {

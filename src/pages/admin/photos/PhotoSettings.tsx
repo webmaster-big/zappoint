@@ -40,6 +40,7 @@ const KIND_LABELS: Record<string, string> = {
   immediate: 'Immediate waiver delivery',
   next_day: '9:00 AM next-day delivery',
   kiosk: 'Kiosk delivery',
+  escape_room: 'Escape-room group photo',
 };
 
 const ChannelTest = ({
@@ -136,12 +137,32 @@ const PhotoSettings = () => {
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [templates, setTemplates] = useState<PhotoMessageTemplateRecord[]>([]);
   const [variables, setVariables] = useState<string[]>([]);
+  const [variablesByKind, setVariablesByKind] = useState<Record<string, string[]> | null>(null);
   const [openTemplate, setOpenTemplate] = useState<number | null>(null);
   const [templateDraft, setTemplateDraft] = useState<Record<number, PhotoMessageTemplateRecord>>({});
+  const [templateTestTo, setTemplateTestTo] = useState<Record<number, string>>({});
+  const [templateTesting, setTemplateTesting] = useState<number | null>(null);
+
+  const sendTemplateTest = async (template: PhotoMessageTemplateRecord) => {
+    if (!effectiveLocationId) return;
+    const destination = (templateTestTo[template.id] ?? '').trim();
+    if (!destination) {
+      setToast({ message: 'Enter an email address for the test.', type: 'error' });
+      return;
+    }
+    setTemplateTesting(template.id);
+    try {
+      const result = await photoService.sendTestMessage(effectiveLocationId, 'email', destination, template.kind);
+      setToast({ message: result.message || (result.success ? 'Test email sent.' : 'The test email could not be sent.'), type: result.success ? 'success' : 'error' });
+    } finally {
+      setTemplateTesting(null);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!effectiveLocationId) return;
@@ -152,6 +173,7 @@ const PhotoSettings = () => {
         photoService.getTemplates(),
       ]);
       setData(settings);
+      setLoadError(null);
       setForm({
         kiosk_enabled: settings.setting.kiosk_enabled,
         slideshow_enabled: settings.setting.slideshow_enabled,
@@ -170,11 +192,12 @@ const PhotoSettings = () => {
       });
       setTemplates(templateData.templates);
       setVariables(templateData.variables);
+      setVariablesByKind(templateData.variables_by_kind ?? null);
       setTemplateDraft(
         Object.fromEntries(templateData.templates.map((t) => [t.id, t])) as Record<number, PhotoMessageTemplateRecord>,
       );
     } catch (e) {
-      setToast({ message: errorMessage(e, 'Could not load photo settings.'), type: 'error' });
+      setLoadError(errorMessage(e, 'Could not load photo settings.'));
     } finally {
       setLoading(false);
     }
@@ -305,11 +328,24 @@ const PhotoSettings = () => {
             <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={() => void load()} loading={loading}>
               Refresh
             </StandardButton>
-            <StandardButton size="sm" icon={Save} onClick={() => void save()} loading={saving}>
+            <StandardButton size="sm" icon={Save} onClick={() => void save()} loading={saving} disabled={!data}>
               Save settings
             </StandardButton>
           </div>
         </div>
+
+        {!data && loadError && !loading && (
+          <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
+            <p className="font-semibold text-gray-900">Photo settings could not be loaded</p>
+            <p className="text-sm text-gray-600 mt-1">{loadError}</p>
+            <p className="text-sm text-gray-600 mt-1">Try again. If it keeps happening, ask your administrator to check this location's photo settings.</p>
+            <div className="mt-4 flex justify-center">
+              <StandardButton size="sm" icon={RefreshCcw} onClick={() => void load()}>
+                Try again
+              </StandardButton>
+            </div>
+          </div>
+        )}
 
         {data && (
           <div className="space-y-6">
@@ -726,6 +762,7 @@ const PhotoSettings = () => {
                 {templates.map((template) => {
                   const draft = templateDraft[template.id] ?? template;
                   const open = openTemplate === template.id;
+                  const templateVariables = variablesByKind?.[template.kind] ?? variables;
 
                   return (
                     <div key={template.id} className="rounded-xl border border-gray-100">
@@ -740,6 +777,10 @@ const PhotoSettings = () => {
 
                       {open && (
                         <div className="px-4 pb-4 space-y-3">
+                          <p className="text-xs text-gray-500">
+                            Variables for this message: {templateVariables.map((v) => `{{${v}}}`).join(', ')}
+                          </p>
+
                           <div>
                             <label htmlFor={`tpl-subject-${template.id}`} className="block text-sm text-gray-700 mb-1">
                               Email subject
@@ -775,24 +816,51 @@ const PhotoSettings = () => {
                             />
                           </div>
 
-                          <div>
-                            <label htmlFor={`tpl-sms-${template.id}`} className="block text-sm text-gray-700 mb-1">
-                              SMS body
-                            </label>
-                            <textarea
-                              id={`tpl-sms-${template.id}`}
-                              rows={3}
-                              value={draft.sms_body}
-                              onChange={(e) =>
-                                setTemplateDraft((prev) => ({
-                                  ...prev,
-                                  [template.id]: { ...draft, sms_body: e.target.value },
-                                }))
-                              }
-                              className={fieldCls}
-                            />
-                            <p className="mt-1 text-xs text-gray-500">{draft.sms_body.length} characters</p>
-                          </div>
+                          {template.kind === 'escape_room' ? (
+                            <div className="space-y-2">
+                              <p className="text-xs text-amber-900">Escape-room photos are sent by email only, so there is no text message to set.</p>
+                              <div className="flex flex-wrap items-end gap-2">
+                                <label className="text-xs text-gray-600 flex flex-col gap-1 flex-1 min-w-[200px]">
+                                  Send a test of the saved wording to
+                                  <input
+                                    type="email"
+                                    value={templateTestTo[template.id] ?? ''}
+                                    onChange={(e) => setTemplateTestTo((prev) => ({ ...prev, [template.id]: e.target.value }))}
+                                    placeholder="you@example.com"
+                                    className={fieldCls}
+                                  />
+                                </label>
+                                <StandardButton
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => void sendTemplateTest(template)}
+                                  loading={templateTesting === template.id}
+                                  disabled={templateTesting !== null}
+                                >
+                                  Send test email
+                                </StandardButton>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <label htmlFor={`tpl-sms-${template.id}`} className="block text-sm text-gray-700 mb-1">
+                                SMS body
+                              </label>
+                              <textarea
+                                id={`tpl-sms-${template.id}`}
+                                rows={3}
+                                value={draft.sms_body}
+                                onChange={(e) =>
+                                  setTemplateDraft((prev) => ({
+                                    ...prev,
+                                    [template.id]: { ...draft, sms_body: e.target.value },
+                                  }))
+                                }
+                                className={fieldCls}
+                              />
+                              <p className="mt-1 text-xs text-gray-500">{draft.sms_body.length} characters</p>
+                            </div>
+                          )}
 
                           <div className="flex gap-2">
                             <StandardButton size="sm" icon={Save} onClick={() => void saveTemplate(template.id)} loading={saving}>

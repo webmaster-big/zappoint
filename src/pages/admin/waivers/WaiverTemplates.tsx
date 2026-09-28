@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, FileText, Power, ArrowLeft, RefreshCcw, Tablet, Trash2, RotateCcw, AlertTriangle, ChevronDown, ChevronRight, Megaphone } from 'lucide-react';
+import { Plus, Search, Pencil, FileText, Power, ArrowLeft, RefreshCcw, Tablet, Trash2, RotateCcw, AlertTriangle, ChevronDown, ChevronRight, Megaphone, DoorOpen } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate, TemplateStatus } from '../../../types/waiver.types';
@@ -231,16 +231,29 @@ const WaiverTemplates = () => {
                     <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <button onClick={() => navigate(`/waivers/templates/${t.id}/edit`)} className="text-sm font-medium text-gray-900 hover:underline text-left">{t.title}</button>
+                        {t.kind === 'escape_room' && <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium border align-middle bg-violet-50 text-violet-700 border-violet-100">Escape room</span>}
                         {t.internal_description && <div className="text-xs text-gray-400 truncate max-w-xs">{t.internal_description}</div>}
                       </td>
                       <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border capitalize ${statusStyles[t.status]}`}>{t.status}</span></td>
                       <td className="px-4 py-3 text-sm text-gray-600">v{t.current_version}</td>
-                      <td className="px-4 py-3">{t.is_default ? <span className={`text-xs font-semibold text-${fullColor}`}>Default</span> : <span className="text-xs text-gray-300">—</span>}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{assignments} item(s)</td>
+                      <td className="px-4 py-3">{t.is_default ? <span className={`text-xs font-semibold whitespace-nowrap text-${fullColor}`}>{t.kind === 'escape_room' ? 'Escape-room default' : 'Default'}</span> : <span className="text-xs text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {t.kind === 'escape_room'
+                          ? assignments > 0
+                            ? `${assignments} ${assignments === 1 ? 'room' : 'rooms'}`
+                            : t.is_default
+                              ? 'All escape rooms'
+                              : '0 rooms'
+                          : `${assignments} item(s)`}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-400">{t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div data-tour="templates-row-actions" className="flex items-center justify-end gap-1">
-                          <button onClick={() => setKioskTarget(t)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
+                          {t.kind === 'escape_room' ? (
+                            <button onClick={() => navigate('/photos/escape-rooms')} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Guests sign this on the escape-room check-in. Open Escape Rooms for the link."><DoorOpen className="w-4 h-4" /></button>
+                          ) : (
+                            <button onClick={() => setKioskTarget(t)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title={t.status === 'active' ? 'Launch kiosk mode (new tab)' : 'Test kiosk (preview, new tab)'}><Tablet className="w-4 h-4" /></button>
+                          )}
                           <button onClick={() => cycleStatus(t)} className={`p-2 rounded-lg transition-colors ${t.status === 'active' ? `text-${fullColor} hover:bg-${themeColor}-50` : 'text-gray-400 hover:bg-gray-100'}`} title={t.status === 'active' ? 'Deactivate' : 'Activate'}><Power className="w-4 h-4" /></button>
                           <button onClick={() => navigate(`/waivers/templates/${t.id}/edit`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Edit"><Pencil className="w-4 h-4" /></button>
                           <button onClick={() => navigate(`/waivers/templates/${t.id}/ads`)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Post-waiver ads"><Megaphone className="w-4 h-4" /></button>

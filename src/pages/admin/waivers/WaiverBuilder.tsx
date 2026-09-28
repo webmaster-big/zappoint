@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Code2, CheckSquare, Square, Eye, Tablet, MapPin, Megaphone } from 'lucide-react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Save, Code2, CheckSquare, Square, Eye, Tablet, MapPin, Megaphone, DoorOpen } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
 import { locationService } from '../../../services/LocationService';
 import type { Location } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
-import type { WaiverTemplate, WaiverTemplatePayload, ActivityType, AvailableActivities } from '../../../types/waiver.types';
+import type { WaiverTemplate, WaiverTemplatePayload, WaiverTemplateKind, ActivityType, AvailableActivities } from '../../../types/waiver.types';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import KioskSessionModal from '../../../components/waiver/KioskSessionModal';
@@ -44,6 +44,7 @@ const TOKEN_GROUPS: Array<{ name: string; keys: string[] }> = [
 
 const defaultForm: WaiverTemplatePayload = {
   title: '',
+  kind: 'standard',
   internal_description: '',
   status: 'draft',
   is_default: false,
@@ -75,6 +76,8 @@ const WaiverBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
+  const [searchParams] = useSearchParams();
+  const startAsEscapeRoom = !isEdit && searchParams.get('kind') === 'escape_room';
   const { themeColor, fullColor } = useThemeColor();
 
   const currentUser = getStoredUser();
@@ -89,16 +92,22 @@ const WaiverBuilder = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [preview, setPreview] = useState(false);
   const [kioskModal, setKioskModal] = useState(false);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const activitiesRequest = useRef(0);
+  const isEscapeRoom = form.kind === 'escape_room';
 
   const set = <K extends keyof WaiverTemplatePayload>(key: K, value: WaiverTemplatePayload[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   // load content tokens + available activities (exclusivity-aware)
-  const loadActivities = useCallback(async (exceptId?: number) => {
+  const loadActivities = useCallback(async (exceptId?: number, kind: WaiverTemplateKind = 'standard') => {
+    const request = ++activitiesRequest.current;
+    setActivitiesLoading(true);
     const results = await Promise.all(
-      assignmentTypes.map((a) => waiverService.availableActivities(a.type, exceptId).catch(() => null)),
+      assignmentTypes.map((a) => waiverService.availableActivities(a.type, exceptId, kind === 'escape_room' ? kind : undefined).catch(() => null)),
     );
+    if (request !== activitiesRequest.current) return;
     setActivities((prev) => {
       const next = { ...prev };
       assignmentTypes.forEach((a, i) => {
@@ -107,7 +116,21 @@ const WaiverBuilder = () => {
       });
       return next;
     });
+    setActivitiesLoading(false);
   }, []);
+
+  const changeKind = (kind: WaiverTemplateKind) => {
+    setForm((f) => ({
+      ...f,
+      kind,
+      assigned_package_ids: [],
+      assigned_attraction_ids: [],
+      assigned_event_ids: [],
+      ...(kind === 'escape_room' ? { photo_video_release_enabled: true } : {}),
+    }));
+    setActivities({ package: [], attraction: [], event: [], party_type: [] });
+    loadActivities(undefined, kind);
+  };
 
   useEffect(() => {
     waiverService.contentTokens().then((r) => r.success && setTokens(r.data)).catch(() => {});
@@ -125,12 +148,15 @@ const WaiverBuilder = () => {
     const exceptId = id ? Number(id) : undefined;
     if (isEdit && id) {
       (async () => {
+        let kind: WaiverTemplateKind = 'standard';
         try {
           const res = await waiverService.getTemplate(Number(id));
           if (res.success) {
             const t = res.data as WaiverTemplate;
+            kind = t.kind ?? 'standard';
             setForm({
               title: t.title,
+              kind,
               internal_description: t.internal_description ?? '',
               status: t.status,
               is_default: t.is_default,
@@ -163,10 +189,15 @@ const WaiverBuilder = () => {
         } finally {
           setLoading(false);
         }
+        loadActivities(exceptId, kind);
       })();
+    } else if (startAsEscapeRoom) {
+      setForm((f) => ({ ...f, kind: 'escape_room', photo_video_release_enabled: true, assigned_package_ids: [], assigned_attraction_ids: [], assigned_event_ids: [] }));
+      loadActivities(exceptId, 'escape_room');
+    } else {
+      loadActivities(exceptId);
     }
-    loadActivities(exceptId);
-  }, [id, isEdit, loadActivities]);
+  }, [id, isEdit, loadActivities, startAsEscapeRoom]);
 
   const insertToken = (token: string) => {
     const el = bodyRef.current;
@@ -212,12 +243,13 @@ const WaiverBuilder = () => {
     if (!form.title?.trim()) { setToast({ message: 'Title is required', type: 'error' }); return; }
     if (!form.body_text?.trim()) { setToast({ message: 'Waiver text is required', type: 'error' }); return; }
     setSaving(true);
+    const payload: WaiverTemplatePayload = isEscapeRoom ? { ...form, assigned_attraction_ids: [], assigned_event_ids: [] } : form;
     try {
       if (isEdit && id) {
-        await waiverService.updateTemplate(Number(id), form);
+        await waiverService.updateTemplate(Number(id), payload);
         setToast({ message: 'Template saved', type: 'success' });
       } else {
-        const res = await waiverService.createTemplate(form);
+        const res = await waiverService.createTemplate(payload);
         setToast({ message: 'Template created', type: 'success' });
         if (res.success) {
           navigate(`/waivers/templates/${res.data.id}/edit`, { replace: true });
@@ -261,13 +293,23 @@ const WaiverBuilder = () => {
               Post-Waiver Ads
             </StandardButton>
           )}
-          {isEdit && (
+          {isEdit && !isEscapeRoom && (
             <StandardButton
               variant="secondary"
               icon={Tablet}
               onClick={() => setKioskModal(true)}
             >
               {form.status === 'active' ? 'Launch Kiosk' : 'Test Kiosk'}
+            </StandardButton>
+          )}
+          {isEdit && isEscapeRoom && (
+            <StandardButton
+              variant="secondary"
+              icon={DoorOpen}
+              title="Guests sign this waiver on the escape-room check-in. Escape Rooms has the check-in link."
+              onClick={() => navigate('/photos/escape-rooms')}
+            >
+              Escape Rooms
             </StandardButton>
           )}
           <StandardButton variant="primary" icon={Save} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Template'}</StandardButton>
@@ -278,6 +320,26 @@ const WaiverBuilder = () => {
         {/* Basics */}
         <div data-tour="builder-basics" className={card}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Waiver type</label>
+              {isEdit ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${isEscapeRoom ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>{isEscapeRoom ? 'Escape room' : 'Standard'}</span>
+                  <span className="text-[11px] text-gray-400">To use a different type, create a new waiver.</span>
+                </div>
+              ) : (
+                <select value={form.kind ?? 'standard'} onChange={(e) => changeKind(e.target.value as WaiverTemplateKind)} className={fieldCls}>
+                  <option value="standard">Standard</option>
+                  <option value="escape_room">Escape room</option>
+                </select>
+              )}
+            </div>
+            {isEscapeRoom && (
+              <div className="sm:col-span-2 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <DoorOpen className="w-4 h-4 text-gray-400 shrink-0" />
+                Guests sign this waiver on the escape-room check-in after choosing their room and time. It is never used for other activities.
+              </div>
+            )}
             <div className="sm:col-span-2">
               <label className={labelCls}>Title *</label>
               <input type="text" value={form.title} onChange={(e) => set('title', e.target.value)} className={fieldCls} placeholder="e.g. General Liability Waiver" />
@@ -298,7 +360,7 @@ const WaiverBuilder = () => {
             <div className="flex items-end pb-2">
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" checked={!!form.is_default} onChange={(e) => set('is_default', e.target.checked)} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
-                Use as default (catch-all) waiver
+                {isEscapeRoom ? 'Use for every escape room that has no waiver of its own' : 'Use as default (catch-all) waiver'}
               </label>
             </div>
             {isAdmin && (
@@ -306,7 +368,20 @@ const WaiverBuilder = () => {
                 <label className={labelCls}><MapPin className="inline w-3.5 h-3.5 mr-1 text-gray-400" />Location <span className="text-gray-400 font-normal">(optional — leave blank for all locations)</span></label>
                 <select
                   value={form.location_id ?? ''}
-                  onChange={(e) => set('location_id', e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) => {
+                    const next = e.target.value ? Number(e.target.value) : null;
+                    setForm((f) => ({
+                      ...f,
+                      location_id: next,
+                      assigned_package_ids:
+                        f.kind === 'escape_room' && next
+                          ? (f.assigned_package_ids ?? []).filter((id) => {
+                              const room = activities.package.find((item) => item.id === id);
+                              return !room || room.location_id === next;
+                            })
+                          : f.assigned_package_ids,
+                    }));
+                  }}
                   className={fieldCls}
                 >
                   <option value="">All locations (company-wide)</option>
@@ -471,15 +546,26 @@ const WaiverBuilder = () => {
         {/* Assignment (exclusivity-aware) */}
         <div data-tour="builder-assignments" className={card}>
           <h2 className="text-sm font-bold text-gray-900 mb-1">Assign to activities</h2>
-          <p className="text-xs text-gray-400 mb-4">Activities already assigned to another template don't appear here — each can belong to only one waiver.</p>
+          <p className="text-xs text-gray-400 mb-4">
+            {isEscapeRoom
+              ? "Rooms already listed on another escape-room waiver don't appear here. Each room can belong to only one escape-room waiver."
+              : "Activities already assigned to another template don't appear here — each can belong to only one waiver."}
+          </p>
+          {isEscapeRoom && form.is_default && (
+            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4">
+              Rooms you leave unticked still use this waiver, because it is set as the default for every escape room.
+            </p>
+          )}
           <div className="space-y-5">
-            {assignmentTypes.map((a) => {
-              const list = activities[a.type] || [];
+            {(isEscapeRoom ? assignmentTypes.filter((a) => a.type === 'package') : assignmentTypes).map((a) => {
+              const list = (activities[a.type] || []).filter(
+                (item) => !isEscapeRoom || !form.location_id || item.location_id === form.location_id,
+              );
               const selected = (form[a.column] as number[] | undefined) ?? [];
               return (
                 <div key={a.type}>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">{a.label}</label>
+                    <label className="text-sm font-medium text-gray-700">{isEscapeRoom ? 'Escape rooms this waiver covers' : a.label}</label>
                     <div className="flex items-center gap-2">
                       {list.length > 0 && selected.length < list.length && (
                         <button type="button" onClick={() => selectAllAssignment(a.column, list.map((i) => i.id))} className={`text-xs font-medium text-${fullColor} hover:underline`}>Select all</button>
@@ -494,7 +580,11 @@ const WaiverBuilder = () => {
                     </div>
                   </div>
                   {list.length === 0 ? (
-                    <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg border border-gray-200">No available {a.label.toLowerCase()}.</div>
+                    isEscapeRoom ? (
+                      <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg border border-gray-200">{activitiesLoading ? 'Loading escape rooms…' : 'No escape rooms to add. A room shows here once "This package is an escape room" is on in Edit Package and no other waiver lists it. The "every escape room" option above covers rooms without listing them.'}</div>
+                    ) : (
+                      <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg border border-gray-200">No available {a.label.toLowerCase()}.</div>
+                    )
                   ) : (
                     <div className="max-h-44 overflow-y-auto bg-white rounded-lg border border-gray-200 divide-y divide-gray-50">
                       {list.map((item) => {
@@ -505,6 +595,9 @@ const WaiverBuilder = () => {
                             <span className="min-w-0">
                               <span className="block text-sm text-gray-900">{item.name}</span>
                               {item.location_name && <span className="block text-[11px] text-gray-400">{item.location_name}</span>}
+                              {!isEscapeRoom && item.is_escape_room && (
+                                <span className="block text-[11px] text-violet-700">Escape room: uses the escape-room waiver once one exists</span>
+                              )}
                             </span>
                           </button>
                         );

@@ -70,6 +70,7 @@ const EditPackage: React.FC = () => {
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]);
     const [slotCleanupMinutes, setSlotCleanupMinutes] = useState<number>(DEFAULT_SLOT_CLEANUP_MINUTES);
 
+    const [savedEscapeRoom, setSavedEscapeRoom] = useState(false);
     const [form, setForm] = useState({
         name: "",
         description: "",
@@ -86,6 +87,7 @@ const EditPackage: React.FC = () => {
         maxTicketsPerSlot: "",
         participantLabel: "",
         displayLabel: "",
+        isEscapeRoom: false,
         duration: "",
         durationUnit: "hours" as "hours" | "minutes" | "hours and minutes",
         durationHours: "",
@@ -282,6 +284,7 @@ const EditPackage: React.FC = () => {
                     durationMinutes = String(Math.round((decimalDuration % 1) * 60));
                 }
 
+                setSavedEscapeRoom(Boolean(pkg.is_escape_room));
                 setForm({
                     name: pkg.name || "",
                     description: pkg.description || "",
@@ -298,6 +301,7 @@ const EditPackage: React.FC = () => {
                     maxTicketsPerSlot: pkg.max_tickets_per_slot != null ? String(pkg.max_tickets_per_slot) : "",
                     participantLabel: pkg.participant_label || "",
                     displayLabel: pkg.display_label || "",
+                    isEscapeRoom: pkg.is_escape_room || false,
                     duration: String(pkg.duration || ""),
                     durationUnit: pkg.duration_unit || "hours",
                     durationHours: durationHours,
@@ -773,6 +777,7 @@ const EditPackage: React.FC = () => {
                 max_tickets_per_slot: form.maxTicketsPerSlot ? parseInt(form.maxTicketsPerSlot) : null,
                 participant_label: form.participantLabel.trim() || null,
                 display_label: form.displayLabel.trim() || null,
+                is_escape_room: form.isEscapeRoom,
                 duration: duration,
                 duration_unit: form.durationUnit,
                 location_id: packageLocationId,
@@ -1143,6 +1148,25 @@ const EditPackage: React.FC = () => {
                                         />
                                         <p className="text-xs text-gray-500 mt-1">Seats sellable per slot per day. Customers see the live count.</p>
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center space-x-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.isEscapeRoom}
+                                            onChange={(e) => {
+                                                const next = e.target.checked;
+                                                if (!next && savedEscapeRoom && !window.confirm("Turn off the escape-room switch? Players who checked in to this room will no longer appear on Photos › Escape Rooms, and guests can't check in to it.")) {
+                                                    return;
+                                                }
+                                                setForm(prev => ({ ...prev, isEscapeRoom: next }));
+                                            }}
+                                            className={`w-5 h-5 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                                        />
+                                        <span className="text-base text-neutral-800">This package is an escape room</span>
+                                    </label>
+                                    <p className="text-xs text-gray-500 mt-2">Turn this on for each escape room. Guests can check in to it, and online bookings get the escape-room waiver, once an active escape-room waiver covers it (Waivers › Templates › New Template, Waiver type: Escape room). Staff then run each game from Photos › Escape Rooms. The Category field does not do this.</p>
                                 </div>
 
                                 {form.maxParticipants && form.pricingType !== 'per_person' && (

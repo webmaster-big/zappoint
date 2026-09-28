@@ -152,8 +152,8 @@ const photoService = {
     payload: { waiver_ids: number[]; schedule?: string },
   ): Promise<PhotoSessionRecord> => (await api.post(`/photo-library/${photoId}/send`, payload)).data.data,
 
-  setPhotoOnSlideshow: async (photoId: number, include: boolean): Promise<string> =>
-    (await api.post(`/slideshow-photos/${photoId}/inclusion`, { include })).data.message,
+  setPhotoOnSlideshow: async (photoId: number, include: boolean, confirmRelease = false): Promise<string> =>
+    (await api.post(`/slideshow-photos/${photoId}/inclusion`, { include, ...(confirmRelease ? { confirm_release: true } : {}) })).data.message,
 
   deletePhoto: async (photoId: number): Promise<string> =>
     (await api.delete(`/photo-library/${photoId}`)).data.message,
@@ -170,14 +170,15 @@ const photoService = {
 
   updateSlideshowPhoto: async (
     photoId: number,
-    payload: { slideshow_state?: string; slideshow_priority?: number },
+    payload: { slideshow_state?: string; slideshow_priority?: number; confirm_release?: boolean },
   ): Promise<PhotoRecord> => (await api.patch(`/slideshow-photos/${photoId}`, payload)).data.data,
 
   setPhotoApproval: async (
     photoId: number,
     status: SlideshowApprovalStatus,
+    confirmRelease = false,
   ): Promise<{ message: string; photo: PhotoRecord }> => {
-    const { data } = await api.post(`/slideshow-photos/${photoId}/approval`, { status });
+    const { data } = await api.post(`/slideshow-photos/${photoId}/approval`, { status, ...(confirmRelease ? { confirm_release: true } : {}) });
     return { message: data.message, photo: data.data };
   },
 
@@ -233,12 +234,14 @@ const photoService = {
     locationId: number,
     channel: PhotoChannel,
     destination: string,
+    kind?: string,
   ): Promise<{ success: boolean; message: string }> => {
     try {
       const res = await api.post('/photo-settings/test-message', {
         location_id: locationId,
         channel,
         destination,
+        ...(kind ? { kind } : {}),
       });
       return { success: true, message: res.data.message as string };
     } catch (error) {

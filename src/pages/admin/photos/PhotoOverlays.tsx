@@ -3,9 +3,11 @@ import { AlertTriangle, Layers, MapPin, Plus, RefreshCcw, Trash2, X } from 'luci
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
+import escapeRoomService from '../../../services/EscapeRoomService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PhotoOverlayRecord, PhotoOverlayResponse } from '../../../types/photo.types';
+import type { EscapeRoomOption } from '../../../types/escapeRoom.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -32,6 +34,8 @@ const PhotoOverlays = () => {
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [priority, setPriority] = useState(0);
+  const [packageId, setPackageId] = useState('');
+  const [rooms, setRooms] = useState<EscapeRoomOption[]>([]);
 
   const load = useCallback(async () => {
     if (!effectiveLocationId) return;
@@ -49,6 +53,24 @@ const PhotoOverlays = () => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setPackageId('');
+    setRooms([]);
+    if (!effectiveLocationId) return;
+    void escapeRoomService
+      .getRooms(effectiveLocationId)
+      .then((list) => {
+        if (!cancelled) setRooms(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setRooms([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveLocationId]);
+
   const create = useCallback(async () => {
     if (!effectiveLocationId || !file || name.trim().length === 0) return;
     setBusy(true);
@@ -60,6 +82,7 @@ const PhotoOverlays = () => {
       if (startsAt) form.append('starts_at', startsAt);
       if (endsAt) form.append('ends_at', endsAt);
       form.append('priority', String(priority));
+      if (packageId) form.append('package_id', packageId);
       await photoService.createOverlay(form);
       setToast({ message: 'Overlay uploaded.', type: 'success' });
       setShowForm(false);
@@ -68,13 +91,14 @@ const PhotoOverlays = () => {
       setStartsAt('');
       setEndsAt('');
       setPriority(0);
+      setPackageId('');
       await load();
     } catch (e) {
       setToast({ message: errorMessage(e, 'That overlay could not be saved.'), type: 'error' });
     } finally {
       setBusy(false);
     }
-  }, [effectiveLocationId, endsAt, file, load, name, priority, startsAt]);
+  }, [effectiveLocationId, endsAt, file, load, name, packageId, priority, startsAt]);
 
   const toggleEnabled = useCallback(
     async (overlay: PhotoOverlayRecord) => {
@@ -83,6 +107,27 @@ const PhotoOverlays = () => {
         const form = new FormData();
         form.append('is_enabled', overlay.is_enabled ? '0' : '1');
         await photoService.updateOverlay(overlay.id, form);
+        await load();
+      } catch (e) {
+        setToast({ message: errorMessage(e, 'That change could not be saved.'), type: 'error' });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load],
+  );
+
+  const changeRoom = useCallback(
+    async (overlay: PhotoOverlayRecord, roomId: string) => {
+      setBusy(true);
+      try {
+        const form = new FormData();
+        form.append('package_id', roomId);
+        await photoService.updateOverlay(overlay.id, form);
+        setToast({
+          message: roomId ? 'Saved. This overlay is now used only for that room\'s group photos.' : 'Saved. This overlay is now used for all photos at this location.',
+          type: 'success',
+        });
         await load();
       } catch (e) {
         setToast({ message: errorMessage(e, 'That change could not be saved.'), type: 'error' });
@@ -199,9 +244,18 @@ const PhotoOverlays = () => {
                     <span className={`text-[11px] rounded-full px-2 py-0.5 ${STATUS_STYLES[overlay.status]}`}>
                       {overlay.status}
                     </span>
+                    {overlay.package_id ? (
+                      <span className="text-[11px] rounded-full bg-gray-100 text-gray-700 px-2 py-0.5">
+                        Room: {overlay.room_name ?? 'escape room'}
+                      </span>
+                    ) : null}
                     {overlay.is_active && (
                       <span className="text-[11px] rounded-full bg-green-600 text-white px-2 py-0.5">
-                        used for new photos
+                        {overlay.package_id
+                          ? `used for ${overlay.room_name ?? 'this room'}'s group photos`
+                          : (data?.overlays ?? []).some((other) => other.package_id && other.is_active)
+                            ? 'used for all other new photos'
+                            : 'used for new photos'}
                       </span>
                     )}
                   </div>
@@ -212,6 +266,31 @@ const PhotoOverlays = () => {
                   {' · '}
                   {overlay.ends_at ? `until ${new Date(overlay.ends_at).toLocaleString()}` : 'no end date'}
                 </p>
+
+                {(rooms.length > 0 || overlay.package_id) && (
+                  <div className="mt-3">
+                    <label htmlFor={`ov-room-${overlay.id}`} className="block text-xs text-gray-500 mb-1">
+                      Applies to
+                    </label>
+                    <select
+                      id={`ov-room-${overlay.id}`}
+                      value={overlay.package_id ? String(overlay.package_id) : ''}
+                      disabled={busy}
+                      onChange={(e) => void changeRoom(overlay, e.target.value)}
+                      className={`${fieldCls} disabled:opacity-60`}
+                    >
+                      <option value="">All photos at this location</option>
+                      {rooms.map((room) => (
+                        <option key={room.id} value={String(room.id)}>
+                          {room.name}
+                        </option>
+                      ))}
+                      {overlay.package_id && !rooms.some((room) => room.id === overlay.package_id) && (
+                        <option value={String(overlay.package_id)}>{overlay.room_name ?? 'Escape room'}</option>
+                      )}
+                    </select>
+                  </div>
+                )}
 
                 <div className="mt-4 flex gap-2">
                   <button
@@ -272,6 +351,29 @@ const PhotoOverlays = () => {
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="block w-full text-sm"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="ov-room" className="block text-sm text-gray-700 mb-1">
+                  Applies to
+                </label>
+                <select
+                  id="ov-room"
+                  value={packageId}
+                  onChange={(e) => setPackageId(e.target.value)}
+                  className={fieldCls}
+                >
+                  <option value="">All photos at this location</option>
+                  {rooms.map((room) => (
+                    <option key={room.id} value={String(room.id)}>
+                      {room.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  A room overlay is used only for that escape room&apos;s group photos. The date stamp is added on top as
+                  usual.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

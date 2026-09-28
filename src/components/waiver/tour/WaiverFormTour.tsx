@@ -83,22 +83,22 @@ const WaiverFormTour = () => {
 
       <button
         onClick={() => setRun((r) => !r)}
-        className="fixed bottom-5 right-5 z-[999] flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-semibold shadow-lg bg-blue-600 hover:bg-blue-700 text-white transition-all select-none"
+        aria-label={run ? 'Stop tour' : hasDone ? 'Replay tour' : 'How to fill this'}
+        title={run ? 'Stop tour' : hasDone ? 'Replay tour' : 'How to fill this'}
+        className="fixed bottom-5 right-5 z-[999] flex items-center justify-center w-11 h-11 rounded-full text-xs font-semibold shadow-lg bg-blue-600 hover:bg-blue-700 text-white transition-all select-none"
         style={{ boxShadow: '0 4px 18px rgba(37,99,235,0.45)' }}
       >
         {run ? (
           <>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
-            Stop tour
           </>
         ) : (
           <>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {hasDone ? 'Replay tour' : 'How to fill this'}
           </>
         )}
       </button>

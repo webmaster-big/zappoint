@@ -16,6 +16,7 @@ const REPORT_TYPES: Array<{ value: string; label: string; dated: boolean }> = [
   { value: 'by-event', label: 'By event', dated: true },
   { value: 'by-template', label: 'By template', dated: true },
   { value: 'by-source', label: 'By source', dated: true },
+  { value: 'by-escape-room', label: 'Escape-room players by room', dated: true },
   { value: 'marketing-consent', label: 'Marketing consent', dated: true },
   { value: 'ad-performance', label: 'Ad performance', dated: true },
   { value: 'deleted', label: 'Deleted waivers', dated: false },

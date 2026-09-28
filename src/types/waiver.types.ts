@@ -3,6 +3,7 @@
 export type WaiverStatus = 'pending' | 'completed' | 'expired' | 'replaced' | 'deleted';
 export type TemplateStatus = 'draft' | 'active' | 'inactive' | 'archived';
 export type DuplicateRule = 'none' | 'allow' | 'manager_only';
+export type WaiverTemplateKind = 'standard' | 'escape_room';
 export type MarketingConsentStatus = 'not_opted_in' | 'opted_in' | 'withdrawn';
 export type WaiverSource =
   | 'checkout' | 'confirmation_email' | 'sms_link' | 'kiosk' | 'staff_sent' | 'bulk_invite';
@@ -57,6 +58,7 @@ export interface WaiverTemplate {
   company_id: number;
   location_id: number | null;
   title: string;
+  kind?: WaiverTemplateKind;
   internal_description?: string | null;
   status: TemplateStatus;
   is_default: boolean;
@@ -131,6 +133,15 @@ export interface Waiver {
   location?: { id: number; name: string };
   minors?: WaiverMinor[];
   booking?: { id: number; reference_number?: string };
+  escape_room_session?: {
+    id: number;
+    session_date: string;
+    session_time: string;
+    completed_at?: string | null;
+    escaped?: boolean | null;
+    completion_seconds?: number | null;
+    package?: { id: number; name: string } | null;
+  } | null;
   attraction_purchase?: { id: number };
   event?: { id: number; name: string };
 }
@@ -169,6 +180,12 @@ export interface WaiverFormContext {
   }>;
   selected_date?: string;
   kiosk?: boolean;
+  escape_room?: {
+    room_name?: string | null;
+    date?: string | null;
+    time?: string | null;
+    time_label?: string | null;
+  } | null;
   settings?: {
     inactivity_timeout_seconds?: number;
     disable_autofill?: boolean;
@@ -368,7 +385,7 @@ export interface BulkChaperoneView {
 export interface AvailableActivities {
   type: ActivityType;
   claimed_ids: Array<number | string>;
-  available: Array<{ id: number; name: string; location_id: number | null; location_name: string | null }>;
+  available: Array<{ id: number; name: string; location_id: number | null; location_name: string | null; is_escape_room?: boolean }>;
 }
 
 export interface WaiverSettings {

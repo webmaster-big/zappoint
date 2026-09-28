@@ -122,6 +122,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Payments': 'Manage and view all payment transactions',
     'Photos': 'Capture, deliver and display customer photos',
     'Take Photos': 'Capture up to three photos and send them to a waiver or a QR code',
+    'Escape Rooms': "The day's escape-room games: group photo, finish time and the send to that game's players",
     'Photo Library': 'Browse, download and resend photos grouped by operating day',
     'Slideshow Queue': 'Manage what the venue screen is showing right now',
     'Overlays': 'Upload and schedule the branded frame applied to photos',
@@ -214,6 +215,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Photos', icon: Camera, section: 'Photos', items: [
           { label: 'Take Photos', href: '/photos/capture', icon: Camera },
+          { label: 'Escape Rooms', href: '/photos/escape-rooms', icon: DoorOpen },
           { label: 'Photo Library', href: '/photos/library', icon: Images },
           { label: 'Slideshow Queue', href: '/photos/slideshow-queue', icon: MonitorPlay },
           { label: 'Delivery Log', href: '/photos/delivery-log', icon: SendIcon }
@@ -287,6 +289,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Photos', icon: Camera, section: 'Photos', items: [
           { label: 'Take Photos', href: '/photos/capture', icon: Camera },
+          { label: 'Escape Rooms', href: '/photos/escape-rooms', icon: DoorOpen },
           { label: 'Photo Library', href: '/photos/library', icon: Images },
           { label: 'Slideshow Queue', href: '/photos/slideshow-queue', icon: MonitorPlay },
           { label: 'Overlays', href: '/photos/overlays', icon: Layers },
@@ -374,6 +377,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Photos', icon: Camera, section: 'Photos', items: [
           { label: 'Take Photos', href: '/photos/capture', icon: Camera },
+          { label: 'Escape Rooms', href: '/photos/escape-rooms', icon: DoorOpen },
           { label: 'Photo Library', href: '/photos/library', icon: Images },
           { label: 'Slideshow Queue', href: '/photos/slideshow-queue', icon: MonitorPlay },
           { label: 'Overlays', href: '/photos/overlays', icon: Layers },

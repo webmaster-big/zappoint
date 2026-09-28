@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import EscapeRoomBookingCard from '../../../components/admin/bookings/EscapeRoomBookingCard';
 import QRCode from 'qrcode';
 import { 
   Calendar, 
@@ -264,6 +265,8 @@ const ViewBooking: React.FC = () => {
             </div>
           </div>
         )}
+
+        {booking.package_id && <EscapeRoomBookingCard bookingId={booking.id} themeColor={themeColor} className="mb-6" />}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">

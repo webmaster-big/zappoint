@@ -58,6 +58,12 @@ export function formatHourLabel(time: string | number): string {
   return `${normalized}${period}`;
 }
 
+export function escapeRoomGameLabel(game?: { session_time?: string | null; package?: { name?: string | null } | null } | null): string {
+  if (!game) return '';
+  const time = game.session_time ? convertTo12Hour(game.session_time.slice(0, 5)) : '';
+  return [game.package?.name || 'Escape room', time ? `${time} game` : ''].filter(Boolean).join(' · ');
+}
+
 export function convertTo12Hour(time24: string): string {
   if (!time24) return '';
   

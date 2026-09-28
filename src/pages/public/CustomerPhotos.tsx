@@ -170,7 +170,16 @@ const CustomerPhotos = () => {
   return (
     <div className="min-h-dvh bg-zinc-950 text-white">
       <header className="px-6 py-6 max-w-3xl mx-auto">
-        <img src={brandLogoSrc} alt={brandName} className="h-10 w-auto object-contain" />
+        <img
+          src={brandLogoSrc}
+          alt={brandName}
+          className="h-10 w-auto object-contain"
+          onError={(e) => {
+            if (e.currentTarget.dataset.fallback) return;
+            e.currentTarget.dataset.fallback = '1';
+            e.currentTarget.src = DEFAULT_LOGO_SRC;
+          }}
+        />
         {page.location_name && (
           <p className="mt-1 text-xs uppercase tracking-[0.2em] text-zinc-400">{page.location_name}</p>
         )}
@@ -273,17 +282,34 @@ const CustomerPhotos = () => {
           </div>
         ) : (
           <div>
-            <h1 className="text-3xl font-bold mb-2">
-              {page.greeting_name ? `Here you go, ${page.greeting_name}` : 'Your photos are ready'}
-            </h1>
-            <p className="text-zinc-400 mb-2">
-              Taken at {page.location_name} on {page.photo_date}.
-            </p>
-            <p className="text-sm text-zinc-500 mb-8">
-              {page.asked_for_details
-                ? `Saved to your email and phone. This page stays open until ${page.expires_on_label}.`
-                : `Nothing was asked of you — this link came straight from the counter. It stays open until ${page.expires_on_label}.`}
-            </p>
+            {page.escape_room ? (
+              <>
+                <h1 className="text-3xl font-bold mb-2">
+                  {page.escape_room.room_name ? `${page.escape_room.room_name} group photo` : 'Your group photo'}
+                </h1>
+                <p className="text-zinc-400 mb-2">
+                  Played at {page.location_name}
+                  {page.escape_room.session_date ? ` on ${page.escape_room.session_date}` : ''}
+                  {page.escape_room.session_time ? ` at ${page.escape_room.session_time}` : ''}.
+                </p>
+                {page.escape_room.result && <p className="text-lg font-semibold text-yellow-300 mb-2">{page.escape_room.result}</p>}
+                <p className="text-sm text-zinc-500 mb-8">This page stays open until {page.expires_on_label}.</p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl font-bold mb-2">
+                  {page.greeting_name ? `Here you go, ${page.greeting_name}` : 'Your photos are ready'}
+                </h1>
+                <p className="text-zinc-400 mb-2">
+                  Taken at {page.location_name} on {page.photo_date}.
+                </p>
+                <p className="text-sm text-zinc-500 mb-8">
+                  {page.asked_for_details
+                    ? `Saved to your email and phone. This page stays open until ${page.expires_on_label}.`
+                    : `Nothing was asked of you — this link came straight from the counter. It stays open until ${page.expires_on_label}.`}
+                </p>
+              </>
+            )}
 
             {page.allow_download_all && (
               <button
@@ -292,11 +318,11 @@ const CustomerPhotos = () => {
                 className="mb-6 inline-flex items-center gap-2 rounded-xl bg-yellow-400 text-zinc-950 font-bold px-6 py-3"
               >
                 <Download className="w-5 h-5" />
-                Download all {page.photos?.length} photos
+                {page.photos?.length === 2 ? 'Download both photos' : `Download all ${page.photos?.length} photos`}
               </button>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
               {(page.photos ?? []).map((photo) => (
                 <figure key={photo.id} className="rounded-2xl overflow-hidden bg-zinc-900">
                   <img src={photo.url} alt="Your Zap Zone photo" className="w-full block" />

@@ -10,6 +10,7 @@ import {
   WaiverCompleted,
   WaiverSuccess,
 } from '../../components/waiver/WaiverStates';
+import EscapeRoomGameBanner from '../../components/waiver/EscapeRoomGameBanner';
 
 /** Token-addressed customer waiver page: /waiver/:token (email / SMS / staff-sent link). */
 const WaiverForm = () => {
@@ -72,6 +73,7 @@ const WaiverForm = () => {
 
   return (
     <WaiverShell title={context.template?.title || 'Sign Your Waiver'} subtitle="Please review and complete the waiver below">
+      <EscapeRoomGameBanner escapeRoom={context.escape_room} />
       <WaiverFormBody
         context={context}
         submitting={submitting}

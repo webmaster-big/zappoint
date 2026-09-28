@@ -66,6 +66,7 @@ export interface BookPackageAvailabilitySchedule {
 }
 
 export interface BookPackagePackage {
+  is_escape_room?: boolean;
   id: number;
   location_id: number;
   name: string;

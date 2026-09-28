@@ -144,6 +144,8 @@ import PhotoOverlays from "./pages/admin/photos/PhotoOverlays";
 import PhotoDeliveryLog from "./pages/admin/photos/PhotoDeliveryLog";
 import PhotoSettings from "./pages/admin/photos/PhotoSettings";
 import PhotoReports from "./pages/admin/photos/PhotoReports";
+import EscapeRoomSessions from "./pages/admin/photos/EscapeRoomSessions";
+import EscapeRoomWaiverKiosk from "./pages/public/EscapeRoomWaiverKiosk";
 
 const ScrollToTop = () => {
   const { pathname, hash } = useLocation();
@@ -201,6 +203,7 @@ function App() {
         <Route path="/waiver/kiosk/:id" element={<><PageViewBeacon pageType="waiver_kiosk" /><WaiverKiosk /></>} />
         <Route path="/waiver/kiosk-session/:token" element={<><PageViewBeacon pageType="waiver_kiosk_session" /><WaiverKioskSession /></>} />
         <Route path="/waiver/bulk/:manageToken" element={<><PageViewBeacon pageType="waiver_bulk" /><WaiverBulk /></>} />
+        <Route path="/waiver/escape-room/:locationId" element={<><PageViewBeacon pageType="waiver_escape_room" /><EscapeRoomWaiverKiosk /></>} />
         <Route path="/waiver/:token" element={<><PageViewBeacon pageType="waiver_sign" /><WaiverForm /></>} />
 
         <Route path="/photos/kiosk/:locationId" element={<PhotoKiosk />} />
@@ -279,6 +282,7 @@ function App() {
           <Route path="/settings/custom-fields" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><CustomFields /></ProtectedRoute>} />
 
           <Route path="/photos/capture" element={<PhotoCapture />} />
+          <Route path="/photos/escape-rooms" element={<EscapeRoomSessions />} />
           <Route path="/photos/library" element={<PhotoLibrary />} />
           <Route path="/photos/slideshow-queue" element={<SlideshowQueuePage />} />
           <Route path="/photos/overlays" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><PhotoOverlays /></ProtectedRoute>} />

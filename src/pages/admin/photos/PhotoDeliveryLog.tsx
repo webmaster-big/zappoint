@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
 import { Mail, MessageSquare, RefreshCcw, Send, XCircle } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -140,6 +142,7 @@ const PhotoDeliveryLog = () => {
             <option value="immediate">Immediate</option>
             <option value="next_day">9:00 AM next day</option>
             <option value="kiosk">Kiosk</option>
+            <option value="escape_room">Escape room</option>
           </select>
           <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPageNumber(1); }} className={fieldCls} aria-label="From date" />
           <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPageNumber(1); }} className={fieldCls} aria-label="To date" />
@@ -198,7 +201,21 @@ const PhotoDeliveryLog = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {delivery.kind === 'next_day' ? '9:00 AM next day' : delivery.kind}
+                      {delivery.kind === 'next_day'
+                        ? '9:00 AM next day'
+                        : delivery.kind === 'escape_room'
+                          ? 'Escape room'
+                          : delivery.kind}
+                      {delivery.kind === 'escape_room' && delivery.escape_room && (
+                        <Link
+                          to={`/photos/escape-rooms?date=${delivery.escape_room.session_date}&session=${delivery.escape_room.id}`}
+                          className="block text-xs text-gray-500 underline underline-offset-2"
+                        >
+                          {delivery.escape_room.room_name ?? 'Game'} ·{' '}
+                          {parseLocalDate(String(delivery.escape_room.session_date).split('T')[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ·{' '}
+                          {convertTo12Hour(delivery.escape_room.session_time.slice(0, 5))} game
+                        </Link>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span

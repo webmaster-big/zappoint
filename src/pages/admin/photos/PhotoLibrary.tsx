@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { convertTo12Hour } from '../../../utils/timeFormat';
 import {
   AlertTriangle,
   CalendarDays,
@@ -16,13 +18,26 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
+import { confirmPhotoRelease, releaseConfirmMessage } from '../../../utils/photoRelease';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import type { PhotoLibraryResponse, PhotoRecord, PhotoWaiverMatch } from '../../../types/photo.types';
+import type { PhotoLibraryResponse, PhotoRecord, PhotoSessionRecord, PhotoWaiverMatch } from '../../../types/photo.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+
+const escapeRoomLink = (photo: PhotoRecord): PhotoSessionRecord['escape_room'] | null =>
+  (photo.session as { escape_room?: PhotoSessionRecord['escape_room'] } | undefined)?.escape_room ?? null;
+
+const escapeRoomNote = (photo: PhotoRecord): string | null => {
+  const link = escapeRoomLink(photo);
+  if (!link) return null;
+  const time = link.session_time ? ` · ${convertTo12Hour(link.session_time.slice(0, 5))} game` : '';
+  return `Escape room${link.room_name ? `: ${link.room_name}` : ''}${time} · ${
+    link.completed ? `sent${link.completion_label ? `, ${link.completion_label}` : ''}` : 'not sent yet'
+  }`;
+};
 
 const saveBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -144,7 +159,15 @@ const PhotoLibrary = () => {
       const include = !photo.shows_in_slideshow;
       setSlideshowBusyId(photo.id);
       try {
-        const message = await photoService.setPhotoOnSlideshow(photo.id, include);
+        let message: string;
+        try {
+          message = await photoService.setPhotoOnSlideshow(photo.id, include);
+        } catch (e) {
+          const ask = releaseConfirmMessage(e);
+          if (!ask) throw e;
+          if (!confirmPhotoRelease(ask)) return;
+          message = await photoService.setPhotoOnSlideshow(photo.id, include, true);
+        }
         setToast({ message, type: 'success' });
         await load();
       } catch (e) {
@@ -373,6 +396,18 @@ const PhotoLibrary = () => {
                         {photo.download_count > 0 && ` · ${photo.download_count} download(s)`}
                       </p>
 
+                      {escapeRoomNote(photo) && (
+                        <p className="text-[11px] text-gray-700">
+                          {escapeRoomNote(photo)}.{' '}
+                          <Link
+                            to={`/photos/escape-rooms?date=${escapeRoomLink(photo)?.session_date ?? ''}&session=${escapeRoomLink(photo)?.id ?? ''}`}
+                            className="font-semibold underline underline-offset-2"
+                          >
+                            Open in Escape Rooms
+                          </Link>
+                        </p>
+                      )}
+
                       <div className="flex gap-1">
                         <button
                           type="button"
@@ -382,20 +417,22 @@ const PhotoLibrary = () => {
                           <Download className="w-3.5 h-3.5" />
                           Save
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSendFor(photo);
-                            setChosen([]);
-                            setMatches([]);
-                            setQuery('');
-                          }}
-                          disabled={photo.session?.access_status !== 'active'}
-                          className="flex-1 inline-flex items-center justify-center gap-1 text-xs border border-gray-200 rounded-lg py-1.5 hover:bg-gray-50 disabled:opacity-40"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          Send
-                        </button>
+                        {!escapeRoomNote(photo) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSendFor(photo);
+                              setChosen([]);
+                              setMatches([]);
+                              setQuery('');
+                            }}
+                            disabled={photo.session?.access_status !== 'active'}
+                            className="flex-1 inline-flex items-center justify-center gap-1 text-xs border border-gray-200 rounded-lg py-1.5 hover:bg-gray-50 disabled:opacity-40"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            Send
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => void toggleSlideshow(photo)}

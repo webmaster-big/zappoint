@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   MapPin,
@@ -15,7 +15,11 @@ import {
   Package,
   Search,
   ArrowUpDown,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  DoorOpen,
+  FileSignature,
+  Image as ImageIcon
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
@@ -32,6 +36,7 @@ import { AppliedFeesDisplay } from '../../components/AppliedFeesDisplay';
 import { AppliedDiscountsDisplay } from '../../components/AppliedDiscountsDisplay';
 import { resolvePaymentState } from '../../types/Bookings.types';
 import { cardFromPayments } from '../../utils/cardLabel';
+import customerBookingWaiverService, { type CustomerBookingWaiver } from '../../services/CustomerBookingWaiverService';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -51,6 +56,9 @@ const CustomerReservations = () => {
   const [invitationBooking, setInvitationBooking] = useState<Booking | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [waiverInfo, setWaiverInfo] = useState<Record<number, CustomerBookingWaiver>>({});
+  const [shownLinkId, setShownLinkId] = useState<number | null>(null);
+  const waiverSequence = useRef(0);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -101,12 +109,33 @@ const CustomerReservations = () => {
         setBookings(response.data.bookings);
         setTotalPages(response.data.pagination.last_page);
         setTotalBookings(response.data.pagination.total);
+        void loadWaiverInfo(response.data.bookings.map((booking: Booking) => booking.id));
       }
     } catch (err: any) {
       console.error('Error fetching bookings:', err);
       setError(err.message || 'Failed to load bookings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadWaiverInfo = async (ids: number[]) => {
+    const sequence = ++waiverSequence.current;
+    try {
+      const rows = await customerBookingWaiverService.getForBookings(ids);
+      if (sequence !== waiverSequence.current) return;
+      setWaiverInfo(Object.fromEntries(rows.map((row) => [row.booking_id, row])));
+    } catch {
+      if (sequence === waiverSequence.current) setWaiverInfo({});
+    }
+  };
+
+  const copyGroupLink = async (bookingId: number, link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast('Group check-in link copied. Send it to everyone playing.', 'success');
+    } catch {
+      setShownLinkId(bookingId);
     }
   };
 
@@ -401,6 +430,101 @@ const CustomerReservations = () => {
                               {resolvePaymentState(booking).label}
                             </span>
                           </div>
+
+                          {(() => {
+                            const info = waiverInfo[booking.id];
+                            if (!info || (!info.waiver && !info.escape_room)) return null;
+                            const game = info.escape_room;
+                            return (
+                              <div className="mt-3 space-y-2">
+                                {info.waiver && (
+                                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                                    {info.waiver.status === 'completed' ? (
+                                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                                        <CheckCircle size={12} />
+                                        Your waiver is signed
+                                      </span>
+                                    ) : info.waiver.signing_url ? (
+                                      <>
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                          <AlertCircle size={12} />
+                                          Waiver not signed yet
+                                        </span>
+                                        <a
+                                          href={info.waiver.signing_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-sm font-medium text-blue-700 border border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
+                                        >
+                                          <FileSignature size={14} />
+                                          Sign your waiver
+                                        </a>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                )}
+                                {game && (
+                                  <div className="rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2 text-sm text-gray-700">
+                                    <p className="flex items-center gap-1.5 font-medium text-gray-900">
+                                      <DoorOpen size={14} className="text-violet-600" />
+                                      Escape room: {game.room_name} · {game.time_label}
+                                    </p>
+                                    {game.completed ? (
+                                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        <span>
+                                          {game.completion_label === 'Did not escape' ? 'Did not escape this time' : `Escaped in ${game.completion_label}`}
+                                          {game.photo_sent ? ` · Group photo emailed to ${game.players_sent} ${game.players_sent === 1 ? 'player' : 'players'}` : ''}
+                                        </span>
+                                        {game.photo_link && (
+                                          <a
+                                            href={game.photo_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-sm font-medium text-violet-700 border border-violet-200 bg-white rounded-lg hover:bg-violet-50 transition"
+                                          >
+                                            <ImageIcon size={14} />
+                                            View your group photo
+                                          </a>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className="mt-1">
+                                          Everyone playing signs their own waiver, and the group photo is emailed to everyone who signed.
+                                          {game.players_signed !== null
+                                            ? ` Signed waivers cover ${game.people_covered ?? game.players_signed} of ${game.players_booked} so far.`
+                                            : ''}
+                                        </p>
+                                        {game.check_in_link && (
+                                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => void copyGroupLink(booking.id, game.check_in_link as string)}
+                                              className="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-sm font-medium text-violet-700 border border-violet-200 bg-white rounded-lg hover:bg-violet-50 transition"
+                                            >
+                                              <Copy size={14} />
+                                              Copy link for your group
+                                            </button>
+                                            <a
+                                              href={game.check_in_link}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center min-h-[36px] text-sm font-medium text-violet-700 underline underline-offset-2"
+                                            >
+                                              Open check-in
+                                            </a>
+                                          </div>
+                                        )}
+                                        {shownLinkId === booking.id && game.check_in_link && (
+                                          <p className="mt-1 text-xs text-gray-600 break-all select-all">{game.check_in_link}</p>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">

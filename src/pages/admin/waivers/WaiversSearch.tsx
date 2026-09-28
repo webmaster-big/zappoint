@@ -24,11 +24,12 @@ import {
   ListChecks,
   UserCog,
   Tablet,
+  DoorOpen,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
-import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
+import { escapeRoomGameLabel, formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import waiverService from '../../../services/waiverService';
 import waiverCacheService from '../../../services/WaiverCacheService';
 import bookingService from '../../../services/bookingService';
@@ -106,7 +107,9 @@ const dashboardTimeframe = (): WaiverScope => {
 const adultName = (w: Waiver) => [w.adult_first_name, w.adult_last_name].filter(Boolean).join(' ');
 const minorNames = (w: Waiver) => (w.minors || []).map((m) => [m.first_name, m.last_name].filter(Boolean).join(' ')).join(', ');
 const linkedLabel = (w: Waiver) => {
-  if (w.booking) return `Booking ${w.booking.reference_number || `#${w.booking.id}`}`;
+  const game = w.escape_room_session ? `Escape room: ${escapeRoomGameLabel(w.escape_room_session)}` : '';
+  if (w.booking) return [`Booking ${w.booking.reference_number || `#${w.booking.id}`}`, game].filter(Boolean).join(' · ');
+  if (game) return game;
   if (w.attraction_purchase) return `Attraction AP-${w.attraction_purchase.id}`;
   if (w.event) return `Event ${w.event.name}`;
   return '';
@@ -151,9 +154,15 @@ const WaiversSearch = () => {
     setKioskLoading(true);
     try {
       const res = await waiverService.listTemplates({ per_page: 100 });
-      const list = res.success ? ((res.data.waiver_templates as WaiverTemplate[]) || []) : [];
+      const all = res.success ? ((res.data.waiver_templates as WaiverTemplate[]) || []) : [];
+      const list = all.filter((t) => t.kind !== 'escape_room');
       if (list.length === 0) {
-        setToast({ message: 'No waiver templates exist yet — create one first.', type: 'error' });
+        setToast({
+          message: all.length > 0
+            ? 'Escape-room waivers are signed from Photos › Escape Rooms › Guest check-in. Create a standard waiver to use this kiosk.'
+            : 'No waiver templates exist yet — create one first.',
+          type: all.length > 0 ? 'info' : 'error',
+        });
         return;
       }
       setKioskTemplates(list);
@@ -868,6 +877,8 @@ const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn, canPrint =
   canPrint?: boolean;
 }) => {
   const w = data.waiver;
+  const navigate = useNavigate();
+  const game = w.escape_room_session;
   const [checkInBusy, setCheckInBusy] = useState(false);
   const runCheckInAction = async (action: (w: Waiver) => Promise<void>) => {
     setCheckInBusy(true);
@@ -999,7 +1010,10 @@ const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn, canPrint =
             </DetailSection>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-wrap justify-end gap-2">
+          {game && (
+            <StandardButton variant="secondary" icon={DoorOpen} onClick={() => navigate(`/photos/escape-rooms?date=${String(game.session_date).split('T')[0]}&session=${game.id}`)}>Open game</StandardButton>
+          )}
           {w.checked_in_at && (
             <StandardButton variant="secondary" icon={Undo2} disabled={checkInBusy} onClick={() => runCheckInAction(onUndoCheckIn)}>Undo Check-In</StandardButton>
           )}
@@ -1049,7 +1063,7 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
 
   useEffect(() => {
     waiverService.listTemplates({ status: 'active', per_page: 100 }).then((r) => {
-      if (r.success) setTemplates((r.data.waiver_templates as WaiverTemplate[]) || []);
+      if (r.success) setTemplates(((r.data.waiver_templates as WaiverTemplate[]) || []).filter((t) => t.kind !== 'escape_room'));
     }).catch(() => {});
   }, []);
 

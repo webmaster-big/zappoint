@@ -38,6 +38,7 @@ export interface Package {
   max_tickets_per_slot?: number | null;
   participant_label?: string | null;
   display_label?: string | null;
+  is_escape_room?: boolean;
   duration: number;
   duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;
@@ -126,6 +127,7 @@ export interface CreatePackageData {
   max_tickets_per_slot?: number | null;
   participant_label?: string | null;
   display_label?: string | null;
+  is_escape_room?: boolean;
   duration: number;
   duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;

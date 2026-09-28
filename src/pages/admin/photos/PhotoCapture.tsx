@@ -327,7 +327,7 @@ const PhotoCapture = () => {
                 type="checkbox"
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
-                className={`mt-1 h-5 w-5 accent-${themeColor}-700`}
+                className={`mt-1 h-5 w-5 shrink-0 accent-${themeColor}-700`}
               />
               <span className="text-sm text-gray-800">
                 I asked the customer and they agreed to have their photo taken.

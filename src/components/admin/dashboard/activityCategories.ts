@@ -46,7 +46,7 @@ export const bucketForCategory = (
 };
 
 export const bucketForBooking = (booking: Pick<Booking, 'package'>): ActivityBucketKey =>
-  bucketForCategory(booking.package?.category, 'booking');
+  booking.package?.is_escape_room ? 'escape_rooms' : bucketForCategory(booking.package?.category, 'booking');
 
 export const bucketForPurchase = (purchase: Pick<AttractionPurchase, 'attraction'>): ActivityBucketKey =>
   bucketForCategory(purchase.attraction?.category, 'attraction');
@@ -115,7 +115,7 @@ export const BUCKET_DEFINITIONS: BucketDefinition[] = [
     primaryUnit: 'bookings',
     secondaryUnit: 'players',
     explanation:
-      'Escape room activity scheduled for this day, whether it was sold as a package booking or as an attraction ticket. Difficulty labels such as Beginner or Advanced count as escape rooms. Cancelled rows are left out.',
+      'Escape room activity scheduled for this day, whether it was sold as a package booking or as an attraction ticket. Packages switched on as escape rooms always count here, and so do difficulty labels such as Beginner or Advanced. Cancelled rows are left out.',
   },
   {
     key: 'rage_rooms',
