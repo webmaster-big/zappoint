@@ -101,11 +101,8 @@ const ManageAddons = () => {
         if (cachedPackages && cachedPackages.length > 0) {
           setPackages(cachedPackages);
         } else {
-          const response = await packageService.getPackages(params);
-          if (response.data?.packages) {
-            setPackages(response.data.packages);
-            await packageCacheService.cachePackages(response.data.packages);
-          }
+          setPackages(await packageService.getAllPackages(params));
+          packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         }
       } catch (error) {
         console.error('Error loading packages:', error);
@@ -242,38 +239,38 @@ const ManageAddons = () => {
       }
       
       console.log('[AddOns] Fetching from API...');
-      const response = await addOnService.getAddOns(params);
-      console.log('Add-ons response:', response);
+      const fetchedAddOns = await addOnService.getAllAddOns(params);
       
-      if (response.data && response.data.add_ons) {
-        const formattedAddons: AddOnsAddon[] = response.data.add_ons.map(addon => {
-          let imageFull = '';
-          if (addon.image) {
-            const imgStr = String(addon.image);
-            if (imgStr.startsWith('http') || imgStr.startsWith(ASSET_URL)) {
-              imageFull = imgStr;
-            } else {
-              imageFull = `${ASSET_URL}${imgStr}`;
-            }
+      const formattedAddons: AddOnsAddon[] = fetchedAddOns.map(addon => {
+        let imageFull = '';
+        if (addon.image) {
+          const imgStr = String(addon.image);
+          if (imgStr.startsWith('http') || imgStr.startsWith(ASSET_URL)) {
+            imageFull = imgStr;
+          } else {
+            imageFull = `${ASSET_URL}${imgStr}`;
           }
+        }
 
-          return {
-            id: addon.id.toString(),
-            name: addon.name,
-            price: addon.price,
-            image: imageFull,
-            description: addon.description,
-            location: addon.location && typeof addon.location === 'object' ? addon.location : null,
-            min_quantity: addon.min_quantity,
-            max_quantity: addon.max_quantity,
-            is_force_add_on: addon.is_force_add_on,
-            price_each_packages: addon.price_each_packages,
-          };
-        });
-        setAddons(formattedAddons);
-        
-        await addOnCacheService.cacheAddOns(response.data.add_ons);
-        console.log('[AddOns] Cached', response.data.add_ons.length, 'add-ons');
+        return {
+          id: addon.id.toString(),
+          name: addon.name,
+          price: addon.price,
+          image: imageFull,
+          description: addon.description,
+          location: addon.location && typeof addon.location === 'object' ? addon.location : null,
+          min_quantity: addon.min_quantity,
+          max_quantity: addon.max_quantity,
+          is_force_add_on: addon.is_force_add_on,
+          price_each_packages: addon.price_each_packages,
+        };
+      });
+      setAddons(formattedAddons);
+      
+      if (params.location_id) {
+        addOnCacheService.syncInBackground({ user_id: params.user_id });
+      } else {
+        await addOnCacheService.cacheAddOns(fetchedAddOns);
       }
     } catch (error) {
       console.error('Error loading addons:', error);

@@ -170,15 +170,15 @@ const DayOffs: React.FC = () => {
             setLoadingResources(true);
             try {
                 const [packagesRes, roomsRes, attractionsRes, eventsRes] = await Promise.all([
-                    packageService.getPackages({ location_id: locationId, is_active: true, per_page: 100 }),
-                    roomService.getRooms({ location_id: locationId, is_available: true, per_page: 100 }),
-                    attractionService.getAttractions({ location_id: locationId, is_active: true, per_page: 100 }),
+                    packageService.getAllPackages({ location_id: locationId, is_active: true }),
+                    roomService.getAllRooms({ location_id: locationId, is_available: true }),
+                    attractionService.getAllAttractions({ location_id: locationId, is_active: true }),
                     eventService.getEvents({ location_id: locationId, is_active: true, per_page: 100 })
                 ]);
 
-                const packages = packagesRes.success && packagesRes.data?.packages ? packagesRes.data.packages : [];
-                const rooms = roomsRes.success && roomsRes.data?.rooms ? roomsRes.data.rooms : [];
-                const attractions = attractionsRes.success && attractionsRes.data?.attractions ? attractionsRes.data.attractions : [];
+                const packages = packagesRes;
+                const rooms = roomsRes;
+                const attractions = attractionsRes;
                 const events = eventsRes.success && Array.isArray(eventsRes.data) ? eventsRes.data : [];
 
                 setAvailablePackages(packages);

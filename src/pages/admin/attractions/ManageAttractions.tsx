@@ -196,7 +196,11 @@ const ManageAttractions = () => {
         page++;
       } while (page <= lastPage);
 
-      await attractionCacheService.cacheAttractions(allRaw);
+      if (selectedLocation === null) {
+        await attractionCacheService.cacheAttractions(allRaw);
+      } else {
+        attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
+      }
 
       setAttractions(allRaw.map(convertAttraction));
     } catch (error) {

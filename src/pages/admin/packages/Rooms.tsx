@@ -177,10 +177,6 @@ const Rooms: React.FC = () => {
                 setRooms(response.data.rooms || []);
                 const pagination = response.data.pagination;
                 setTotalPages(pagination?.last_page || 1);
-                
-                if (currentPage === 1 && !searchTerm && response.data.rooms) {
-                    await roomCacheService.cacheRooms(response.data.rooms);
-                }
             }
         } catch (error) {
             console.error('Error fetching Spaces:', error);

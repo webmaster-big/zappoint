@@ -29,7 +29,8 @@ import type {
 } from '../../../types/AttendantActivityLogs.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { API_BASE_URL, getStoredUser } from '../../../utils/storage';
-import { getAuthToken } from '../../../services';
+import { getAuthToken, userService } from '../../../services';
+import { MICHIGAN_TZ } from '../../../utils/timeFormat';
 
 const AttendantActivityLogs = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -64,6 +65,8 @@ const AttendantActivityLogs = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [totalLogs, setTotalLogs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [todayCount, setTodayCount] = useState(0);
+  const [staffUsers, setStaffUsers] = useState<{ id: string; name: string; type: string }[]>([]);
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
 
   const actionIcons = {
@@ -666,7 +669,7 @@ const AttendantActivityLogs = () => {
       },
       {
         title: "Today's Activities",
-        value: todayLogs.length.toString(),
+        value: todayCount.toString(),
         change: 'Last 24 hours',
         accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Zap,
@@ -754,12 +757,25 @@ const AttendantActivityLogs = () => {
       params.append('sort_by', 'created_at');
       params.append('sort_order', 'desc');
 
-      const response = await fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const requestHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const todayParams = new URLSearchParams(params);
+      todayParams.set('per_page', '1');
+      todayParams.set('page', '1');
+      todayParams.set('date_from', new Date().toLocaleDateString('en-CA', { timeZone: MICHIGAN_TZ }));
+
+      const [response, todayTotal] = await Promise.all([
+        fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, { headers: requestHeaders }),
+        fetch(`${API_BASE_URL}/activity-logs?${todayParams.toString()}`, { headers: requestHeaders })
+          .then(todayResponse => (todayResponse.ok ? todayResponse.json() : null))
+          .then(todayData => Number(todayData?.data?.pagination?.total) || 0)
+          .catch(() => 0),
+      ]);
+
+      setTodayCount(todayTotal);
 
       if (response.ok) {
         const data = await response.json();
@@ -812,6 +828,19 @@ const AttendantActivityLogs = () => {
       loadLogs();
     }
   }, [filters, currentPage, loadLogs, userLocationId]);
+
+  useEffect(() => {
+    Promise.all([
+      userService.getAllUsers({ status: 'active' }),
+      userService.getAllUsers({ status: 'inactive' }),
+    ])
+      .then(([activeUsers, inactiveUsers]) => setStaffUsers([...activeUsers, ...inactiveUsers].map(user => ({
+        id: user.id.toString(),
+        name: user.name || user.email,
+        type: user.role,
+      }))))
+      .catch(error => console.error('Error loading users:', error));
+  }, []);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -1074,14 +1103,22 @@ const AttendantActivityLogs = () => {
   };
 
   const getUniqueUsers = () => {
-    const users = filteredLogs
-      .filter(log => log.userId && log.userType)
-      .map(log => ({ id: log.userId!, name: log.attendantName, type: log.userType! }));
+    const users = [
+      ...staffUsers,
+      ...filteredLogs
+        .filter(log => log.userId && log.userType && log.userId !== 'system')
+        .map(log => ({ id: log.userId!, name: log.attendantName, type: log.userType! })),
+    ];
     return [...new Map(users.map(item => [item.id, item])).values()];
   };
 
   const getUniqueAttendants = () => {
-    const attendants = filteredLogs.map(log => ({ id: log.attendantId, name: log.attendantName }));
+    const attendants = [
+      ...staffUsers.map(user => ({ id: user.id, name: user.name })),
+      ...filteredLogs
+        .filter(log => log.attendantId !== 'system')
+        .map(log => ({ id: log.attendantId, name: log.attendantName })),
+    ];
     return [...new Map(attendants.map(item => [item.id, item])).values()];
   };
 

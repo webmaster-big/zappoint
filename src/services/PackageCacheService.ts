@@ -1,8 +1,11 @@
 
-import packageService, { type Package, type PackageFilters, type PaginatedResponse } from './PackageService';
+import packageService, { type Package, type PackageFilters } from './PackageService';
 import { normalizeCategory } from '../utils/venueCategories';
+import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-packages-cache-v1';
+const CACHE_NAME = 'zapzone-packages-cache-v2';
+const LEGACY_CACHE_NAME = 'zapzone-packages-cache-v1';
+let legacyCleared = false;
 const PACKAGES_CACHE_KEY = '/api/packages/cached';
 const CACHE_METADATA_KEY = '/api/packages/metadata';
 
@@ -49,6 +52,10 @@ class PackageCacheService {
       console.warn('[PackageCacheService] Cache Storage not available');
       return null;
     }
+    if (!legacyCleared) {
+      legacyCleared = true;
+      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+    }
     return await caches.open(CACHE_NAME);
   }
 
@@ -74,6 +81,7 @@ class PackageCacheService {
         lastUpdated: Date.now(),
         totalRecords: packages.length,
         ...metadata,
+        userId: metadata?.userId ?? getStoredUser()?.id,
       };
 
       const metadataResponse = new Response(JSON.stringify(fullMetadata), {
@@ -135,7 +143,7 @@ class PackageCacheService {
     forceRefresh: boolean = false
   ): Promise<Package[]> {
     if (this.isSyncing && this.syncPromise) {
-      return this.syncPromise;
+      return this.syncPromise.then((packages) => this.filterPackages(packages, filters));
     }
 
     if (!forceRefresh) {
@@ -146,27 +154,27 @@ class PackageCacheService {
         if (isStale) {
           this.syncInBackground(filters);
         }
-        return cachedPackages;
+        return this.filterPackages(cachedPackages, filters);
       }
     }
 
-    return this.syncFromAPI(filters);
+    return this.filterPackages(await this.syncFromAPI(filters), filters);
   }
 
   private async syncFromAPI(filters?: PackageFilters): Promise<Package[]> {
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
     this.isSyncing = true;
 
     this.syncPromise = (async () => {
       try {
-        const response: PaginatedResponse<Package> = await packageService.getPackages({
-          ...filters,
-          per_page: 1000, // Get a large batch
-        });
-
-        const packages = response.data.packages || [];
+        const packages = await packageService.getAllPackages(
+          filters?.user_id ? { user_id: filters.user_id } : undefined,
+        );
 
         await this.cachePackages(packages, {
-          locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
@@ -260,7 +268,16 @@ class PackageCacheService {
     
     if (!cachedPackages) return [];
 
-    const filtered = cachedPackages.filter(pkg => {
+    const filtered = this.filterPackages(cachedPackages, filters);
+
+    console.log('[PackageCacheService] Filtered packages count:', filtered.length);
+    return filtered;
+  }
+
+  private filterPackages(packages: Package[], filters?: PackageFilters): Package[] {
+    if (!filters) return packages;
+
+    return packages.filter(pkg => {
       if (filters.location_id && pkg.location_id !== filters.location_id) {
         return false;
       }
@@ -292,9 +309,6 @@ class PackageCacheService {
 
       return true;
     });
-
-    console.log('[PackageCacheService] Filtered packages count:', filtered.length);
-    return filtered;
   }
 
   async clearCache(): Promise<void> {

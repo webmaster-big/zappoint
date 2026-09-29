@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -44,10 +45,11 @@ export interface GiftCard {
 }
 
 export interface GiftCardFilters {
-  status?: 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
+  status?: 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted' | 'all';
   type?: 'fixed' | 'percentage';
   search?: string;
   location_id?: number;
+  include_expired?: boolean;
   sort_by?: 'code' | 'initial_value' | 'balance' | 'created_at';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
@@ -139,6 +141,13 @@ class GiftCardService {
   async getGiftCards(filters?: GiftCardFilters): Promise<PaginatedResponse<GiftCard>> {
     const response = await api.get('/gift-cards', { params: filters });
     return response.data;
+  }
+
+  async getAllGiftCards(filters?: GiftCardFilters): Promise<GiftCard[]> {
+    return fetchAllPages<GiftCard>(async (page) => {
+      const response = await this.getGiftCards({ ...filters, sort_by: 'created_at', sort_order: 'desc', per_page: 100, page });
+      return { items: response.data?.gift_cards || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   }
 
   async getGiftCard(id: number): Promise<ApiResponse<GiftCard>> {

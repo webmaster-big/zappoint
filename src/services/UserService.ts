@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -97,6 +98,13 @@ class UserService {
   async getUsers(filters?: UserFilters): Promise<ApiResponse<{ users: User[]; total: number }>> {
     const response = await api.get('/users', { params: filters });
     return response.data;
+  }
+
+  async getAllUsers(filters?: UserFilters): Promise<User[]> {
+    return fetchAllPages<User>(async (page) => {
+      const response = await api.get('/users', { params: { ...filters, per_page: 500, page } });
+      return { items: response.data?.data?.users || [], lastPage: response.data?.data?.pagination?.last_page ?? 1 };
+    });
   }
 
   async getUser(id: number): Promise<ApiResponse<User>> {

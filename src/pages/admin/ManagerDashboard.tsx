@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Calendar,
   Users,
@@ -69,7 +69,6 @@ import { guestNoteOf } from '../../utils/bookingNotes';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { cardFromPayments } from '../../utils/cardLabel';
-import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { resolvePaymentState } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
@@ -124,7 +123,17 @@ const LocationManagerDashboard: React.FC = () => {
   const itemsPerPage = 10;
 
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings for this location
-  const [recentlyCreatedBookings, setRecentlyCreatedBookings] = useState<any[]>([]);
+  const localPatchesRef = useRef(new Map<number, { fields: Record<string, unknown>; at: number }>());
+  const patchBooking = (id: number, fields: Record<string, unknown>) => {
+    const previous = localPatchesRef.current.get(id);
+    localPatchesRef.current.set(id, { fields: { ...previous?.fields, ...fields }, at: Date.now() });
+    setAllBookings(list => list.map(booking => (booking.id === id ? { ...booking, ...fields } : booking)));
+  };
+  const withLocalPatches = (list: typeof allBookings) =>
+    list.map(booking => {
+      const patch = localPatchesRef.current.get(booking.id);
+      return patch ? { ...booking, ...patch.fields } : booking;
+    });
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
   const [ticketPurchases, setTicketPurchases] = useState<any[]>([]);
@@ -178,6 +187,20 @@ const LocationManagerDashboard: React.FC = () => {
   useEffect(() => {
     if (!locationId) return;
     
+    let cancelled = false;
+    let fullListShown = false;
+    let windowShown = false;
+    const scopeBookings = <T extends { location_id?: number | null }>(list: T[]) => list.filter(booking => booking.location_id === locationId);
+    const applyFullList = (list: typeof allBookings, startedAt: number) => {
+      fullListShown = true;
+      if (startedAt > 0) {
+        localPatchesRef.current.forEach((patch, id) => {
+          if (startedAt > patch.at) localPatchesRef.current.delete(id);
+        });
+      }
+      setAllBookings(withLocalPatches(scopeBookings(list)));
+    };
+
     const loadAllBookings = async () => {
       try {
         console.log('📦 [ManagerDashboard] Loading all bookings for location:', locationId);
@@ -186,22 +209,29 @@ const LocationManagerDashboard: React.FC = () => {
           location_id: locationId,
         });
         
-        if (cachedBookings && cachedBookings.length > 0) {
-          console.log('📦 [ManagerDashboard] Loaded', cachedBookings.length, 'bookings from cache');
-          setAllBookings(cachedBookings);
-          setLoading(false);
+        if (!cancelled && !fullListShown) {
+          setAllBookings(withLocalPatches(cachedBookings || []));
+          if (cachedBookings && cachedBookings.length > 0) {
+            console.log('📦 [ManagerDashboard] Loaded', cachedBookings.length, 'bookings from cache');
+            setLoading(false);
+          }
+        }
+
+        if (!cancelled && !fullListShown && (!cachedBookings || cachedBookings.length === 0)) {
+          const windowBookings = await bookingService.getBookingsAroundToday(locationId).catch(() => null);
+          if (!cancelled && !fullListShown && windowBookings) {
+            windowShown = true;
+            setAllBookings(withLocalPatches(windowBookings));
+            setLoading(false);
+          }
         }
         
         console.log('🔄 [ManagerDashboard] Background sync: Fetching fresh bookings...');
-        const bookingsResponse = await bookingService.getBookings({
-          location_id: locationId,
-          per_page: 500, // Get all bookings (500 max to avoid backend limits)
-        });
-        
-        const bookings = bookingsResponse.data.bookings || [];
+        const bookings = await bookingCacheService.fetchAndCacheBookings();
+        if (cancelled || (bookings.length === 0 && windowShown)) return;
         console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings from API');
         
-        setAllBookings(bookings);
+        applyFullList(bookings, 0);
         bookingCacheService.syncInBackground();
       } catch (error) {
         console.error('⚠️ [ManagerDashboard] Error loading bookings:', error);
@@ -211,27 +241,16 @@ const LocationManagerDashboard: React.FC = () => {
     };
 
     loadAllBookings();
-  }, [locationId]);
 
-  useEffect(() => {
-    if (!locationId) return;
+    const unsubscribe = bookingCacheService.onCacheUpdate((event: CustomEvent) => {
+      if (cancelled || event.detail?.source !== 'api') return;
+      applyFullList(event.detail.bookings || [], event.detail?.startedAt ?? 0);
+    });
 
-    let cancelled = false;
-
-    bookingService.getBookings({
-      location_id: locationId,
-      sort_by: 'created_at',
-      sort_order: 'desc',
-      per_page: 100,
-    })
-      .then(response => {
-        if (!cancelled) setRecentlyCreatedBookings(response.data.bookings || []);
-      })
-      .catch(error => {
-        console.error('⚠️ [ManagerDashboard] Error loading recently created bookings:', error);
-      });
-
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [locationId]);
 
   useEffect(() => {
@@ -266,20 +285,22 @@ const LocationManagerDashboard: React.FC = () => {
   }, [locationId]);
 
   useEffect(() => {
-    if (recentlyCreatedBookings.length === 0) {
+    if (allBookings.length === 0) {
       setNewBookings([]);
       return;
     }
 
-    const recentlyCreated = recentlyCreatedBookings.filter((booking: any) =>
-      String(booking.status).toLowerCase() !== 'cancelled' &&
-      createdWithinTimeframe(booking.created_at, metricsTimeframe, customDateFrom, customDateTo)
-    );
+    const recentlyCreated = allBookings
+      .filter((booking: any) =>
+        String(booking.status).toLowerCase() !== 'cancelled' &&
+        createdWithinTimeframe(booking.created_at, metricsTimeframe, customDateFrom, customDateTo)
+      )
+      .sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
 
     setNewBookings(recentlyCreated);
     console.log(`📅 [ManagerDashboard] New bookings (${timeframeDescription}) derived:`, recentlyCreated.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recentlyCreatedBookings, metricsTimeframe, customDateFrom, customDateTo]);
+  }, [allBookings, metricsTimeframe, customDateFrom, customDateTo]);
 
   useEffect(() => {
     const fetchMetricsData = async () => {
@@ -338,7 +359,6 @@ const LocationManagerDashboard: React.FC = () => {
         
         if (metricsResponse.recentPurchases) {
           setTicketPurchases(metricsResponse.recentPurchases as any);
-          await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
         }
 
         if (metricsResponse.recentEventPurchases) {
@@ -879,7 +899,7 @@ const LocationManagerDashboard: React.FC = () => {
       }
 
       setSelectedBooking({ ...selectedBooking, amount_paid: newAmountPaid, payment_status: newPaymentStatus });
-      setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, amount_paid: newAmountPaid, payment_status: newPaymentStatus } : b));
+      patchBooking(selectedBooking.id, { amount_paid: newAmountPaid, payment_status: newPaymentStatus });
       handleClosePaymentModal();
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -1964,13 +1984,7 @@ const LocationManagerDashboard: React.FC = () => {
                         ? ({ ...current, internal_notes: summary ?? undefined })
                         : current
                     );
-                    setAllBookings(prev =>
-                      prev.map((booking: any) =>
-                        booking.id === selectedBooking.id
-                          ? ({ ...booking, internal_notes: summary ?? undefined })
-                          : booking
-                      )
-                    );
+                    patchBooking(selectedBooking.id, { internal_notes: summary ?? undefined });
                   }}
                 />
               </div>
@@ -2274,7 +2288,7 @@ const LocationManagerDashboard: React.FC = () => {
                           try {
                             await bookingService.checkInBooking(selectedBooking.reference_number);
                             setSelectedBooking({ ...selectedBooking, status: 'checked-in' });
-                            setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'checked-in' } : b));
+                            patchBooking(selectedBooking.id, { status: 'checked-in' });
                             setShowCheckInConfirm(false);
                           } catch (err) {
                             console.error('Check-in failed:', err);

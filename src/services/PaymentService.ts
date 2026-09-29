@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 import type {
   PaymentChargeRequest,
   PaymentChargeResponse,
@@ -86,6 +87,13 @@ export const getPayments = async (filters?: PaymentFilters): Promise<PaginatedPa
   return response.data;
 };
 
+export const getAllPayments = async (filters?: PaymentFilters): Promise<Payment[]> => {
+  return fetchAllPages<Payment>(async (page) => {
+    const response = await getPayments({ ...filters, sort_by: 'id', sort_order: 'desc', per_page: 1000, page });
+    return { items: response.data?.payments || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+  });
+};
+
 export const getPaymentsForBooking = async (bookingId: number): Promise<PaginatedPaymentsResponse> => {
   return getPayments({
     payable_id: bookingId,
@@ -142,6 +150,13 @@ export const getTrashedPayments = async (filters?: PaymentFilters): Promise<Pagi
   const queryString = params.toString() ? `?${params.toString()}` : '';
   const response = await api.get<PaginatedPaymentsResponse>(`/payments/trashed${queryString}`);
   return response.data;
+};
+
+export const getAllTrashedPayments = async (filters?: PaymentFilters): Promise<Payment[]> => {
+  return fetchAllPages<Payment>(async (page) => {
+    const response = await getTrashedPayments({ ...filters, sort_by: 'id', sort_order: 'desc', per_page: 1000, page });
+    return { items: response.data?.payments || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+  });
 };
 
 

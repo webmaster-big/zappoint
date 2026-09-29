@@ -1,6 +1,7 @@
 import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
@@ -179,7 +180,7 @@ export interface PurchaseFilters {
   scheduled_from?: string;
   scheduled_to?: string;
   search?: string;
-  sort_by?: 'purchase_date' | 'total_amount' | 'quantity' | 'status' | 'created_at' | 'deleted_at';
+  sort_by?: 'purchase_date' | 'total_amount' | 'quantity' | 'status' | 'created_at' | 'deleted_at' | 'id';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
@@ -252,6 +253,13 @@ class AttractionPurchaseService {
   async getPurchases(filters?: PurchaseFilters): Promise<PaginatedResponse<AttractionPurchase>> {
     const response = await api.get('/attraction-purchases', { params: filters });
     return response.data;
+  }
+
+  async getAllPurchases(filters?: PurchaseFilters): Promise<AttractionPurchase[]> {
+    return fetchAllPages<AttractionPurchase>(async (page) => {
+      const response = await this.getPurchases({ ...filters, sort_by: 'id', sort_order: 'desc', per_page: 100, page });
+      return { items: response.data?.purchases || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    }, 1000);
   }
 
   async getPurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {

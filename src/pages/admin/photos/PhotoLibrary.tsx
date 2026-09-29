@@ -75,11 +75,18 @@ const PhotoLibrary = () => {
   const [schedule, setSchedule] = useState<'immediate' | 'next_day_9am'>('immediate');
   const [sending, setSending] = useState(false);
 
+  const rangeDays = useMemo(() => {
+    if (!from) return 0;
+    const end = to || new Date().toISOString().slice(0, 10);
+    return Math.round((Date.parse(end) - Date.parse(from)) / 86400000) + 1;
+  }, [from, to]);
+  const dayLimit = rangeDays > 0 ? Math.min(120, rangeDays) : 14;
+
   const load = useCallback(async () => {
     if (!effectiveLocationId) return;
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { location_id: effectiveLocationId };
+      const params: Record<string, unknown> = { location_id: effectiveLocationId, days: dayLimit };
       if (source) params.source = source;
       if (from) params.from = from;
       if (to) params.to = to;
@@ -89,7 +96,7 @@ const PhotoLibrary = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveLocationId, from, source, to]);
+  }, [dayLimit, effectiveLocationId, from, source, to]);
 
   useEffect(() => {
     void load();
@@ -287,6 +294,12 @@ const PhotoLibrary = () => {
         {library?.truncated && (
           <p className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             Showing the most recent 1,500 photos. Narrow the date range to see older days.
+          </p>
+        )}
+
+        {!loading && library && !library.truncated && library.days.length >= dayLimit && rangeDays !== dayLimit && (
+          <p className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Showing the {dayLimit} most recent days with photos. {from ? 'Narrow the date range' : 'Pick a From date'} to see earlier days.
           </p>
         )}
 

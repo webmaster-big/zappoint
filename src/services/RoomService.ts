@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -95,6 +96,13 @@ class RoomService {
   async getRooms(filters?: RoomFilters): Promise<PaginatedResponse<Room>> {
     const response = await api.get('/rooms', { params: filters });
     return response.data;
+  }
+
+  async getAllRooms(filters?: RoomFilters): Promise<Room[]> {
+    return fetchAllPages<Room>(async (page) => {
+      const response = await this.getRooms({ ...filters, per_page: 500, page });
+      return { items: response.data?.rooms || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   }
 
   async getRoom(id: number): Promise<ApiResponse<Room>> {

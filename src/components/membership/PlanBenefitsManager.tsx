@@ -238,19 +238,19 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
     (async () => {
       setOptionsLoading(true);
       const [pk, at, ev, ad, lo, ca] = await Promise.allSettled([
-        packageService.getPackages({ per_page: 500 }),
-        attractionService.getAttractions({ per_page: 500 }),
+        packageService.getAllPackages(),
+        attractionService.getAllAttractions(),
         eventService.getEvents(),
-        addOnService.getAddOns({ per_page: 500 }),
+        addOnService.getAllAddOns(),
         locationService.getLocations(),
         categoryService.getCategories(),
       ]);
       if (!active) return;
 
-      const packages = pk.status === 'fulfilled' ? norm(pk.value?.data?.packages) : [];
-      const attractions = at.status === 'fulfilled' ? norm(at.value?.data?.attractions) : [];
+      const packages = pk.status === 'fulfilled' ? norm(pk.value) : [];
+      const attractions = at.status === 'fulfilled' ? norm(at.value) : [];
       const events = ev.status === 'fulfilled' ? norm(ev.value?.data) : [];
-      const addons = ad.status === 'fulfilled' ? norm(ad.value?.data?.add_ons) : [];
+      const addons = ad.status === 'fulfilled' ? norm(ad.value) : [];
       const locations = lo.status === 'fulfilled' ? norm(lo.value?.data) : [];
 
       let cats: string[] = [];

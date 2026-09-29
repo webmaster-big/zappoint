@@ -1,8 +1,11 @@
 
 import { attractionService, type Attraction, type AttractionFilters } from './AttractionService';
 import { normalizeCategory } from '../utils/venueCategories';
+import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-attractions-cache-v1';
+const CACHE_NAME = 'zapzone-attractions-cache-v2';
+const LEGACY_CACHE_NAME = 'zapzone-attractions-cache-v1';
+let legacyCleared = false;
 const ATTRACTIONS_CACHE_KEY = '/api/attractions/cached';
 const CACHE_METADATA_KEY = '/api/attractions/metadata';
 
@@ -49,6 +52,10 @@ class AttractionCacheService {
       console.warn('[AttractionCacheService] Cache Storage not available');
       return null;
     }
+    if (!legacyCleared) {
+      legacyCleared = true;
+      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+    }
     return await caches.open(CACHE_NAME);
   }
 
@@ -74,6 +81,7 @@ class AttractionCacheService {
         lastUpdated: Date.now(),
         totalRecords: attractions.length,
         ...metadata,
+        userId: metadata?.userId ?? getStoredUser()?.id,
       };
 
       const metadataResponse = new Response(JSON.stringify(fullMetadata), {
@@ -135,7 +143,7 @@ class AttractionCacheService {
     forceRefresh: boolean = false
   ): Promise<Attraction[]> {
     if (this.isSyncing && this.syncPromise) {
-      return this.syncPromise;
+      return this.syncPromise.then((items) => this.filterAttractions(items, filters));
     }
 
     if (!forceRefresh) {
@@ -146,27 +154,27 @@ class AttractionCacheService {
         if (isStale) {
           this.syncInBackground(filters);
         }
-        return cachedAttractions;
+        return this.filterAttractions(cachedAttractions, filters);
       }
     }
 
-    return this.syncFromAPI(filters);
+    return this.filterAttractions(await this.syncFromAPI(filters), filters);
   }
 
   private async syncFromAPI(filters?: AttractionFilters): Promise<Attraction[]> {
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
     this.isSyncing = true;
 
     this.syncPromise = (async () => {
       try {
-        const response = await attractionService.getAttractions({
-          ...filters,
-          per_page: 1000, // Get a large batch
-        });
-
-        const attractions = response.data.attractions || [];
+        const attractions = await attractionService.getAllAttractions(
+          filters?.user_id ? { user_id: filters.user_id } : undefined,
+        );
 
         await this.cacheAttractions(attractions, {
-          locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
@@ -260,7 +268,16 @@ class AttractionCacheService {
     
     if (!cachedAttractions) return [];
 
-    const filtered = cachedAttractions.filter(attraction => {
+    const filtered = this.filterAttractions(cachedAttractions, filters);
+
+    console.log('[AttractionCacheService] Filtered attractions count:', filtered.length);
+    return filtered;
+  }
+
+  private filterAttractions(attractions: Attraction[], filters?: AttractionFilters): Attraction[] {
+    if (!filters) return attractions;
+
+    return attractions.filter(attraction => {
       if (filters.location_id && attraction.location_id !== filters.location_id) {
         return false;
       }
@@ -288,9 +305,6 @@ class AttractionCacheService {
 
       return true;
     });
-
-    console.log('[AttractionCacheService] Filtered attractions count:', filtered.length);
-    return filtered;
   }
 
   async clearCache(): Promise<void> {

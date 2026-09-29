@@ -5,6 +5,7 @@ import type { BookingQuote, BookingRepriceIntent } from '../types/Bookings.types
 import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { changeReasonWasRequired, requestChangeReason } from '../utils/changeReasonPrompt';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
@@ -352,7 +353,7 @@ export interface BookingFilters {
   booking_date?: string;
   upcoming?: boolean;
   search?: string;
-  sort_by?: 'booking_date' | 'booking_time' | 'total_amount' | 'status' | 'created_at';
+  sort_by?: 'booking_date' | 'booking_time' | 'total_amount' | 'status' | 'created_at' | 'id';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
@@ -528,6 +529,25 @@ const bookingService = {
 
     const response = await api.get(`${endpoint}?${params.toString()}`);
     return response.data;
+  },
+
+  async getBookingsAroundToday(locationId?: number): Promise<Booking[]> {
+    const today = new Date();
+    const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const from = day(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+    const to = day(new Date(today.getFullYear(), today.getMonth() + 2, 0));
+    return fetchAllPages<Booking>(async (page) => {
+      const response = await bookingService.getBookings({
+        ...(locationId ? { location_id: locationId } : {}),
+        date_from: from,
+        date_to: to,
+        sort_by: 'id',
+        sort_order: 'desc',
+        per_page: 100,
+        page,
+      });
+      return { items: response.data?.bookings || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   },
 
   async getBookingById(bookingId: number): Promise<BookingResponse> {

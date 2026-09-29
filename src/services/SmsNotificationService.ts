@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 export interface SmsNotification {
   id: number;
@@ -48,8 +49,14 @@ const BASE = '/sms-notifications';
 
 export const getSmsNotifications = async (params?: Record<string, unknown>) => {
   const res = await api.get(BASE, { params });
-  return res.data as { success: boolean; data: { data: SmsNotification[] } };
+  return res.data as { success: boolean; data: { data: SmsNotification[]; current_page: number; last_page: number } };
 };
+
+export const getAllSmsNotifications = (params?: Record<string, unknown>) =>
+  fetchAllPages<SmsNotification>(async (page) => {
+    const res = await getSmsNotifications({ ...params, per_page: 200, page });
+    return { items: res.data?.data ?? [], lastPage: res.data?.last_page ?? 1 };
+  });
 
 export const getSmsOptions = async () => {
   const res = await api.get(`${BASE}/options`);

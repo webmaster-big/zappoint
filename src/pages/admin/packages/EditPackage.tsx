@@ -68,6 +68,7 @@ const EditPackage: React.FC = () => {
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
     const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]);
+    const [attached, setAttached] = useState<Record<'attractions' | 'addOns' | 'rooms', { id: number; name: string }[]>>({ attractions: [], addOns: [], rooms: [] });
     const [slotCleanupMinutes, setSlotCleanupMinutes] = useState<number>(DEFAULT_SLOT_CLEANUP_MINUTES);
 
     const [savedEscapeRoom, setSavedEscapeRoom] = useState(false);
@@ -142,6 +143,12 @@ const EditPackage: React.FC = () => {
                     return;
                 }
 
+                const attachedOf = (list: unknown, allowNoLocation = false) => ((Array.isArray(list) ? list : []) as Array<{ id: number; name: string; location_id?: number | null } | string>)
+                    .filter((item): item is { id: number; name: string; location_id?: number | null } => typeof item === 'object' && item !== null && Boolean(item.id))
+                    .filter((item) => item.location_id == null ? allowNoLocation : pkg.location_id != null && Number(item.location_id) === Number(pkg.location_id))
+                    .map((item) => ({ id: item.id, name: item.name || '' }));
+                setAttached({ attractions: attachedOf(pkg.attractions), addOns: attachedOf(pkg.add_ons, true), rooms: attachedOf(pkg.rooms) });
+
                 const locId: number | null = pkg.location_id ?? null;
                 setPackageLocationId(locId);
                 setPackageLocationName(
@@ -164,21 +171,22 @@ const EditPackage: React.FC = () => {
                 const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true });
                 const cachedAttractions = await attractionCacheService.getFilteredAttractionsFromCache({ ...cacheFilters, is_active: true });
 
-                if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground(scopeParams);
-                if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground(scopeParams);
-                if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(scopeParams);
+                const syncParams = { user_id: scopeParams.user_id };
+                roomCacheService.syncInBackground(syncParams);
+                attractionCacheService.syncInBackground(syncParams);
+                addOnCacheService.syncInBackground(syncParams);
 
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0)
                     ? Promise.resolve({ data: { rooms: cachedRooms, slot_cleanup_minutes: undefined as number | undefined } })
-                    : roomService.getRooms(scopeParams);
+                    : roomService.getRooms({ ...scopeParams, per_page: 500 });
 
                 const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
                     ? Promise.resolve({ data: { add_ons: cachedAddOns } })
-                    : addOnService.getAddOns(scopeParams);
+                    : addOnService.getAllAddOns(scopeParams).then((add_ons) => ({ data: { add_ons } }));
 
                 const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
                     ? Promise.resolve({ data: { attractions: cachedAttractions } })
-                    : attractionService.getAttractions(scopeParams);
+                    : attractionService.getAllAttractions(scopeParams).then((attractions) => ({ data: { attractions } }));
 
                 const [attractionsRes, addOnsRes, roomsRes, categoriesRes] = await Promise.all([
                     attractionsPromise,
@@ -194,25 +202,11 @@ const EditPackage: React.FC = () => {
                     unit: attr.unit || ''
                 })) || [];
 
-                if (!cachedAttractions || cachedAttractions.length === 0) {
-                    const attractionsList = attractionsRes.data?.attractions || [];
-                    if (attractionsList.length > 0) {
-                        await attractionCacheService.cacheAttractions(attractionsList);
-                    }
-                }
-
                 const addOnsData = addOnsRes.data?.add_ons?.map(addon => ({
                     id: addon.id,
                     name: addon.name,
                     price: addon.price || 0
                 })) || [];
-                
-                if (!cachedAddOns || cachedAddOns.length === 0) {
-                    const addOnsList = addOnsRes.data?.add_ons || [];
-                    if (addOnsList.length > 0) {
-                        await addOnCacheService.cacheAddOns(addOnsList);
-                    }
-                }
 
                 let roomsData: CreatePackageRoom[] = [];
                 const roomsList = roomsRes.data?.rooms || [];
@@ -226,12 +220,6 @@ const EditPackage: React.FC = () => {
                     booking_interval: room.booking_interval ?? undefined,
                     is_available: room.is_available ?? true
                 }));
-                
-                if (!cachedRooms || cachedRooms.length === 0) {
-                    if (roomsList.length > 0) {
-                        await roomCacheService.cacheRooms(roomsList);
-                    }
-                }
 
                 const categoriesData = categoriesRes.data || [];
 
@@ -752,15 +740,15 @@ const EditPackage: React.FC = () => {
         setSubmitting(true);
         try {
             const attraction_ids = form.attractions
-                .map(name => attractions.find(a => a.name === name)?.id)
+                .map(name => attractions.find(a => a.name === name)?.id ?? attached.attractions.find(a => a.name === name)?.id)
                 .filter(Boolean) as number[];
 
             const addon_ids = form.addOns
-                .map(name => addOns.find(a => a.name === name)?.id)
+                .map(name => addOns.find(a => a.name === name)?.id ?? attached.addOns.find(a => a.name === name)?.id)
                 .filter(Boolean) as number[];
 
             const room_ids = form.rooms
-                .map(name => rooms.find(r => r.name === name)?.id)
+                .map(name => rooms.find(r => r.name === name)?.id ?? attached.rooms.find(r => r.name === name)?.id)
                 .filter(Boolean) as number[];
 
             const updateData = {

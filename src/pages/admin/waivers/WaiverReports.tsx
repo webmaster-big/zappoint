@@ -255,7 +255,13 @@ const ReportResult = ({ type, data, fullColor }: { type: string; data: unknown; 
     if (Array.isArray(obj.items)) {
       return (
         <div>
-          <p className="text-sm text-gray-500 mb-3">{String(obj.count ?? (obj.items as unknown[]).length)} record(s)</p>
+          {obj.truncated ? (
+            <p className="mb-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Showing {(obj.items as unknown[]).length} of {String(obj.total)} record(s). Narrow the date range to see the rest.
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 mb-3">{String(obj.count ?? (obj.items as unknown[]).length)} record(s)</p>
+          )}
           <SimpleTable rows={obj.items as Array<Record<string, unknown>>} fullColor={fullColor} />
         </div>
       );

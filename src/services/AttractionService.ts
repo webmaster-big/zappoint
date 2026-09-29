@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -124,6 +125,13 @@ class AttractionService {
   async getAttractions(filters?: AttractionFilters): Promise<PaginatedResponse<Attraction>> {
     const response = await api.get('/attractions', { params: filters, headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${getStoredUser()?.token}`} });
     return response.data;
+  }
+
+  async getAllAttractions(filters?: AttractionFilters): Promise<Attraction[]> {
+    return fetchAllPages<Attraction>(async (page) => {
+      const response = await this.getAttractions({ ...filters, per_page: 100, page });
+      return { items: response.data?.attractions || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   }
   
 

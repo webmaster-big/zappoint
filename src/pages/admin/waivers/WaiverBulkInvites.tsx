@@ -10,6 +10,7 @@ import EmailInput from '../../../components/ui/EmailInput';
 import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_BULK_STEPS } from '../../../components/waiver/tour/tourSteps';
 import { formatDateLong } from '../../../utils/timeFormat';
+import { fetchAllPages } from '../../../utils/fetchAllPages';
 
 interface BulkInvite {
   id: number;
@@ -41,8 +42,10 @@ const WaiverBulkInvites = () => {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await waiverService.listBulkInvites({ per_page: 100 });
-      if (res?.success) setInvites(res.data.bulk_invites || []);
+      setInvites(await fetchAllPages<BulkInvite>(async (page) => {
+        const res = await waiverService.listBulkInvites({ sort_by: 'created_at', sort_order: 'desc', per_page: 100, page });
+        return { items: res?.data?.bulk_invites || [], lastPage: res?.data?.pagination?.last_page ?? 1 };
+      }));
     } catch {
       setToast({ message: 'Failed to load group invites', type: 'error' });
     } finally {

@@ -130,21 +130,22 @@ const CreatePackage: React.FC = () => {
                     addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true })
                 ]);
 
-                if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground(params);
-                if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground(params);
-                if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(params);
+                const syncParams = { user_id: params.user_id };
+                roomCacheService.syncInBackground(syncParams);
+                attractionCacheService.syncInBackground(syncParams);
+                addOnCacheService.syncInBackground(syncParams);
 
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0)
                     ? Promise.resolve({ data: { rooms: cachedRooms, slot_cleanup_minutes: undefined as number | undefined } })
-                    : roomService.getRooms(params);
+                    : roomService.getRooms({ ...params, per_page: 500 });
 
                 const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
                     ? Promise.resolve({ data: { attractions: cachedAttractions } })
-                    : attractionService.getAttractions(params);
+                    : attractionService.getAllAttractions(params).then((attractions) => ({ data: { attractions } }));
 
                 const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
                     ? Promise.resolve({ data: { add_ons: cachedAddOns } })
-                    : addOnService.getAddOns(params);
+                    : addOnService.getAllAddOns(params).then((add_ons) => ({ data: { add_ons } }));
 
                 const [attractionsRes, addOnsRes, roomsRes] = await Promise.all([
                     attractionsPromise,
@@ -177,26 +178,6 @@ const CreatePackage: React.FC = () => {
                     booking_interval: room.booking_interval ?? undefined,
                     is_available: room.is_available ?? true
                 }));
-
-                if (!cachedRooms || cachedRooms.length === 0) {
-                    if (roomsList.length > 0) {
-                        await roomCacheService.cacheRooms(roomsList);
-                    }
-                }
-
-                if (!cachedAttractions || cachedAttractions.length === 0) {
-                    const attractionsList = attractionsRes.data?.attractions || [];
-                    if (attractionsList.length > 0) {
-                        await attractionCacheService.cacheAttractions(attractionsList);
-                    }
-                }
-
-                if (!cachedAddOns || cachedAddOns.length === 0) {
-                    const addOnsList = addOnsRes.data?.add_ons || [];
-                    if (addOnsList.length > 0) {
-                        await addOnCacheService.cacheAddOns(addOnsList);
-                    }
-                }
 
                 setAttractions(attractionsData);
                 setAddOns(addOnsData);

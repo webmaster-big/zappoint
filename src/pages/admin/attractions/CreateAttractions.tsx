@@ -160,11 +160,8 @@ const CreateAttraction = () => {
         addOnCacheService.syncInBackground(params);
         setAddOns(cachedAddOns.map(a => ({ id: a.id, name: a.name, price: a.price || 0 })));
       } else {
-        const res = await addOnService.getAddOns(params);
-        const list = res.data?.add_ons || [];
-        if (list.length > 0) {
-          await addOnCacheService.cacheAddOns(list);
-        }
+        const list = await addOnService.getAllAddOns(params);
+        addOnCacheService.syncInBackground({ user_id: params.user_id });
         setAddOns(list.map((a: any) => ({ id: a.id, name: a.name, price: a.price || 0 })));
       }
     } catch (error) {

@@ -1,8 +1,11 @@
 
 import { attractionPurchaseService, type AttractionPurchase, type PurchaseFilters } from './AttractionPurchaseService';
 import { metricsCacheService } from './MetricsCacheService';
+import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-attraction-purchases-cache-v1';
+const CACHE_NAME = 'zapzone-attraction-purchases-cache-v2';
+const LEGACY_CACHE_NAME = 'zapzone-attraction-purchases-cache-v1';
+let legacyCleared = false;
 const PURCHASES_CACHE_KEY = '/api/attraction-purchases/cached';
 const CACHE_METADATA_KEY = '/api/attraction-purchases/metadata';
 
@@ -30,6 +33,7 @@ class AttractionPurchaseCacheService {
   private static instance: AttractionPurchaseCacheService;
   private isSyncing: boolean = false;
   private syncPromise: Promise<AttractionPurchase[]> | null = null;
+  private listenerCount: number = 0;
 
   private constructor() {}
 
@@ -48,6 +52,10 @@ class AttractionPurchaseCacheService {
     if (!this.isCacheAvailable()) {
       console.warn('[PurchaseCacheService] Cache Storage not available');
       return null;
+    }
+    if (!legacyCleared) {
+      legacyCleared = true;
+      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
     }
     return await caches.open(CACHE_NAME);
   }
@@ -72,6 +80,7 @@ class AttractionPurchaseCacheService {
         lastUpdated: Date.now(),
         totalRecords: purchases.length,
         ...metadata,
+        userId: metadata?.userId ?? getStoredUser()?.id,
       };
 
       const metadataResponse = new Response(JSON.stringify(fullMetadata), {
@@ -133,7 +142,7 @@ class AttractionPurchaseCacheService {
     forceRefresh: boolean = false
   ): Promise<AttractionPurchase[]> {
     if (this.isSyncing && this.syncPromise) {
-      return this.syncPromise;
+      return this.syncPromise.then((items) => this.filterPurchases(items, filters));
     }
 
     if (!forceRefresh) {
@@ -144,27 +153,27 @@ class AttractionPurchaseCacheService {
         if (isStale) {
           this.syncInBackground(filters);
         }
-        return cachedPurchases;
+        return this.filterPurchases(cachedPurchases, filters);
       }
     }
 
-    return this.syncFromAPI(filters);
+    return this.filterPurchases(await this.syncFromAPI(filters), filters);
   }
 
   private async syncFromAPI(filters?: PurchaseFilters): Promise<AttractionPurchase[]> {
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
     this.isSyncing = true;
 
     this.syncPromise = (async () => {
       try {
-        const response = await attractionPurchaseService.getPurchases({
-          ...filters,
-          per_page: 500,
-        });
-
-        const purchases = response.data.purchases || [];
+        const purchases = await attractionPurchaseService.getAllPurchases(
+          filters?.user_id ? { user_id: filters.user_id } : undefined,
+        );
 
         await this.cachePurchases(purchases, {
-          locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
@@ -187,7 +196,7 @@ class AttractionPurchaseCacheService {
   }
 
   syncInBackground(filters?: PurchaseFilters): void {
-    if (this.isSyncing) return;
+    if (this.isSyncing || this.listenerCount === 0) return;
 
     setTimeout(async () => {
       try {
@@ -259,8 +268,14 @@ class AttractionPurchaseCacheService {
     const cachedPurchases = await this.getCachedPurchases();
     if (!cachedPurchases) return [];
 
-    return cachedPurchases.filter(purchase => {
-      if (filters.location_id && purchase.location_id !== filters.location_id) {
+    return this.filterPurchases(cachedPurchases, filters);
+  }
+
+  private filterPurchases(purchases: AttractionPurchase[], filters?: PurchaseFilters): AttractionPurchase[] {
+    if (!filters) return purchases;
+
+    return purchases.filter(purchase => {
+      if (filters.location_id && Number(purchase.location_id ?? purchase.attraction?.location_id) !== Number(filters.location_id)) {
         return false;
       }
 
@@ -353,8 +368,12 @@ class AttractionPurchaseCacheService {
 
   onCacheUpdate(callback: (event: CustomEvent) => void): () => void {
     const handler = (e: Event) => callback(e as CustomEvent);
+    this.listenerCount += 1;
     window.addEventListener('purchases-cache-updated', handler);
-    return () => window.removeEventListener('purchases-cache-updated', handler);
+    return () => {
+      this.listenerCount = Math.max(0, this.listenerCount - 1);
+      window.removeEventListener('purchases-cache-updated', handler);
+    };
   }
 
   onCacheCleared(callback: () => void): () => void {

@@ -10,6 +10,7 @@ import EmailInput from '../../../components/ui/EmailInput';
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
+import { packageService } from '../../../services/PackageService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
@@ -333,26 +334,14 @@ const ManualBooking: React.FC = () => {
       if (effectiveLocationId !== null) {
         params.location_id = effectiveLocationId;
       }
-      const response = await bookingService.getPackages(params);
+      const allPackages = await packageService.getAllPackages(params);
+      const pkgs = allPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
+      console.log('Active packages:', pkgs.length, 'of', allPackages.length);
       
-      console.log('📦 Packages response:', response);
+      setPackages(pkgs);
+      packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       
-      if (response.success && response.data && response.data.packages) {
-        const allPackages = Array.isArray(response.data.packages) ? response.data.packages : [];
-        const pkgs = allPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
-        console.log('Active packages:', pkgs.length, 'of', allPackages.length);
-        
-        setPackages(pkgs);
-        
-        if (pkgs.length > 0) {
-          await packageCacheService.cachePackages(pkgs);
-        }
-        
-        if (pkgs.length === 0) {
-          setShowEmptyModal(true);
-        }
-      } else {
-        setPackages([]);
+      if (pkgs.length === 0) {
         setShowEmptyModal(true);
       }
     } catch (error) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MessageSquare, RefreshCcw, X, Send, RotateCcw, Power, Pencil, AlertTriangle } from 'lucide-react';
 import {
-  getSmsNotifications,
+  getAllSmsNotifications,
   getSmsOptions,
   updateSmsNotification,
   toggleSmsNotification,
@@ -43,8 +43,8 @@ const SmsNotifications = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [list, opts] = await Promise.all([getSmsNotifications(), getSmsOptions()]);
-      setItems(list.data.data);
+      const [list, opts] = await Promise.all([getAllSmsNotifications(), getSmsOptions()]);
+      setItems(list);
       setOptions(opts.data);
     } catch (e) {
       showError(e, 'Failed to load SMS notifications');

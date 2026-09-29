@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   ShoppingCart,
@@ -94,20 +94,22 @@ const TicketOrders = () => {
       allCheckedIn: o.lines.length > 0 && o.lines.every(l => l.checked_in_at),
     }));
 
+  const ordersRequestRef = useRef(0);
+
   const load = useCallback(async () => {
+    const requestId = ++ordersRequestRef.current;
     setLoading(true);
     try {
-      const result = await ticketOrderService.list({
+      const result = await ticketOrderService.listAll({
         location_id: effectiveLocationId,
-        page: 1,
-        per_page: 1000,
       });
-      setRawOrders(result.orders);
-      setOrders(convert(result.orders));
+      if (requestId !== ordersRequestRef.current) return;
+      setRawOrders(result);
+      setOrders(convert(result));
     } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : 'Failed to load orders', type: 'error' });
+      if (requestId === ordersRequestRef.current) setToast({ message: e instanceof Error ? e.message : 'Failed to load orders', type: 'error' });
     } finally {
-      setLoading(false);
+      if (requestId === ordersRequestRef.current) setLoading(false);
     }
   }, [effectiveLocationId]);
 

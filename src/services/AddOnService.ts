@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -96,6 +97,13 @@ class AddOnService {
   async getAddOns(filters?: AddOnFilters): Promise<PaginatedResponse<AddOn>> {
     const response = await api.get('/addons', { params: filters });
     return response.data;
+  }
+
+  async getAllAddOns(filters?: AddOnFilters): Promise<AddOn[]> {
+    return fetchAllPages<AddOn>(async (page) => {
+      const response = await this.getAddOns({ ...filters, per_page: 500, page });
+      return { items: response.data?.add_ons || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   }
 
   async getAddOn(id: number): Promise<ApiResponse<AddOn>> {

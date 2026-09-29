@@ -19,6 +19,7 @@ import { promoService } from '../../../services/PromoService';
 import { giftCardService } from '../../../services/GiftCardService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
+import { packageService } from '../../../services/PackageService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -675,98 +676,93 @@ const OnsiteBooking: React.FC = () => {
         if (selectedLocation !== null) {
           params.location_id = selectedLocation;
         }
-        const response = await bookingService.getPackages(params);
+        const fetchedPackages = await packageService.getAllPackages(params);
         
-        if (response.success && response.data && response.data.packages) {
-          
-          console.log('Fetched packages:', response.data.packages);
-          
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const activePackages = response.data.packages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
-          console.log('Active packages:', activePackages.length, 'of', response.data.packages.length);
-          
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const transformedPackages: OnsiteBookingPackage[] = activePackages.map((pkg: any) => {
-            console.log('🔍 Transforming package:', {
-              id: pkg.id,
-              name: pkg.name,
-              min_participants: pkg.min_participants,
-              max_participants: pkg.max_participants
-            });
-            
-            return {
-              id: pkg.id,
-              name: pkg.name,
-              description: pkg.description,
-              price: Number(pkg.price),
-              pricingType: (pkg.pricing_type === 'per_person' ? 'per_person' : 'base') as 'base' | 'per_person',
-              participantLabel: pkg.participant_label ?? null,
-              minParticipants: pkg.min_participants,
-              maxParticipants: pkg.max_participants,
-              category: normalizeCategory(pkg.category),
-              features: pkg.features,
-            availabilityType: pkg.availability_type,
-            availableDays: pkg.available_days || [],
-            availableWeekDays: pkg.available_week_days || [],
-            availableMonthDays: pkg.available_month_days || [],
-            availability_schedules: pkg.availability_schedules || [],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            attractions: pkg.attractions?.map((a: any) => ({
-              id: a.id.toString(),
-              name: a.name,
-              description: a.description || '',
-              price: Number(a.price),
-              pricingType: a.pricing_type as 'per_person' | 'per_unit',
-              category: normalizeCategory(a.category),
-              maxCapacity: a.max_capacity || 0,
-              image: Array.isArray(a.image) ? a.image[0] : a.image,
-              min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
-            })) || [],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            addOns: pkg.add_ons?.map((a: any) => ({
-              id: a.id,
-              name: a.name,
-              price: a.price != null ? Number(a.price) : null,
-              image: Array.isArray(a.image) ? a.image[0] : a.image,
-              min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity,
-              is_force_add_on: a.is_force_add_on || false,
-              price_each_packages: a.price_each_packages || null
-            })) || [],
-            addOnsOrder: pkg.add_ons_order || [],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            rooms: pkg.rooms?.map((r: any) => ({
-              id: r.id,
-              name: r.name,
-              capacity: r.capacity
-            })) || [],
-            image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            duration: pkg.duration?.toString() || '2',
-            durationUnit: pkg.duration_unit || 'hours',
-            pricePerAdditional30min: pkg.price_per_additional_30min?.toString() || '0',
-            pricePerAdditional1hr: pkg.price_per_additional_1hr?.toString() || '0',
-            pricePerAdditional: Number(pkg.price_per_additional || 0),
-            partialPaymentPercentage: pkg.partial_payment_percentage || 0,
-            partialPaymentFixed: pkg.partial_payment_fixed || 0,
-            has_guest_of_honor: pkg.has_guest_of_honor || false,
-            customerNotes: pkg.customer_notes || '',
-            location_id: pkg.location_id ?? pkg.location?.id,
-            location: pkg.location || undefined
-            };
+        console.log('Fetched packages:', fetchedPackages);
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const activePackages = fetchedPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
+        console.log('Active packages:', activePackages.length, 'of', fetchedPackages.length);
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transformedPackages: OnsiteBookingPackage[] = activePackages.map((pkg: any) => {
+          console.log('🔍 Transforming package:', {
+            id: pkg.id,
+            name: pkg.name,
+            min_participants: pkg.min_participants,
+            max_participants: pkg.max_participants
           });
           
-          console.log('✅ All transformed packages:', transformedPackages);
-          setPackages(transformedPackages);
-          
-          if (activePackages.length > 0) {
-            await packageCacheService.cachePackages(activePackages);
-          }
-          
-          if (transformedPackages.length === 0) {
-            setShowEmptyModal(true);
-          }
+          return {
+            id: pkg.id,
+            name: pkg.name,
+            description: pkg.description,
+            price: Number(pkg.price),
+            pricingType: (pkg.pricing_type === 'per_person' ? 'per_person' : 'base') as 'base' | 'per_person',
+            participantLabel: pkg.participant_label ?? null,
+            minParticipants: pkg.min_participants,
+            maxParticipants: pkg.max_participants,
+            category: normalizeCategory(pkg.category),
+            features: pkg.features,
+          availabilityType: pkg.availability_type,
+          availableDays: pkg.available_days || [],
+          availableWeekDays: pkg.available_week_days || [],
+          availableMonthDays: pkg.available_month_days || [],
+          availability_schedules: pkg.availability_schedules || [],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          attractions: pkg.attractions?.map((a: any) => ({
+            id: a.id.toString(),
+            name: a.name,
+            description: a.description || '',
+            price: Number(a.price),
+            pricingType: a.pricing_type as 'per_person' | 'per_unit',
+            category: normalizeCategory(a.category),
+            maxCapacity: a.max_capacity || 0,
+            image: Array.isArray(a.image) ? a.image[0] : a.image,
+            min_quantity: a.min_quantity,
+            max_quantity: a.max_quantity
+          })) || [],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          addOns: pkg.add_ons?.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            price: a.price != null ? Number(a.price) : null,
+            image: Array.isArray(a.image) ? a.image[0] : a.image,
+            min_quantity: a.min_quantity,
+            max_quantity: a.max_quantity,
+            is_force_add_on: a.is_force_add_on || false,
+            price_each_packages: a.price_each_packages || null
+          })) || [],
+          addOnsOrder: pkg.add_ons_order || [],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          rooms: pkg.rooms?.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            capacity: r.capacity
+          })) || [],
+          image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          duration: pkg.duration?.toString() || '2',
+          durationUnit: pkg.duration_unit || 'hours',
+          pricePerAdditional30min: pkg.price_per_additional_30min?.toString() || '0',
+          pricePerAdditional1hr: pkg.price_per_additional_1hr?.toString() || '0',
+          pricePerAdditional: Number(pkg.price_per_additional || 0),
+          partialPaymentPercentage: pkg.partial_payment_percentage || 0,
+          partialPaymentFixed: pkg.partial_payment_fixed || 0,
+          has_guest_of_honor: pkg.has_guest_of_honor || false,
+          customerNotes: pkg.customer_notes || '',
+          location_id: pkg.location_id ?? pkg.location?.id,
+          location: pkg.location || undefined
+          };
+        });
+        
+        console.log('✅ All transformed packages:', transformedPackages);
+        setPackages(transformedPackages);
+        
+        packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
+        
+        if (transformedPackages.length === 0) {
+          setShowEmptyModal(true);
         }
       } catch (error) {
         console.error('❌ Error fetching packages:', error);

@@ -31,15 +31,17 @@ import type {
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../utils/storage';
-import { locationService } from '../../services';
+import { locationService, userService } from '../../services';
 import type { Location } from '../../services/LocationService';
 import { getAuthToken } from '../../services';
+import { MICHIGAN_TZ } from '../../utils/timeFormat';
 
 const LocationActivityLogs = () => {
   const { themeColor, fullColor } = useThemeColor();
   
   const [filteredLogs, setFilteredLogs] = useState<LocationActivityLogsActivityLog[]>([]);
-  const [allLogs, setAllLogs] = useState<LocationActivityLogsActivityLog[]>([]); // For client-side pagination
+  const [metricCounts, setMetricCounts] = useState({ today: 0, managers: 0, attendants: 0 });
+  const [staffUsers, setStaffUsers] = useState<{ id: string; name: string; type: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -725,20 +727,7 @@ const LocationActivityLogs = () => {
     return result;
   };
 
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
-  };
-
   const getLocationMetrics = () => {
-    const locationLogs = filteredLogs;
-
-    const todayLogs = locationLogs.filter(log => isToday(new Date(log.timestamp)));
-    const managerLogs = locationLogs.filter(log => log.userType === 'location_manager');
-    const attendantLogs = locationLogs.filter(log => log.userType === 'attendant');
-
     return [
       {
         title: 'Total Activities',
@@ -749,21 +738,21 @@ const LocationActivityLogs = () => {
       },
       {
         title: "Today's Activities",
-        value: todayLogs.length.toString(),
+        value: metricCounts.today.toString(),
         change: 'Last 24 hours',
         accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Zap,
       },
       {
         title: 'Manager Actions',
-        value: managerLogs.length.toString(),
+        value: metricCounts.managers.toString(),
         change: `${selectedLocation === 'all' ? 'All locations' : selectedLocation}`,
         accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: User,
       },
       {
         title: 'Attendant Actions',
-        value: attendantLogs.length.toString(),
+        value: metricCounts.attendants.toString(),
         change: `${selectedLocation === 'all' ? 'All locations' : selectedLocation}`,
         accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Users,
@@ -793,6 +782,23 @@ const LocationActivityLogs = () => {
     }
   };
 
+  const loadStaffUsers = async () => {
+    try {
+      const [activeUsers, inactiveUsers] = await Promise.all([
+        userService.getAllUsers({ status: 'active' }),
+        userService.getAllUsers({ status: 'inactive' }),
+      ]);
+      setStaffUsers([...activeUsers, ...inactiveUsers].map(user => ({
+        id: user.id.toString(),
+        name: user.name || user.email,
+        type: user.role,
+      })));
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setStaffUsers([]);
+    }
+  };
+
   const loadLogs = useCallback(async () => {
     const hasLogs = filteredLogs.length > 0;
     if (!hasLogs) {
@@ -804,15 +810,8 @@ const LocationActivityLogs = () => {
       const token = getAuthToken();
       const params = new URLSearchParams();
       
-      const needsClientSideFiltering = filters.userType !== 'all';
-      
-      if (needsClientSideFiltering) {
-        params.append('per_page', '1000'); // Get all records for client-side filtering
-        params.append('page', '1');
-      } else {
-        params.append('per_page', itemsPerPage.toString());
-        params.append('page', currentPage.toString());
-      }
+      params.append('per_page', itemsPerPage.toString());
+      params.append('page', currentPage.toString());
       
       if (selectedLocation !== 'all') {
         const location = locations.find(l => l.name === selectedLocation);
@@ -835,6 +834,10 @@ const LocationActivityLogs = () => {
       
       if (filters.user !== 'all') {
         params.append('user_id', filters.user);
+      }
+
+      if (filters.userType !== 'all') {
+        params.append('user_role', filters.userType);
       }
       
       
@@ -866,12 +869,34 @@ const LocationActivityLogs = () => {
       params.append('sort_by', 'created_at');
       params.append('sort_order', 'desc');
 
-      const response = await fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const requestHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const countLogs = (extra: Record<string, string>) => {
+        const countParams = new URLSearchParams(params);
+        countParams.set('per_page', '1');
+        countParams.set('page', '1');
+        Object.entries(extra).forEach(([key, value]) => countParams.set(key, value));
+        return fetch(`${API_BASE_URL}/activity-logs?${countParams.toString()}`, { headers: requestHeaders })
+          .then(countResponse => (countResponse.ok ? countResponse.json() : null))
+          .then(countData => Number(countData?.data?.pagination?.total) || 0)
+          .catch(() => 0);
+      };
+
+      const countRole = (role: string) => (filters.userType === 'all' || filters.userType === role ? countLogs({ user_role: role }) : Promise.resolve(0));
+
+      const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: MICHIGAN_TZ });
+
+      const [response, todayCount, managerCount, attendantCount] = await Promise.all([
+        fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, { headers: requestHeaders }),
+        countLogs({ date_from: todayKey }),
+        countRole('location_manager'),
+        countRole('attendant'),
+      ]);
+
+      setMetricCounts({ today: todayCount, managers: managerCount, attendants: attendantCount });
 
       if (response.ok) {
         const data = await response.json();
@@ -904,7 +929,7 @@ const LocationActivityLogs = () => {
           created_at?: string;
         }
         
-        let transformedLogs = activityLogs.map((log: ActivityLogRaw) => ({
+        const transformedLogs = activityLogs.map((log: ActivityLogRaw) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
           // actor_name is the snapshot taken when the log was written, so an employee who has
@@ -927,28 +952,9 @@ const LocationActivityLogs = () => {
           severity: determineSeverity(log.action || '')
         }));
         
-        const needsClientSideFiltering = filters.userType !== 'all';
-        
-        if (filters.userType !== 'all') {
-          transformedLogs = transformedLogs.filter((log: LocationActivityLogsActivityLog) => log.userType === filters.userType);
-        }
-        
-        if (needsClientSideFiltering) {
-          setAllLogs(transformedLogs);
-          
-          const startIndex = (currentPage - 1) * itemsPerPage;
-          const endIndex = startIndex + itemsPerPage;
-          const paginatedLogs = transformedLogs.slice(startIndex, endIndex);
-          
-          setFilteredLogs(paginatedLogs);
-          setTotalLogs(transformedLogs.length);
-          setTotalPages(Math.ceil(transformedLogs.length / itemsPerPage));
-        } else {
-          setAllLogs([]);
-          setFilteredLogs(transformedLogs);
-          setTotalLogs(pagination.total || 0);
-          setTotalPages(pagination.last_page || 1);
-        }
+        setFilteredLogs(transformedLogs);
+        setTotalLogs(pagination.total || 0);
+        setTotalPages(pagination.last_page || 1);
       }
     } catch (error) {
       console.error('Error loading activity logs:', error);
@@ -960,7 +966,7 @@ const LocationActivityLogs = () => {
 
   useEffect(() => {
     const initializeData = async () => {
-      await loadLocations();
+      await Promise.all([loadLocations(), loadStaffUsers()]);
     };
     initializeData();
   }, []); // Only run once on mount
@@ -978,13 +984,7 @@ const LocationActivityLogs = () => {
 
   useEffect(() => {
     if (locations.length > 0 || selectedLocation === 'all') {
-      const needsClientSideFiltering = filters.userType !== 'all';
-      
-      if (!needsClientSideFiltering) {
-        loadLogs();
-      } else if (allLogs.length === 0) {
-        loadLogs();
-      }
+      loadLogs();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, selectedLocation, currentPage, loadLogs]);
@@ -1058,6 +1058,10 @@ const LocationActivityLogs = () => {
         exportSelectedUsers.forEach(userId => {
           params.append('user_id[]', userId);
         });
+      }
+
+      if (exportFilters.userType !== 'all') {
+        params.append('user_role', exportFilters.userType);
       }
       
       if (exportFilters.dateRange !== 'all') {
@@ -1266,8 +1270,12 @@ const LocationActivityLogs = () => {
   };
 
   const getUniqueUsers = () => {
-    const users = filteredLogs
-      .map(log => ({ id: log.userId, name: log.userName, type: log.userType }));
+    const users = [
+      ...staffUsers,
+      ...filteredLogs
+        .filter(log => log.userId !== 'system')
+        .map(log => ({ id: log.userId, name: log.userName, type: log.userType })),
+    ];
     return [...new Map(users.map(item => [item.id, item])).values()];
   };
 
@@ -1301,17 +1309,7 @@ const LocationActivityLogs = () => {
   const indexOfLastItem = ((currentPage - 1) * itemsPerPage) + filteredLogs.length;
 
   const paginate = (pageNumber: number) => {
-    const needsClientSideFiltering = filters.userType !== 'all';
-    
-    if (needsClientSideFiltering && allLogs.length > 0) {
-      const startIndex = (pageNumber - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedLogs = allLogs.slice(startIndex, endIndex);
-      setFilteredLogs(paginatedLogs);
-      setCurrentPage(pageNumber);
-    } else {
-      setCurrentPage(pageNumber);
-    }
+    setCurrentPage(pageNumber);
   };
 
   if (loading) {

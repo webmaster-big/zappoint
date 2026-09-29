@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -181,6 +182,13 @@ class PackageService {
   async getPackages(filters?: PackageFilters): Promise<PaginatedResponse<Package>> {
     const response = await api.get('/packages', { params: filters });
     return response.data;
+  }
+
+  async getAllPackages(filters?: PackageFilters): Promise<Package[]> {
+    return fetchAllPages<Package>(async (page) => {
+      const response = await this.getPackages({ ...filters, sort_by: 'id', sort_order: 'desc', per_page: 50, page });
+      return { items: response.data?.packages || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   }
 
   async getPackage(id: number): Promise<ApiResponse<Package>> {

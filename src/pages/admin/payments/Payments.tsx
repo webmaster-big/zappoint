@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   RefreshCcw,
@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import {
-  getPayments,
+  getAllPayments,
   PAYMENT_TYPE,
   getInvoice,
   exportInvoices,
@@ -45,7 +45,7 @@ import {
   deletePayment,
   restorePayment,
   forceDeletePayment,
-  getTrashedPayments,
+  getAllTrashedPayments,
   type InvoiceExportFilters,
   type PackageInvoiceFilters
 } from '../../../services/PaymentService';
@@ -302,13 +302,14 @@ const Payments = () => {
     }
   ];
 
+  const paymentsRequestRef = useRef(0);
+
   const loadPayments = useCallback(async () => {
+    const requestId = ++paymentsRequestRef.current;
     try {
       setLoading(true);
 
-      const params: PaymentFilters = {
-        per_page: 1000,
-      };
+      const params: PaymentFilters = {};
 
       if (selectedLocation) {
         params.location_id = parseInt(selectedLocation);
@@ -316,37 +317,47 @@ const Payments = () => {
         params.location_id = currentUser.location_id;
       }
 
-      const response = await getPayments(params);
+      const allPayments = await getAllPayments(params);
 
-      if (response.success && response.data) {
-        setPayments(response.data.payments.map(transformPayment));
+      if (requestId === paymentsRequestRef.current) {
+        setPayments(allPayments.map(transformPayment));
       }
     } catch (error) {
       console.error('Error loading payments:', error);
-      setToast({ message: 'Failed to load payments', type: 'error' });
+      if (requestId === paymentsRequestRef.current) {
+        setToast({ message: 'Failed to load payments', type: 'error' });
+      }
     } finally {
-      setLoading(false);
+      if (requestId === paymentsRequestRef.current) {
+        setLoading(false);
+      }
     }
   }, [selectedLocation, isLocationManager, currentUser?.location_id]);
 
+  const trashedRequestRef = useRef(0);
+
   const loadTrashedPayments = useCallback(async () => {
+    const requestId = ++trashedRequestRef.current;
     try {
       setLoadingTrashed(true);
-      const params: PaymentFilters = { per_page: 1000 };
+      const params: PaymentFilters = {};
       if (selectedLocation) {
         params.location_id = parseInt(selectedLocation);
       } else if (isLocationManager && currentUser?.location_id) {
         params.location_id = currentUser.location_id;
       }
-      const response = await getTrashedPayments(params);
-      if (response.success && response.data) {
-        setTrashedPayments(response.data.payments.map(transformPayment));
-      }
+      const allTrashed = await getAllTrashedPayments(params);
+      if (requestId !== trashedRequestRef.current) return;
+      setTrashedPayments(
+        allTrashed
+          .map(transformPayment)
+          .sort((a, b) => (b.deleted_at ? new Date(b.deleted_at).getTime() : 0) - (a.deleted_at ? new Date(a.deleted_at).getTime() : 0) || b.id - a.id)
+      );
     } catch (error) {
       console.error('Error loading trashed payments:', error);
-      setToast({ message: 'Failed to load deleted payments', type: 'error' });
+      if (requestId === trashedRequestRef.current) setToast({ message: 'Failed to load deleted payments', type: 'error' });
     } finally {
-      setLoadingTrashed(false);
+      if (requestId === trashedRequestRef.current) setLoadingTrashed(false);
     }
   }, [selectedLocation, isLocationManager, currentUser?.location_id]);
 
@@ -382,20 +393,17 @@ const Payments = () => {
         ? parseInt(selectedLocation)
         : (isLocationManager && currentUser?.location_id ? currentUser.location_id : undefined);
 
-      const response = await packageService.getPackages({
+      const packages = await packageService.getAllPackages({
         location_id: locationId,
-        is_active: true,
-        per_page: 100
+        is_active: true
       });
 
-      if (response.success && response.data) {
-        setAvailablePackages(
-          (response.data.packages || []).map((pkg: { id: number; name: string }) => ({
-            id: pkg.id,
-            name: pkg.name
-          }))
-        );
-      }
+      setAvailablePackages(
+        packages.map((pkg: { id: number; name: string }) => ({
+          id: pkg.id,
+          name: pkg.name
+        }))
+      );
     } catch (error) {
       console.error('Error loading packages:', error);
       setToast({ message: 'Failed to load packages', type: 'error' });

@@ -96,14 +96,7 @@ const Packages: React.FC = () => {
         }
         
         console.log('[Packages] Fetching from API...');
-        const response = await packageService.getPackages({ 
-          per_page: 50, // Backend max is 50 for better performance
-          sort_by: 'id',
-          sort_order: 'desc',
-          user_id: getStoredUser()?.id
-        });
-        
-        const packagesData = response.data.packages || [];
+        const packagesData = await packageService.getAllPackages({ user_id: getStoredUser()?.id });
         
         const regularPackages = packagesData.filter(
           (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
@@ -380,12 +373,9 @@ const Packages: React.FC = () => {
 
       const response = await packageService.bulkImport(packagesForImport);
       
-      const packagesResponse = await packageService.getPackages({ 
-        per_page: 50,
-        sort_by: 'id',
-        sort_order: 'desc'
-      });
-      setPackages(packagesResponse.data.packages || []);
+      const allPackages = await packageService.getAllPackages({ user_id: getStoredUser()?.id });
+      await packageCacheService.cachePackages(allPackages);
+      setPackages(allPackages.filter((pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at));
       
       setShowImportModal(false);
       setImportData('');

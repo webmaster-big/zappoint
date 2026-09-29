@@ -3,7 +3,9 @@ import { membershipService } from './MembershipService';
 import type { Membership, MembershipPlan } from '../types/Membership.types';
 import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-memberships-cache-v2';
+const CACHE_NAME = 'zapzone-memberships-cache-v3';
+const LEGACY_CACHE_NAME = 'zapzone-memberships-cache-v2';
+let legacyCleared = false;
 
 const KEYS = {
   plans: '/api/membership-plans/cached',
@@ -57,6 +59,10 @@ const isCacheAvailable = (): boolean =>
 
 async function openCache(): Promise<Cache | null> {
   if (!isCacheAvailable()) return null;
+  if (!legacyCleared) {
+    legacyCleared = true;
+    caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+  }
   try {
     return await caches.open(CACHE_NAME);
   } catch {
@@ -153,6 +159,10 @@ function backgroundRefresh<T>(key: CacheKey, fetcher: () => Promise<T>): void {
   }, 0);
 }
 
+async function fetchFullList(): Promise<{ data: Membership[] }> {
+  return { data: await membershipService.listAllMemberships() };
+}
+
 
 export const membershipCache = {
   // ── Sync reads (from in-memory store — available after first async load) ──
@@ -185,12 +195,12 @@ export const membershipCache = {
       const cached = await readJson<MembershipPlan[]>(KEYS.plans);
       if (cached && Array.isArray(cached)) {
         if (isStaleSync('plans', 10)) {
-          backgroundRefresh('plans', () => membershipService.listPlans());
+          backgroundRefresh('plans', () => membershipService.listAllPlans());
         }
         return cached;
       }
     }
-    return fetchAndStore('plans', () => membershipService.listPlans());
+    return fetchAndStore('plans', () => membershipService.listAllPlans());
   },
 
   async getPublicPlans(forceRefresh = false): Promise<MembershipPlan[]> {
@@ -222,12 +232,12 @@ export const membershipCache = {
       );
       if (cached && Array.isArray(cached.data)) {
         if (isStaleSync('list', 3)) {
-          backgroundRefresh('list', () => membershipService.listMemberships(params));
+          backgroundRefresh('list', fetchFullList);
         }
         return cached;
       }
     }
-    return fetchAndStore('list', () => membershipService.listMemberships(params));
+    return fetchAndStore('list', fetchFullList);
   },
 
   async getMine(forceRefresh = false): Promise<Membership | null> {

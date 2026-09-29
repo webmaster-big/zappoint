@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 import type { GenerateBulkPayload, GenerateBulkResponseData, PromoBatch, BatchDetailResponse, BatchDetailFilters } from '../types/Promo.types';
 
 const api = axios.create({
@@ -53,6 +54,7 @@ export interface PromoFilters {
   status?: 'active' | 'inactive' | 'expired' | 'exhausted' | 'all';
   type?: 'fixed' | 'percentage';
   location_id?: number;
+  exclude_batches?: boolean;
   search?: string;
   sort_by?: 'code' | 'name' | 'value' | 'start_date' | 'end_date' | 'created_at';
   sort_order?: 'asc' | 'desc';
@@ -130,6 +132,13 @@ class PromoService {
   async getPromos(filters?: PromoFilters): Promise<PaginatedResponse<Promo>> {
     const response = await api.get('/promos', { params: filters });
     return response.data;
+  }
+
+  async getAllPromos(filters?: PromoFilters): Promise<Promo[]> {
+    return fetchAllPages<Promo>(async (page) => {
+      const response = await this.getPromos({ ...filters, sort_by: 'created_at', sort_order: 'desc', per_page: 100, page });
+      return { items: response.data?.promos || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+    });
   }
 
   async getPromo(id: number): Promise<ApiResponse<Promo>> {

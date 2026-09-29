@@ -70,6 +70,7 @@ const EditAttraction = () => {
 
   const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [attachedAddOns, setAttachedAddOns] = useState<{ id: number; name: string }[]>([]);
   const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
   const [attractionLocationId, setAttractionLocationId] = useState<number | null>(null);
   const [attractionLocationName, setAttractionLocationName] = useState<string>('');
@@ -149,6 +150,12 @@ const EditAttraction = () => {
         
         setIsActive(attraction.is_active ?? true);
 
+        setAttachedAddOns(
+          (Array.isArray(attraction.add_ons) ? attraction.add_ons : [])
+            .filter((a) => a.location_id == null || Number(a.location_id) === Number(attraction.location_id))
+            .map((a) => ({ id: a.id, name: a.name }))
+        );
+
         if (attraction.add_ons_order && Array.isArray(attraction.add_ons_order)) {
           setSelectedAddOns(attraction.add_ons_order);
         } else if (attraction.add_ons && Array.isArray(attraction.add_ons)) {
@@ -201,11 +208,8 @@ const EditAttraction = () => {
           addOnCacheService.syncInBackground(params);
           setAddOns(cachedAddOns.map(a => ({ id: a.id, name: a.name, price: a.price || 0 })));
         } else {
-          const res = await addOnService.getAddOns(params);
-          const list = res.data?.add_ons || [];
-          if (list.length > 0) {
-            await addOnCacheService.cacheAddOns(list);
-          }
+          const list = await addOnService.getAllAddOns(params);
+          addOnCacheService.syncInBackground({ user_id: params.user_id });
           setAddOns(list.map((a: any) => ({ id: a.id, name: a.name, price: a.price || 0 })));
         }
       } catch (error) {
@@ -394,7 +398,7 @@ const EditAttraction = () => {
         availability: formData.availability,
         image: formData.images, // Send all images as array; an empty array removes them
         is_active: isActive,
-        addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
+        addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id ?? attachedAddOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
         add_ons_order: selectedAddOns,
         display_capacity_to_customers: displayCapacityToCustomers,
         display_order: displayOrder ? Number(displayOrder) : 0,

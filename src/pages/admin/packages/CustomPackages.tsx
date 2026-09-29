@@ -49,14 +49,7 @@ const CustomPackages: React.FC = () => {
           return;
         }
         
-        const response = await packageService.getPackages({ 
-          per_page: 50,
-          sort_by: 'id',
-          sort_order: 'desc',
-          user_id: getStoredUser()?.id
-        });
-        
-        const packagesData = response.data.packages || [];
+        const packagesData = await packageService.getAllPackages({ user_id: getStoredUser()?.id });
         
         await packageCacheService.cachePackages(packagesData);
         

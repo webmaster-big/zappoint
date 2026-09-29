@@ -1,6 +1,7 @@
 import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -208,6 +209,13 @@ const ticketOrderService = {
     } catch (error) {
       throw new Error(messageFrom(error, 'We could not load orders.'));
     }
+  },
+
+  async listAll(filters: Omit<OrderListFilters, 'page' | 'per_page'> = {}): Promise<TicketOrder[]> {
+    return fetchAllPages<TicketOrder>(async (page) => {
+      const { orders, meta } = await ticketOrderService.list({ ...filters, per_page: 200, page });
+      return { items: orders, lastPage: meta?.last_page ?? 1 };
+    });
   },
 
   async get(id: number): Promise<TicketOrder> {

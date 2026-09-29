@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { fetchAllPages } from '../utils/fetchAllPages';
 import type {
   Membership,
   MembershipPlan,
@@ -63,6 +64,19 @@ async function listPlans(params: Record<string, unknown> = {}): Promise<Membersh
   return [];
 }
 
+async function listAllPlans(params: Record<string, unknown> = {}): Promise<MembershipPlan[]> {
+  return fetchAllPages<MembershipPlan>(async (page) => {
+    const res = await api.get('/membership-plans', {
+      params: { ...params, sort_by: 'price', sort_order: 'asc', per_page: 100, page },
+    });
+    const payload = res.data?.data;
+    if (payload && typeof payload === 'object' && Array.isArray(payload.data)) {
+      return { items: payload.data as MembershipPlan[], lastPage: Number(payload.last_page) || 1 };
+    }
+    return { items: Array.isArray(payload) ? (payload as MembershipPlan[]) : [], lastPage: 1 };
+  });
+}
+
 async function publicPlans(params: Record<string, unknown> = {}): Promise<MembershipPlan[]> {
   const res = await api.get('/membership-plans/public', { params });
   return unwrap<MembershipPlan[]>(res.data);
@@ -106,6 +120,13 @@ async function listMemberships(params: Record<string, unknown> = {}): Promise<{
   }
   if (Array.isArray(payload)) return { data: payload };
   return { data: [] };
+}
+
+async function listAllMemberships(params: Record<string, unknown> = {}): Promise<Membership[]> {
+  return fetchAllPages<Membership>(async (page) => {
+    const { data, meta } = await listMemberships({ ...params, sort_by: 'id', sort_order: 'desc', per_page: 200, page });
+    return { items: data, lastPage: Number(meta?.last_page) || 1 };
+  });
 }
 
 async function getMembership(id: number): Promise<Membership> {
@@ -327,6 +348,7 @@ async function quoteBenefits(payload: MembershipBenefitQuoteRequest): Promise<Me
 
 export const membershipService = {
   listPlans,
+  listAllPlans,
   publicPlans,
   getPlan,
   createPlan,
@@ -334,6 +356,7 @@ export const membershipService = {
   deletePlan,
   togglePlanStatus,
   listMemberships,
+  listAllMemberships,
   getMembership,
   myMembership,
   gatewayKey,

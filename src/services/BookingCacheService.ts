@@ -1,6 +1,8 @@
 
 import bookingService, { type Booking, type BookingFilters, type PaginatedBookingResponse } from './bookingService';
 import { metricsCacheService } from './MetricsCacheService';
+import { fetchAllPages } from '../utils/fetchAllPages';
+import { getStoredUser } from '../utils/storage';
 
 const CACHE_NAME = 'zapzone-bookings-cache-v1';
 const BOOKINGS_CACHE_KEY = '/api/bookings/cached';
@@ -74,6 +76,7 @@ class BookingCacheService {
         lastUpdated: Date.now(),
         totalRecords: bookings.length,
         ...metadata,
+        userId: metadata?.userId ?? getStoredUser()?.id,
       };
 
       const metadataResponse = new Response(JSON.stringify(fullMetadata), {
@@ -154,35 +157,33 @@ class BookingCacheService {
   }
 
   private async syncFromAPI(filters?: BookingFilters): Promise<Booking[]> {
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
     this.isSyncing = true;
+    const startedAt = Date.now();
 
     this.syncPromise = (async () => {
       try {
-        let allBookings: Booking[] = [];
-        let currentPage = 1;
-        let lastPage = 1;
-
-        do {
+        const bookings = await fetchAllPages<Booking>(async (page) => {
           const response: PaginatedBookingResponse = await bookingService.getBookings({
-            ...filters,
-            per_page: 500,
-            page: currentPage,
+            ...(filters?.user_id ? { user_id: filters.user_id } : {}),
+            sort_by: 'id',
+            sort_order: 'desc',
+            per_page: 100,
+            page,
           });
-          const pageBatch = response.data.bookings || [];
-          allBookings = allBookings.concat(pageBatch);
-          lastPage = response.data.pagination?.last_page ?? 1;
-          currentPage++;
-        } while (currentPage <= lastPage);
-
-        const bookings = allBookings;
+          return { items: response.data?.bookings || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+        }, 1000);
+        bookings.sort((a, b) => String(b.booking_date || '').localeCompare(String(a.booking_date || '')) || b.id - a.id);
 
         await this.cacheBookings(bookings, {
-          locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
         window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
-          detail: { bookings, source: 'api' }
+          detail: { bookings, source: 'api', startedAt }
         }));
 
         return bookings;

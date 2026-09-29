@@ -70,16 +70,7 @@ const EditEvent = () => {
           addOnCacheService.syncInBackground({ user_id: currentUser?.id, location_id: locId });
           return;
         }
-        const addOnRes = await addOnService.getAddOns({ user_id: currentUser?.id, location_id: locId });
-        const raw = addOnRes as unknown as Record<string, unknown>;
-        let addOnList: Array<{ id: number; name: string; price: number | null }> = [];
-        if (raw.data && typeof raw.data === 'object' && Array.isArray((raw.data as Record<string, unknown>).add_ons)) {
-          addOnList = (raw.data as Record<string, unknown>).add_ons as typeof addOnList;
-        } else if (Array.isArray(raw.add_ons)) {
-          addOnList = raw.add_ons as typeof addOnList;
-        } else if (Array.isArray(raw.data)) {
-          addOnList = raw.data as typeof addOnList;
-        }
+        const addOnList = await addOnService.getAllAddOns({ user_id: currentUser?.id, location_id: locId });
         setAllAddOns(addOnList.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
       } catch {
         console.error('EditEvent: Failed to load add-ons');

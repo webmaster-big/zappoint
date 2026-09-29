@@ -1,7 +1,10 @@
 
-import roomService, { type Room, type RoomFilters, type PaginatedResponse } from './RoomService';
+import roomService, { type Room, type RoomFilters } from './RoomService';
+import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-rooms-cache-v1';
+const CACHE_NAME = 'zapzone-rooms-cache-v2';
+const LEGACY_CACHE_NAME = 'zapzone-rooms-cache-v1';
+let legacyCleared = false;
 const ROOMS_CACHE_KEY = '/api/rooms/cached';
 const CACHE_METADATA_KEY = '/api/rooms/metadata';
 
@@ -49,6 +52,10 @@ class RoomCacheService {
       console.warn('[RoomCacheService] Cache Storage not available');
       return null;
     }
+    if (!legacyCleared) {
+      legacyCleared = true;
+      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+    }
     return await caches.open(CACHE_NAME);
   }
 
@@ -74,6 +81,7 @@ class RoomCacheService {
         lastUpdated: Date.now(),
         totalRecords: rooms.length,
         ...metadata,
+        userId: metadata?.userId ?? getStoredUser()?.id,
       };
 
       const metadataResponse = new Response(JSON.stringify(fullMetadata), {
@@ -135,7 +143,7 @@ class RoomCacheService {
     forceRefresh: boolean = false
   ): Promise<Room[]> {
     if (this.isSyncing && this.syncPromise) {
-      return this.syncPromise;
+      return this.syncPromise.then((items) => this.filterRooms(items, filters));
     }
 
     if (!forceRefresh) {
@@ -146,27 +154,27 @@ class RoomCacheService {
         if (isStale) {
           this.syncInBackground(filters);
         }
-        return cachedRooms;
+        return this.filterRooms(cachedRooms, filters);
       }
     }
 
-    return this.syncFromAPI(filters);
+    return this.filterRooms(await this.syncFromAPI(filters), filters);
   }
 
   private async syncFromAPI(filters?: RoomFilters): Promise<Room[]> {
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
     this.isSyncing = true;
 
     this.syncPromise = (async () => {
       try {
-        const response: PaginatedResponse<Room> = await roomService.getRooms({
-          ...filters,
-          per_page: 500, // Get a large batch
-        });
-
-        const rooms = response.data?.rooms || (Array.isArray(response.data) ? response.data : []);
+        const rooms = await roomService.getAllRooms(
+          filters?.user_id ? { user_id: filters.user_id } : undefined,
+        );
 
         await this.cacheRooms(rooms, {
-          locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
@@ -288,7 +296,13 @@ class RoomCacheService {
     const cachedRooms = await this.getCachedRooms();
     if (!cachedRooms) return [];
 
-    return cachedRooms.filter(room => {
+    return this.filterRooms(cachedRooms, filters);
+  }
+
+  private filterRooms(rooms: Room[], filters?: RoomFilters): Room[] {
+    if (!filters) return rooms;
+
+    return rooms.filter(room => {
       if (filters.location_id && room.location_id !== filters.location_id) {
         return false;
       }

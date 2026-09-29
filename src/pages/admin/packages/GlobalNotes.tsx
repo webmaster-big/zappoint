@@ -41,11 +41,11 @@ const GlobalNotes: React.FC = () => {
         setLoading(true);
         const [notesRes, packagesRes] = await Promise.all([
           globalNoteService.getGlobalNotes(),
-          packageService.getPackages({ per_page: 100 })
+          packageService.getAllPackages()
         ]);
         
         setNotes(notesRes.data || []);
-        setPackages(packagesRes.data.packages || []);
+        setPackages(packagesRes);
       } catch (error) {
         console.error('Error fetching data:', error);
         setToast({ message: 'Failed to load data', type: 'error' });

@@ -1135,15 +1135,15 @@ const Bookings: React.FC = () => {
       
       if (locationId) {
         const cachedPackages = await packageCacheService.getCachedPackages();
+        const cachedForLocation = (cachedPackages || []).filter(
+          (pkg: PackageType) => pkg.location_id === locationId && pkg.is_active
+        );
         
-        if (cachedPackages && cachedPackages.length > 0) {
-          const filteredPackages = cachedPackages.filter(
-            (pkg: PackageType) => pkg.location_id === locationId && pkg.is_active
-          );
-          setAvailablePackages(filteredPackages);
+        if (cachedForLocation.length > 0) {
+          setAvailablePackages(cachedForLocation);
           setLoadingPackages(false);
           
-          packageCacheService.syncInBackground({ location_id: locationId, is_active: true });
+          packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         } else {
           const packages = await packageCacheService.fetchAndCachePackages({ 
             location_id: locationId, 
@@ -1161,10 +1161,8 @@ const Bookings: React.FC = () => {
         const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
         const locationId = cachedBooking?.location_id;
         if (locationId) {
-          const response = await packageService.getPackages({ location_id: locationId, is_active: true });
-          if (response.success && response.data) {
-            setAvailablePackages(response.data.packages || []);
-          }
+          const packages = await packageService.getAllPackages({ location_id: locationId });
+          setAvailablePackages(packages.filter((pkg: PackageType) => pkg.is_active));
         }
       } catch (fallbackError) {
         console.error('Fallback package loading failed:', fallbackError);
@@ -1262,10 +1260,8 @@ const Bookings: React.FC = () => {
         const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
         const locationId = cachedBooking?.location_id;
         if (locationId) {
-          const response = await roomService.getRooms({ location_id: locationId, is_available: true });
-          if (response.success && response.data) {
-            setAvailableRooms(response.data.rooms || []);
-          }
+          const rooms = await roomService.getAllRooms({ location_id: locationId, is_available: true });
+          setAvailableRooms(rooms);
         }
       } catch (fallbackError) {
         console.error('Fallback room loading failed:', fallbackError);
@@ -1675,13 +1671,8 @@ const Bookings: React.FC = () => {
           : cachedPackages.filter((pkg: PackageType) => pkg.is_active);
         setReportPackages(filteredPackages);
       } else {
-        const params: any = { is_active: true };
-        if (selectedLocation) params.location_id = selectedLocation;
-        
-        const response = await packageService.getPackages(params);
-        if (response.success && response.data) {
-          setReportPackages(response.data.packages || []);
-        }
+        const packages = await packageService.getAllPackages(selectedLocation ? { location_id: selectedLocation } : undefined);
+        setReportPackages(packages.filter((pkg: PackageType) => pkg.is_active));
       }
     } catch (error) {
       console.error('Error loading packages for report:', error);

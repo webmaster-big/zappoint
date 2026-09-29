@@ -154,8 +154,7 @@ const EditPurchase: React.FC = () => {
         const locationId = purchase.location_id ?? purchase.attraction?.location_id;
         if (locationId) {
           try {
-            const attractionsResponse = await attractionService.getAttractions({ location_id: locationId, is_active: true, per_page: 100, user_id: getStoredUser()?.id });
-            const list = attractionsResponse.data?.attractions || [];
+            const list = await attractionService.getAllAttractions({ location_id: locationId, is_active: true, user_id: getStoredUser()?.id });
             const hasCurrent = list.some((a) => a.id === purchase.attraction_id);
             if (!hasCurrent && purchase.attraction) {
               list.push({

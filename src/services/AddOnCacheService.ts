@@ -1,7 +1,10 @@
 
-import addOnService, { type AddOn, type AddOnFilters, type PaginatedResponse } from './AddOnService';
+import addOnService, { type AddOn, type AddOnFilters } from './AddOnService';
+import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-addons-cache-v1';
+const CACHE_NAME = 'zapzone-addons-cache-v2';
+const LEGACY_CACHE_NAME = 'zapzone-addons-cache-v1';
+let legacyCleared = false;
 const ADDONS_CACHE_KEY = '/api/addons/cached';
 const CACHE_METADATA_KEY = '/api/addons/metadata';
 
@@ -48,6 +51,10 @@ class AddOnCacheService {
       console.warn('[AddOnCacheService] Cache Storage not available');
       return null;
     }
+    if (!legacyCleared) {
+      legacyCleared = true;
+      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+    }
     return await caches.open(CACHE_NAME);
   }
 
@@ -73,6 +80,7 @@ class AddOnCacheService {
         lastUpdated: Date.now(),
         totalRecords: addOns.length,
         ...metadata,
+        userId: metadata?.userId ?? getStoredUser()?.id,
       };
 
       const metadataResponse = new Response(JSON.stringify(fullMetadata), {
@@ -134,7 +142,7 @@ class AddOnCacheService {
     forceRefresh: boolean = false
   ): Promise<AddOn[]> {
     if (this.isSyncing && this.syncPromise) {
-      return this.syncPromise;
+      return this.syncPromise.then((items) => this.filterAddOns(items, filters));
     }
 
     if (!forceRefresh) {
@@ -145,27 +153,27 @@ class AddOnCacheService {
         if (isStale) {
           this.syncInBackground(filters);
         }
-        return cachedAddOns;
+        return this.filterAddOns(cachedAddOns, filters);
       }
     }
 
-    return this.syncFromAPI(filters);
+    return this.filterAddOns(await this.syncFromAPI(filters), filters);
   }
 
   private async syncFromAPI(filters?: AddOnFilters): Promise<AddOn[]> {
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
     this.isSyncing = true;
 
     this.syncPromise = (async () => {
       try {
-        const response: PaginatedResponse<AddOn> = await addOnService.getAddOns({
-          ...filters,
-          per_page: 1000, // Get a large batch
-        });
-
-        const addOns = response.data.add_ons || [];
+        const addOns = await addOnService.getAllAddOns(
+          filters?.user_id ? { user_id: filters.user_id } : undefined,
+        );
 
         await this.cacheAddOns(addOns, {
-          locationId: filters?.location_id,
           userId: filters?.user_id,
         });
 
@@ -259,7 +267,16 @@ class AddOnCacheService {
     
     if (!cachedAddOns) return [];
 
-    const filtered = cachedAddOns.filter(addOn => {
+    const filtered = this.filterAddOns(cachedAddOns, filters);
+
+    console.log('[AddOnCacheService] Filtered add-ons count:', filtered.length);
+    return filtered;
+  }
+
+  private filterAddOns(addOns: AddOn[], filters?: AddOnFilters): AddOn[] {
+    if (!filters) return addOns;
+
+    return addOns.filter(addOn => {
       if (filters.location_id && addOn.location_id !== filters.location_id) {
         return false;
       }
@@ -280,9 +297,6 @@ class AddOnCacheService {
 
       return true;
     });
-
-    console.log('[AddOnCacheService] Filtered add-ons count:', filtered.length);
-    return filtered;
   }
 
   async clearCache(): Promise<void> {

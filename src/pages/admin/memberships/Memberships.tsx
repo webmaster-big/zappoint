@@ -125,7 +125,7 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
   const planPrice = selectedPlan ? Number(selectedPlan.price) : 0;
 
   useEffect(() => {
-    membershipService.listPlans().then(setPlans).catch(() => {});
+    membershipService.listAllPlans().then(setPlans).catch(() => {});
     locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
   }, []);
 

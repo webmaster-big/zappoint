@@ -159,17 +159,7 @@ const ManagePurchases = () => {
         }
       }
 
-      let allRawPurchases: any[] = [];
-      let currentPage = 1;
-      let lastPage = 1;
-
-      do {
-        const response = await attractionPurchaseService.getPurchases({ ...params, page: currentPage });
-        const batch = response.data.purchases || [];
-        allRawPurchases = allRawPurchases.concat(batch);
-        lastPage = response.data.pagination?.last_page ?? 1;
-        currentPage++;
-      } while (currentPage <= lastPage);
+      const allRawPurchases = await attractionPurchaseService.getAllPurchases(params);
 
       await attractionPurchaseCacheService.cachePurchases(allRawPurchases, {
         locationId: selectedLocation ? Number(selectedLocation) : undefined,

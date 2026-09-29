@@ -119,13 +119,12 @@ const EditBooking: React.FC = () => {
   const loadPackagesAndRoomsForLocation = useCallback(async (locationId: number) => {
     const [packagesResult, roomsResult] = await Promise.all([
       (async () => {
-        const cachedPackages = await packageCacheService.getCachedPackages();
-        if (cachedPackages && cachedPackages.length > 0) {
+        const cachedPackages = await packageCacheService.getFilteredPackagesFromCache({ location_id: locationId });
+        if (cachedPackages.length > 0) {
           packageCacheService.syncInBackground();
-          return cachedPackages.filter((pkg: PackageType) => pkg.location_id === locationId);
+          return cachedPackages;
         }
-        const response = await packageService.getPackages({ location_id: locationId });
-        return response.success && response.data ? (response.data.packages || []) : [];
+        return packageService.getAllPackages({ location_id: locationId });
       })(),
 
       (async () => {
@@ -134,14 +133,8 @@ const EditBooking: React.FC = () => {
           roomCacheService.syncInBackground();
           return cachedRooms.map(room => ({ id: room.id, name: room.name }));
         }
-        const response = await roomService.getRooms({ location_id: locationId });
-        if (response.success && response.data) {
-          const rooms = response.data.rooms || response.data;
-          const roomsArray = Array.isArray(rooms) ? rooms : [];
-          roomCacheService.cacheRooms(roomsArray);
-          return roomsArray.map((room: any) => ({ id: room.id, name: room.name }));
-        }
-        return [];
+        const rooms = await roomService.getAllRooms({ location_id: locationId });
+        return rooms.map((room) => ({ id: room.id, name: room.name }));
       })()
     ]);
 

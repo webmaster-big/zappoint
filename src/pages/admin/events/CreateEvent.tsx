@@ -80,8 +80,7 @@ const CreateEvent = () => {
       return;
     }
     try {
-      const res = await addOnService.getAddOns({ user_id: currentUser?.id, location_id: parseInt(selectedLocation) });
-      const list = res.data?.add_ons || [];
+      const list = await addOnService.getAllAddOns({ user_id: currentUser?.id, location_id: parseInt(selectedLocation) });
       setAllAddOns(list.map((a: { id: number; name: string; price: number | null }) => ({ id: a.id, name: a.name, price: a.price || 0 })));
     } catch {
     }

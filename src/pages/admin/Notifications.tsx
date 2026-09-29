@@ -20,6 +20,7 @@ import Pagination from '../../components/ui/Pagination';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NotificationsNotification } from '../../types/Notifications.types';
 import { API_BASE_URL } from '../../utils/storage';
+import { fetchAllPages } from '../../utils/fetchAllPages';
 
 const Notifications = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -117,46 +118,52 @@ const Notifications = () => {
         return;
       }
 
-      const params = new URLSearchParams({
-        per_page: '500',
-        page: '1',
-      });
-
-      if (!isCompanyAdmin && locationId) {
-        params.append('location_id', locationId.toString());
-      }
-
-      const response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const transformedNotifications = data.data.notifications.map((notif: any) => ({
-          id: notif.id.toString(),
-          type: notif.type,
-          title: notif.title,
-          message: notif.message,
-          timestamp: notif.created_at,
-          read: notif.status === 'read',
-          priority: notif.priority || 'medium',
-          action_url: notif.action_url || null,
-          action_text: notif.action_text || null,
-          metadata: notif.metadata || {},
-        }));
-
-        transformedNotifications.sort((a: any, b: any) => {
-          const ta = new Date(a.timestamp).getTime();
-          const tb = new Date(b.timestamp).getTime();
-          return tb - ta;
+      const rawNotifications = await fetchAllPages<{ id: number } & Record<string, unknown>>(async (page) => {
+        const params = new URLSearchParams({
+          per_page: '500',
+          page: String(page),
         });
 
-        setNotifications(transformedNotifications);
-      }
+        if (!isCompanyAdmin && locationId) {
+          params.append('location_id', locationId.toString());
+        }
+
+        const response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to load notifications');
+        }
+
+        return { items: data.data.notifications, lastPage: data.data.pagination?.last_page ?? 1 };
+      });
+
+      const transformedNotifications = rawNotifications.map((notif: any) => ({
+        id: notif.id.toString(),
+        type: notif.type,
+        title: notif.title,
+        message: notif.message,
+        timestamp: notif.created_at,
+        read: notif.status === 'read',
+        priority: notif.priority || 'medium',
+        action_url: notif.action_url || null,
+        action_text: notif.action_text || null,
+        metadata: notif.metadata || {},
+      }));
+
+      transformedNotifications.sort((a: any, b: any) => {
+        const ta = new Date(a.timestamp).getTime();
+        const tb = new Date(b.timestamp).getTime();
+        return tb - ta;
+      });
+
+      setNotifications(transformedNotifications);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {

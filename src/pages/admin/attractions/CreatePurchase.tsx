@@ -189,17 +189,16 @@ const CreatePurchase = () => {
         
         const params: any = {
           is_active: true,
-          per_page: 100,
           user_id: getStoredUser()?.id
         };
         if (selectedLocation !== null) {
           params.location_id = selectedLocation;
         }
-        const response = await attractionService.getAttractions(params);
+        const fetchedAttractions = await attractionService.getAllAttractions(params);
         
-        await attractionCacheService.cacheAttractions(response.data.attractions);
+        attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         
-        const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
+        const convertedAttractions: CreatePurchaseAttraction[] = fetchedAttractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
           id: attr.id.toString(),
           name: attr.name,
           description: attr.description,

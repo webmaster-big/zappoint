@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy, Search, Filter, RefreshCcw } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PromoStatus, PromoType, PromoItem } from '../../../types/Promo.types';
@@ -66,45 +66,51 @@ const Promo: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const promosRequestRef = useRef(0);
+
   const loadPromos = useCallback(async () => {
+    const requestId = ++promosRequestRef.current;
     try {
       setLoading(true);
-      const response = await promoService.getPromos({
+      const allPromos = await promoService.getAllPromos({
         status: 'all',
-        per_page: 200,
+        exclude_batches: true,
         ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
       });
 
-      if (response.data && response.data.promos) {
-        const formattedPromos: PromoItem[] = response.data.promos
-          .filter(promo => !promo.batch_id) // Only show single-mode promos
-          .map(promo => ({
-            id: promo.id,
-            code: promo.code,
-            code_mode: promo.code_mode || 'single',
-            batch_id: promo.batch_id ?? null,
-            name: promo.name || promo.code,
-            type: promo.type as PromoType,
-            value: Number(promo.value),
-            start_date: promo.start_date,
-            end_date: promo.end_date,
-            usage_limit_total: promo.usage_limit_total ? Number(promo.usage_limit_total) : null,
-            usage_limit_per_user: Number(promo.usage_limit_per_user),
-            current_usage: Number(promo.current_usage),
-            status: promo.status as PromoStatus,
-            description: promo.description || '',
-            created_by: promo.created_by,
-            created_at: promo.created_at,
-            updated_at: promo.updated_at,
-            deleted: promo.deleted || false
-          }));
-        setPromos(formattedPromos);
-      }
+      const formattedPromos: PromoItem[] = allPromos
+        .filter(promo => !promo.batch_id)
+        .map(promo => ({
+          id: promo.id,
+          code: promo.code,
+          code_mode: promo.code_mode || 'single',
+          batch_id: promo.batch_id ?? null,
+          name: promo.name || promo.code,
+          type: promo.type as PromoType,
+          value: Number(promo.value),
+          start_date: promo.start_date,
+          end_date: promo.end_date,
+          usage_limit_total: promo.usage_limit_total ? Number(promo.usage_limit_total) : null,
+          usage_limit_per_user: Number(promo.usage_limit_per_user),
+          current_usage: Number(promo.current_usage),
+          status: promo.status as PromoStatus,
+          description: promo.description || '',
+          created_by: promo.created_by,
+          created_at: promo.created_at,
+          updated_at: promo.updated_at,
+          deleted: promo.deleted || false,
+          creator: promo.creator,
+          location_ids: promo.location_ids ?? null,
+          package_ids: promo.package_ids ?? null,
+          attraction_ids: promo.attraction_ids ?? null,
+          event_ids: promo.event_ids ?? null,
+        }));
+      if (requestId === promosRequestRef.current) setPromos(formattedPromos);
     } catch (error) {
       console.error('Error loading promos:', error);
-      showToast(apiErrorMessage(error, 'Error loading promo codes'), 'error');
+      if (requestId === promosRequestRef.current) showToast(apiErrorMessage(error, 'Error loading promo codes'), 'error');
     } finally {
-      setLoading(false);
+      if (requestId === promosRequestRef.current) setLoading(false);
     }
   }, [effectiveLocationId]);
 

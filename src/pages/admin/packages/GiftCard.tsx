@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy, Search, Filter, RefreshCcw, ShoppingCart, CheckCircle2 } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import EmailInput from '../../../components/ui/EmailInput';
@@ -107,37 +107,39 @@ const GiftCard: React.FC = () => {
       .catch(() => setFallbackLocations([]));
   }, [showSellModal, locations.length]);
 
+  const giftCardsRequestRef = useRef(0);
+
   const loadGiftCards = async () => {
+    const requestId = ++giftCardsRequestRef.current;
     try {
       setLoading(true);
-      const response = await giftCardService.getGiftCards(
-        effectiveLocationId ? { location_id: effectiveLocationId } : undefined
-      );
+      const cards = await giftCardService.getAllGiftCards({
+        status: 'all',
+        include_expired: true,
+        ...(effectiveLocationId ? { location_id: effectiveLocationId } : {}),
+      });
       
-      if (response.data && response.data.gift_cards) {
-        const formattedCards: GiftCardItem[] = response.data.gift_cards.map(card => ({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(card as any), // Keep all backend fields including id
-          code: card.code,
-          type: card.type as GiftCardType,
-          initial_value: Number(card.initial_value),
-          balance: Number(card.balance),
-          max_usage: Number(card.max_usage),
-          description: card.description || '',
-          status: card.status as GiftCardStatus,
-          expiry_date: card.expiry_date,
-          created_by: card.created_by?.toString() || 'admin',
-          created_at: card.created_at,
-          updated_at: card.updated_at,
-          deleted: card.deleted || false
-        }));
-        setGiftCards(formattedCards);
-      }
+      const formattedCards: GiftCardItem[] = cards.map(card => ({
+        ...card,
+        code: card.code,
+        type: card.type as GiftCardType,
+        initial_value: Number(card.initial_value),
+        balance: Number(card.balance),
+        max_usage: Number(card.max_usage),
+        description: card.description || '',
+        status: card.status as GiftCardStatus,
+        expiry_date: card.expiry_date,
+        created_by: card.created_by?.toString() || 'admin',
+        created_at: card.created_at,
+        updated_at: card.updated_at,
+        deleted: card.deleted || false
+      }));
+      if (requestId === giftCardsRequestRef.current) setGiftCards(formattedCards);
     } catch (error) {
       console.error('Error loading gift cards:', error);
-      showToast('Error loading gift cards', 'error');
+      if (requestId === giftCardsRequestRef.current) showToast('Error loading gift cards', 'error');
     } finally {
-      setLoading(false);
+      if (requestId === giftCardsRequestRef.current) setLoading(false);
     }
   };
 
@@ -447,7 +449,8 @@ const GiftCard: React.FC = () => {
       }
     }
     
-    if (filterStatus !== "all" && card.status !== filterStatus) {
+    const effectiveStatus = card.expiry_date && new Date(card.expiry_date) < new Date() ? 'expired' : card.status;
+    if (filterStatus !== "all" && effectiveStatus !== filterStatus) {
       return false;
     }
     
@@ -536,6 +539,8 @@ const GiftCard: React.FC = () => {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="expired">Expired</option>
+                    <option value="redeemed">Redeemed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>
@@ -584,7 +589,7 @@ const GiftCard: React.FC = () => {
                           className="p-1.5"
                           icon={Edit2}
                         />
-                        {status === 'active' ? (
+                        {isExpired ? null : status === 'active' ? (
                           <StandardButton 
                             onClick={() => handleDeactivate(originalIndex)}
                             variant="ghost"

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
+import { fetchAllPages } from '../../../utils/fetchAllPages';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import attractionPurchaseService, { type AttractionPurchase } from '../../../services/AttractionPurchaseService';
@@ -148,19 +149,19 @@ const CalendarView: React.FC = () => {
         bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       } else {
         if (!silent && !initialLoading) setDataLoading(true);
-        const response = await bookingService.getBookings({
-          ...dateParams,
-          per_page: 1000,
-          user_id: getStoredUser()?.id,
+        const rangeBookings = await fetchAllPages<Booking>(async (page) => {
+          const response = await bookingService.getBookings({
+            ...dateParams,
+            sort_by: 'id',
+            sort_order: 'desc',
+            per_page: 100,
+            page,
+            user_id: getStoredUser()?.id,
+          });
+          return { items: response.data?.bookings || [], lastPage: response.data?.pagination?.last_page ?? 1 };
         });
-        
-        if (response.success && response.data) {
-          setBookings(response.data.bookings);
-          bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
-        } else {
-          console.log('No bookings data in response');
-          setBookings([]);
-        }
+        setBookings(rangeBookings);
+        bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       }
     } catch (error) {
       console.error('Error loading bookings:', error);

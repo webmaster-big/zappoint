@@ -214,6 +214,8 @@ export interface PaymentFilters {
   end_date?: string;
   per_page?: number;
   page?: number;
+  sort_by?: 'created_at' | 'amount' | 'status' | 'method' | 'paid_at' | 'updated_at' | 'id' | 'deleted_at';
+  sort_order?: 'asc' | 'desc';
 }
 
 export interface RefundRequest {

@@ -54,7 +54,7 @@ const itemFetchers: Record<ItemKey, (locationId: number) => Promise<Option[]>> =
   package: (id) =>
     packageService.getPackagesByLocation(id).then((r) => (r.data || []).map(toOption)).catch(() => []),
   attraction: (id) =>
-    attractionService.getAttractions({ location_id: id, per_page: 200 }).then((r) => (r.data?.attractions || []).map(toOption)).catch(() => []),
+    attractionService.getAllAttractions({ location_id: id }).then((list) => list.map(toOption)).catch(() => []),
   event: (id) =>
     eventService.getEventsByLocation(id).then((r) => (r.data || []).map(toOption)).catch(() => []),
 };
