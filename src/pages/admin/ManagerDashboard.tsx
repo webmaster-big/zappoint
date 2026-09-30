@@ -69,7 +69,7 @@ import { guestNoteOf } from '../../utils/bookingNotes';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { cardFromPayments } from '../../utils/cardLabel';
-import { resolvePaymentState } from '../../types/Bookings.types';
+import { resolvePaymentState, statusAfterPayment } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
 import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
@@ -889,9 +889,10 @@ const LocationManagerDashboard: React.FC = () => {
         amount_paid: newAmountPaid,
         total_amount: selectedBooking.total_amount,
       }).state;
+      const nextStatus = statusAfterPayment(booking.status ?? selectedBooking.status);
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        status: 'confirmed',
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
 
       if (updateResponse.success && updateResponse.data) {

@@ -65,6 +65,16 @@ const EscapeRoomBookingCard = ({ bookingId, themeColor, className = '' }: { book
             <p className="text-sm text-gray-600 mt-0.5">
               Signed waivers cover {covered} of {game.players_booked} {game.players_booked === 1 ? 'player' : 'players'} · {status}
             </p>
+            {game.reviews && game.reviews.scheduled + game.reviews.sent + game.reviews.rated > 0 && (
+              <p className="text-xs text-gray-600 mt-1">
+                Review requests: {game.reviews.scheduled > 0 ? `${game.reviews.scheduled} waiting` : ''}
+                {game.reviews.scheduled > 0 && game.reviews.sent > 0 ? ' · ' : ''}
+                {game.reviews.sent > 0 ? `${game.reviews.sent} sent` : ''}
+                {game.reviews.rated > 0
+                  ? ` · ${game.reviews.rated} rated${game.reviews.average_rating !== null ? `, average ${game.reviews.average_rating}/5` : ''}`
+                  : ''}
+              </p>
+            )}
             {!game.has_waiver && (
               <p className="text-xs text-amber-700 mt-1">No escape-room waiver covers this room yet, so players cannot check in to it.</p>
             )}

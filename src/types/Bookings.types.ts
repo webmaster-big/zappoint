@@ -215,6 +215,9 @@ const toCents = (value: number | string | null | undefined): number => {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
 };
 
+export const statusAfterPayment = (current: string | null | undefined): 'confirmed' | undefined =>
+  current === 'checked-in' || current === 'completed' ? undefined : 'confirmed';
+
 export const resolvePaymentState = (input: {
   payment_status?: string | null;
   amount_paid?: number | string | null;

@@ -35,6 +35,8 @@ import {
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 import { resolvePaymentState } from '../../../types/Bookings.types';
+import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
+import type { VisitFollowUpSummary } from '../../../types/visitFollowUp.types';
 
 interface DisplayPurchase {
   id: string;
@@ -194,8 +196,11 @@ const EventPurchases = () => {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      await eventPurchaseService.updateStatus(Number(id), newStatus);
-      setToast({ message: 'Status updated successfully', type: 'success' });
+      const result = await eventPurchaseService.updateStatus(Number(id), newStatus);
+      const notice = newStatus === 'completed'
+        ? describeFollowUp((result as unknown as { follow_up?: VisitFollowUpSummary }).follow_up)
+        : null;
+      setToast({ message: notice ? `Status updated. ${notice}` : 'Status updated successfully', type: 'success' });
       loadPurchases();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -562,6 +567,14 @@ const EventPurchases = () => {
     const skipped = table.selectedIds.length - eligible.length;
     if (eligible.length === 0) {
       setToast({ message: 'The selected tickets belong to bulk orders — manage them on the order page.', type: 'info' });
+      return;
+    }
+    if (
+      newStatus === 'completed'
+      && !window.confirm(
+        `Mark ${eligible.length} ${eligible.length === 1 ? 'purchase' : 'purchases'} as Completed? Guests of visits from the last 3 days get the Thanks for Playing email right away and a review request later. Older or future visits are marked Completed without emailing anyone.`
+      )
+    ) {
       return;
     }
     try {

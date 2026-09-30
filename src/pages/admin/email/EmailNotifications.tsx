@@ -20,7 +20,9 @@ import {
   RotateCcw,
   Shield,
   Sparkles,
-  Download
+  Download,
+  Star,
+  Tag
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -57,6 +59,8 @@ const FALLBACK_TRIGGER_OPTIONS = [
   { value: 'payment_received', label: 'Payment Received' },
   { value: 'payment_failed', label: 'Payment Failed' },
   { value: 'payment_refunded', label: 'Payment Refunded' },
+  { value: 'visit_completed', label: 'Visit Completed: Thanks for Playing' },
+  { value: 'visit_followup', label: 'Visit Follow-up: Review Request' },
 ];
 
 const EmailNotifications = () => {
@@ -87,6 +91,8 @@ const EmailNotifications = () => {
     if (triggerType.startsWith('booking_')) return Calendar;
     if (triggerType.startsWith('purchase_')) return Ticket;
     if (triggerType.startsWith('payment_')) return CreditCard;
+    if (triggerType === 'visit_followup') return Star;
+    if (triggerType === 'visit_completed') return Sparkles;
     return Bell;
   };
 
@@ -162,6 +168,9 @@ const EmailNotifications = () => {
     loadNotifications();
   }, []);
 
+  const serverMessage = (error: unknown, fallback: string): string =>
+    (error as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+
   const handleDelete = async (id: number) => {
     try {
       const response = await emailNotificationService.delete(id);
@@ -189,13 +198,22 @@ const EmailNotifications = () => {
       }
     } catch (error) {
       console.error('Error resetting notification:', error);
-      setToast({ message: 'Failed to reset notification', type: 'error' });
+      setToast({ message: serverMessage(error, 'Failed to reset notification'), type: 'error' });
     } finally {
       setResetConfirm(null);
     }
   };
 
   const handleToggleStatus = async (notification: EmailNotification) => {
+    if (notification.can_edit === false) {
+      setToast({
+        message: notification.location_id === null
+          ? 'This follow-up email goes to guests of every location, so only a company admin can switch it on or off.'
+          : 'Only a manager of this location or a company admin can change this follow-up email.',
+        type: 'info',
+      });
+      return;
+    }
     try {
       const response = await emailNotificationService.toggleStatus(notification.id);
       if (response.success) {
@@ -207,7 +225,7 @@ const EmailNotifications = () => {
       }
     } catch (error) {
       console.error('Error toggling status:', error);
-      setToast({ message: 'Failed to toggle notification status', type: 'error' });
+      setToast({ message: serverMessage(error, 'Failed to toggle notification status'), type: 'error' });
     }
   };
 
@@ -220,7 +238,7 @@ const EmailNotifications = () => {
       }
     } catch (error) {
       console.error('Error duplicating notification:', error);
-      setToast({ message: 'Failed to duplicate notification', type: 'error' });
+      setToast({ message: serverMessage(error, 'Failed to duplicate notification'), type: 'error' });
     }
   };
 
@@ -283,6 +301,25 @@ const EmailNotifications = () => {
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
                 Edited
               </span>
+            )}
+            {n.trigger_type === 'visit_completed' && (
+              n.promo_summary?.code || n.promo_summary?.problem ? (
+                <span
+                  title={n.promo_summary.problem ?? undefined}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                    n.promo_summary.problem ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}
+                >
+                  <Tag className="w-3 h-3" />
+                  {n.promo_summary.code ?? 'Promo missing'}
+                  {n.promo_summary.problem ? ' · not usable' : ''}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                  <Tag className="w-3 h-3" />
+                  No promo code
+                </span>
+              )
             )}
           </div>
           {n.location && (
@@ -536,9 +573,16 @@ const EmailNotifications = () => {
 
   const handleBulkSetActive = async (active: boolean) => {
     if (table.selectedIds.length === 0) return;
-    const targets = notifications.filter(
+    const selected = notifications.filter(
       n => table.selectedIds.includes(String(n.id)) && n.is_active !== active
     );
+    const targets = selected.filter(n => n.can_edit !== false);
+    const locked = selected.length - targets.length;
+    if (targets.length === 0 && locked > 0) {
+      setToast({ message: 'You cannot switch the selected follow-up emails on or off. Ask a company admin.', type: 'info' });
+      table.clearSelection();
+      return;
+    }
     if (targets.length === 0) {
       setToast({ message: `Selected notifications are already ${active ? 'active' : 'inactive'}`, type: 'info' });
       table.clearSelection();
@@ -547,7 +591,7 @@ const EmailNotifications = () => {
     try {
       await Promise.all(targets.map(n => emailNotificationService.toggleStatus(n.id)));
       setToast({
-        message: `${targets.length} notification(s) ${active ? 'activated' : 'deactivated'} successfully`,
+        message: `${targets.length} notification(s) ${active ? 'activated' : 'deactivated'} successfully${locked > 0 ? ` — ${locked} follow-up email(s) skipped because only a company admin can change them` : ''}`,
         type: 'success'
       });
       table.clearSelection();
@@ -603,7 +647,7 @@ const EmailNotifications = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Email Notifications</h1>
-          <p className="text-gray-600 mt-2">Automated email notifications for bookings, purchases, and payments</p>
+          <p className="text-gray-600 mt-2">Automated email notifications for bookings, purchases, payments and the follow-up after each visit</p>
         </div>
         <div className="flex items-center gap-3 mt-4 sm:mt-0">
           <StandardButton

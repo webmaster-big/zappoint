@@ -54,7 +54,7 @@ import eventPurchaseService, { type ScannedEventTicket } from '../../../services
 import type { EventPurchase } from '../../../types/event.types';
 import type { MembershipScanResponse } from '../../../types/Membership.types';
 import { useLocationScope } from '../../../contexts/LocationContext';
-import { resolvePaymentState } from '../../../types/Bookings.types';
+import { resolvePaymentState, statusAfterPayment } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import { matchesBookingSearch, digitsOnly } from '../../../utils/bookingSearch';
 import axios from 'axios';
@@ -1166,9 +1166,10 @@ const CheckIn: React.FC = () => {
       }
 
       const newAmountPaid = Number(selectedBookingForPayment.amount_paid || 0) + amount;
+      const nextStatus = statusAfterPayment(booking.status ?? selectedBookingForPayment.status);
       const updateResponse = await bookingService.updateBooking(selectedBookingForPayment.id, {
         amount_paid: newAmountPaid,
-        status: 'confirmed', // Set status to confirmed when payment is made
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
 
       if (updateResponse.success && updateResponse.data) {

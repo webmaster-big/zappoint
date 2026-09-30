@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import VisitFollowUpCard from '../../../components/admin/visits/VisitFollowUpCard';
 import {
   ArrowLeft,
   User,
@@ -427,6 +428,10 @@ const ViewEventPurchase = () => {
             </div>
           )}
         </div>
+
+        {purchase.status !== 'cancelled' && (
+          <VisitFollowUpCard visitType="event_purchase" visitId={purchase.id} themeColor={themeColor} refreshKey={purchase.status} className="mt-6" />
+        )}
 
         <div className="mt-6">
           <WaiverConnectionPanel type="event_purchase" id={purchase.id} title="Waivers" />

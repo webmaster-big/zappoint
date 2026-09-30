@@ -79,7 +79,7 @@ import { useHideEmptySpaces, useScheduleDayWindow } from '../../components/admin
 import CustomerSearch from '../../components/admin/calendar/CustomerSearch';
 import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
-import { resolvePaymentState } from '../../types/Bookings.types';
+import { resolvePaymentState, statusAfterPayment } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
 
 const CompanyDashboard: React.FC = () => {
@@ -998,9 +998,10 @@ const CompanyDashboard: React.FC = () => {
         amount_paid: newAmountPaid,
         total_amount: selectedBooking.total_amount,
       }).state;
+      const nextStatus = statusAfterPayment(booking.status ?? selectedBooking.status);
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        status: 'confirmed',
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
 
       if (updateResponse.success && updateResponse.data) {

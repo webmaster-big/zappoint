@@ -26,6 +26,7 @@ export interface LocationManagerProfileLocation {
   phone: string;
   address: LocationManagerProfileAddress;
   timezone: string;
+  reviewUrl: string;
   isActive: boolean;
 }
 

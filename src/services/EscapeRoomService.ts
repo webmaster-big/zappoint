@@ -67,11 +67,12 @@ const escapeRoomService = {
   startPhoto: async (sessionId: number): Promise<EscapeRoomSessionDetail> =>
     (await api.post(`/escape-rooms/sessions/${sessionId}/photo-session`, { verbal_consent: true })).data.data,
 
-  complete: async (sessionId: number, escaped: boolean, completionTime: string | null, withoutPhoto = false): Promise<EscapeRoomSessionDetail> =>
+  complete: async (sessionId: number, escaped: boolean, completionTime: string | null, withoutPhoto = false, emailPlayers = false): Promise<EscapeRoomSessionDetail> =>
     (await api.post(`/escape-rooms/sessions/${sessionId}/complete`, {
       escaped,
       completion_time: escaped ? completionTime : null,
       ...(withoutPhoto ? { without_photo: true } : {}),
+      ...(withoutPhoto && emailPlayers ? { email_players: true } : {}),
     })).data.data,
 
   sendToNewPlayers: async (sessionId: number): Promise<EscapeRoomSessionDetail> =>

@@ -52,6 +52,7 @@ export interface Promo {
 
 export interface PromoFilters {
   status?: 'active' | 'inactive' | 'expired' | 'exhausted' | 'all';
+  shared_only?: boolean;
   type?: 'fixed' | 'percentage';
   location_id?: number;
   exclude_batches?: boolean;

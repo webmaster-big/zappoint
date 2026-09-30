@@ -38,9 +38,11 @@ export interface Location {
   geocoded_at?: string | null;
   phone?: string;
   email?: string;
+  review_url?: string | null;
   logo_path?: string | null;
   capacity?: number;
   operating_hours?: string;
+  timezone?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -67,6 +69,7 @@ export interface CreateLocationData {
   longitude?: number | null;
   phone?: string;
   email?: string;
+  review_url?: string | null;
   logo_path?: string | null;
   capacity?: number;
   operating_hours?: string;

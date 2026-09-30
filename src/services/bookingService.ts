@@ -6,6 +6,7 @@ import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { changeReasonWasRequired, requestChangeReason } from '../utils/changeReasonPrompt';
 import { fetchAllPages } from '../utils/fetchAllPages';
+import type { VisitFollowUpSummary } from '../types/visitFollowUp.types';
 
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
@@ -460,6 +461,7 @@ export interface BookingResponse {
   success: boolean;
   data: Booking;
   message?: string;
+  follow_up?: VisitFollowUpSummary;
 }
 
 export interface PaginatedBookingResponse {

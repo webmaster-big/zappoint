@@ -23,6 +23,8 @@ const PHONE_RE = /^[\d\s\-\+\(\)\.]{7,20}$/;
 // Matches the server's slug rule, so a bad URL is caught before the round trip
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const REVIEW_URL_RE = /^https?:\/\/\S+\.\S+/i;
+
 const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged, elevated = false }: EditLocationModalProps) => {
   const { themeColor } = useThemeColor();
   const [form, setForm] = useState<UpdateLocationData>({});
@@ -45,6 +47,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
       longitude: location.longitude === null || location.longitude === undefined ? null : Number(location.longitude),
       phone: location.phone ?? '',
       email: location.email ?? '',
+      review_url: location.review_url ?? '',
     });
     setLogoPath(location.logo_path ?? null);
     setError(null);
@@ -103,6 +106,9 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
     if (oneCoordinateOnly) {
       errs.latitude = ['Set both latitude and longitude, or leave both blank.'];
     }
+    if (form.review_url?.trim() && !REVIEW_URL_RE.test(form.review_url.trim())) {
+      errs.review_url = ['Enter the full review link, starting with https://'];
+    }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       setError('Please correct the highlighted fields.');
@@ -130,6 +136,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
         longitude: form.longitude ?? null,
         phone: form.phone?.trim() ?? '',
         email: form.email?.trim() ?? '',
+        review_url: form.review_url?.trim() ? form.review_url.trim() : null,
       };
 
       const res = await locationService.updateLocation(location.id, payload);
@@ -305,6 +312,26 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
             />
             {fieldErrors.email && (
               <p className="text-xs text-red-600 mt-1">{fieldErrors.email[0]}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Public review link</label>
+            <input
+              type="url"
+              inputMode="url"
+              value={form.review_url ?? ''}
+              onChange={(e) => update('review_url', e.target.value)}
+              disabled={submitting}
+              placeholder="https://g.page/r/..."
+              className={`w-full px-3 py-2 border ${fieldErrors.review_url ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100`}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Where guests leave a review, for example this location's Google review link. The review-request email shows a Leave a
+              review button when this is set.
+            </p>
+            {fieldErrors.review_url && (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors.review_url[0]}</p>
             )}
           </div>
 

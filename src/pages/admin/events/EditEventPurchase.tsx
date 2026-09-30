@@ -16,6 +16,8 @@ import type { EventPurchase, Event, UpdateEventPurchaseData } from '../../../typ
 import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
+import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
+import type { VisitFollowUpSummary } from '../../../types/visitFollowUp.types';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 
 type EventStatus = 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
@@ -366,6 +368,7 @@ const EditEventPurchase: React.FC = () => {
       return;
     }
     setSubmitting(true);
+    const statusChanged = status !== originalPurchase.status;
     try {
       const data: UpdateEventPurchaseData = isOrderLine
         ? {
@@ -381,7 +384,7 @@ const EditEventPurchase: React.FC = () => {
             quantity,
             purchase_date: purchaseDate,
             purchase_time: purchaseTime,
-            status,
+            ...(statusChanged ? { status } : {}),
             payment_status: paymentStatus,
             payment_method: paymentMethod,
             amount_paid: amountPaid,
@@ -398,8 +401,16 @@ const EditEventPurchase: React.FC = () => {
 
       if (response.success) {
         void metricsCacheService.clearAllCaches();
-        setToast({ message: 'Event purchase updated successfully!', type: 'success' });
-        setTimeout(() => navigate(getBackPath()), 1200);
+        const notice = statusChanged && status === 'completed'
+          ? describeFollowUp((response as unknown as { follow_up?: VisitFollowUpSummary }).follow_up)
+          : null;
+        if (notice) {
+          alert(`Event purchase updated. ${notice}`);
+          navigate(getBackPath());
+        } else {
+          setToast({ message: 'Event purchase updated successfully!', type: 'success' });
+          setTimeout(() => navigate(getBackPath()), 1200);
+        }
       } else {
         setToast({ message: 'Failed to update purchase. Please try again.', type: 'error' });
         setSubmitting(false);
@@ -564,7 +575,7 @@ const EditEventPurchase: React.FC = () => {
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                 <p className="text-sm text-amber-800">
-                  Changing the date or time will automatically notify the customer by email. Setting the status to Cancelled will also send a cancellation email.
+                  Changing the date or time will automatically notify the customer by email. Setting the status to Cancelled will also send a cancellation email, and setting it to Completed sends the Thanks for Playing email now and a review request later.
                 </p>
               </div>
               {scheduleAvailability.length > 0 ? (

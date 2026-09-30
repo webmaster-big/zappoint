@@ -101,6 +101,7 @@ import SmsNotifications from "./pages/admin/sms/SmsNotifications";
 import FeeSupports from "./pages/admin/fee-supports/FeeSupports";
 import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
 import RsvpPage from "./pages/public/RsvpPage";
+import VisitFeedback from "./pages/public/VisitFeedback";
 import WaiverForm from "./pages/public/WaiverForm";
 import WaiverKiosk from "./pages/public/WaiverKiosk";
 import WaiverKioskSession from "./pages/public/WaiverKioskSession";
@@ -200,6 +201,7 @@ function App() {
         <Route path="/purchase/event/:location/:slug" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdFromSlugParam="slug" /><PurchaseEvent /></>} />
         <Route path="/events/:eventId/purchase" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdParam="eventId" /><PurchaseEvent /></>} />
         <Route path="/rsvp/:token" element={<><PageViewBeacon pageType="rsvp" /><RsvpPage /></>} />
+        <Route path="/feedback/:token" element={<VisitFeedback />} />
         <Route path="/waiver/kiosk/:id" element={<><PageViewBeacon pageType="waiver_kiosk" /><WaiverKiosk /></>} />
         <Route path="/waiver/kiosk-session/:token" element={<><PageViewBeacon pageType="waiver_kiosk_session" /><WaiverKioskSession /></>} />
         <Route path="/waiver/bulk/:manageToken" element={<><PageViewBeacon pageType="waiver_bulk" /><WaiverBulk /></>} />

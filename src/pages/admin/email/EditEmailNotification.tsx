@@ -41,7 +41,8 @@ import {
   RotateCcw,
   Shield,
   Sparkles,
-  Pencil
+  Pencil,
+  AlertTriangle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -51,12 +52,16 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import HtmlCodeEditor from '../../../components/admin/email/HtmlCodeEditor';
 import EmailInput from '../../../components/ui/EmailInput';
+import VisitEmailSettings from '../../../components/admin/email/VisitEmailSettings';
 import { getStoredUser } from '../../../utils/storage';
+import { isVisitTrigger } from '../../../types/EmailNotification.types';
 import type { 
   UpdateEmailNotificationData, 
   TriggerType, 
   EntityType, 
-  RecipientType 
+  RecipientType,
+  EmailPromoSummary,
+  VisitEmailOverride
 } from '../../../types/EmailNotification.types';
 import type { EmailTemplate } from '../../../types/EmailCampaign.types';
 
@@ -93,12 +98,16 @@ const EditEmailNotification: React.FC = () => {
     include_qr_code: false,
     is_active: true,
     send_before_hours: undefined,
-    send_after_hours: undefined
+    send_after_hours: undefined,
+    promo_id: null
   });
 
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [entities, setEntities] = useState<Array<{ id: number; name: string }>>([]);
+  const [entities, setEntities] = useState<Array<{ id: number; name: string; is_escape_room?: boolean; location_name?: string | null }>>([]);
+  const [promoSummary, setPromoSummary] = useState<EmailPromoSummary | null>(null);
+  const [canEdit, setCanEdit] = useState(true);
+  const [overrides, setOverrides] = useState<VisitEmailOverride[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -134,21 +143,29 @@ const EditEmailNotification: React.FC = () => {
     { value: 'booking_rescheduled', label: 'Booking Rescheduled' },
     { value: 'booking_cancelled', label: 'Booking Cancelled' },
     { value: 'booking_checked_in', label: 'Booking Checked In' },
-    { value: 'booking_completed', label: 'Booking Completed' },
     { value: 'booking_reminder', label: 'Booking Reminder' },
-    { value: 'booking_followup', label: 'Booking Follow-up' },
     { value: 'booking_no_show', label: 'Booking No-Show' },
   ];
+
+  const visitTriggers = [
+    { value: 'visit_completed', label: 'Visit Completed: Thanks for Playing' },
+    { value: 'visit_followup', label: 'Visit Follow-up: Review Request' },
+  ];
+
+  const retiredTriggerLabels: Record<string, string> = {
+    booking_completed: 'Booking Completed (never sent, use Visit Completed)',
+    booking_followup: 'Booking Follow-up (never sent, use Visit Follow-up)',
+    purchase_completed: 'Purchase Completed (never sent)',
+    purchase_followup: 'Purchase Follow-up (never sent, use Visit Follow-up)',
+  };
 
   const purchaseTriggers = [
     { value: 'purchase_created', label: 'Purchase Created' },
     { value: 'purchase_confirmed', label: 'Purchase Confirmed' },
     { value: 'purchase_cancelled', label: 'Purchase Cancelled' },
-    { value: 'purchase_completed', label: 'Purchase Completed' },
     { value: 'purchase_checked_in', label: 'Purchase Checked In' },
     { value: 'purchase_refunded', label: 'Purchase Refunded' },
     { value: 'purchase_reminder', label: 'Purchase Reminder' },
-    { value: 'purchase_followup', label: 'Purchase Follow-up' },
   ];
 
   const paymentTriggers = [
@@ -163,17 +180,21 @@ const EditEmailNotification: React.FC = () => {
     { value: 'end_of_day_sales_report', label: 'End of Day Sales Report' },
   ];
 
-  const getAvailableTriggers = () => {
-    const entityType = formData.entity_type;
+  const triggersFor = (entityType?: EntityType) => {
     if (entityType === 'package') {
       return [
         { label: 'Booking Events', icon: Calendar, options: bookingTriggers },
         { label: 'Payment Events', icon: CreditCard, options: paymentTriggers },
+        { label: 'After the Visit', icon: Sparkles, options: visitTriggers },
       ];
     } else if (entityType === 'attraction') {
       return [
         { label: 'Purchase Events', icon: Ticket, options: purchaseTriggers },
         { label: 'Payment Events', icon: CreditCard, options: paymentTriggers },
+      ];
+    } else if (entityType === 'event') {
+      return [
+        { label: 'After the Visit', icon: Sparkles, options: visitTriggers },
       ];
     } else {
       return [
@@ -181,9 +202,12 @@ const EditEmailNotification: React.FC = () => {
         { label: 'Purchase Events', icon: Ticket, options: purchaseTriggers },
         { label: 'Payment Events', icon: CreditCard, options: paymentTriggers },
         { label: 'Reports', icon: BarChart3, options: reportTriggers },
+        { label: 'After the Visit', icon: Sparkles, options: visitTriggers },
       ];
     }
   };
+
+  const getAvailableTriggers = () => triggersFor(formData.entity_type);
 
   const recipientTypeOptions: Array<{ value: RecipientType; label: string }> = [
     { value: 'customer', label: 'Customer' },
@@ -195,6 +219,7 @@ const EditEmailNotification: React.FC = () => {
 
   const isReminderTrigger = formData.trigger_type?.endsWith('_reminder') || false;
   const isFollowupTrigger = formData.trigger_type?.endsWith('_followup') || false;
+  const isVisitEmail = isVisitTrigger(formData.trigger_type);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -203,11 +228,19 @@ const EditEmailNotification: React.FC = () => {
       try {
         setFetching(true);
         
-        const [notificationRes, templateRes, locRes] = await Promise.all([
+        const [notificationResult, templateResult, locResult] = await Promise.allSettled([
           emailNotificationService.getById(parseInt(id)),
           emailCampaignService.getTemplates({ status: 'active', per_page: 100 }),
           isCompanyAdmin ? locationService.getLocations() : Promise.resolve({ success: true, data: [] })
         ]);
+
+        if (notificationResult.status === 'rejected') {
+          throw notificationResult.reason;
+        }
+
+        const notificationRes = notificationResult.value;
+        const templateRes = templateResult.status === 'fulfilled' ? templateResult.value : null;
+        const locRes = locResult.status === 'fulfilled' ? locResult.value : null;
         
         if (notificationRes.success && notificationRes.data) {
           const notification = notificationRes.data;
@@ -232,8 +265,15 @@ const EditEmailNotification: React.FC = () => {
             include_qr_code: notification.include_qr_code || false,
             is_active: notification.is_active,
             send_before_hours: notification.send_before_hours,
-            send_after_hours: notification.send_after_hours
+            send_after_hours: notification.send_after_hours,
+            promo_id: notification.promo_id ?? null,
+            from_name: notification.from_name ?? '',
+            review_url: notification.review_url ?? '',
+            activity_filter: notification.activity_filter ?? null,
           });
+          setPromoSummary(notification.promo_summary ?? null);
+          setCanEdit(notification.can_edit !== false);
+          setOverrides(notification.visit_overrides ?? []);
           setUseTemplate(!!notification.email_template_id);
           
           setTimeout(() => {
@@ -243,11 +283,11 @@ const EditEmailNotification: React.FC = () => {
           }, 100);
         }
         
-        if (templateRes.success && templateRes.data) {
+        if (templateRes?.success && templateRes.data) {
           setTemplates(templateRes.data.data);
         }
         
-        if (locRes.success && locRes.data) {
+        if (locRes?.success && locRes.data) {
           setLocations(locRes.data);
         }
       } catch (error) {
@@ -259,16 +299,6 @@ const EditEmailNotification: React.FC = () => {
     };
     fetchData();
   }, [id, isCompanyAdmin]);
-
-  useEffect(() => {
-    const availableTriggers = getAvailableTriggers();
-    const allOptions = availableTriggers.flatMap(g => g.options.map(o => o.value));
-    if (formData.trigger_type && !allOptions.includes(formData.trigger_type)) {
-      if (allOptions.length > 0) {
-        setFormData(prev => ({ ...prev, trigger_type: allOptions[0] as TriggerType }));
-      }
-    }
-  }, [formData.entity_type]);
 
   useEffect(() => {
     if (!formData.trigger_type) return;
@@ -348,7 +378,17 @@ const EditEmailNotification: React.FC = () => {
   };
 
   const handleEntityTypeChange = (entityType: EntityType) => {
-    setFormData(prev => ({ ...prev, entity_type: entityType, entity_ids: [] }));
+    setFormData(prev => {
+      const allowed = triggersFor(entityType).flatMap(g => g.options.map(o => o.value));
+      const trigger = prev.trigger_type && allowed.includes(prev.trigger_type) ? prev.trigger_type : (allowed[0] as TriggerType);
+      return {
+        ...prev,
+        entity_type: entityType,
+        entity_ids: [],
+        trigger_type: trigger,
+        ...(trigger !== prev.trigger_type ? { send_before_hours: undefined, send_after_hours: undefined } : {}),
+      };
+    });
   };
 
   const handleRecipientTypeToggle = (type: RecipientType) => {
@@ -449,6 +489,7 @@ const EditEmailNotification: React.FC = () => {
       const response = await emailNotificationService.preview(parseInt(id), {
         subject: formData.subject || undefined,
         body: formData.body || undefined,
+        ...(isVisitEmail ? { promo_id: formData.promo_id ?? null, review_url: formData.review_url || null, from_name: formData.from_name || null } : {}),
       });
       if (response.success) {
         setPreviewSubject(response.data.subject);
@@ -600,11 +641,11 @@ const EditEmailNotification: React.FC = () => {
       setToast({ message: 'Please enter a notification name', type: 'error' });
       return;
     }
-    if (!formData.recipient_types || formData.recipient_types.length === 0) {
+    if (!isVisitEmail && (!formData.recipient_types || formData.recipient_types.length === 0)) {
       setToast({ message: 'Please select at least one recipient type', type: 'error' });
       return;
     }
-    if (formData.recipient_types.includes('custom') && (!formData.custom_emails || formData.custom_emails.length === 0)) {
+    if (!isVisitEmail && formData.recipient_types?.includes('custom') && (!formData.custom_emails || formData.custom_emails.length === 0)) {
       setToast({ message: 'Please add at least one custom email address', type: 'error' });
       return;
     }
@@ -634,13 +675,26 @@ const EditEmailNotification: React.FC = () => {
             description: formData.description,
             is_active: formData.is_active,
             include_qr_code: formData.include_qr_code,
-            recipient_types: formData.recipient_types,
-            custom_emails: formData.custom_emails,
+            recipient_types: isVisitEmail ? ['customer'] : formData.recipient_types,
+            custom_emails: isVisitEmail ? [] : formData.custom_emails,
             send_before_hours: formData.send_before_hours,
             send_after_hours: formData.send_after_hours,
+            ...(formData.trigger_type === 'visit_completed' ? { promo_id: formData.promo_id ?? null } : {}),
+            ...(isVisitEmail ? { from_name: formData.from_name?.trim() || null, review_url: formData.review_url?.trim() || null } : {}),
           }
         : {
             ...formData,
+            ...(isVisitEmail
+              ? {
+                  recipient_types: ['customer'] as RecipientType[],
+                  custom_emails: [],
+                  include_qr_code: false,
+                  from_name: formData.from_name?.trim() || null,
+                  review_url: formData.review_url?.trim() || null,
+                  activity_filter: formData.entity_type === 'event' ? null : formData.activity_filter ?? null,
+                }
+              : { from_name: null, review_url: null, activity_filter: null }),
+            promo_id: formData.trigger_type === 'visit_completed' ? formData.promo_id ?? null : null,
             email_template_id: useTemplate ? formData.email_template_id : undefined,
             subject: useTemplate ? undefined : formData.subject,
             body: useTemplate ? undefined : formData.body,
@@ -655,7 +709,9 @@ const EditEmailNotification: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error('Error updating notification:', error);
-      setToast({ message: 'Failed to update notification', type: 'error' });
+      const data = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response?.data;
+      const firstError = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
+      setToast({ message: firstError ?? data?.message ?? 'Failed to update notification', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -727,7 +783,7 @@ const EditEmailNotification: React.FC = () => {
                 variant="primary"
                 icon={loading ? Loader2 : Save}
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || !canEdit}
                 loading={loading}
               >
                 Save Changes
@@ -738,6 +794,16 @@ const EditEmailNotification: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {!canEdit && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />
+            <p>
+              {formData.location_id === null || formData.location_id === undefined
+                ? 'This follow-up email goes to guests of every location, so only a company admin can change it. A manager can duplicate it to make a version for their own location.'
+                : 'Only a manager of this location or a company admin can change this follow-up email.'}
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -769,13 +835,17 @@ const EditEmailNotification: React.FC = () => {
                       name="location_id"
                       value={formData.location_id || ''}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isDefault}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDefault ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
                     >
                       <option value="">All Locations</option>
                       {locations.map(loc => (
                         <option key={loc.id} value={loc.id}>{loc.name}</option>
                       ))}
                     </select>
+                    {isDefault && (
+                      <p className="text-xs text-gray-500 mt-1">Default emails cover every location. Duplicate this one to make a version for a single location.</p>
+                    )}
                   </div>
                 )}
 
@@ -789,9 +859,11 @@ const EditEmailNotification: React.FC = () => {
                     disabled={isDefault}
                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDefault ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
                   >
-                    <option value="all">All (Packages & Attractions)</option>
+                    <option value="all">All (Packages, Attractions & Events)</option>
                     <option value="package">Packages Only</option>
                     <option value="attraction">Attractions Only</option>
+                    <option value="event">Events Only</option>
+                    {formData.entity_type === 'waiver' && <option value="waiver">Waivers</option>}
                   </select>
                 </div>
 
@@ -810,6 +882,11 @@ const EditEmailNotification: React.FC = () => {
                     disabled={isDefault}
                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDefault ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
                   >
+                    {formData.trigger_type && !availableTriggers.some(group => group.options.some(opt => opt.value === formData.trigger_type)) && (
+                      <option value={formData.trigger_type}>
+                        {retiredTriggerLabels[formData.trigger_type] ?? formData.trigger_type.replace(/_/g, ' ')}
+                      </option>
+                    )}
                     {availableTriggers.map((group) => (
                       <optgroup key={group.label} label={group.label}>
                         {group.options.map(opt => (
@@ -835,7 +912,9 @@ const EditEmailNotification: React.FC = () => {
                         className={`w-20 border border-${themeColor}-300 rounded px-2 py-1 text-sm`}
                       />
                       <span className={`text-sm text-${fullColor}`}>
-                        hours {isReminderTrigger ? 'before' : 'after'} the event
+                        {isVisitEmail
+                          ? 'hours after staff mark the visit complete'
+                          : `hours ${isReminderTrigger ? 'before' : 'after'} the event`}
                       </span>
                     </div>
                   </div>
@@ -844,7 +923,7 @@ const EditEmailNotification: React.FC = () => {
                 {formData.entity_type !== 'all' && entities.length > 0 && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Select {formData.entity_type === 'package' ? 'Packages' : 'Attractions'}
+                      Select {formData.entity_type === 'package' ? 'Packages' : formData.entity_type === 'event' ? 'Events' : 'Attractions'}
                     </label>
                     <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 grid grid-cols-2 md:grid-cols-3 gap-2">
                       {entities.map(entity => (
@@ -863,6 +942,12 @@ const EditEmailNotification: React.FC = () => {
                             className={`w-4 h-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
                           />
                           <span className="text-sm text-gray-700 truncate">{entity.name}</span>
+                          {!formData.location_id && entity.location_name && (
+                            <span className="shrink-0 text-[11px] text-gray-500">{entity.location_name}</span>
+                          )}
+                          {entity.is_escape_room && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700">Escape room</span>
+                          )}
                         </label>
                       ))}
                     </div>
@@ -885,6 +970,27 @@ const EditEmailNotification: React.FC = () => {
               </div>
             </div>
 
+            {isVisitEmail && (
+              <VisitEmailSettings
+                triggerType={formData.trigger_type as string}
+                promoId={formData.promo_id ?? null}
+                onPromoChange={(promoId) => setFormData(prev => ({ ...prev, promo_id: promoId }))}
+                locationId={formData.location_id ?? null}
+                locations={locations}
+                promoSummary={promoSummary}
+                disabled={!canEdit}
+                fromName={formData.from_name ?? ''}
+                onFromNameChange={(value) => setFormData(prev => ({ ...prev, from_name: value }))}
+                reviewUrl={formData.review_url ?? ''}
+                onReviewUrlChange={(value) => setFormData(prev => ({ ...prev, review_url: value }))}
+                activityFilter={formData.activity_filter ?? null}
+                onActivityFilterChange={(value) => setFormData(prev => ({ ...prev, activity_filter: value }))}
+                canFilterActivity={!isDefault && formData.entity_type !== 'event'}
+                overrides={overrides}
+              />
+            )}
+
+            {!isVisitEmail && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Recipients</h2>
               
@@ -953,6 +1059,7 @@ const EditEmailNotification: React.FC = () => {
                 </label>
               </div>
             </div>
+            )}
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
@@ -1247,7 +1354,11 @@ const EditEmailNotification: React.FC = () => {
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Email Preview</h3>
-                <p className="text-sm text-gray-500">Preview with sample variable data</p>
+                <p className="text-sm text-gray-500">
+                  {isVisitEmail
+                    ? 'Preview with a sample escape-room game. The result and photo parts only appear when a visit has them.'
+                    : 'Preview with sample variable data'}
+                </p>
               </div>
               <button onClick={() => setShowPreview(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
                 <X className="w-5 h-5" />

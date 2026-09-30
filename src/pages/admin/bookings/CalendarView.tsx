@@ -44,7 +44,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, parseLocalDate, getMichiganNow } from '../../../utils/timeFormat';
-import { resolvePaymentState } from '../../../types/Bookings.types';
+import { resolvePaymentState, statusAfterPayment } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
 
@@ -929,9 +929,10 @@ const CalendarView: React.FC = () => {
         amount_paid: newAmountPaid,
         total_amount: selectedBooking.total_amount,
       }).state;
+      const nextStatus = statusAfterPayment(booking.status ?? selectedBooking.status);
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        status: 'confirmed',
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
 
       if (updateResponse.success && updateResponse.data) {

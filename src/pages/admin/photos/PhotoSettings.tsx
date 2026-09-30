@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { followUpEmailName } from '../../../utils/visitFollowUpNotice';
 import {
   Copy,
   Link as LinkIcon,
@@ -143,6 +145,7 @@ const PhotoSettings = () => {
   const [templates, setTemplates] = useState<PhotoMessageTemplateRecord[]>([]);
   const [variables, setVariables] = useState<string[]>([]);
   const [variablesByKind, setVariablesByKind] = useState<Record<string, string[]> | null>(null);
+  const [escapeRoomEmail, setEscapeRoomEmail] = useState<{ id: number; name: string; is_active: boolean; rooms_without_email?: string[] } | null>(null);
   const [openTemplate, setOpenTemplate] = useState<number | null>(null);
   const [templateDraft, setTemplateDraft] = useState<Record<number, PhotoMessageTemplateRecord>>({});
   const [templateTestTo, setTemplateTestTo] = useState<Record<number, string>>({});
@@ -193,6 +196,7 @@ const PhotoSettings = () => {
       setTemplates(templateData.templates);
       setVariables(templateData.variables);
       setVariablesByKind(templateData.variables_by_kind ?? null);
+      setEscapeRoomEmail(templateData.escape_room_email ?? null);
       setTemplateDraft(
         Object.fromEntries(templateData.templates.map((t) => [t.id, t])) as Record<number, PhotoMessageTemplateRecord>,
       );
@@ -756,6 +760,23 @@ const PhotoSettings = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Separate email and SMS wording for each delivery kind. Available variables:{' '}
                 {variables.map((v) => `{{${v}}}`).join(', ')}
+              </p>
+              <p className="text-sm text-gray-600 mb-4 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2">
+                Escape-room games send their group photo with the{' '}
+                {escapeRoomEmail ? (
+                  <Link to={`/admin/email/notifications/edit/${escapeRoomEmail.id}`} className="font-semibold underline">
+                    {followUpEmailName(escapeRoomEmail.name, 'Thanks for Playing')}
+                  </Link>
+                ) : (
+                  <Link to="/admin/email/notifications" className="font-semibold underline">
+                    Thanks for Playing
+                  </Link>
+                )}{' '}
+                email in Email Notifications, together with the finish time and the return-visit promo code. Edit that email to change
+                what players get.
+                {escapeRoomEmail && (escapeRoomEmail.rooms_without_email?.length ?? 0) > 0
+                  ? ` No active Thanks for Playing email covers ${escapeRoomEmail.rooms_without_email?.join(', ')}, so photos from ${(escapeRoomEmail.rooms_without_email?.length ?? 0) === 1 ? 'that room' : 'those rooms'} cannot be emailed.`
+                  : escapeRoomEmail && !escapeRoomEmail.is_active && ' It is switched off right now, so escape-room photos cannot be emailed.'}
               </p>
 
               <div className="space-y-3">

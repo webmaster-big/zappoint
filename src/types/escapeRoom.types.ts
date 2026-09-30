@@ -1,3 +1,4 @@
+import type { FollowUpRow, GameFollowUp, GameReviewCounts } from './visitFollowUp.types';
 import type { KioskAd, WaiverFormContext } from './waiver.types';
 import type { PhotoSessionRecord } from './photo.types';
 
@@ -135,6 +136,8 @@ export interface EscapeRoomPlayer {
     error: string | null;
   } | null;
   excluded_reason: EscapeRoomExcludedReason | null;
+  thanks_email?: FollowUpRow | null;
+  review?: FollowUpRow | null;
 }
 
 export interface EscapeRoomSessionDetail {
@@ -173,12 +176,15 @@ export interface EscapeRoomSessionDetail {
     sending: number;
     stuck: number;
     new_players: number;
+    thanks_sent?: number;
+    thanks_failed?: number;
     excluded: number;
     unsigned: number;
   };
   photo_session: PhotoSessionRecord | null;
   can_complete: boolean;
   can_send_new: boolean;
+  can_email_players?: boolean;
   can_resend?: boolean;
   can_complete_without_photo?: boolean;
   send_blocker?: string | null;
@@ -188,6 +194,7 @@ export interface EscapeRoomSessionDetail {
   kiosk_url: string | null;
   players_booked?: number;
   slideshow?: { enabled: boolean; declined: number; not_asked: number };
+  follow_up?: GameFollowUp;
 }
 
 export interface EscapeRoomBookingGame {
@@ -209,6 +216,7 @@ export interface EscapeRoomBookingGame {
   sent: number;
   booking_cancelled: boolean;
   kiosk_url: string;
+  reviews?: GameReviewCounts | null;
 }
 
 export interface EscapeRoomOption {

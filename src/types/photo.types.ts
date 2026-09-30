@@ -339,6 +339,7 @@ export interface PhotoTemplatesResponse {
   variables: string[];
   variables_by_kind?: Record<string, string[]>;
   kinds: string[];
+  escape_room_email?: { id: number; name: string; is_active: boolean; rooms_without_email?: string[] } | null;
 }
 
 export interface KioskContext {

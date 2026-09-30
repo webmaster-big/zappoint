@@ -56,6 +56,7 @@ const LocationManagerProfile = () => {
         zipCode: ''
       },
       timezone: '',
+      reviewUrl: '',
       isActive: true
     }
   });
@@ -144,6 +145,7 @@ const LocationManagerProfile = () => {
             zipCode: location.zip_code || ''
           },
           timezone: location.timezone || '',
+          reviewUrl: location.review_url || '',
           isActive: location.is_active !== undefined ? location.is_active : true
         }
       };
@@ -177,6 +179,11 @@ const LocationManagerProfile = () => {
       
       if (!token || !userId || !locationId) {
         throw new Error('Missing authentication or user data');
+      }
+
+      const reviewUrl = editedData.location.reviewUrl.trim();
+      if (reviewUrl !== '' && !/^https?:\/\/\S+\.\S+/i.test(reviewUrl)) {
+        throw new Error('Enter the full review link, starting with https://');
       }
       
       const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
@@ -219,12 +226,14 @@ const LocationManagerProfile = () => {
           state: editedData.location.address.state,
           zip_code: editedData.location.address.zipCode,
           timezone: editedData.location.timezone,
+          review_url: reviewUrl === '' ? null : reviewUrl,
           is_active: editedData.location.isActive
         })
       });
       
       if (!locationResponse.ok) {
-        throw new Error('Failed to update location information');
+        const failure = await locationResponse.json().catch(() => null);
+        throw new Error(failure?.errors?.review_url?.[0] ?? failure?.message ?? 'Failed to update location information');
       }
       
       setStoredUser({
@@ -680,6 +689,22 @@ const LocationManagerProfile = () => {
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                     placeholder="e.g., America/New_York"
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Public review link</label>
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={isEditing ? editedData.location.reviewUrl : profileData.location.reviewUrl}
+                    onChange={(e) => handleInputChange('location', 'reviewUrl', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                    placeholder="https://g.page/r/..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Where guests leave a review, for example your Google review link. The review-request email shows a Leave a review button when this is set.
+                  </p>
                 </div>
 
                 <div>

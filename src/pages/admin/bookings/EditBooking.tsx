@@ -27,6 +27,7 @@ import EmailInput from '../../../components/ui/EmailInput';
 import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
 import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns } from '../../../utils/addOnQuantity';
+import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -791,6 +792,9 @@ const EditBooking: React.FC = () => {
     try {
       const isPackageChanged = formData.packageId !== originalBooking.package_id;
       const additionalAddons = buildAdditionalAddons();
+      const statusChanged = formData.status !== originalBooking.status;
+      const closingVisit = statusChanged && (formData.status === 'completed' || formData.status === 'cancelled');
+      const sendUpdateEmail = formData.sendNotification && !(statusChanged && formData.status === 'completed');
 
       const response = await bookingService.updateBooking(Number(originalBooking.id), {
         change_reason: changeReason,
@@ -800,12 +804,12 @@ const EditBooking: React.FC = () => {
         booking_date: formData.date,
         booking_time: formData.time,
         participants: formData.participants,
-        status: formData.status,
+        ...(statusChanged && { status: formData.status }),
         location_id: formData.locationId || undefined,
         package_id: formData.packageId || undefined,
         room_id: formData.roomId || null,
         notes: formData.notes,
-        send_notification: formData.sendNotification,
+        send_notification: sendUpdateEmail,
         ...(addOnsChanged && { additional_addons: additionalAddons }),
         ...(isPackageChanged && { additional_attractions: [] }),
         ...(quote && {
@@ -827,7 +831,7 @@ const EditBooking: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
 
-        if (formData.sendNotification) {
+        if (sendUpdateEmail && !closingVisit) {
           try {
             const refNumber = response.data?.reference_number || originalBooking.reference_number;
             const qrCodeBase64 = await QRCode.toDataURL(refNumber, {
@@ -842,7 +846,8 @@ const EditBooking: React.FC = () => {
           }
         }
         
-        alert('Booking updated successfully!');
+        const followUpNotice = formData.status === 'completed' && response.follow_up ? describeFollowUp(response.follow_up) : null;
+        alert(followUpNotice ? `Booking updated successfully! ${followUpNotice}` : 'Booking updated successfully!');
         navigate(getBackPath());
       } else {
         alert('Failed to update booking. Please try again.');
@@ -1273,6 +1278,13 @@ const EditBooking: React.FC = () => {
                       <option value="completed">Completed</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
+                    {formData.status === 'completed' && originalBooking?.status !== 'completed' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Saving as Completed emails the guest the Thanks for Playing email now and a review request later, instead of a
+                        booking update email. Escape-room bookings send it from the game screen instead, and visits more than 3 days
+                        old are not emailed automatically.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1436,7 +1448,9 @@ const EditBooking: React.FC = () => {
                     <BellOff size={18} className="text-gray-400" />
                   )}
                   <span className="text-sm text-gray-700">
-                    {formData.sendNotification ? 'Customer will receive update' : 'Silent update (no email)'}
+                    {formData.status === 'completed' && originalBooking?.status !== 'completed'
+                      ? 'No update email: completing sends the Thanks for Playing email instead'
+                      : formData.sendNotification ? 'Customer will receive update' : 'Silent update (no email)'}
                   </span>
                 </div>
                 <div className="flex items-center">

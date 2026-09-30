@@ -19,7 +19,7 @@ import { formatDurationDisplay, getMichiganNow } from '../../../utils/timeFormat
 import { normalizeCategory } from '../../../utils/venueCategories';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
-import { resolvePaymentState } from '../../../types/Bookings.types';
+import { resolvePaymentState, statusAfterPayment } from '../../../types/Bookings.types';
 import type { SchedulePackageWindow } from '../../../services/ScheduleWindowService';
 import { useScheduleDayWindow } from '../../../components/admin/calendar/useDayScheduleView';
 import BookingHoverCard from '../../../components/admin/calendar/BookingHoverCard';
@@ -1217,9 +1217,10 @@ const SpaceSchedule = () => {
         amount_paid: newAmountPaid,
         total_amount: selectedBooking.total_amount,
       }).state;
+      const nextStatus = statusAfterPayment(booking.status ?? selectedBooking.status);
       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
         amount_paid: newAmountPaid,
-        status: 'confirmed',
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
 
       if (updateResponse.success && updateResponse.data) {

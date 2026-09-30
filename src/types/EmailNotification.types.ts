@@ -30,9 +30,16 @@ export type PurchaseTriggerType =
 
 export type ReportTriggerType = 'end_of_day_sales_report';
 
-export type TriggerType = BookingTriggerType | PaymentTriggerType | PurchaseTriggerType | ReportTriggerType;
+export type VisitTriggerType = 'visit_completed' | 'visit_followup';
 
-export type EntityType = 'all' | 'package' | 'attraction';
+export type TriggerType = BookingTriggerType | PaymentTriggerType | PurchaseTriggerType | ReportTriggerType | VisitTriggerType;
+
+export const VISIT_TRIGGERS: VisitTriggerType[] = ['visit_completed', 'visit_followup'];
+
+export const isVisitTrigger = (trigger: string | null | undefined): trigger is VisitTriggerType =>
+  trigger === 'visit_completed' || trigger === 'visit_followup';
+
+export type EntityType = 'all' | 'package' | 'attraction' | 'event' | 'waiver';
 
 export type RecipientType = 'customer' | 'staff' | 'company_admin' | 'location_manager' | 'custom';
 
@@ -48,7 +55,30 @@ export type DefaultNotificationKey =
   | 'purchase_cancellation_customer'
   | 'payment_received_customer'
   | 'payment_refunded_customer'
-  | 'end_of_day_sales_report';
+  | 'end_of_day_sales_report'
+  | 'thanks_for_playing_customer'
+  | 'review_request_customer';
+
+export interface EmailPromoSummary {
+  id: number;
+  code: string | null;
+  offer: string | null;
+  name: string | null;
+  ends_on: string | null;
+  terms?: string;
+  location_note?: string | null;
+  problem: string | null;
+}
+
+export type VisitActivityFilter = 'escape_room' | 'not_escape_room';
+
+export interface VisitEmailOverride {
+  id: number;
+  name: string;
+  location_name: string | null;
+  promo_code: string | null;
+  covers_everything: boolean;
+}
 
 export interface EmailNotification {
   id: number;
@@ -76,6 +106,13 @@ export interface EmailNotification {
   is_active: boolean;
   send_before_hours: number | null;
   send_after_hours: number | null;
+  promo_id?: number | null;
+  promo_summary?: EmailPromoSummary | null;
+  from_name?: string | null;
+  review_url?: string | null;
+  activity_filter?: VisitActivityFilter | null;
+  can_edit?: boolean;
+  visit_overrides?: VisitEmailOverride[];
   created_at: string;
   updated_at: string;
   location?: {
@@ -123,6 +160,10 @@ export interface CreateEmailNotificationData {
   is_active?: boolean;
   send_before_hours?: number | null;
   send_after_hours?: number | null;
+  promo_id?: number | null;
+  from_name?: string | null;
+  review_url?: string | null;
+  activity_filter?: VisitActivityFilter | null;
 }
 
 export interface UpdateEmailNotificationData extends Partial<CreateEmailNotificationData> {}
@@ -150,6 +191,9 @@ export interface EmailNotificationFilters {
 export interface PreviewEmailNotificationData {
   subject?: string;
   body?: string;
+  promo_id?: number | null;
+  review_url?: string | null;
+  from_name?: string | null;
 }
 
 export interface PreviewEmailNotificationResponse {
@@ -172,6 +216,7 @@ export interface TriggerTypesResponse {
     booking: Record<string, string>;
     payment: Record<string, string>;
     purchase: Record<string, string>;
+    visit?: Record<string, string>;
   };
   flat: Record<string, string>;
 }
@@ -200,6 +245,9 @@ export interface EntitiesResponse {
     id: number;
     name: string;
     slug?: string;
+    location_id?: number;
+    location_name?: string | null;
+    is_escape_room?: boolean;
   }>;
 }
 

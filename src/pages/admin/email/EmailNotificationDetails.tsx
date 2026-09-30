@@ -22,7 +22,10 @@ import {
   RefreshCcw,
   X,
   Eye,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  Star,
+  Tag
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -30,6 +33,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import EmailInput from '../../../components/ui/EmailInput';
+import GuestRatingsPanel from '../../../components/admin/visits/GuestRatingsPanel';
 
 import type { 
   EmailNotification, 
@@ -58,6 +62,7 @@ const EmailNotificationDetails: React.FC = () => {
   const [logsPage, setLogsPage] = useState(1);
   const [logsTotalPages, setLogsTotalPages] = useState(1);
   const [logsTotalItems, setLogsTotalItems] = useState(0);
+  const [statistics, setStatistics] = useState<{ total_sent: number; total_failed: number; total_pending: number } | null>(null);
   const logsPerPage = 10;
 
   const triggerTypeLabels: Record<string, string> = {
@@ -67,9 +72,9 @@ const EmailNotificationDetails: React.FC = () => {
     booking_rescheduled: 'Booking Rescheduled',
     booking_cancelled: 'Booking Cancelled',
     booking_checked_in: 'Booking Checked In',
-    booking_completed: 'Booking Completed',
+    booking_completed: 'Booking Completed (never sent)',
     booking_reminder: 'Booking Reminder',
-    booking_followup: 'Booking Follow-up',
+    booking_followup: 'Booking Follow-up (never sent)',
     booking_no_show: 'Booking No-Show',
     payment_received: 'Payment Received',
     payment_failed: 'Payment Failed',
@@ -79,12 +84,14 @@ const EmailNotificationDetails: React.FC = () => {
     purchase_created: 'Purchase Created',
     purchase_confirmed: 'Purchase Confirmed',
     purchase_cancelled: 'Purchase Cancelled',
-    purchase_completed: 'Purchase Completed',
+    purchase_completed: 'Purchase Completed (never sent)',
     purchase_checked_in: 'Purchase Checked In',
     purchase_refunded: 'Purchase Refunded',
     purchase_reminder: 'Purchase Reminder',
-    purchase_followup: 'Purchase Follow-up',
+    purchase_followup: 'Purchase Follow-up (never sent)',
     end_of_day_sales_report: 'End of Day Sales Report',
+    visit_completed: 'Visit Completed: Thanks for Playing',
+    visit_followup: 'Visit Follow-up: Review Request',
   };
 
   const recipientTypeLabels: Record<RecipientType, string> = {
@@ -99,6 +106,8 @@ const EmailNotificationDetails: React.FC = () => {
     if (triggerType.startsWith('booking_')) return Calendar;
     if (triggerType.startsWith('purchase_')) return Ticket;
     if (triggerType.startsWith('payment_')) return CreditCard;
+    if (triggerType === 'visit_followup') return Star;
+    if (triggerType === 'visit_completed') return Sparkles;
     return Bell;
   };
 
@@ -133,6 +142,7 @@ const EmailNotificationDetails: React.FC = () => {
         const response = await emailNotificationService.getById(parseInt(id));
         if (response.success && response.data) {
           setNotification(response.data);
+          setStatistics((response as unknown as { statistics?: { total_sent: number; total_failed: number; total_pending: number } }).statistics ?? null);
         }
       } catch (error) {
         console.error('Error fetching notification:', error);
@@ -194,7 +204,11 @@ const EmailNotificationDetails: React.FC = () => {
     try {
       const response = await emailNotificationService.toggleStatus(notification.id);
       if (response.success) {
-        setNotification(response.data);
+        setNotification(prev => prev ? {
+          ...prev,
+          is_active: response.data.is_active,
+          ...(response.data.promo_summary !== undefined ? { promo_summary: response.data.promo_summary } : {}),
+        } : prev);
         setToast({
           message: `Notification ${response.data.is_active ? 'activated' : 'deactivated'} successfully`,
           type: 'success'
@@ -202,7 +216,10 @@ const EmailNotificationDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error toggling status:', error);
-      setToast({ message: 'Failed to toggle notification status', type: 'error' });
+      setToast({
+        message: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to toggle notification status',
+        type: 'error',
+      });
     }
   };
 
@@ -217,7 +234,10 @@ const EmailNotificationDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error duplicating notification:', error);
-      setToast({ message: 'Failed to duplicate notification', type: 'error' });
+      setToast({
+        message: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to duplicate notification',
+        type: 'error',
+      });
     }
   };
 
@@ -254,7 +274,8 @@ const EmailNotificationDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error resending email:', error);
-      setToast({ message: 'Failed to resend email', type: 'error' });
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setToast({ message: message ?? 'Failed to resend email', type: 'error' });
     }
   };
 
@@ -351,6 +372,7 @@ const EmailNotificationDetails: React.FC = () => {
             variant={notification.is_active ? 'secondary' : 'primary'}
             icon={Power}
             onClick={handleToggleStatus}
+            disabled={notification.can_edit === false}
           >
             {notification.is_active ? 'Deactivate' : 'Activate'}
           </StandardButton>
@@ -363,6 +385,7 @@ const EmailNotificationDetails: React.FC = () => {
             variant="danger"
             icon={Trash2}
             onClick={() => setDeleteConfirm(true)}
+            disabled={notification.can_edit === false}
           >
             Delete
           </StandardButton>
@@ -390,7 +413,9 @@ const EmailNotificationDetails: React.FC = () => {
                 <div className="mt-1 flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200 capitalize">
                     <EntityIcon className="w-4 h-4" />
-                    {notification.entity_type === 'all' ? 'All Entities' : notification.entity_type + 's'}
+                    {notification.entity_type === 'all'
+                      ? notification.trigger_type.startsWith('visit_') ? 'Every visit' : 'All Entities'
+                      : notification.entity_type + 's'}
                   </span>
                 </div>
               </div>
@@ -423,7 +448,9 @@ const EmailNotificationDetails: React.FC = () => {
                     <Clock className="w-4 h-4" />
                     <span>
                       {notification.send_before_hours && `${notification.send_before_hours} hours before event`}
-                      {notification.send_after_hours && `${notification.send_after_hours} hours after event`}
+                      {notification.send_after_hours && (notification.trigger_type === 'visit_followup'
+                        ? `${notification.send_after_hours} hours after staff mark the visit complete, never between 8 PM and 9 AM`
+                        : `${notification.send_after_hours} hours after event`)}
                     </span>
                   </div>
                 </div>
@@ -466,8 +493,61 @@ const EmailNotificationDetails: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {notification.trigger_type === 'visit_completed' && (
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-gray-500">Return-visit promo code</label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {notification.promo_summary?.code ? (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                          <Tag className="w-4 h-4" />
+                          <span className="font-mono">{notification.promo_summary.code}</span>
+                          {notification.promo_summary.offer && ` · ${notification.promo_summary.offer}`}
+                        </span>
+                        {notification.promo_summary.problem && (
+                          <span className="text-xs text-red-700">{notification.promo_summary.problem}</span>
+                        )}
+                      </>
+                    ) : notification.promo_summary?.problem ? (
+                      <span className="text-xs text-red-700">{notification.promo_summary.problem}</span>
+                    ) : (
+                      <span className="text-gray-500 text-sm">No promo code chosen. Pick one on the edit page.</span>
+                    )}
+                  </div>
+                  {notification.promo_summary?.terms && (
+                    <p className="text-xs text-gray-600 mt-1">{notification.promo_summary.terms}</p>
+                  )}
+                  {notification.promo_summary?.location_note && (
+                    <p className="text-xs text-amber-700 mt-1">{notification.promo_summary.location_note}</p>
+                  )}
+                </div>
+              )}
+
+              {(notification.visit_overrides?.length ?? 0) > 0 && (
+                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p className="font-medium">
+                    {notification.visit_overrides?.some((override) => override.covers_everything)
+                      ? 'This email is never sent: another active email covers every visit it does.'
+                      : 'Other active emails are sent instead for some visits:'}
+                  </p>
+                  <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                    {notification.visit_overrides?.map((override) => (
+                      <li key={override.id}>
+                        <Link to={`/admin/email/notifications/${override.id}`} className="underline">{override.name}</Link>
+                        {override.location_name ? ` · ${override.location_name}` : ' · every location'}
+                        {notification.trigger_type === 'visit_completed'
+                          ? ` · ${override.promo_code ? `code ${override.promo_code}` : 'no promo code'}`
+                          : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
+
+          {notification.trigger_type === 'visit_followup' && <GuestRatingsPanel />}
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -611,7 +691,7 @@ const EmailNotificationDetails: React.FC = () => {
                   <span className={`text-sm text-${themeColor}-700`}>Successful</span>
                 </div>
                 <span className={`text-lg font-semibold text-${themeColor}-700`}>
-                  {logs.filter(l => l.status === 'sent').length}
+                  {statistics?.total_sent ?? logs.filter(l => l.status === 'sent').length}
                 </span>
               </div>
 
@@ -621,7 +701,7 @@ const EmailNotificationDetails: React.FC = () => {
                   <span className="text-sm text-red-700">Failed</span>
                 </div>
                 <span className="text-lg font-semibold text-red-700">
-                  {logs.filter(l => l.status === 'failed').length}
+                  {statistics?.total_failed ?? logs.filter(l => l.status === 'failed').length}
                 </span>
               </div>
 
@@ -631,7 +711,7 @@ const EmailNotificationDetails: React.FC = () => {
                   <span className="text-sm text-gray-700">Pending</span>
                 </div>
                 <span className="text-lg font-semibold text-gray-700">
-                  {logs.filter(l => l.status === 'pending').length}
+                  {statistics?.total_pending ?? logs.filter(l => l.status === 'pending').length}
                 </span>
               </div>
             </div>

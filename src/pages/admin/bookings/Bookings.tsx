@@ -41,7 +41,7 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
-import { resolvePaymentState, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
+import { resolvePaymentState, statusAfterPayment, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
 import type { BookingRepriceIntent } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
@@ -61,6 +61,8 @@ import BulkImportModal from '../../../components/admin/bookings/BulkImportModal'
 import CategoryTabs from '../../../components/admin/CategoryTabs';
 import { toCsv } from '../../../components/admin/table';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
+import Toast from '../../../components/ui/Toast';
+import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
 
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -154,6 +156,7 @@ const Bookings: React.FC = () => {
   const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingStatusBookingId, setSavingStatusBookingId] = useState<string | null>(null);
+  const [followUpNotice, setFollowUpNotice] = useState<string | null>(null);
   const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
   const [filters, setFilters] = useState<BookingsPageFilterOptions>(() => {
     const fallback: BookingsPageFilterOptions = {
@@ -1060,6 +1063,10 @@ const Bookings: React.FC = () => {
       
       if (response.data) {
         await bookingCacheService.updateBookingInCache(response.data);
+      }
+
+      if (newStatus === 'completed') {
+        setFollowUpNotice(describeFollowUp(response.follow_up));
       }
       
       const updatedBookings = bookings.map(b =>
@@ -2480,8 +2487,20 @@ const Bookings: React.FC = () => {
 
   const handleBulkStatusChange = async (newStatus: BookingsPageBooking['status']) => {
     if (selectedBookings.length === 0) return;
-    
+
+    if (
+      newStatus === 'completed'
+      && !window.confirm(
+        `Mark ${selectedBookings.length} ${selectedBookings.length === 1 ? 'booking' : 'bookings'} as Completed? Guests of visits from the last 3 days get the Thanks for Playing email right away and a review request later. Older or future visits are marked Completed without emailing anyone.`
+      )
+    ) {
+      return;
+    }
+
     try {
+      let thanksSent = 0;
+      let reviewsScheduled = 0;
+      let heldForDate = 0;
       await Promise.all(
         selectedBookings.map(async (id) => {
           let response;
@@ -2496,8 +2515,19 @@ const Bookings: React.FC = () => {
           if (response?.data) {
             await bookingCacheService.updateBookingInCache(response.data);
           }
+          const followUp = response && 'follow_up' in response ? response.follow_up : undefined;
+          if (followUp?.thanks.some((row) => row.sent_in_this_action)) thanksSent++;
+          if (followUp?.reviews.some((row) => row.status === 'scheduled')) reviewsScheduled++;
+          if (followUp?.thanks.some((row) => row.reason === 'visit_date')) heldForDate++;
         })
       );
+
+      if (newStatus === 'completed' && (thanksSent > 0 || reviewsScheduled > 0 || heldForDate > 0)) {
+        setFollowUpNotice(
+          `Thanks for Playing sent for ${thanksSent} of ${selectedBookings.length} ${selectedBookings.length === 1 ? 'booking' : 'bookings'}; ${reviewsScheduled} review ${reviewsScheduled === 1 ? 'request' : 'requests'} scheduled.`
+            + (heldForDate > 0 ? ` ${heldForDate} ${heldForDate === 1 ? 'visit was' : 'visits were'} not emailed because of the visit date.` : '')
+        );
+      }
       
       const updatedBookings = bookings.map(booking =>
         selectedBookings.includes(booking.id) ? { ...booking, status: newStatus } : booking
@@ -2846,9 +2876,12 @@ const Bookings: React.FC = () => {
       const newAmountPaid = selectedBookingForPayment.amountPaid + amount;
       const newPaymentStatus: BookingsPageBooking['paymentStatus'] = newAmountPaid >= selectedBookingForPayment.totalAmount ? 'paid' : 'partial';
 
+      const liveStatus = (await bookingService.getBookingById(Number(selectedBookingForPayment.id)).catch(() => null))?.data?.status;
+      const nextStatus = statusAfterPayment(liveStatus ?? booking.status ?? selectedBookingForPayment.status);
+
       const updateResponse = await bookingService.updateBooking(Number(selectedBookingForPayment.id), {
         amount_paid: newAmountPaid,
-        status: 'confirmed', // Set status to confirmed when payment is made
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
 
       if (updateResponse?.data) {
@@ -2864,7 +2897,7 @@ const Bookings: React.FC = () => {
 
       const updatedBookings = bookings.map(booking =>
         booking.id === selectedBookingForPayment.id
-          ? { ...booking, amountPaid: newAmountPaid, paymentStatus: newPaymentStatus, status: 'confirmed' as BookingsPageBooking['status'] }
+          ? { ...booking, amountPaid: newAmountPaid, paymentStatus: newPaymentStatus, status: (nextStatus ?? booking.status) as BookingsPageBooking['status'] }
           : booking
       );
       setBookings(updatedBookings);
@@ -4862,6 +4895,12 @@ const Bookings: React.FC = () => {
                 </StandardButton>
               </div>
             </div>
+          </div>
+        )}
+
+        {followUpNotice && (
+          <div className="fixed bottom-4 right-4 z-50 max-w-sm">
+            <Toast message={followUpNotice} type="info" onClose={() => setFollowUpNotice(null)} />
           </div>
         )}
       </div>

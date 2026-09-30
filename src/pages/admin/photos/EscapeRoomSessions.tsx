@@ -38,6 +38,8 @@ import StandardButton from '../../../components/ui/StandardButton';
 import CalendarDatePicker from '../../../components/admin/calendar/CalendarDatePicker';
 import { dateKey, michiganToday, parseLocalDate } from '../../../utils/timeFormat';
 import { getStoredUser } from '../../../utils/storage';
+import { followUpEmailName, formatFollowUpTime as followUpTime } from '../../../utils/visitFollowUpNotice';
+import visitFollowUpService from '../../../services/VisitFollowUpService';
 import type { PhotoRecord, PhotoSessionRecord } from '../../../types/photo.types';
 import type {
   EscapeRoomDay,
@@ -180,6 +182,7 @@ const EscapeRoomSessions = () => {
   const [correctSeconds, setCorrectSeconds] = useState('');
   const [entryMode, setEntryMode] = useState<'used' | 'left'>('used');
   const [recordingOnly, setRecordingOnly] = useState(false);
+  const [emailPlayersOnly, setEmailPlayersOnly] = useState(true);
   const [busyOnly, setBusyOnly] = useState(readBusyOnly);
   const [confirmResendAll, setConfirmResendAll] = useState(false);
   const [slideshowConfirmId, setSlideshowConfirmId] = useState<number | null>(null);
@@ -511,16 +514,42 @@ const EscapeRoomSessions = () => {
   const resendTargets = detail
     ? detail.players.filter((player) => player.sent && (player.has_email || player.delivery?.status === 'sent') && !player.delivery?.is_duplicate)
     : [];
+  const followUp = detail?.follow_up;
+  const thanksEmail = followUp?.thanks_email;
+  const reviewEmail = followUp?.review_email;
+  const thanksName = followUpEmailName(thanksEmail?.name, 'Thanks for Playing');
+  const thanksOn = thanksEmail?.active !== false;
+  const reviewOn = reviewEmail?.active === true;
+  const thanksPromo = thanksEmail?.promo && !thanksEmail.promo.problem ? thanksEmail.promo : null;
+  const promoProblem = thanksOn ? thanksEmail?.promo?.problem ?? null : null;
+  const reviewHours = reviewEmail?.active ? reviewEmail.hours ?? 24 : null;
+  const canEmailPlayers = detail?.can_email_players ?? (thanksOn || reviewOn);
+  const isTodayGame = detail ? detail.session_date === dateKey(michiganToday()) : false;
+  const gameDayLabel = detail ? parseLocalDate(detail.session_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+  const emailSettingsPath = thanksEmail?.id ? `/admin/email/notifications/edit/${thanksEmail.id}` : '/admin/email/notifications';
+  const players = (count: number) => `${count} ${count === 1 ? 'player' : 'players'}`;
 
   const recordWithoutPhoto = async () => {
     if (!detail) return;
     setBusy(true);
+    const emailing = emailPlayersOnly && canEmailPlayers && recipients > 0;
     try {
-      const data = await escapeRoomService.complete(detail.id, escaped, escaped ? finishLabel : null, true);
+      const data = await escapeRoomService.complete(detail.id, escaped, escaped ? finishLabel : null, true, emailing);
       stopCamera();
       setRecordingOnly(false);
       applyDetail(data);
-      setToast({ message: 'Result recorded. No photo was sent.', type: 'success' });
+      const thanked = data.players.filter((player) => player.thanks_email?.status === 'sent').length;
+      const notDelivered = data.players.filter((player) => player.thanks_email?.status === 'failed').length;
+      const reviewsWaiting = data.players.filter((player) => player.review?.status === 'scheduled').length;
+      const parts = [
+        thanked > 0 ? `the ${thanksName} email went to ${players(thanked)}` : '',
+        notDelivered > 0 ? `${notDelivered} ${notDelivered === 1 ? 'email has' : 'emails have'} not gone through yet` : '',
+        reviewsWaiting > 0 ? `${reviewsWaiting} review ${reviewsWaiting === 1 ? 'request is' : 'requests are'} scheduled` : '',
+      ].filter(Boolean);
+      setToast({
+        message: parts.length > 0 ? `Result recorded; ${parts.join(', ')}.` : 'Result recorded. No email was sent.',
+        type: notDelivered > 0 ? 'info' : 'success',
+      });
     } catch (e) {
       setRecordingOnly(false);
       setToast({ message: errorMessage(e, 'The result could not be recorded.'), type: 'error' });
@@ -646,14 +675,13 @@ const EscapeRoomSessions = () => {
       setConfirming(false);
       applyDetail(data);
       const notYet = data.counts.retrying + data.counts.failed;
-      const players = (count: number) => `${count} ${count === 1 ? 'player' : 'players'}`;
       setToast({
         message:
           notYet === 0
-            ? `Emailed the group photo to ${players(data.counts.emailed)}.`
+            ? `Emailed the ${thanksName} email with the group photo to ${players(data.counts.emailed)}.`
             : data.counts.emailed === 0
               ? `The photo has not gone through yet for ${players(notYet)}. See below.`
-              : `Emailed the group photo to ${players(data.counts.emailed)}. ${notYet} ${notYet === 1 ? 'email has' : 'emails have'} not gone through yet; see below.`,
+              : `Emailed the ${thanksName} email with the group photo to ${players(data.counts.emailed)}. ${notYet} ${notYet === 1 ? 'email has' : 'emails have'} not gone through yet; see below.`,
         type: notYet === 0 ? 'success' : 'info',
       });
     } catch (e) {
@@ -665,8 +693,57 @@ const EscapeRoomSessions = () => {
     }
   };
 
+  const followUpAction = async (rowId: number, action: 'send' | 'cancel') => {
+    if (!detail) return;
+    const gameId = detail.id;
+    setBusy(true);
+    try {
+      if (action === 'send') {
+        const result = await visitFollowUpService.sendNow(rowId);
+        setToast({ message: result.message || 'Email sent.', type: 'success' });
+      } else {
+        await visitFollowUpService.cancel(rowId);
+        setToast({ message: 'The email will not be sent.', type: 'success' });
+      }
+    } catch (e) {
+      setToast({ message: errorMessage(e, 'That did not work. Please try again.'), type: 'error' });
+    } finally {
+      setBusy(false);
+      void refreshDetail(gameId);
+    }
+  };
+
   const sendToNew = async () => {
     if (!detail) return;
+    if (detail.completed_without_photo) {
+      if (
+        !isTodayGame
+        && !window.confirm(
+          `This game was played on ${gameDayLabel}. Email ${players(detail.counts.new_players)} about it now?`
+        )
+      ) {
+        return;
+      }
+      setBusy(true);
+      try {
+        const data = await escapeRoomService.sendToNewPlayers(detail.id);
+        applyDetail(data);
+        const thanked = data.players.filter((player) => player.thanks_email?.status === 'sent').length
+          - detail.players.filter((player) => player.thanks_email?.status === 'sent').length;
+        setToast({
+          message: thanksOn
+            ? `Emailed the ${thanksName} email to ${players(Math.max(0, thanked))}.`
+            : 'Review requests are scheduled for those players.',
+          type: 'success',
+        });
+      } catch (e) {
+        setToast({ message: errorMessage(e, 'The players could not be emailed.'), type: 'error' });
+        void refreshDetail(detail.id);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setBusy(true);
     try {
       const before = detail.counts.sent;
@@ -914,6 +991,88 @@ const EscapeRoomSessions = () => {
                     : 'Sending'}
             </span>
           )}
+          {!excluded && player.thanks_email && (
+            <span
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                player.thanks_email.status === 'sent'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : player.thanks_email.status === 'failed'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-700'
+              }`}
+              title={player.thanks_email.error ?? undefined}
+            >
+              {player.thanks_email.status === 'sent'
+                ? 'Thank-you sent'
+                : player.thanks_email.status === 'failed'
+                  ? 'Thank-you not delivered'
+                  : player.thanks_email.status === 'scheduled' || player.thanks_email.status === 'sending'
+                    ? 'Thank-you sending'
+                    : 'Thank-you not sent'}
+            </span>
+          )}
+          {!excluded && player.thanks_email && ['failed', 'skipped', 'canceled'].includes(player.thanks_email.status) && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => player.thanks_email && void followUpAction(player.thanks_email.id, 'send')}
+              className="inline-flex items-center min-h-[40px] px-2 text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
+            >
+              Send thank-you again
+            </button>
+          )}
+          {!excluded && player.review && (
+            <span
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                player.review.rating !== null
+                  ? 'bg-amber-100 text-amber-800'
+                  : player.review.status === 'failed'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-blue-50 text-blue-800'
+              }`}
+              title={player.review.comment ?? player.review.error ?? undefined}
+            >
+              {player.review.rating !== null
+                ? `Rated ${player.review.rating}/5`
+                : player.review.status === 'scheduled'
+                  ? `Review request ${followUpTime(player.review.due_at)}`
+                  : player.review.status === 'sent'
+                    ? 'Review request sent'
+                    : player.review.status === 'failed'
+                      ? 'Review request not delivered'
+                      : 'No review request'}
+            </span>
+          )}
+          {!excluded && player.review && player.review.rating === null && player.review.status === 'scheduled' && (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => player.review && void followUpAction(player.review.id, 'send')}
+                className="inline-flex items-center min-h-[40px] px-2 text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
+              >
+                Send review now
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => player.review && void followUpAction(player.review.id, 'cancel')}
+                className="inline-flex items-center min-h-[40px] px-2 text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
+              >
+                Don&apos;t ask for a review
+              </button>
+            </>
+          )}
+          {!excluded && player.review && player.review.rating === null && player.review.status === 'failed' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => player.review && void followUpAction(player.review.id, 'send')}
+              className="inline-flex items-center min-h-[40px] px-2 text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
+            >
+              Send review again
+            </button>
+          )}
           {player.sent && !excluded && detail?.can_resend && !player.delivery?.is_duplicate && (
             <button
               type="button"
@@ -976,7 +1135,7 @@ const EscapeRoomSessions = () => {
       {removingId === player.waiver_id && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex flex-wrap items-center gap-2">
           <p className="text-sm text-red-900 flex-1 min-w-0">
-            Remove {player.name || 'this player'} from this game? They will not be sent this game's photo. Their signed waiver is kept.
+            Remove {player.name || 'this player'} from this game? They will not be sent this game's photo or follow-up emails. Their signed waiver is kept.
           </p>
           <StandardButton size="sm" variant="danger" onClick={() => void removePlayer(player)} disabled={busy} loading={busy}>
             Remove
@@ -1359,11 +1518,20 @@ const EscapeRoomSessions = () => {
                       </p>
                       <p>
                         {detail.completed_without_photo
-                          ? 'Recorded without a group photo, so no email was sent'
+                          ? detail.players.some((player) => player.thanks_email?.status === 'sent')
+                            ? `Recorded without a group photo; the ${thanksName} email went to ${players(detail.players.filter((player) => player.thanks_email?.status === 'sent').length)}`
+                            : detail.players.some((player) => player.review)
+                              ? 'Recorded without a group photo; the players get a review request later'
+                              : 'Recorded without a group photo, so no email was sent'
                           : `Photo emailed to ${detail.counts.emailed} ${detail.counts.emailed === 1 ? 'player' : 'players'}`}
                         {detail.completed_by_name && ` · completed by ${detail.completed_by_name}`}
                         {detail.completed_at && ` at ${new Date(detail.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}.
                       </p>
+                      {detail.completed_without_photo && (detail.counts.thanks_failed ?? 0) > 0 && (
+                        <p className="text-red-700">
+                          {detail.counts.thanks_failed} {detail.counts.thanks_failed === 1 ? 'thank-you email has' : 'thank-you emails have'} not gone through. Use Send thank-you again next to the player.
+                        </p>
+                      )}
                       {detail.counts.retrying > 0 && (
                         <p className="text-amber-800">
                           {detail.counts.retrying} {detail.counts.retrying === 1 ? 'email has' : 'emails have'} not gone through yet and will be retried automatically.
@@ -1376,6 +1544,15 @@ const EscapeRoomSessions = () => {
                       )}
                       {detail.counts.sending > 0 && detail.counts.stuck === 0 && (
                         <p>{detail.counts.sending} still sending.</p>
+                      )}
+                      {followUp?.reviews && followUp.reviews.scheduled + followUp.reviews.sent + followUp.reviews.rated > 0 && (
+                        <p className="text-emerald-800">
+                          Review requests: {followUp.reviews.scheduled > 0 && `${followUp.reviews.scheduled} waiting${followUp.reviews.next_due_at ? ` (next ${followUpTime(followUp.reviews.next_due_at)})` : ''}`}
+                          {followUp.reviews.scheduled > 0 && followUp.reviews.sent > 0 && ' · '}
+                          {followUp.reviews.sent > 0 && `${followUp.reviews.sent} sent`}
+                          {followUp.reviews.rated > 0 && ` · ${followUp.reviews.rated} rated${followUp.reviews.average_rating !== null ? `, average ${followUp.reviews.average_rating}/5` : ''}`}
+                          .
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1804,13 +1981,45 @@ const EscapeRoomSessions = () => {
                     </ul>
                   )}
 
+                  {followUp?.available && (
+                    <p className="text-xs text-gray-500">
+                      {thanksOn ? (
+                        <>
+                          Players get the{' '}
+                          <Link to={emailSettingsPath} className="underline">
+                            {thanksName}
+                          </Link>{' '}
+                          email with the photo and finish time
+                          {thanksPromo ? `, plus promo code ${thanksPromo.code} (${thanksPromo.offer})` : ''}.
+                          {reviewHours !== null ? ` A review request follows about ${reviewHours} ${reviewHours === 1 ? 'hour' : 'hours'} later.` : ''}
+                          {promoProblem ? ` ${promoProblem}` : ''}
+                        </>
+                      ) : (
+                        <>
+                          The{' '}
+                          <Link to={emailSettingsPath} className="underline">
+                            {thanksName}
+                          </Link>{' '}
+                          email is switched off in Email Notifications, so the photo cannot be emailed.
+                        </>
+                      )}
+                    </p>
+                  )}
+
                   {confirming ? (
                     <div className={`border border-${themeColor}-700 rounded-xl p-4 space-y-3`}>
                       <p className="text-sm text-gray-900">
-                        Email the group photo to {recipients} {recipients === 1 ? 'player' : 'players'} in {detail.room.name} at{' '}
+                        Send the {thanksName} email with the group photo to {players(recipients)} in {detail.room.name} at{' '}
                         {detail.session_time_label}
                         {escaped ? ` with a finish time of ${finishLabel}` : ", marked as didn't escape"}? This can only be done once.
                       </p>
+                      {(thanksPromo || reviewHours !== null) && (
+                        <p className="text-sm text-gray-600">
+                          {thanksPromo ? `It includes promo code ${thanksPromo.code} (${thanksPromo.offer}) for their next visit.` : ''}
+                          {thanksPromo && reviewHours !== null ? ' ' : ''}
+                          {reviewHours !== null ? `Each player gets a review request about ${reviewHours} ${reviewHours === 1 ? 'hour' : 'hours'} later.` : ''}
+                        </p>
+                      )}
                       <ul className="text-sm text-gray-700 space-y-0.5">
                         {recipientPlayers.map((player) => (
                           <li key={player.waiver_id} className="flex flex-wrap gap-x-2">
@@ -1847,8 +2056,31 @@ const EscapeRoomSessions = () => {
                     <div className="border border-gray-300 rounded-xl p-4 space-y-3">
                       <p className="text-sm text-gray-900">
                         Record {detail.room.name} at {detail.session_time_label}
-                        {escaped ? ` with a finish time of ${finishLabel}` : " as didn't escape"} without a photo? No email is sent, and a photo can't be added to this game later.
+                        {escaped ? ` with a finish time of ${finishLabel}` : " as didn't escape"} without a photo? A photo can't be added to this game later.
                       </p>
+                      {canEmailPlayers && recipients > 0 ? (
+                        <>
+                          <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={emailPlayersOnly}
+                              onChange={(event) => setEmailPlayersOnly(event.target.checked)}
+                              className="mt-0.5 w-4 h-4 rounded border-gray-300"
+                            />
+                            <span>
+                              {thanksOn
+                                ? `Email ${players(recipients)} the ${thanksName} email without a photo${thanksPromo ? `, with promo code ${thanksPromo.code}` : ''}${reviewHours !== null ? ', and the review request later' : ''}.`
+                                : `Send ${players(recipients)} a review request about ${reviewHours ?? 24} ${(reviewHours ?? 24) === 1 ? 'hour' : 'hours'} from now. The ${thanksName} email is switched off.`}
+                            </span>
+                          </label>
+                          {!isTodayGame && (
+                            <p className="text-xs text-amber-800">This game was on an earlier day, so the players are emailed now about a past visit. Leave the box unticked to record the result only.</p>
+                          )}
+                          <p className="text-xs text-gray-500">You can also email the players later from this game.</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-600">No email is sent.</p>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <StandardButton variant="secondary" onClick={() => void recordWithoutPhoto()} loading={busy} disabled={busy || !finishTimeValid}>
                           Yes, record result only
@@ -1870,7 +2102,10 @@ const EscapeRoomSessions = () => {
                       {detail.can_complete_without_photo && (
                         <button
                           type="button"
-                          onClick={() => setRecordingOnly(true)}
+                          onClick={() => {
+                            setEmailPlayersOnly(isTodayGame);
+                            setRecordingOnly(true);
+                          }}
                           disabled={busy || !finishTimeValid || (escaped && !finishEntered)}
                           className="inline-flex items-center min-h-[40px] text-sm font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
                         >
@@ -1882,7 +2117,7 @@ const EscapeRoomSessions = () => {
                 </div>
               ) : (
                 <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-                  {detail.send_blocker && !detail.completed_without_photo && (
+                  {detail.send_blocker && (
                     <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                       {detail.send_blocker}
@@ -1893,7 +2128,9 @@ const EscapeRoomSessions = () => {
                       <p className="text-sm text-gray-800">
                         {[
                           detail.counts.new_players > 0
-                            ? `${detail.counts.new_players} ${detail.counts.new_players === 1 ? 'player has' : 'players have'} signed since the photo was sent`
+                            ? detail.completed_without_photo
+                              ? `${detail.counts.new_players} ${detail.counts.new_players === 1 ? 'player has' : 'players have'} not been emailed${isTodayGame ? '' : ` (this game was on ${gameDayLabel})`}`
+                              : `${detail.counts.new_players} ${detail.counts.new_players === 1 ? 'player has' : 'players have'} signed since the photo was sent`
                             : '',
                           detail.counts.stuck > 0 ? `${detail.counts.stuck} ${detail.counts.stuck === 1 ? 'email did' : 'emails did'} not finish sending` : '',
                         ]
@@ -1902,11 +2139,15 @@ const EscapeRoomSessions = () => {
                         .
                       </p>
                       <StandardButton onClick={() => void sendToNew()} disabled={!detail.can_send_new || busy} loading={busy} icon={Send}>
-                        {detail.counts.new_players > 0 && detail.counts.stuck > 0
-                          ? 'Send now'
-                          : detail.counts.new_players > 0
-                            ? 'Send to new players'
-                            : 'Try sending again'}
+                        {detail.completed_without_photo
+                          ? thanksOn
+                            ? `Email ${players(detail.counts.new_players)}`
+                            : 'Schedule review requests'
+                          : detail.counts.new_players > 0 && detail.counts.stuck > 0
+                            ? 'Send now'
+                            : detail.counts.new_players > 0
+                              ? 'Send to new players'
+                              : 'Try sending again'}
                       </StandardButton>
                     </div>
                   )}
