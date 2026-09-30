@@ -102,7 +102,7 @@ const Settings = () => {
   const [selectedShade, setSelectedShade] = useState('800');
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
+  const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('grouped');
   
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);

@@ -477,7 +477,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const searchRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
   
-  const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
+  const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('grouped');
   
   useEffect(() => {
     localStorage.setItem('zapzone_sidebar_dropdowns', JSON.stringify(openDropdowns));
