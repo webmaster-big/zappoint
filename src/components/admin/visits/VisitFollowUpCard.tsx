@@ -96,7 +96,7 @@ const VisitFollowUpCard = ({ visitType, visitId, themeColor, className = '', ref
       && !['opted_out', 'redirected', 'left_game'].includes(row.reason ?? '')
       && !(isReview && row.reason === 'asked_recently');
     const sendLabel = row.status === 'failed' ? 'Try again' : row.attempts > 0 ? 'Send again' : 'Send now';
-    const canCancel = row.status === 'scheduled';
+    const canCancel = row.status === 'scheduled' || (row.status === 'failed' && !row.gave_up);
 
     return (
       <li key={row.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 py-2">

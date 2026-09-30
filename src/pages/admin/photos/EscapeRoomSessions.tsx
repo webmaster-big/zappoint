@@ -1091,6 +1091,16 @@ const EscapeRoomSessions = () => {
               {player.review.status === 'failed' ? 'Send review again' : 'Send review now'}
             </button>
           )}
+          {!excluded && player.review && player.review.rating === null && player.review.status === 'failed' && !player.review.gave_up && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => player.review && void followUpAction(player.review.id, 'cancel')}
+              className="inline-flex items-center min-h-[40px] px-2 text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
+            >
+              Don&apos;t ask for a review
+            </button>
+          )}
           {player.sent && !excluded && detail?.can_resend && !player.delivery?.is_duplicate && (
             <button
               type="button"

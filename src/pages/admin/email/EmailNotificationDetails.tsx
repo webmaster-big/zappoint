@@ -42,6 +42,7 @@ import type {
   EntityType,
   RecipientType
 } from '../../../types/EmailNotification.types';
+import { isVisitTrigger } from '../../../types/EmailNotification.types';
 
 const EmailNotificationDetails: React.FC = () => {
   const navigate = useNavigate();
@@ -361,13 +362,15 @@ const EmailNotificationDetails: React.FC = () => {
           >
             Send Test
           </StandardButton>
-          <StandardButton
-            variant="secondary"
-            icon={Copy}
-            onClick={handleDuplicate}
-          >
-            Duplicate
-          </StandardButton>
+          {(!notification.is_default || isVisitTrigger(notification.trigger_type)) && (
+            <StandardButton
+              variant="secondary"
+              icon={Copy}
+              onClick={handleDuplicate}
+            >
+              Duplicate
+            </StandardButton>
+          )}
           <StandardButton
             variant={notification.is_active ? 'secondary' : 'primary'}
             icon={Power}

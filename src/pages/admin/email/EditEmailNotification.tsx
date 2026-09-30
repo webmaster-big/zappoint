@@ -845,7 +845,11 @@ const EditEmailNotification: React.FC = () => {
                       ))}
                     </select>
                     {isDefault && (
-                      <p className="text-xs text-gray-500 mt-1">Default emails cover every location. Duplicate this one to make a version for a single location.</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {isVisitEmail
+                          ? 'Default emails cover every location. Duplicate this one to make a version for a single location.'
+                          : 'Default emails cover every location. To email one location differently, create a new notification for it.'}
+                      </p>
                     )}
                   </div>
                 )}

@@ -46,6 +46,7 @@ import type {
   TriggerType,
   EntityType
 } from '../../../types/EmailNotification.types';
+import { isVisitTrigger } from '../../../types/EmailNotification.types';
 
 const FALLBACK_TRIGGER_OPTIONS = [
   { value: 'booking_created', label: 'Booking Created' },
@@ -814,13 +815,15 @@ const EmailNotifications = () => {
                     <RotateCcw className="w-4 h-4" />
                   </button>
                 )}
-              <button
-                onClick={() => handleDuplicate(notification.id)}
-                className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                title="Duplicate"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
+              {(!notification.is_default || isVisitTrigger(notification.trigger_type)) && (
+                <button
+                  onClick={() => handleDuplicate(notification.id)}
+                  className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                  title="Duplicate"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              )}
               <Link
                 to={`/admin/email/notifications/${notification.id}`}
                 className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"

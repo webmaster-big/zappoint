@@ -401,7 +401,7 @@ const EditEventPurchase: React.FC = () => {
 
       if (response.success) {
         void metricsCacheService.clearAllCaches();
-        const notice = statusChanged && status === 'completed'
+        const notice = status === 'completed'
           ? describeFollowUp((response as unknown as { follow_up?: VisitFollowUpSummary }).follow_up)
           : null;
         if (notice) {

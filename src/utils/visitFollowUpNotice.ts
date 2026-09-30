@@ -59,6 +59,8 @@ export const describeFollowUp = (summary: VisitFollowUpSummary | null | undefine
     parts.push(`The ${thanksName} email is switched off, so no thank-you email went out.`);
   } else if (!summary.recipient_email_masked) {
     parts.push('No email address on file, so no follow-up email went out.');
+  } else if (!thanks && summary.can_send_thanks) {
+    parts.push(`Nothing has been emailed to ${summary.recipient_email_masked} for this visit yet. To send it, open the ${summary.visit_type === 'event_purchase' ? 'purchase' : 'booking'} and choose Send ${thanksName} now.`);
   }
 
   if (review) {
