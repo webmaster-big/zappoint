@@ -668,10 +668,20 @@ const CheckIn: React.FC = () => {
     }
   };
 
+  const eventCheckInRefusal = scannedEvent?.status === 'completed'
+    ? 'This ticket is already marked Completed, so it cannot be checked in again.'
+    : scannedEvent?.status === 'cancelled'
+      ? 'This ticket was cancelled, so it cannot be checked in.'
+      : null;
+
   const confirmEventCheckIn = async () => {
     if (!scannedEvent) return;
     if (scannedEvent.ticket_order_id) {
       setToast({ message: 'This ticket belongs to a bulk order — scan the order instead.', type: 'error' });
+      return;
+    }
+    if (eventCheckInRefusal) {
+      setToast({ message: eventCheckInRefusal, type: 'error' });
       return;
     }
     try {
@@ -3099,6 +3109,12 @@ const CheckIn: React.FC = () => {
                       </p>
                     </div>
                   )}
+                  {eventCheckInRefusal && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-amber-800">{eventCheckInRefusal}</p>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -3142,7 +3158,7 @@ const CheckIn: React.FC = () => {
                 variant="primary"
                 icon={CheckCircle}
                 onClick={scannedMembership ? confirmMembershipCheckIn : scannedOrder ? confirmOrderCheckIn : scannedEvent ? confirmEventCheckIn : confirmTicketCheckIn}
-                disabled={entityBusy}
+                disabled={entityBusy || (!scannedMembership && !scannedOrder && !!eventCheckInRefusal)}
                 loading={entityBusy}
               >
                 {entityBusy ? 'Checking in...' : 'Check In'}

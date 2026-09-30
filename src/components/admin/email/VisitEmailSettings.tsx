@@ -57,8 +57,9 @@ const VisitEmailSettings = ({
               Completed. It is never sent from checkout, check-in or imports, and each guest gets it once per visit.
             </p>
             <p className="text-sm text-gray-700">
-              Visits more than 3 days old, or still in the future, are marked Completed without an email. Staff can still send it with Send
-              now on the booking or purchase.
+              Party bookings and event purchases more than 3 days old, or still in the future, are marked Completed without an email. Staff
+              can still send it with Send now on the booking or purchase. Escape-room games from an earlier day are emailed when staff
+              complete them on the game screen, which asks first.
             </p>
             <p className="text-xs text-gray-500">
               Party bookings include the group photo only when staff sent that party&apos;s photo from the photo library to the party&apos;s

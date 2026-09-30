@@ -532,6 +532,7 @@ const CreateEmailNotification: React.FC = () => {
       setLoading(true);
       const submitData: CreateEmailNotificationData = {
         ...formData,
+        ...(isCompanyAdmin ? { location_id: formData.location_id ?? null } : {}),
         ...(isVisitEmail
           ? {
               recipient_types: ['customer'] as RecipientType[],

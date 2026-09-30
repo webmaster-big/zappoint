@@ -684,6 +684,7 @@ const EditEmailNotification: React.FC = () => {
           }
         : {
             ...formData,
+            ...(isCompanyAdmin ? { location_id: formData.location_id ?? null } : {}),
             ...(isVisitEmail
               ? {
                   recipient_types: ['customer'] as RecipientType[],

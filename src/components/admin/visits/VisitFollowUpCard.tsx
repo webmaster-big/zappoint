@@ -93,7 +93,7 @@ const VisitFollowUpCard = ({ visitType, visitId, themeColor, className = '', ref
     const canSendNow = summary.completed
       && ['scheduled', 'failed', 'skipped', 'canceled'].includes(row.status)
       && row.is_current_recipient !== false
-      && !['opted_out', 'recipient_changed', 'redirected', 'left_game'].includes(row.reason ?? '')
+      && !['opted_out', 'redirected', 'left_game'].includes(row.reason ?? '')
       && !(isReview && row.reason === 'asked_recently');
     const sendLabel = row.status === 'failed' ? 'Try again' : row.attempts > 0 ? 'Send again' : 'Send now';
     const canCancel = row.status === 'scheduled';

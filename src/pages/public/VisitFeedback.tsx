@@ -27,9 +27,10 @@ const VisitFeedback = () => {
   const [searchParams] = useSearchParams();
   const requestedRating = Number(searchParams.get('rating'));
   const wantsUnsubscribe = searchParams.get('unsubscribe') === '1';
+  const isSample = token === 'sample';
 
   const [page, setPage] = useState<VisitFeedbackPage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isSample);
   const [loadError, setLoadError] = useState<'missing' | 'failed' | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [rating, setRating] = useState<number>(requestedRating >= 1 && requestedRating <= 5 ? requestedRating : 0);
@@ -40,6 +41,10 @@ const VisitFeedback = () => {
 
   useEffect(() => {
     let alive = true;
+
+    if (isSample) {
+      return;
+    }
 
     visitFollowUpService
       .getFeedback(token)
@@ -65,7 +70,7 @@ const VisitFeedback = () => {
     return () => {
       alive = false;
     };
-  }, [token, requestedRating, attempt]);
+  }, [token, isSample, requestedRating, attempt]);
 
   const submit = async () => {
     if (rating < 1) {
@@ -103,7 +108,15 @@ const VisitFeedback = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center px-4 py-10">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
-        {loading ? (
+        {isSample ? (
+          <div className="text-center py-6">
+            <h1 className="text-lg font-semibold text-gray-900">This is a preview link</h1>
+            <p className="text-sm text-gray-600 mt-2">
+              Links in test emails and previews do not record anything. In a real email, each guest&apos;s link opens their own rating
+              and unsubscribe page.
+            </p>
+          </div>
+        ) : loading ? (
           <div className="flex flex-col items-center py-10 text-gray-500">
             <Loader2 className="w-7 h-7 animate-spin mb-3" />
             <p className="text-sm">Loading…</p>

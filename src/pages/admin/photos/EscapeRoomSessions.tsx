@@ -668,6 +668,9 @@ const EscapeRoomSessions = () => {
 
   const complete = async () => {
     if (!detail) return;
+    if (!isTodayGame && !window.confirm(`This game was played on ${gameDayLabel}. Complete it and email the players now?`)) {
+      return;
+    }
     setBusy(true);
     try {
       const data = await escapeRoomService.complete(detail.id, escaped, escaped ? finishLabel : null);
@@ -719,7 +722,9 @@ const EscapeRoomSessions = () => {
       if (
         !isTodayGame
         && !window.confirm(
-          `This game was played on ${gameDayLabel}. Email ${players(detail.counts.new_players)} about it now?`
+          thanksOn
+            ? `This game was played on ${gameDayLabel}. Email ${players(detail.counts.new_players)} about it now?`
+            : `This game was played on ${gameDayLabel}. Schedule review requests for ${players(detail.counts.new_players)}?`
         )
       ) {
         return;
@@ -728,13 +733,23 @@ const EscapeRoomSessions = () => {
       try {
         const data = await escapeRoomService.sendToNewPlayers(detail.id);
         applyDetail(data);
-        const thanked = data.players.filter((player) => player.thanks_email?.status === 'sent').length
-          - detail.players.filter((player) => player.thanks_email?.status === 'sent').length;
+        const count = (list: EscapeRoomPlayer[], test: (player: EscapeRoomPlayer) => boolean) => list.filter(test).length;
+        const isSent = (player: EscapeRoomPlayer) => player.thanks_email?.status === 'sent';
+        const isFailed = (player: EscapeRoomPlayer) => player.thanks_email?.status === 'failed';
+        const isWaiting = (player: EscapeRoomPlayer) => player.review?.status === 'scheduled';
+        const thanked = Math.max(0, count(data.players, isSent) - count(detail.players, isSent));
+        const notDelivered = Math.max(0, count(data.players, isFailed) - count(detail.players, isFailed));
+        const reviewsWaiting = Math.max(0, count(data.players, isWaiting) - count(detail.players, isWaiting));
+        const parts = [
+          thanked > 0 ? `the ${thanksName} email went to ${players(thanked)}` : '',
+          notDelivered > 0 ? `${notDelivered} ${notDelivered === 1 ? 'email has' : 'emails have'} not gone through yet` : '',
+          reviewsWaiting > 0 ? `${reviewsWaiting} review ${reviewsWaiting === 1 ? 'request is' : 'requests are'} scheduled` : '',
+        ].filter(Boolean);
         setToast({
-          message: thanksOn
-            ? `Emailed the ${thanksName} email to ${players(Math.max(0, thanked))}.`
-            : 'Review requests are scheduled for those players.',
-          type: 'success',
+          message: parts.length > 0
+            ? `${parts.join(', ').replace(/^./, (first) => first.toUpperCase())}.`
+            : 'No email was sent. See each player below.',
+          type: notDelivered > 0 || parts.length === 0 ? 'info' : 'success',
         });
       } catch (e) {
         setToast({ message: errorMessage(e, 'The players could not be emailed.'), type: 'error' });
@@ -1011,7 +1026,8 @@ const EscapeRoomSessions = () => {
                     : 'Thank-you not sent'}
             </span>
           )}
-          {!excluded && player.thanks_email && ['failed', 'skipped', 'canceled'].includes(player.thanks_email.status) && (
+          {!excluded && player.thanks_email && ['failed', 'skipped', 'canceled'].includes(player.thanks_email.status)
+            && (player.thanks_email.reason !== 'left_game' || Number(player.thanks_email.waiver_id) === Number(player.waiver_id)) && (
             <button
               type="button"
               disabled={busy}
@@ -1063,14 +1079,16 @@ const EscapeRoomSessions = () => {
               </button>
             </>
           )}
-          {!excluded && player.review && player.review.rating === null && player.review.status === 'failed' && (
+          {!excluded && player.review && player.review.rating === null
+            && (player.review.status === 'failed'
+              || (player.review.status === 'canceled' && player.review.reason === 'left_game' && Number(player.review.waiver_id) === Number(player.waiver_id))) && (
             <button
               type="button"
               disabled={busy}
               onClick={() => player.review && void followUpAction(player.review.id, 'send')}
               className="inline-flex items-center min-h-[40px] px-2 text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-40"
             >
-              Send review again
+              {player.review.status === 'failed' ? 'Send review again' : 'Send review now'}
             </button>
           )}
           {player.sent && !excluded && detail?.can_resend && !player.delivery?.is_duplicate && (
