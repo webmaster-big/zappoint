@@ -9,6 +9,7 @@ export interface GuestIdentity {
   name: string;
   phone: string;
   email?: string;
+  smsConsent?: boolean;
   savedAt?: string;
 }
 
@@ -54,7 +55,7 @@ export const hasGuestIdentity = (): boolean => getGuestIdentity() !== null;
 const identityFingerprint = (identity: GuestIdentity): string =>
   `${getVisitorId()}|${identity.name.trim().toLowerCase()}|${identity.phone.replace(/\D/g, '')}`;
 
-const sendIdentity = (identity: GuestIdentity, locationId?: number | null): void => {
+const sendIdentity = (identity: GuestIdentity, locationId?: number | null, withConsent = false): void => {
   if (isAnalyticsDnt() || isTrackingSilencedHost()) return;
   const fingerprint = identityFingerprint(identity);
   void api
@@ -62,6 +63,7 @@ const sendIdentity = (identity: GuestIdentity, locationId?: number | null): void
       name: identity.name.trim(),
       phone: identity.phone.trim(),
       email: identity.email?.trim() || undefined,
+      sms_consent: withConsent && typeof identity.smsConsent === 'boolean' ? identity.smsConsent : undefined,
       location_id: locationId ?? undefined,
       visitor_id: getVisitorId(),
     })
@@ -76,7 +78,7 @@ const sendIdentity = (identity: GuestIdentity, locationId?: number | null): void
 };
 
 export const saveGuestIdentity = (identity: GuestIdentity, locationId?: number | null): void => {
-  sendIdentity(identity, locationId);
+  sendIdentity(identity, locationId, true);
   try {
     localStorage.setItem(GUEST_KEY, JSON.stringify({ ...identity, savedAt: new Date().toISOString() }));
   } catch {

@@ -29,6 +29,7 @@ const LocationConfirmModal = ({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [smsConsent, setSmsConsent] = useState(false);
 
   useEffect(() => {
     if (!location?.slug) return;
@@ -55,7 +56,7 @@ const LocationConfirmModal = ({
 
   const confirm = () => {
     if (!canContinue) return;
-    saveGuestIdentity({ name: name.trim(), phone: phone.trim() }, location.id);
+    saveGuestIdentity({ name: name.trim(), phone: phone.trim(), smsConsent }, location.id);
     setOpen(false);
     onConfirm?.();
   };
@@ -139,6 +140,29 @@ const LocationConfirmModal = ({
                 className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                 placeholder="(810) 555-0134"
               />
+              <label className="flex items-start gap-2 cursor-pointer mt-2">
+                <input
+                  id="guest-welcome-sms-consent"
+                  type="checkbox"
+                  checked={smsConsent}
+                  onChange={event => setSmsConsent(event.target.checked)}
+                  className="mt-1"
+                />
+                <span className="text-xs text-gray-500">
+                  I agree to receive text messages from Zap Zone at the phone number provided above. I
+                  understand that consent is not a condition of purchase. Message and data rates may apply.
+                  Message frequency varies. Text STOP to cancel or HELP for assistance. View our{' '}
+                  <a
+                    href="https://zap-zone.com/terms-conditions/"
+                    className="text-blue-600 underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Terms and Conditions
+                  </a>
+                  .
+                </span>
+              </label>
             </div>
           </div>
         </div>

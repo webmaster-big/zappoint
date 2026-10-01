@@ -22,6 +22,7 @@ export interface VisitorSession {
   guest_name: string | null;
   guest_phone: string | null;
   guest_email: string | null;
+  guest_sms_consent?: boolean;
   first_seen_label: string;
   last_seen_label: string;
   page_views: number;
@@ -93,7 +94,13 @@ export interface VisitorSessionDetail {
   visitor_id: string;
   session_date: string;
   date_label: string;
-  guest: { name: string; phone: string; email: string | null } | null;
+  guest: {
+    name: string;
+    phone: string;
+    email: string | null;
+    sms_consent?: boolean;
+    sms_consent_label?: string | null;
+  } | null;
   device: { device_type: string | null; browser: string | null; os: string | null };
   referrer: string | null;
   summary: {

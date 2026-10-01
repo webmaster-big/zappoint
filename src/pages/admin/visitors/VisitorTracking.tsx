@@ -52,6 +52,11 @@ const pageLabel = (title: string | null, path: string | null): string => {
 
 const isKnown = (session: VisitorSession): boolean => Boolean(session.guest_phone || session.guest_name);
 
+const smsConsentLabel = (session: VisitorSession): string => {
+  if (!isKnown(session)) return '';
+  return session.guest_sms_consent ? 'Opted In' : 'No';
+};
+
 const VisitorTracking = () => {
   const { effectiveLocationId } = useLocationScope();
   const { themeColor, fullColor } = useThemeColor();
@@ -151,6 +156,22 @@ const VisitorTracking = () => {
             </a>
           ) : (
             <span className="text-sm text-gray-400">—</span>
+          ),
+      },
+      {
+        key: 'sms',
+        label: 'SMS',
+        sortable: true,
+        sortValue: s => (s.guest_sms_consent ? 2 : isKnown(s) ? 1 : 0),
+        exportValue: s => smsConsentLabel(s),
+        cellClassName: 'whitespace-nowrap',
+        render: s =>
+          !isKnown(s) ? (
+            <span className="text-sm text-gray-400">—</span>
+          ) : s.guest_sms_consent ? (
+            <span className="text-green-600 font-medium text-xs">Opted In</span>
+          ) : (
+            <span className="text-gray-400 text-xs">No</span>
           ),
       },
       {
@@ -370,13 +391,14 @@ const VisitorTracking = () => {
       }
 
       const headers = [
-        'Customer', 'Phone', 'Email', 'Date', 'First seen (ET)', 'Last seen (ET)',
+        'Customer', 'Phone', 'SMS', 'Email', 'Date', 'First seen (ET)', 'Last seen (ET)',
         'Pages viewed', 'Clicks', 'Purchases', 'Time on site', 'Entry page', 'Exit page',
         'Device', 'Browser', 'Session actions (ET)',
       ];
       const rows = result.sessions.map(s => [
         s.guest_name || 'Anonymous',
         s.guest_phone,
+        smsConsentLabel(s),
         s.guest_email,
         s.session_date,
         s.first_seen_label,
@@ -550,6 +572,12 @@ const VisitorTracking = () => {
                           <Phone size={11} />
                           {detail.guest.phone}
                         </a>
+                      )}
+                      {detail.guest?.sms_consent && (
+                        <span className="text-green-600 font-medium">
+                          SMS opted in
+                          {detail.guest.sms_consent_label ? ` · ${detail.guest.sms_consent_label} ET` : ''}
+                        </span>
                       )}
                       {detail.guest?.email && (
                         <a
