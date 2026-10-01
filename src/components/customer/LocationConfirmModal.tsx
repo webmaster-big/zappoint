@@ -152,25 +152,6 @@ const LocationConfirmModal = ({
                   I agree to receive text messages from Zap Zone at the phone number provided above. I
                   understand that consent is not a condition of purchase. Message and data rates may apply.
                   Message frequency varies. Text STOP to cancel or HELP for assistance.
-                  <span className="block mt-1">
-                    <a
-                      href="https://zap-zone.com/privacy-policy/"
-                      className="text-blue-600 underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Privacy Policy
-                    </a>
-                    {' | '}
-                    <a
-                      href="https://zap-zone.com/terms-conditions/"
-                      className="text-blue-600 underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Terms &amp; Conditions
-                    </a>
-                  </span>
                 </span>
               </label>
             </div>
@@ -190,6 +171,25 @@ const LocationConfirmModal = ({
           <p className="mt-2.5 text-[11px] text-gray-400 text-center leading-relaxed">
             Saved on this device so you only enter it once. We only use it to help with your visit and
             bookings — nothing is booked or charged.
+          </p>
+          <p className="mt-1.5 text-[11px] text-center">
+            <a
+              href="https://zap-zone.com/privacy-policy/"
+              className="text-blue-600 underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Privacy Policy
+            </a>
+            <span className="text-gray-400">{' | '}</span>
+            <a
+              href="https://zap-zone.com/terms-conditions/"
+              className="text-blue-600 underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Terms &amp; Conditions
+            </a>
           </p>
         </div>
       </div>
