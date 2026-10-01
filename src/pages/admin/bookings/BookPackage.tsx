@@ -2425,11 +2425,28 @@ const BookPackage: React.FC = () => {
                         className="mt-1"
                       />
                       <span className="text-xs text-gray-500">
-                        I agree to receive automated delivery notifications and promotional text
-                        messages from Zap Zone at the phone number provided. Consent is not a
-                        condition of purchase. Message frequency varies. Message and data rates
-                        may apply. Reply STOP to cancel or HELP for help. View our{' '}
-                        <a href="https://zap-zone.com/terms-conditions/" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.
+                        I agree to receive text messages from Zap Zone at the phone number provided above. I
+                        understand that consent is not a condition of purchase. Message and data rates may apply.
+                        Message frequency varies. Text STOP to cancel or HELP for assistance.
+                        <span className="block mt-1">
+                          <a
+                            href="https://zap-zone.com/privacy-policy/"
+                            className="text-blue-600 underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Privacy Policy
+                          </a>
+                          {' | '}
+                          <a
+                            href="https://zap-zone.com/terms-conditions/"
+                            className="text-blue-600 underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Terms &amp; Conditions
+                          </a>
+                        </span>
                       </span>
                     </label>
                   </div>
