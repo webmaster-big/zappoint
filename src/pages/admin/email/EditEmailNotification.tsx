@@ -81,6 +81,7 @@ const EditEmailNotification: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const canSetUpVisit = isCompanyAdmin || (currentUser?.role === 'location_manager' && !!currentUser?.location_id);
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -220,6 +221,7 @@ const EditEmailNotification: React.FC = () => {
   const isReminderTrigger = formData.trigger_type?.endsWith('_reminder') || false;
   const isFollowupTrigger = formData.trigger_type?.endsWith('_followup') || false;
   const isVisitEmail = isVisitTrigger(formData.trigger_type);
+  const visitLocked = isVisitEmail && !canSetUpVisit;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -469,7 +471,10 @@ const EditEmailNotification: React.FC = () => {
       }
     } catch (error) {
       console.error('Error resetting notification:', error);
-      setToast({ message: 'Failed to reset notification', type: 'error' });
+      setToast({
+        message: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to reset notification',
+        type: 'error',
+      });
     } finally {
       setResetting(false);
       setShowResetConfirm(false);
@@ -764,7 +769,7 @@ const EditEmailNotification: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {isDefault && (isBodyCustomized || isSubjectCustomized) && (
+              {isDefault && (isBodyCustomized || isSubjectCustomized) && canEdit && !visitLocked && (
                 <StandardButton
                   variant="secondary"
                   icon={RotateCcw}
@@ -784,7 +789,7 @@ const EditEmailNotification: React.FC = () => {
                 variant="primary"
                 icon={loading ? Loader2 : Save}
                 onClick={handleSubmit}
-                disabled={loading || !canEdit}
+                disabled={loading || !canEdit || visitLocked}
                 loading={loading}
               >
                 Save Changes
@@ -795,6 +800,12 @@ const EditEmailNotification: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {canEdit && visitLocked && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />
+            <p>Only a manager or company admin can set up follow-up emails.</p>
+          </div>
+        )}
         {!canEdit && (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />

@@ -68,6 +68,7 @@ const EmailNotifications = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const canSetUpVisit = isCompanyAdmin || (currentUser?.role === 'location_manager' && !!currentUser?.location_id);
 
   const [notifications, setNotifications] = useState<EmailNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -806,7 +807,8 @@ const EmailNotifications = () => {
                 <Send className="w-4 h-4" />
               </button>
               {notification.is_default &&
-                (notification.is_body_customized || notification.is_subject_customized) && (
+                (notification.is_body_customized || notification.is_subject_customized) &&
+                notification.can_edit !== false && (
                   <button
                     onClick={() => setResetConfirm(notification)}
                     className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
@@ -815,7 +817,8 @@ const EmailNotifications = () => {
                     <RotateCcw className="w-4 h-4" />
                   </button>
                 )}
-              {(!notification.is_default || isVisitTrigger(notification.trigger_type)) && (
+              {(!notification.is_default || isVisitTrigger(notification.trigger_type))
+                && (!isVisitTrigger(notification.trigger_type) || canSetUpVisit) && (
                 <button
                   onClick={() => handleDuplicate(notification.id)}
                   className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
@@ -838,7 +841,7 @@ const EmailNotifications = () => {
               >
                 <Edit className="w-4 h-4" />
               </Link>
-              {!notification.is_default && (
+              {!notification.is_default && notification.can_edit !== false && (
                 <button
                   onClick={() => setDeleteConfirm(notification.id)}
                   className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
@@ -919,9 +922,9 @@ const EmailNotifications = () => {
                         <button
                           onClick={() => setDeleteConfirm(notification.id)}
                           className="p-2 text-red-500 hover:text-red-700"
-                          disabled={notification.is_default}
-                          style={notification.is_default ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
-                          title={notification.is_default ? 'Default templates cannot be deleted' : 'Delete'}
+                          disabled={notification.is_default || notification.can_edit === false}
+                          style={notification.is_default || notification.can_edit === false ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
+                          title={notification.is_default ? 'Default templates cannot be deleted' : notification.can_edit === false ? 'You cannot delete this email' : 'Delete'}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

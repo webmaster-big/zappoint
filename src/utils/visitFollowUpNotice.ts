@@ -36,14 +36,20 @@ export const describeFollowUp = (summary: VisitFollowUpSummary | null | undefine
   if (!summary || !summary.available) return null;
 
   const thanksName = followUpEmailName(summary.thanks_email.name, 'Thanks for Playing');
+  const reviewName = followUpEmailName(summary.review_email.name, 'Review Request');
 
   if (summary.handled_by_game) {
-    return summary.thanks_email.active
-      ? `This is an escape-room booking, so the ${thanksName} email goes out from the game screen with the group photo.`
-      : `This is an escape-room booking, and the ${thanksName} email is switched off, so nothing is emailed from the game screen.`;
+    if (summary.thanks_email.active) {
+      return `This is an escape-room booking, so the ${thanksName} email goes out from the game screen with the group photo.`;
+    }
+    return summary.review_email.active
+      ? `This is an escape-room booking, and the ${thanksName} email is switched off, so the group photo cannot be emailed. The players still get the ${reviewName} email once their result is recorded on the game screen.`
+      : `This is an escape-room booking, and the ${thanksName} and ${reviewName} emails are switched off, so nothing is emailed from the game screen.`;
   }
 
-  const thanks = summary.thanks.find((row) => row.is_current_recipient) ?? summary.thanks[summary.thanks.length - 1];
+  const current = summary.thanks.find((row) => row.is_current_recipient);
+  const thanks = current ?? (summary.recipient_email_masked ? undefined : summary.thanks[summary.thanks.length - 1]);
+  const earlier = current ? undefined : [...summary.thanks].reverse().find((row) => row.status === 'sent');
   const review = summary.reviews.find((row) => row.status === 'scheduled');
   const parts: string[] = [];
 
@@ -60,7 +66,9 @@ export const describeFollowUp = (summary: VisitFollowUpSummary | null | undefine
   } else if (!summary.recipient_email_masked) {
     parts.push('No email address on file, so no follow-up email went out.');
   } else if (!thanks && summary.can_send_thanks) {
-    parts.push(`Nothing has been emailed to ${summary.recipient_email_masked} for this visit yet. To send it, open the ${summary.visit_type === 'event_purchase' ? 'purchase' : 'booking'} and choose Send ${thanksName} now.`);
+    const noun = summary.visit_type === 'event_purchase' ? 'purchase' : 'booking';
+    const button = summary.thanks.length > 0 ? `Send ${thanksName} to ${summary.recipient_email_masked}` : `Send ${thanksName} now`;
+    parts.push(`${earlier ? `The ${thanksName} email went to the earlier address ${earlier.recipient_email_masked}. ` : ''}Nothing has been emailed to ${summary.recipient_email_masked} for this visit yet. To send it, open the ${noun} and choose ${button}.`);
   }
 
   if (review) {

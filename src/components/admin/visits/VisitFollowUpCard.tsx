@@ -172,7 +172,16 @@ const VisitFollowUpCard = ({ visitType, visitId, themeColor, className = '', ref
                 ? summary.recipient_email_masked
                   ? `Nothing has been sent for this ${noun} yet.`
                   : `This ${noun} has no email address, so no follow-up emails can be sent.`
-                : `When this ${noun} is set to Completed, ${thanksName} goes to ${summary.recipient_email_masked ?? 'the guest'} right away and ${reviewName} follows about ${hours} ${hours === 1 ? 'hour' : 'hours'} later (never overnight). Visits more than ${maxAge} days old or still ahead are not emailed automatically.`}
+                : !summary.recipient_email_masked
+                  ? `This ${noun} has no email address. Add the guest's email before it is set to Completed, or no follow-up emails can be sent.`
+                  : summary.thanks_email.active || summary.review_email.active
+                    ? `When this ${noun} is set to Completed, ${[
+                        summary.thanks_email.active ? `${thanksName} goes to ${summary.recipient_email_masked} right away` : '',
+                        summary.review_email.active
+                          ? `${reviewName} ${summary.thanks_email.active ? 'follows' : `goes to ${summary.recipient_email_masked}`} about ${hours} ${hours === 1 ? 'hour' : 'hours'} later (never overnight)`
+                          : '',
+                      ].filter(Boolean).join(' and ')}. Visits more than ${maxAge} days old or still ahead are not emailed automatically.`
+                    : `No follow-up emails go out when this ${noun} is set to Completed.`}
             </p>
           ) : null}
 

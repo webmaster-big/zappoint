@@ -1548,9 +1548,12 @@ const EscapeRoomSessions = () => {
                         {detail.completed_without_photo
                           ? detail.players.some((player) => player.thanks_email?.status === 'sent')
                             ? `Recorded without a group photo; the ${thanksName} email went to ${players(detail.players.filter((player) => player.thanks_email?.status === 'sent').length)}`
-                            : detail.players.some((player) => player.review)
+                            : detail.players.some((player) => player.review && player.review.rating === null
+                                && (player.review.status === 'scheduled' || player.review.status === 'sending' || (player.review.status === 'failed' && !player.review.gave_up)))
                               ? 'Recorded without a group photo; the players get a review request later'
-                              : 'Recorded without a group photo, so no email was sent'
+                              : detail.players.some((player) => player.review?.status === 'sent' || (player.review?.rating ?? null) !== null)
+                                ? `Recorded without a group photo; a review request went to ${players(detail.players.filter((player) => player.review?.status === 'sent' || (player.review?.rating ?? null) !== null).length)}`
+                                : 'Recorded without a group photo, so no email was sent'
                           : `Photo emailed to ${detail.counts.emailed} ${detail.counts.emailed === 1 ? 'player' : 'players'}`}
                         {detail.completed_by_name && ` · completed by ${detail.completed_by_name}`}
                         {detail.completed_at && ` at ${new Date(detail.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}.

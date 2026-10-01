@@ -43,11 +43,14 @@ import type {
   RecipientType
 } from '../../../types/EmailNotification.types';
 import { isVisitTrigger } from '../../../types/EmailNotification.types';
+import { getStoredUser } from '../../../utils/storage';
 
 const EmailNotificationDetails: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { themeColor, fullColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const canSetUpVisit = currentUser?.role === 'company_admin' || (currentUser?.role === 'location_manager' && !!currentUser?.location_id);
 
   const [notification, setNotification] = useState<EmailNotification | null>(null);
   const [logs, setLogs] = useState<EmailNotificationLog[]>([]);
@@ -193,7 +196,10 @@ const EmailNotificationDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error deleting notification:', error);
-      setToast({ message: 'Failed to delete notification', type: 'error' });
+      setToast({
+        message: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to delete notification',
+        type: 'error',
+      });
     } finally {
       setDeleteConfirm(false);
     }
@@ -362,7 +368,8 @@ const EmailNotificationDetails: React.FC = () => {
           >
             Send Test
           </StandardButton>
-          {(!notification.is_default || isVisitTrigger(notification.trigger_type)) && (
+          {(!notification.is_default || isVisitTrigger(notification.trigger_type))
+            && (!isVisitTrigger(notification.trigger_type) || canSetUpVisit) && (
             <StandardButton
               variant="secondary"
               icon={Copy}
