@@ -2223,9 +2223,6 @@ const PurchaseAttraction = () => {
                           <path d="M16 4.6a7 7 0 010 10.8 7 7 0 010-10.8z" fill="#FF5F00"/>
                         </svg>
                       </div>
-                      <div className="h-5 md:h-6 lg:h-7 px-1 md:px-1.5 bg-blue-500 rounded flex items-center justify-center" title="Amex">
-                        <span className="text-white text-[7px] md:text-[8px] lg:text-[9px] font-bold">AMEX</span>
-                      </div>
                       <div className="h-5 md:h-6 lg:h-7 px-1 md:px-1.5 bg-orange-500 rounded flex items-center justify-center" title="Discover">
                         <span className="text-white text-[6px] md:text-[7px] lg:text-[8px] font-bold">DISC</span>
                       </div>
