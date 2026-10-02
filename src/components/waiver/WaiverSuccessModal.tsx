@@ -202,7 +202,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   });
 
   return {
-    bookUrl: venue?.slug ? `${window.location.origin}/${venue.slug}` : null,
+    bookUrl: venue?.slug && venue.show_on_main_page !== false ? `${window.location.origin}/${venue.slug}` : null,
     locationName: venue?.name ?? null,
     phone: venue?.phone ?? null,
     picks: spread(pool),

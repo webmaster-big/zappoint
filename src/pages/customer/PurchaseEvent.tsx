@@ -65,6 +65,7 @@ import { generateOrderQRCode } from '../../utils/qrcode';
 import { convertTo12Hour } from '../../utils/timeFormat';
 import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
 import { useStorefrontBrand } from '../../hooks/useStorefrontBrand';
+import LocationUnavailable from '../../components/customer/LocationUnavailable';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
@@ -1135,6 +1136,10 @@ const PurchaseEvent = () => {
         </div>
       </div>
     );
+  }
+
+  if (callToBookVenue?.show_on_main_page === false) {
+    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} />;
   }
 
   const orderedAddOns: EventAddOn[] = event

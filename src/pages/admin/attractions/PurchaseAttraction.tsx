@@ -68,6 +68,7 @@ import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
 import { generateTimeSlots } from '../../../utils/timeSlots';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import LocationUnavailable from '../../../components/customer/LocationUnavailable';
 
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -1334,6 +1335,10 @@ const PurchaseAttraction = () => {
         </div>
       </div>
     );
+  }
+
+  if (callToBookVenue?.show_on_main_page === false) {
+    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} />;
   }
 
   return (

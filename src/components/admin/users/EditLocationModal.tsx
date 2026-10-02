@@ -160,7 +160,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
       }
       if (payload.show_on_main_page !== undefined && res.data.show_on_main_page !== payload.show_on_main_page) {
         savedWithoutVisibility.current = res.data;
-        setError('Your other changes were saved, but the main booking page setting could not be changed yet. Please try again in a few minutes.');
+        setError('Your other changes were saved, but the booking site setting could not be changed yet. Please try again in a few minutes.');
         return;
       }
       setSuccess(true);
@@ -366,11 +366,11 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
                 className="mt-0.5 rounded border-gray-300"
               />
               <span className="min-w-0">
-                <span className="block text-sm font-medium text-gray-700">Show on the main booking page</span>
+                <span className="block text-sm font-medium text-gray-700">Show on the booking site</span>
                 <span className="block text-xs text-gray-500 mt-0.5">
                   {form.show_on_main_page !== false
-                    ? 'Guests see this location in the list of locations on the main booking page.'
-                    : `Guests will not see this location on the main booking page or under Browse all locations. ${form.slug?.trim() ? `Its own page at /${form.slug.trim()}` : 'Its own page'}, its bookings and all its data stay exactly as they are.`}
+                    ? 'Guests can find this location on the main booking page and book it online.'
+                    : `Guests will not see this location on the booking site, and ${form.slug?.trim() ? `its page at /${form.slug.trim()}` : 'its page'} and booking links will show a "not available" message. Its existing bookings and all its data stay exactly as they are.`}
                 </span>
               </span>
             </label>

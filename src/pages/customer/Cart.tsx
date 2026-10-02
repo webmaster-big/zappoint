@@ -54,7 +54,7 @@ const Cart = () => {
   const { locations: storefrontLocations } = useStorefrontLocations();
   const backTo = useMemo(() => {
     const match = storefrontLocations.find(l => l.id === cartLocationId);
-    return match?.slug ? `/${match.slug}` : '/';
+    return match?.slug && match.show_on_main_page ? `/${match.slug}` : '/';
   }, [storefrontLocations, cartLocationId]);
 
   useEffect(() => {
@@ -144,6 +144,7 @@ const Cart = () => {
 
   const lineFor = (position: number) => quote?.lines.find(l => l.position === position);
   const missingSchedule = items.some(i => i.type === 'attraction' && (!i.scheduledDate || !i.scheduledTime));
+  const venueUnavailable = storefrontLocations.find(l => l.id === cartLocationId)?.show_on_main_page === false;
 
   return (
     <>
@@ -345,6 +346,13 @@ const Cart = () => {
                 </div>
               )}
 
+              {venueUnavailable && (
+                <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                  <span>{items[0]?.locationName ?? 'This location'} is not taking online bookings right now, so these items cannot be checked out.</span>
+                </div>
+              )}
+
               {quoteError && (
                 <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3 mb-4">
                   <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
@@ -380,7 +388,7 @@ const Cart = () => {
               <button
                 type="button"
                 onClick={() => navigate('/checkout')}
-                disabled={quoting || !quote || missingSchedule}
+                disabled={quoting || !quote || missingSchedule || venueUnavailable}
                 className="w-full px-5 py-3 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
               >
                 Continue to checkout
@@ -388,9 +396,11 @@ const Cart = () => {
               </button>
 
               <p className="text-xs text-gray-400 text-center mt-3">
-                {missingSchedule
-                  ? 'Pick a visit day & time for each attraction to continue.'
-                  : 'You pay on the next step. Prices are confirmed by the venue.'}
+                {venueUnavailable
+                  ? 'Online booking is turned off for this location.'
+                  : missingSchedule
+                    ? 'Pick a visit day & time for each attraction to continue.'
+                    : 'You pay on the next step. Prices are confirmed by the venue.'}
               </p>
             </div>
           </aside>

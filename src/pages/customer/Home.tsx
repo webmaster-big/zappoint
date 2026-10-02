@@ -38,6 +38,7 @@ import { getImageUrl as assetUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import SiteFooter from '../../components/customer/SiteFooter';
 import NotFound from '../NotFound';
+import LocationUnavailable from '../../components/customer/LocationUnavailable';
 // import MembershipCarousel from '../../components/customer/MembershipCarousel';
 
 
@@ -1006,6 +1007,10 @@ const EntertainmentLandingPage = () => {
     }
 
     return <NotFound />;
+  }
+
+  if (activeLocation && !activeLocation.show_on_main_page) {
+    return <LocationUnavailable name={activeLocation.name} city={activeLocation.city} />;
   }
 
   const locationAddress = activeLocation

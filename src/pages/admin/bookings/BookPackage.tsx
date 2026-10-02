@@ -60,6 +60,7 @@ import customFieldService, {
   type ApplicableCustomField,
 } from '../../../services/CustomFieldService';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
+import LocationUnavailable from '../../../components/customer/LocationUnavailable';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -1797,6 +1798,10 @@ const BookPackage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (callToBookVenue?.show_on_main_page === false) {
+    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} />;
   }
 
   return (

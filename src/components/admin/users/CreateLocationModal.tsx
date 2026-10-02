@@ -143,7 +143,7 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
             </div>
             {hideNotApplied && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                It could not be hidden from the main booking page yet. In a few minutes, open Edit location and turn off Show on the main booking page.
+                It could not be hidden from the booking site yet. In a few minutes, open Edit location and turn off Show on the booking site.
               </div>
             )}
             <div className="flex justify-end pt-2">
@@ -262,8 +262,8 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
                 className="mt-0.5 rounded border-gray-300"
               />
               <span>
-                Show on the main booking page
-                <span className="block text-xs text-gray-500">When this is off, the location is left off the main booking page and Browse all locations, but its own page still works and can take bookings. You can change this later from Edit location.</span>
+                Show on the booking site
+                <span className="block text-xs text-gray-500">When this is off, guests cannot see or book this location online, and its links show a "not available" message. You can turn it on later from Edit location.</span>
               </span>
             </label>
 
