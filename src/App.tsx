@@ -49,6 +49,7 @@ import AttendantProfile from "./pages/admin/profile/AttendantProfile";
 import Notifications from "./pages/admin/Notifications";
 import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
 import ManageAccounts from "./pages/admin/users/ManageAccounts";
+import StaffPins from "./pages/admin/pins/StaffPins";
 import EntertainmentLandingPage from "./pages/customer/Home";
 import { CartProvider } from "./contexts/CartContext";
 import LocationChooser from "./pages/customer/Locations";
@@ -349,6 +350,7 @@ function App() {
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
           <Route path="/admin/day-offs" element={<ProtectedRoute allowedRoles={['company_admin']}><DayOffs /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
+          <Route path="/staff-pins" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><StaffPins /></ProtectedRoute>} />
           <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={['company_admin']}><Payments /></ProtectedRoute>} />
           <Route path="/admin/payments/:id" element={<ProtectedRoute allowedRoles={['company_admin']}><ViewPayment /></ProtectedRoute>} />
           

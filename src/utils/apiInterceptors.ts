@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { isReportingEndpoint, reportClientError } from './errorLogger';
 import { enforceCacheOwnership, purgeAllZapzoneCaches } from './cacheGuard';
+import { isTerminalLocked } from './terminalLock';
 
 const SCOPE_LEAK_KEYS = ['user_id', 'userId'] as const;
 
@@ -98,6 +99,13 @@ const handleAuthError = (error: any) => {
   }
 
   if (status === 401 && !isAuthEndpoint(url)) {
+    // While a shared terminal sits on the PIN screen its token is deliberately dead on the server.
+    // Wiping the session here would navigate away from the admin shell and destroy the half-finished
+    // work the lock is meant to preserve.
+    if (isTerminalLocked()) {
+      return Promise.reject(error);
+    }
+
     let hadSession = false;
     try {
       hadSession = !!localStorage.getItem('zapzone_user');

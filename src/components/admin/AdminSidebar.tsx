@@ -55,7 +55,8 @@ import {
   ExternalLink,
   Send as SendIcon,
   PhoneCall,
-  Footprints
+  Footprints,
+  KeyRound
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -103,6 +104,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Visitor Tracking': 'Every customer visit as a session - pages, clicks and time on site',
     'Profile': 'Update your personal profile information',
     'Settings': 'Configure application settings',
+    'Employee PINs': 'Issue staff PINs and set the automatic logout',
     'Custom Fields': 'Extra checkboxes shown at checkout',
     'Attendants Management': 'Manage attendant accounts and permissions',
     'Manage Attendants': 'View and edit attendant accounts',
@@ -320,6 +322,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Payments', icon: CreditCard, href: '/manager/payments', section: 'Financial' },
         { label: 'Attendants Management', icon: UserCog, section: 'Team', items: [
           { label: 'Manage Attendants', href: '/manager/attendants', icon: Users },
+          { label: 'Employee PINs', href: '/staff-pins', icon: KeyRound },
           { label: 'Activity Log', href: '/manager/attendants/activity', icon: FileText },
           { label: 'Day Offs', href: '/manager/day-offs', icon: CalendarOff },
         ]},
@@ -408,6 +411,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Payments', icon: CreditCard, href: '/admin/payments', section: 'Financial' },
         { label: 'User Management', icon: UserCog, section: 'Administration', items: [
           { label: 'Manage Accounts', href: '/admin/users', icon: Users },
+          { label: 'Employee PINs', href: '/staff-pins', icon: KeyRound },
           { label: 'Activity Log', href: '/admin/activity', icon: FileText },
           { label: 'Day Offs', href: '/admin/day-offs', icon: CalendarOff },
         ]},
