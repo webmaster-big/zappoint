@@ -61,6 +61,8 @@ import customFieldService, {
 } from '../../../services/CustomFieldService';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 import LocationUnavailable from '../../../components/customer/LocationUnavailable';
+import StaffPreviewBanner from '../../../components/customer/StaffPreviewBanner';
+import { hasStaffSession } from '../../../utils/staffSession';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -1800,12 +1802,14 @@ const BookPackage: React.FC = () => {
     );
   }
 
-  if (callToBookVenue?.show_on_main_page === false) {
-    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} />;
+  const hiddenFromGuests = callToBookVenue?.show_on_main_page === false;
+  if (callToBookVenue && hiddenFromGuests && !hasStaffSession()) {
+    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} phone={callToBookVenue.phone} />;
   }
 
   return (
     <>
+      {hiddenFromGuests && <StaffPreviewBanner name={callToBookVenue?.name} city={callToBookVenue?.city} />}
       <ConfirmationModal />
       <AddOnDetailsModal />
       

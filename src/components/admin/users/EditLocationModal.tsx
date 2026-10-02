@@ -370,7 +370,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
                 <span className="block text-xs text-gray-500 mt-0.5">
                   {form.show_on_main_page !== false
                     ? 'Guests can find this location on the main booking page and book it online.'
-                    : `Guests will not see this location on the booking site, and ${form.slug?.trim() ? `its page at /${form.slug.trim()}` : 'its page'} and booking links will show a "not available" message. Its existing bookings and all its data stay exactly as they are.`}
+                    : `Guests will not see this location on the booking site and cannot book it online: ${form.slug?.trim() ? `its page at /${form.slug.trim()}` : 'its page'} and booking links will show a "not available" message. Staff who are logged in can still open those pages, and bookings made from the admin app keep working. Its existing bookings and all its data stay exactly as they are.`}
                 </span>
               </span>
             </label>

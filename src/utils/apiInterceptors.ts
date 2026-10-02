@@ -74,9 +74,11 @@ const ADMIN_ROUTE_PREFIXES = [
 ];
 
 const PUBLIC_PATH_PREFIXES = ['/photos/kiosk', '/photos/slideshow', '/photos/qr'];
+const PUBLIC_PATH_PATTERNS = [/^\/events\/\d+\/purchase\/?$/];
 
 const isAdminRoute = (path: string): boolean => {
   if (PUBLIC_PATH_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return false;
+  if (PUBLIC_PATH_PATTERNS.some((pattern) => pattern.test(path))) return false;
   return ADMIN_ROUTE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 };
 

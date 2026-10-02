@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
+import { hasStaffSession } from '../../utils/staffSession';
 import ticketOrderService, { type CartQuote } from '../../services/TicketOrderService';
 import { attractionService } from '../../services/AttractionService';
 import dayOffService, { type DayOff } from '../../services/DayOffService';
@@ -54,7 +55,7 @@ const Cart = () => {
   const { locations: storefrontLocations } = useStorefrontLocations();
   const backTo = useMemo(() => {
     const match = storefrontLocations.find(l => l.id === cartLocationId);
-    return match?.slug && match.show_on_main_page ? `/${match.slug}` : '/';
+    return match?.slug && (match.show_on_main_page || hasStaffSession()) ? `/${match.slug}` : '/';
   }, [storefrontLocations, cartLocationId]);
 
   useEffect(() => {
@@ -144,7 +145,7 @@ const Cart = () => {
 
   const lineFor = (position: number) => quote?.lines.find(l => l.position === position);
   const missingSchedule = items.some(i => i.type === 'attraction' && (!i.scheduledDate || !i.scheduledTime));
-  const venueUnavailable = storefrontLocations.find(l => l.id === cartLocationId)?.show_on_main_page === false;
+  const venueUnavailable = storefrontLocations.find(l => l.id === cartLocationId)?.show_on_main_page === false && !hasStaffSession();
 
   return (
     <>
@@ -349,7 +350,7 @@ const Cart = () => {
               {venueUnavailable && (
                 <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                   <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                  <span>{items[0]?.locationName ?? 'This location'} is not taking online bookings right now, so these items cannot be checked out.</span>
+                  <span>{items[0]?.locationName ?? 'This location'} is not taking online bookings right now, so these items cannot be checked out. Clear the cart to choose another location.</span>
                 </div>
               )}
 

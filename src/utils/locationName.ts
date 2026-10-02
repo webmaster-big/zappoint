@@ -25,3 +25,8 @@ export const splitLocationName = (name: string, city?: string | null): LocationN
 
 export const locationShortName = (name: string, city?: string | null): string =>
   splitLocationName(name, city).primary;
+
+export const locationDisplayName = (name: string, city?: string | null): string => {
+  const { primary, secondary } = splitLocationName(name, city);
+  return secondary ? `${primary} (${secondary})` : primary;
+};

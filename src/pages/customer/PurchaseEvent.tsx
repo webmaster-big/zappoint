@@ -66,6 +66,8 @@ import { convertTo12Hour } from '../../utils/timeFormat';
 import MobilePurchaseIntro from '../../components/customer/MobilePurchaseIntro';
 import { useStorefrontBrand } from '../../hooks/useStorefrontBrand';
 import LocationUnavailable from '../../components/customer/LocationUnavailable';
+import StaffPreviewBanner from '../../components/customer/StaffPreviewBanner';
+import { hasStaffSession } from '../../utils/staffSession';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
@@ -1138,8 +1140,9 @@ const PurchaseEvent = () => {
     );
   }
 
-  if (callToBookVenue?.show_on_main_page === false) {
-    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} />;
+  const hiddenFromGuests = callToBookVenue?.show_on_main_page === false;
+  if (callToBookVenue && hiddenFromGuests && !hasStaffSession()) {
+    return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} phone={callToBookVenue.phone} />;
   }
 
   const orderedAddOns: EventAddOn[] = event
@@ -1150,6 +1153,7 @@ const PurchaseEvent = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40">
+      {hiddenFromGuests && <StaffPreviewBanner name={callToBookVenue?.name} city={callToBookVenue?.city} />}
 
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>

@@ -39,6 +39,8 @@ import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import SiteFooter from '../../components/customer/SiteFooter';
 import NotFound from '../NotFound';
 import LocationUnavailable from '../../components/customer/LocationUnavailable';
+import StaffPreviewBanner from '../../components/customer/StaffPreviewBanner';
+import { hasStaffSession } from '../../utils/staffSession';
 // import MembershipCarousel from '../../components/customer/MembershipCarousel';
 
 
@@ -1009,8 +1011,9 @@ const EntertainmentLandingPage = () => {
     return <NotFound />;
   }
 
-  if (activeLocation && !activeLocation.show_on_main_page) {
-    return <LocationUnavailable name={activeLocation.name} city={activeLocation.city} />;
+  const hiddenFromGuests = Boolean(activeLocation && !activeLocation.show_on_main_page);
+  if (activeLocation && hiddenFromGuests && !hasStaffSession()) {
+    return <LocationUnavailable name={activeLocation.name} city={activeLocation.city} phone={activeLocation.phone} />;
   }
 
   const locationAddress = activeLocation
@@ -1019,6 +1022,7 @@ const EntertainmentLandingPage = () => {
 
   return (
     <>
+      {hiddenFromGuests && <StaffPreviewBanner name={activeLocation?.name} city={activeLocation?.city} />}
       <style>{`
         @keyframes backdrop-fade {
           from { opacity: 0; }

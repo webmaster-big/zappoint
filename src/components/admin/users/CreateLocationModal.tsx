@@ -263,7 +263,7 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
               />
               <span>
                 Show on the booking site
-                <span className="block text-xs text-gray-500">When this is off, guests cannot see or book this location online, and its links show a "not available" message. You can turn it on later from Edit location.</span>
+                <span className="block text-xs text-gray-500">When this is off, guests cannot see or book this location online, and its links show a "not available" message. Staff can still open it and book from the admin app. You can turn it on later from Edit location.</span>
               </span>
             </label>
 
