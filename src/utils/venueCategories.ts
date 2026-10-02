@@ -27,7 +27,8 @@ export const normalizeCategory = (value?: string | null): string => {
   const trimmed = (value ?? '').trim();
   if (trimmed === '') return '';
 
-  return CANONICAL_BY_ALIAS[trimmed.toLowerCase().replace(/\s+/g, ' ')] ?? trimmed;
+  const alias = trimmed.toLowerCase().replace(/\s+/g, ' ');
+  return Object.prototype.hasOwnProperty.call(CANONICAL_BY_ALIAS, alias) ? CANONICAL_BY_ALIAS[alias] : trimmed;
 };
 
 export const isEscapeRoomCategory = (value?: string | null): boolean =>

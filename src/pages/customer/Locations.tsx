@@ -1,76 +1,62 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Phone, Search, ChevronRight, X, Zap } from 'lucide-react';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
 import type { StorefrontLocation } from '../../services/StorefrontLocationService';
 import { customerDataCacheService } from '../../services/CustomerDataCacheService';
-import type { GroupedAttraction, GroupedPackage, GroupedEvent } from '../../services/CustomerService';
 import SiteFooter from '../../components/customer/SiteFooter';
 import LocationsMap from '../../components/customer/LocationsMap';
 import { splitLocationName } from '../../utils/locationName';
-
-interface LocationTally {
-  packages: number;
-  attractions: number;
-  events: number;
-}
-
-const emptyTally = (): LocationTally => ({ packages: 0, attractions: 0, events: 0 });
+import { buildLocationCategories, storefrontCategoryPath, type StorefrontCategory } from '../../utils/storefrontCategories';
 
 const LocationChooser = () => {
-  const { locations, loaded, failed } = useStorefrontLocations();
+  const { locations: allLocations, loaded, failed } = useStorefrontLocations();
   const [query, setQuery] = useState('');
-  const [tallies, setTallies] = useState<Record<number, LocationTally>>({});
+  const [categoriesByLocation, setCategoriesByLocation] = useState<Record<number, StorefrontCategory[]>>({});
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
 
-  const buildTallies = useCallback((
-    attractions: GroupedAttraction[],
-    packages: GroupedPackage[],
-    events: GroupedEvent[],
-  ) => {
-    const next: Record<number, LocationTally> = {};
-
-    const bump = (locationId: number, key: keyof LocationTally) => {
-      if (!next[locationId]) next[locationId] = emptyTally();
-      next[locationId][key] += 1;
-    };
-
-    packages.forEach((pkg) => pkg.locations.forEach((loc) => bump(loc.location_id, 'packages')));
-    attractions.forEach((attr) => attr.locations.forEach((loc) => bump(loc.location_id, 'attractions')));
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    events
-      .filter((evt) => {
-        const endDate = (evt.end_date || evt.start_date || '').substring(0, 10);
-        if (!endDate) return false;
-        return new Date(`${endDate}T23:59:59`) >= today;
-      })
-      .forEach((evt) => evt.locations.forEach((loc) => bump(loc.location_id, 'events')));
-
-    setTallies(next);
-  }, []);
+  const locations = useMemo(
+    () => allLocations.filter((location) => location.show_on_main_page),
+    [allLocations],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      try {
-        const cached = await customerDataCacheService.getCachedAll();
-        if (cached && !cancelled) {
-          buildTallies(cached.attractions, cached.packages, cached.events);
-        }
-        const fresh = await customerDataCacheService.getWithBackgroundSync();
-        if (!cancelled) {
-          buildTallies(fresh.attractions, fresh.packages, fresh.events);
-        }
-      } catch {
-        /* counts are a nicety; the location list stands without them */
+      const cached = await customerDataCacheService.getCachedAll();
+      if (cached && !cancelled && (cached.attractions.length > 0 || cached.packages.length > 0 || cached.events.length > 0)) {
+        setCategoriesByLocation(buildLocationCategories(cached.attractions, cached.packages, cached.events));
+        setCategoriesLoaded(true);
+      }
+      const fresh = await customerDataCacheService.getWithBackgroundSync();
+      if (!cancelled) {
+        setCategoriesByLocation(buildLocationCategories(fresh.attractions, fresh.packages, fresh.events));
       }
     };
 
-    load();
+    load()
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setCategoriesLoaded(true);
+      });
     return () => { cancelled = true; };
-  }, [buildTallies]);
+  }, []);
+
+  useEffect(() => {
+    return customerDataCacheService.onCacheUpdate((event: CustomEvent) => {
+      const data = event.detail?.source === 'api' ? event.detail?.data : null;
+      if (!data) return;
+      setCategoriesByLocation(buildLocationCategories(data.attractions, data.packages, data.events));
+    });
+  }, []);
+
+  const exampleCities = useMemo(() => {
+    const cities = locations.map((location) => location.city || splitLocationName(location.name, location.city).primary).filter(Boolean);
+    if (cities.length <= 1) return cities.join('');
+    const shown = cities.slice(0, 3);
+    return `${shown.slice(0, -1).join(', ')} or ${shown[shown.length - 1]}`;
+  }, [locations]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -116,7 +102,7 @@ const LocationChooser = () => {
             <div className="inline-flex items-center space-x-2 bg-white/15 backdrop-blur-md px-4 py-2 md:px-5 md:py-2.5 rounded-full mb-5 md:mb-7 border border-white/20">
               <Zap className="w-4 h-4 md:w-5 md:h-5 text-yellow-300" />
               <span className="text-xs md:text-sm font-semibold tracking-wide">
-                {locations.length > 0 ? `${locations.length} Michigan Locations` : 'Michigan Locations'}
+                {locations.length > 0 ? `${locations.length} Michigan ${locations.length === 1 ? 'Location' : 'Locations'}` : 'Michigan Locations'}
               </span>
             </div>
 
@@ -124,8 +110,7 @@ const LocationChooser = () => {
               Which Zap Zone are you visiting?
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-blue-100/90 leading-relaxed">
-              Pick a location to see its packages, attractions and events — and to book without being
-              asked which one you meant.
+              Pick a location, or tap one of its categories to go straight to what you want to book there.
             </p>
           </div>
 
@@ -199,7 +184,9 @@ const LocationChooser = () => {
           {!showSkeletons && !loadFailed && !noLocationsPublished && visible.length === 0 && (
             <div className="text-center py-16">
               <p className="text-base font-semibold text-gray-900 mb-1.5">No location matches "{query}"</p>
-              <p className="text-sm text-gray-500 mb-6">Try a city name such as Brighton, Canton or Taylor.</p>
+              {exampleCities && (
+                <p className="text-sm text-gray-500 mb-6">Try a city name such as {exampleCities}.</p>
+              )}
               <button
                 type="button"
                 onClick={() => setQuery('')}
@@ -213,28 +200,20 @@ const LocationChooser = () => {
           {visible.length > 0 && (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {visible.map((location, index) => {
-                const tally = tallies[location.id];
-                const counts = [
-                  { noun: 'package', value: tally?.packages ?? 0 },
-                  { noun: 'attraction', value: tally?.attractions ?? 0 },
-                  { noun: 'event', value: tally?.events ?? 0 },
-                ]
-                  .filter((entry) => entry.value > 0)
-                  .map((entry) => ({ ...entry, label: entry.value === 1 ? entry.noun : `${entry.noun}s` }));
-
+                const categories = categoriesByLocation[location.id] ?? [];
                 const { primary, secondary } = splitLocationName(location.name, location.city);
 
                 return (
                   <article
                     key={location.id}
-                    className={`flex flex-col bg-white border border-gray-200 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group card-hover animate-fade-in-up ${index < 5 ? `animate-stagger-${index + 1}` : ''}`}
+                    className={`relative flex flex-col bg-white border border-gray-200 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group card-hover animate-fade-in-up ${index < 5 ? `animate-stagger-${index + 1}` : ''}`}
                   >
                     <Link
                       to={`/${location.slug}`}
                       aria-label={`${location.name} — view and book`}
-                      className="flex-1 flex flex-col p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-inset"
+                      className="block px-5 pt-5 pb-4 after:absolute after:inset-0 after:rounded-2xl focus:outline-none focus-visible:after:ring-2 focus-visible:after:ring-blue-800 focus-visible:after:ring-inset"
                     >
-                      <div className="flex items-start gap-3 mb-4">
+                      <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-800 transition-colors duration-300">
                           <MapPin className="w-5 h-5 text-blue-800 group-hover:text-white transition-colors duration-300" />
                         </div>
@@ -249,7 +228,7 @@ const LocationChooser = () => {
                       </div>
 
                       {addressLine(location) && (
-                        <p className="flex items-start gap-2 text-sm text-gray-500 leading-relaxed mb-4">
+                        <p className="flex items-start gap-2 text-sm text-gray-500 leading-relaxed mt-4">
                           <MapPin className="w-3.5 h-3.5 mt-1 flex-shrink-0 text-blue-600" aria-hidden="true" />
                           <span>
                             {addressLine(location)}
@@ -257,23 +236,42 @@ const LocationChooser = () => {
                           </span>
                         </p>
                       )}
+                    </Link>
 
-                      {counts.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-5">
-                          {counts.map(({ noun, label, value }) => (
-                            <span
-                              key={noun}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 text-xs rounded-lg"
-                            >
-                              <span className="font-bold text-gray-900 tabular-nums">{value}</span>
-                              <span className="font-medium">{label}</span>
-                            </span>
-                          ))}
+                    <div className="flex-1 flex flex-col px-5 pb-5">
+                      {categories.length > 0 && (
+                        <nav aria-label={`What you can book at ${primary}`} className="relative z-10 pointer-events-none">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400 mb-2">
+                            Book by category
+                          </p>
+                          <ul className="flex flex-wrap gap-1.5">
+                            {categories.map((category) => (
+                              <li key={category.key}>
+                                <Link
+                                  to={storefrontCategoryPath(location.slug, category.key)}
+                                  className="pointer-events-auto inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-800 text-xs font-semibold rounded-full capitalize hover:bg-blue-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-1 transition-colors"
+                                >
+                                  {category.label}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </nav>
+                      )}
+
+                      {categories.length === 0 && !categoriesLoaded && (
+                        <div className="flex flex-wrap gap-1.5 animate-pulse" aria-hidden="true">
+                          <span className="h-7 w-24 rounded-full bg-gray-100" />
+                          <span className="h-7 w-20 rounded-full bg-gray-100" />
+                          <span className="h-7 w-16 rounded-full bg-gray-100" />
                         </div>
                       )}
 
-                      <div className="mt-auto space-y-2.5">
-                        <span className="w-full py-3 bg-gradient-to-r from-blue-800 to-blue-700 text-white font-semibold text-sm rounded-xl group-hover:from-blue-900 group-hover:to-blue-800 transition-all flex items-center justify-center gap-2 shadow-md group-hover:shadow-lg">
+                      <div className="mt-auto pt-5 space-y-2.5">
+                        <span
+                          aria-hidden="true"
+                          className="w-full py-3 bg-gradient-to-r from-blue-800 to-blue-700 text-white font-semibold text-sm rounded-xl group-hover:from-blue-900 group-hover:to-blue-800 transition-all flex items-center justify-center gap-2 shadow-md group-hover:shadow-lg"
+                        >
                           View &amp; Book
                           <ChevronRight className="w-4 h-4 transition-transform duration-300 motion-safe:group-hover:translate-x-1" />
                         </span>
@@ -281,10 +279,10 @@ const LocationChooser = () => {
                           /{location.slug}
                         </span>
                       </div>
-                    </Link>
+                    </div>
 
                     {location.phone && (
-                      <div className="border-t border-gray-100 px-5 py-2.5 bg-gray-50/60">
+                      <div className="relative z-10 border-t border-gray-100 px-5 py-2.5 bg-gray-50/60">
                         <a
                           href={`tel:${location.phone}`}
                           className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-blue-800 transition-colors"

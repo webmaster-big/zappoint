@@ -22,6 +22,7 @@ const initialForm: CreateLocationData = {
   phone: '',
   email: '',
   is_active: true,
+  show_on_main_page: true,
 };
 
 const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: CreateLocationModalProps) => {
@@ -31,6 +32,7 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [success, setSuccess] = useState<Location | null>(null);
+  const [hideNotApplied, setHideNotApplied] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -38,6 +40,7 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
     setError(null);
     setFieldErrors({});
     setSuccess(null);
+    setHideNotApplied(false);
   }, [isOpen]);
 
   const update = <K extends keyof CreateLocationData>(key: K, value: CreateLocationData[K]) => {
@@ -63,12 +66,14 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
       if (form.phone?.trim()) payload.phone = form.phone.trim();
       if (form.email?.trim()) payload.email = form.email.trim();
       payload.is_active = form.is_active ?? true;
+      payload.show_on_main_page = form.show_on_main_page ?? true;
 
       const res = await locationService.createLocation(payload);
       if (!res.success || !res.data) {
         setError(res.message || 'Failed to create location.');
         return;
       }
+      setHideNotApplied(payload.show_on_main_page === false && res.data.show_on_main_page !== false);
       setSuccess(res.data);
       onCreated?.(res.data);
     } catch (err: unknown) {
@@ -136,6 +141,11 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
                 </p>
               </div>
             </div>
+            {hideNotApplied && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                It could not be hidden from the main booking page yet. In a few minutes, open Edit location and turn off Show on the main booking page.
+              </div>
+            )}
             <div className="flex justify-end pt-2">
               <StandardButton onClick={onClose} variant="primary" size="md">
                 Done
@@ -241,6 +251,20 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
                 className={`rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
               />
               Active
+            </label>
+
+            <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.show_on_main_page ?? true}
+                onChange={(e) => update('show_on_main_page', e.target.checked)}
+                disabled={submitting}
+                className="mt-0.5 rounded border-gray-300"
+              />
+              <span>
+                Show on the main booking page
+                <span className="block text-xs text-gray-500">When this is off, the location is left off the main booking page and Browse all locations, but its own page still works and can take bookings. You can change this later from Edit location.</span>
+              </span>
             </label>
 
             <div className="flex gap-3 pt-2">

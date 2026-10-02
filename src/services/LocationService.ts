@@ -44,6 +44,7 @@ export interface Location {
   operating_hours?: string;
   timezone?: string | null;
   is_active: boolean;
+  show_on_main_page?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +76,7 @@ export interface CreateLocationData {
   operating_hours?: string;
   timezone?: string;
   is_active?: boolean;
+  show_on_main_page?: boolean;
 }
 
 export type UpdateLocationData = Partial<CreateLocationData>;

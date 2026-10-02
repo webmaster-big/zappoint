@@ -40,7 +40,7 @@ const FitToPins: React.FC<{ positions: Array<[number, number]> }> = ({ positions
 
   useEffect(() => {
     if (positions.length === 0) return;
-    map.fitBounds(L.latLngBounds(positions), { padding: [60, 60], maxZoom: 11 });
+    map.fitBounds(L.latLngBounds(positions), { padding: [60, 60], maxZoom: 11, animate: false });
   }, [map, positions]);
 
   return null;

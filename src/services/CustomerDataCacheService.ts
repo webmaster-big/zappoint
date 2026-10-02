@@ -124,20 +124,27 @@ class CustomerDataCacheService {
       customerService.getGroupedEvents(),
     ]);
 
-    const attractions = attractionsResult.status === 'fulfilled' && attractionsResult.value.success
-      ? attractionsResult.value.data : [];
-    const packages = packagesResult.status === 'fulfilled' && packagesResult.value.success
-      ? packagesResult.value.data : [];
-    const events = eventsResult.status === 'fulfilled' && eventsResult.value.success
-      ? eventsResult.value.data : [];
+    const freshAttractions = attractionsResult.status === 'fulfilled' && attractionsResult.value.success
+      ? attractionsResult.value.data : null;
+    const freshPackages = packagesResult.status === 'fulfilled' && packagesResult.value.success
+      ? packagesResult.value.data : null;
+    const freshEvents = eventsResult.status === 'fulfilled' && eventsResult.value.success
+      ? eventsResult.value.data : null;
+
+    const complete = freshAttractions !== null && freshPackages !== null && freshEvents !== null;
+    const previous = complete ? null : await this.getCachedAll();
+
+    const attractions = freshAttractions ?? previous?.attractions ?? [];
+    const packages = freshPackages ?? previous?.packages ?? [];
+    const events = freshEvents ?? previous?.events ?? [];
 
     const cache = await this.getCache();
     if (cache) {
       await Promise.all([
-        this.putJSON(cache, ATTRACTIONS_KEY, attractions),
-        this.putJSON(cache, PACKAGES_KEY, packages),
-        this.putJSON(cache, EVENTS_KEY, events),
-        this.putJSON(cache, METADATA_KEY, { lastUpdated: Date.now() } as CacheMetadata),
+        freshAttractions !== null && this.putJSON(cache, ATTRACTIONS_KEY, attractions),
+        freshPackages !== null && this.putJSON(cache, PACKAGES_KEY, packages),
+        freshEvents !== null && this.putJSON(cache, EVENTS_KEY, events),
+        complete && this.putJSON(cache, METADATA_KEY, { lastUpdated: Date.now() } as CacheMetadata),
       ]);
     }
 

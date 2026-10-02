@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { normalizeCategory } from '../../utils/venueCategories';
+import { EVENTS_CATEGORY_LABEL, categoryKeyOf, categoryLabelOfPackage, isUpcomingEvent } from '../../utils/storefrontCategories';
 import { useParams } from 'react-router-dom';
 import {
   MapPin,
@@ -71,6 +72,7 @@ interface DisplayEvent {
   price: string;
   features: string[] | null;
   availableLocations: string[];
+  availableLocationIds?: number[];
   locations: DisplayEventLocation[];
   purchaseLinks: Array<{ location: string; url: string; event_id: number; location_id: number }>;
   callToBookByLocation?: Record<number, boolean>;
@@ -91,13 +93,6 @@ interface FilterChip {
 }
 
 const CART_ENABLED = true;
-
-const categoryKeyOf = (value?: string | null) =>
-  (value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 
 const firstImage = (value?: string | string[] | null): string | null => {
   if (Array.isArray(value)) return value.find(item => typeof item === 'string' && item.trim() !== '') ?? null;
@@ -257,12 +252,45 @@ const resolveForLocation = <T extends { overridesByLocation?: Record<number, Par
   });
 };
 
-const EVENTS_CATEGORY_LABEL = 'Events';
+interface LocationScopedItem<T> {
+  availableLocations: string[];
+  availableLocationIds?: number[];
+  image?: string | null;
+  imageByLocation?: Record<number, string | null>;
+  callToBookByLocation?: Record<number, boolean>;
+  overridesByLocation?: Record<number, Partial<T>>;
+}
 
-// A package shown as "Escape Room" belongs under that name, not under its
-// internal category, so the storefront filters read the way guests think.
-const categoryLabelOfPackage = (pkg: { display_label?: string | null; category?: string | null }) =>
-  normalizeCategory(pkg.display_label || pkg.category);
+const onlyKept = <V,>(map: Record<number, V> | undefined, keep: (locationId: number) => boolean) =>
+  map && (Object.fromEntries(Object.entries(map).filter(([locationId]) => keep(Number(locationId)))) as Record<number, V>);
+
+const withoutHiddenLocations = <T extends LocationScopedItem<T>>(
+  items: T[],
+  hiddenIds: Set<number>,
+  pruneLinks: (item: T, keep: (locationId: number) => boolean) => Partial<T>,
+): T[] => {
+  if (hiddenIds.size === 0) return items;
+  const keep = (locationId: number) => !hiddenIds.has(locationId);
+  return items.flatMap(item => {
+    const ids = item.availableLocationIds ?? [];
+    if (ids.every(keep)) return [item];
+    const availableLocationIds = ids.filter(keep);
+    if (availableLocationIds.length === 0) return [];
+    const keptImage = availableLocationIds.map(id => item.imageByLocation?.[id]).find(Boolean);
+    const hiddenImages = ids.filter(id => !keep(id)).map(id => item.imageByLocation?.[id]);
+    return [{
+      ...item,
+      ...(keep(ids[0]) ? undefined : item.overridesByLocation?.[availableLocationIds[0]]),
+      ...pruneLinks(item, keep),
+      image: keptImage ?? (item.image && hiddenImages.includes(item.image) ? '' : item.image),
+      imageByLocation: onlyKept(item.imageByLocation, keep),
+      callToBookByLocation: onlyKept(item.callToBookByLocation, keep),
+      overridesByLocation: onlyKept(item.overridesByLocation, keep),
+      availableLocationIds,
+      availableLocations: item.availableLocations.filter((_, index) => keep(ids[index])),
+    }];
+  });
+};
 
 const EntertainmentLandingPage = () => {
   const { locationSlug } = useParams<{ locationSlug?: string }>();
@@ -334,28 +362,61 @@ const EntertainmentLandingPage = () => {
   const [rawAttractions, setAttractions] = useState<Attraction[]>([]);
   const [rawPackages, setPackages] = useState<PackageType[]>([]);
   const [rawEvents, setEvents] = useState<DisplayEvent[]>([]);
-  const [locations, setLocations] = useState<string[]>(['All Locations']);
+  const [allLocationNames, setLocations] = useState<string[]>(['All Locations']);
   const [dataLoading, setDataLoading] = useState(true);
+
+  const hiddenFromBrowse = useMemo(
+    () => new Set(isSingleLocationPage ? [] : storefrontLocations.filter(loc => !loc.show_on_main_page).map(loc => loc.id)),
+    [isSingleLocationPage, storefrontLocations],
+  );
+  const locations = useMemo(() => {
+    if (hiddenFromBrowse.size === 0) return allLocationNames;
+    const hiddenNames = new Set(storefrontLocations.filter(loc => hiddenFromBrowse.has(loc.id)).map(loc => loc.name));
+    return allLocationNames.filter(name => !hiddenNames.has(name));
+  }, [allLocationNames, hiddenFromBrowse, storefrontLocations]);
+  const scopedLocation = locations.includes(selectedLocation) ? selectedLocation : 'All Locations';
 
   // A package sold at ten locations keeps ten separate photos, so a card has to
   // show the one belonging to the location the guest is actually looking at.
   const viewedLocationId = useMemo(() => {
     if (activeLocation) return activeLocation.id;
-    if (selectedLocation === 'All Locations') return null;
-    return storefrontLocations.find(loc => loc.name === selectedLocation)?.id ?? null;
-  }, [activeLocation, selectedLocation, storefrontLocations]);
+    if (scopedLocation === 'All Locations') return null;
+    return storefrontLocations.find(loc => loc.name === scopedLocation)?.id ?? null;
+  }, [activeLocation, scopedLocation, storefrontLocations]);
 
   const attractions = useMemo(
-    () => resolveForLocation(rawAttractions, viewedLocationId),
-    [rawAttractions, viewedLocationId],
+    () => resolveForLocation(
+      withoutHiddenLocations(rawAttractions, hiddenFromBrowse, (item, keep) => {
+        const purchaseLinks = item.purchaseLinks?.filter(link => keep(link.location_id));
+        return { purchaseLinks, id: purchaseLinks?.[0]?.attraction_id ?? item.id };
+      }),
+      viewedLocationId,
+    ),
+    [rawAttractions, hiddenFromBrowse, viewedLocationId],
   );
   const packages = useMemo(
-    () => resolveForLocation(rawPackages, viewedLocationId),
-    [rawPackages, viewedLocationId],
+    () => resolveForLocation(
+      withoutHiddenLocations(rawPackages, hiddenFromBrowse, (item, keep) => {
+        const bookingLinks = item.bookingLinks?.filter(link => keep(link.location_id));
+        return { bookingLinks, id: bookingLinks?.[0]?.package_id ?? item.id };
+      }),
+      viewedLocationId,
+    ),
+    [rawPackages, hiddenFromBrowse, viewedLocationId],
   );
   const events = useMemo(
-    () => resolveForLocation(rawEvents, viewedLocationId),
-    [rawEvents, viewedLocationId],
+    () => resolveForLocation(
+      withoutHiddenLocations(rawEvents, hiddenFromBrowse, (item, keep) => {
+        const purchaseLinks = item.purchaseLinks.filter(link => keep(link.location_id));
+        return {
+          locations: item.locations.filter(loc => keep(loc.location_id)),
+          purchaseLinks,
+          id: purchaseLinks[0]?.event_id ?? item.id,
+        };
+      }).filter(evt => hiddenFromBrowse.size === 0 || isUpcomingEvent(evt)),
+      viewedLocationId,
+    ),
+    [rawEvents, hiddenFromBrowse, viewedLocationId],
   );
 
   const processData = useCallback((
@@ -413,10 +474,7 @@ const EntertainmentLandingPage = () => {
       evt.locations.forEach(loc => allLocations.add(loc.location_name));
     });
     const transformedEvents: DisplayEvent[] = eventsData
-      .filter((evt: GroupedEvent) => {
-        const endDate = (evt.end_date || evt.start_date).substring(0, 10);
-        return new Date(endDate + 'T23:59:59') >= new Date();
-      })
+      .filter((evt: GroupedEvent) => isUpcomingEvent(evt))
       .map((evt: GroupedEvent) => ({
         id: evt.purchase_links[0]?.event_id || 0,
         name: evt.name,
@@ -425,6 +483,7 @@ const EntertainmentLandingPage = () => {
         imageByLocation: imagesByLocation(evt.locations),
         overridesByLocation: eventOverrides(evt),
         availableLocations: evt.locations.map(loc => loc.location_name),
+        availableLocationIds: evt.locations.map(loc => loc.location_id),
         callToBookByLocation: byLocation(evt.locations, loc =>
           loc.time_start !== undefined ? eventIsCallToBook(loc) : eventIsCallToBook(evt)),
         locations: evt.locations.map(loc => ({
@@ -498,9 +557,9 @@ const EntertainmentLandingPage = () => {
       if (activeLocation) {
         return (locationIds ?? []).includes(activeLocation.id);
       }
-      return selectedLocation === 'All Locations' || locationNames.includes(selectedLocation);
+      return scopedLocation === 'All Locations' || locationNames.includes(scopedLocation);
     },
-    [activeLocation, selectedLocation],
+    [activeLocation, scopedLocation],
   );
 
   const matchesSearch = useCallback(
@@ -1310,7 +1369,7 @@ const EntertainmentLandingPage = () => {
                       key={location}
                       onClick={() => setSelectedLocation(location)}
                       className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                        selectedLocation === location
+                        scopedLocation === location
                           ? 'bg-gray-900 text-white shadow-md'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}

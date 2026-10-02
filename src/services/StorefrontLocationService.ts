@@ -15,6 +15,7 @@ export interface StorefrontLocation {
   logo_path?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  show_on_main_page: boolean;
   /** False when the slug was derived here because the server had none to give. */
   hasStoredSlug?: boolean;
 }
@@ -30,6 +31,9 @@ const api = axios.create({
 
 const asText = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() !== '' ? value : null;
+
+const asListed = (value: unknown): boolean =>
+  value !== false && value !== 0 && value !== '0' && value !== 'false';
 
 const asCoordinate = (value: unknown, limit: number): number | null => {
   if (value === null || value === undefined || value === '') return null;
@@ -63,6 +67,7 @@ const toStorefrontLocation = (value: unknown): StorefrontLocation | null => {
     logo_path: asText(row.logo_path),
     latitude: asCoordinate(row.latitude, 90),
     longitude: asCoordinate(row.longitude, 180),
+    show_on_main_page: asListed(row.show_on_main_page),
   };
 };
 

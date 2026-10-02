@@ -1049,6 +1049,10 @@ const ManageAccounts = () => {
       <CreateLocationModal
         isOpen={showCreateLocationModal}
         onClose={() => setShowCreateLocationModal(false)}
+        onCreated={(created) => {
+          if (created.is_active === false) return;
+          setLocationsData((prev) => [...prev.filter((l) => l.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name)));
+        }}
       />
 
       <ResendCredentialsModal

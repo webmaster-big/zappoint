@@ -1,4 +1,4 @@
-import { X, Building2, Pencil, Phone, Mail } from 'lucide-react';
+import { X, Building2, Pencil, Phone, Mail, EyeOff } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { Location } from '../../../services/LocationService';
 
@@ -55,7 +55,15 @@ const LocationsListModal = ({ isOpen, onClose, locations, onEditLocation, loadin
             locations.map((loc) => (
               <div key={loc.id} className="flex items-start justify-between px-6 py-4 hover:bg-gray-50 gap-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-900">{loc.name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-gray-900">{loc.name}</p>
+                    {loc.show_on_main_page === false && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-full">
+                        <EyeOff className="h-3 w-3" />
+                        Hidden from main booking page
+                      </span>
+                    )}
+                  </div>
                   {(loc.address || loc.city) && (
                     <p className="text-xs text-gray-500 mt-0.5">
                       {[loc.address, loc.city, loc.state, loc.zip_code].filter(Boolean).join(', ')}

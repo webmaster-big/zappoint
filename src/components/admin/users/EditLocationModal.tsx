@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Building2, Save, CheckCircle } from 'lucide-react';
 import StandardButton from '../../ui/StandardButton';
 import EmailInput from '../../ui/EmailInput';
@@ -33,6 +33,14 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [success, setSuccess] = useState(false);
   const [logoPath, setLogoPath] = useState<string | null>(null);
+  const savedWithoutVisibility = useRef<Location | null>(null);
+
+  const close = () => {
+    const saved = savedWithoutVisibility.current;
+    savedWithoutVisibility.current = null;
+    if (saved) onUpdated?.(saved);
+    onClose();
+  };
 
   useEffect(() => {
     if (!isOpen || !location) return;
@@ -48,11 +56,13 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
       phone: location.phone ?? '',
       email: location.email ?? '',
       review_url: location.review_url ?? '',
+      show_on_main_page: location.show_on_main_page !== false,
     });
     setLogoPath(location.logo_path ?? null);
     setError(null);
     setFieldErrors({});
     setSuccess(false);
+    savedWithoutVisibility.current = null;
   }, [isOpen, location]);
 
   const saveLogo = async (next: string | null) => {
@@ -138,14 +148,24 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
         email: form.email?.trim() ?? '',
         review_url: form.review_url?.trim() ? form.review_url.trim() : null,
       };
+      const showOnMainPage = form.show_on_main_page !== false;
+      if (showOnMainPage !== (location.show_on_main_page !== false)) {
+        payload.show_on_main_page = showOnMainPage;
+      }
 
       const res = await locationService.updateLocation(location.id, payload);
       if (!res.success || !res.data) {
         setError(res.message || 'Failed to update location.');
         return;
       }
+      if (payload.show_on_main_page !== undefined && res.data.show_on_main_page !== payload.show_on_main_page) {
+        savedWithoutVisibility.current = res.data;
+        setError('Your other changes were saved, but the main booking page setting could not be changed yet. Please try again in a few minutes.');
+        return;
+      }
       setSuccess(true);
       onUpdated?.(res.data);
+      savedWithoutVisibility.current = null;
       setTimeout(onClose, 1500);
     } catch (err: unknown) {
       const e = err as {
@@ -171,7 +191,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
   return (
     <div
       className={`fixed inset-0 bg-black/50 flex items-center justify-center ${elevated ? 'z-[60]' : 'z-50'} p-4 animate-backdrop-fade`}
-      onClick={submitting ? undefined : onClose}
+      onClick={submitting ? undefined : close}
     >
       <div
         className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto relative animate-scale-in"
@@ -189,7 +209,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
             </div>
           </div>
           <StandardButton
-            onClick={onClose}
+            onClick={close}
             disabled={submitting}
             variant="ghost"
             size="sm"
@@ -337,6 +357,24 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
 
           {/* Storefront URL + map pin */}
           <div className="pt-3 border-t border-gray-100 space-y-3">
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={form.show_on_main_page !== false}
+                onChange={(e) => update('show_on_main_page', e.target.checked)}
+                disabled={submitting}
+                className="mt-0.5 rounded border-gray-300"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-gray-700">Show on the main booking page</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  {form.show_on_main_page !== false
+                    ? 'Guests see this location in the list of locations on the main booking page.'
+                    : `Guests will not see this location on the main booking page or under Browse all locations. ${form.slug?.trim() ? `Its own page at /${form.slug.trim()}` : 'Its own page'}, its bookings and all its data stay exactly as they are.`}
+                </span>
+              </span>
+            </label>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Storefront URL</label>
               <div className="flex items-center">
@@ -405,7 +443,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
           {/* Actions */}
           <div className="flex gap-3 pt-2 border-t border-gray-100">
             <StandardButton
-              onClick={onClose}
+              onClick={close}
               disabled={submitting}
               variant="secondary"
               size="md"

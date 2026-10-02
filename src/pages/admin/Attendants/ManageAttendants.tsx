@@ -16,6 +16,7 @@ import {
   UserPlus,
   Building2,
   Download,
+  EyeOff,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import EmailInput from '../../../components/ui/EmailInput';
@@ -939,7 +940,15 @@ const ManageAttendants = () => {
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Your Location</p>
-                <p className="font-semibold text-gray-900">{locationInfo.name}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-gray-900">{locationInfo.name}</p>
+                  {locationInfo.show_on_main_page === false && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-full">
+                      <EyeOff className="h-3 w-3" />
+                      Hidden from main booking page
+                    </span>
+                  )}
+                </div>
                 {(locationInfo.address || locationInfo.city) && (
                   <p className="text-xs text-gray-500 mt-0.5">
                     {[locationInfo.address, locationInfo.city, locationInfo.state, locationInfo.zip_code].filter(Boolean).join(', ')}
