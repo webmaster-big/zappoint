@@ -29,6 +29,7 @@ import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntr
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo, PurchaseAttractionAddOn } from '../../../types/PurchaseAttraction.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import { newCheckoutKey } from '../../../utils/checkoutKey';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
@@ -47,7 +48,7 @@ import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber,
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { useCartSafe } from '../../../contexts/CartContext';
-import ticketOrderService, { type CartQuote as OrderQuote, type TicketOrder as PlacedOrder } from '../../../services/TicketOrderService';
+import ticketOrderService, { OrderAlreadyPlacedError, type CartQuote as OrderQuote, type TicketOrder as PlacedOrder } from '../../../services/TicketOrderService';
 import { trackPageView } from '../../../utils/analytics';
 import { setNextTrackingId } from '../../../utils/analyticsHeaders';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -934,6 +935,7 @@ const PurchaseAttraction = () => {
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
+  const checkoutKeyRef = useRef(newCheckoutKey());
 
   const pageViewFiredRef = useRef(false);
 
@@ -1103,6 +1105,7 @@ const PurchaseAttraction = () => {
         })(),
         membership_id: membershipBenefits.membershipId ?? undefined,
         membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
+        checkout_key: checkoutKeyRef.current,
       };
 
       if (orderMode && orderItemsPayload && cart) {
@@ -1125,8 +1128,18 @@ const PurchaseAttraction = () => {
             payment_method: 'authorize.net',
             gift_card_code: giftCard?.code ?? null,
             notes: `Bulk order — ${orderItemsPayload.length} items`,
+            checkout_key: checkoutKeyRef.current,
           });
         } catch (createErr) {
+          if (createErr instanceof OrderAlreadyPlacedError) {
+            setPlacedOrder(createErr.order);
+            checkoutKeyRef.current = newCheckoutKey();
+            cart.clear();
+            setToast({ message: createErr.message, type: 'success' });
+            setPurchaseComplete(true);
+            setCurrentStep(4);
+            return;
+          }
           console.error('❌ Order creation failed:', createErr);
           throw new Error(
             createErr instanceof Error && createErr.message
@@ -1142,6 +1155,7 @@ const PurchaseAttraction = () => {
             void ticketOrderService.storeQrCode(order.id, orderQr);
           } catch { void 0; }
           setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: 0, remaining_balance: 0, status: 'confirmed' })));
+          checkoutKeyRef.current = newCheckoutKey();
           cart.clear();
           setToast({ message: 'Order confirmed — your gift card covered it in full!', type: 'success' });
           setPurchaseComplete(true);
@@ -1195,6 +1209,7 @@ const PurchaseAttraction = () => {
         }
 
         setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: order.total_amount, remaining_balance: 0, status: 'confirmed' })));
+        checkoutKeyRef.current = newCheckoutKey();
         cart.clear();
         setToast({ message: 'Order confirmed! Receipt sent to your email.', type: 'success' });
         setPurchaseComplete(true);
@@ -1207,6 +1222,22 @@ const PurchaseAttraction = () => {
         setNextTrackingId();
         response = await attractionPurchaseService.createPurchase(purchaseData);
       } catch (createErr) {
+        const refusal = (createErr as { response?: { status?: number; data?: { code?: string; message?: string; data?: { id?: number } } } })?.response;
+        if (refusal?.status === 409 && refusal.data?.code === 'ALREADY_PURCHASED' && refusal.data.data?.id) {
+          let existingQr = '';
+          try {
+            existingQr = await generatePurchaseQRCode(refusal.data.data.id);
+          } catch (qrError) {
+            console.error('⚠️ QR code generation failed:', qrError);
+          }
+          setQrCodeImage(existingQr);
+          setToast({ message: refusal.data.message || 'This purchase already went through, so your card was not charged again.', type: 'success' });
+          checkoutKeyRef.current = newCheckoutKey();
+          setPurchaseComplete(true);
+          setCurrentStep(4);
+          setShowQRModal(true);
+          return;
+        }
         console.error('❌ Purchase creation failed:', createErr);
         throw new Error('We couldn\'t process your order right now. No charges were made. Please try again or contact us for help.');
       }
@@ -1226,6 +1257,7 @@ const PurchaseAttraction = () => {
 
       if (giftCard && serverDue <= 0 && createdPurchase.status === 'confirmed') {
         setQrCodeImage(qrData);
+        checkoutKeyRef.current = newCheckoutKey();
         setToast({ message: 'Purchase confirmed — your gift card covered it in full!', type: 'success' });
         setPurchaseComplete(true);
         setCurrentStep(4);
@@ -1297,6 +1329,7 @@ const PurchaseAttraction = () => {
       console.log('✅ Payment charged successfully, txn:', paymentResponse.transaction_id);
 
       setQrCodeImage(qrData);
+      checkoutKeyRef.current = newCheckoutKey();
       setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
       const dedupFp = `${attraction.id}-${customerInfo.email}-${quantity}-${total.toFixed(2)}`;

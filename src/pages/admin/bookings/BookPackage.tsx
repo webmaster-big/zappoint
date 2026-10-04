@@ -254,6 +254,10 @@ const BookPackage: React.FC = () => {
       amountPaid: number;
       message: string;
     };
+    amounts?: {
+      total: number;
+      paid: number;
+    };
     notice?: string;
   } | null>(null);
   const checkoutKeyRef = useRef(newCheckoutKey());
@@ -1449,6 +1453,10 @@ const BookPackage: React.FC = () => {
           qrCode: qrCodeBase64,
           bookingId,
           waiverUrl,
+          amounts: {
+            total: Number(response.data.total_amount ?? 0),
+            paid: Number(response.data.amount_paid ?? 0),
+          },
           notice: emailSent ? undefined : "We couldn't send your confirmation email. Please save or screenshot this confirmation.",
         });
         setShowConfirmation(true);
@@ -1456,8 +1464,16 @@ const BookPackage: React.FC = () => {
         return;
       }
 
-      const serverDue = Number(response.data.total_amount ?? 0) - Number(response.data.amount_paid ?? 0);
-      const chargeAmount = serverDue > 0 ? Math.min(amountToPay, Math.round(serverDue * 100) / 100) : amountToPay;
+      const serverDue = Math.round((Number(response.data.total_amount ?? 0) - Number(response.data.amount_paid ?? 0)) * 100) / 100;
+      const chargeAmount = Math.min(amountToPay, serverDue);
+      if (!(chargeAmount > 0)) {
+        try {
+          await bookingService.rollbackBooking(bookingId);
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete booking with nothing to charge:', deleteErr);
+        }
+        throw new Error('We could not work out the amount to charge for this booking, so nothing was charged. Please refresh the page and try again, or call us to book.');
+      }
       
       const paymentData = {
         location_id: pkg.location_id,
@@ -1513,7 +1529,11 @@ const BookPackage: React.FC = () => {
         referenceNumber,
         qrCode: qrCodeBase64,
         bookingId,
-        waiverUrl
+        waiverUrl,
+        amounts: {
+          total: Math.round(Number(response.data.total_amount ?? 0) * 100) / 100,
+          paid: chargeAmount,
+        },
       });
       setShowConfirmation(true);
       checkoutKeyRef.current = newCheckoutKey();
@@ -1583,6 +1603,10 @@ const BookPackage: React.FC = () => {
   
   const ConfirmationModal = () => {
     if (!showConfirmation || !confirmationData) return null;
+
+    const shownTotal = confirmationData.existing?.totalAmount ?? confirmationData.amounts?.total ?? finalTotal;
+    const shownPaid = confirmationData.existing?.amountPaid ?? confirmationData.amounts?.paid ?? amountDueNow;
+    const shownRemaining = confirmationData.existing || confirmationData.amounts ? Math.max(0, shownTotal - shownPaid) : remainingBalance;
     
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade">
@@ -1785,16 +1809,16 @@ const BookPackage: React.FC = () => {
                 </>)}
                 <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Amount:</span>
-                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${(confirmationData.existing?.totalAmount ?? finalTotal).toFixed(2)}</span>
+                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${shownTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Amount Paid:</span>
-                  <span className="font-medium text-green-600">${(confirmationData.existing?.amountPaid ?? amountDueNow).toFixed(2)}</span>
+                  <span className="font-medium text-green-600">${shownPaid.toFixed(2)}</span>
                 </div>
-                {(confirmationData.existing ? Math.max(0, confirmationData.existing.totalAmount - confirmationData.existing.amountPaid) : remainingBalance) > 0 && (
+                {shownRemaining > 0 && (
                   <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
-                    <span className="font-medium text-orange-600">${(confirmationData.existing ? Math.max(0, confirmationData.existing.totalAmount - confirmationData.existing.amountPaid) : remainingBalance).toFixed(2)}</span>
+                    <span className="font-medium text-orange-600">${shownRemaining.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">

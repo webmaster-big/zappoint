@@ -1849,6 +1849,27 @@ const OnsiteBooking: React.FC = () => {
             margin: 2,
             color: { dark: '#000000', light: '#FFFFFF' }
           });
+
+          const serverDue = Math.round((Number(response.data.total_amount ?? 0) - Number(response.data.amount_paid ?? 0)) * 100) / 100;
+          const chargeAmount = Math.min(amountPaid, serverDue);
+
+          if (response.data.status === 'confirmed') {
+            try {
+              await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
+            } catch (qrError) {
+              console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
+            }
+            setToast({
+              message: `Booking created successfully! Reference: ${referenceNumber}`,
+              type: 'success'
+            });
+            resetForm();
+            return;
+          }
+
+          if (!(chargeAmount > 0)) {
+            throw new Error('The server found nothing to charge for this booking, so the card was not charged. Check the total and try again.');
+          }
           
           const customerData = {
             first_name: bookingData.customer.firstName || '',
@@ -1871,7 +1892,7 @@ const OnsiteBooking: React.FC = () => {
             },
             {
               location_id: bookingData_request.location_id,
-              amount: amountPaid,
+              amount: chargeAmount,
               order_id: `P${selectedPackage.id}-${Date.now().toString().slice(-8)}`,
               description: `On-Site Booking: ${selectedPackage.name}`,
               customer_id: bookingData_request.customer_id || undefined,
@@ -1948,10 +1969,6 @@ const OnsiteBooking: React.FC = () => {
             }
           }
           
-          if (paymentErr?.response?.data?.code === 'ALREADY_BOOKED') {
-            checkoutKeyRef.current = newCheckoutKey();
-          }
-
           if (paymentErr instanceof PaymentOutcomeUnknownError) {
             setPaymentError('No answer from the payment service, so the card may or may not have been charged. The booking was kept: check it in Bookings or in Authorize.Net before charging again.');
           } else if (paymentErr?.message?.includes('HTTPS') || paymentErr?.message?.includes('https')) {
@@ -2030,10 +2047,6 @@ const OnsiteBooking: React.FC = () => {
       const failure = (err as {
         response?: { status?: number; data?: { code?: string; message?: string; requires_override?: boolean; conflicts?: string[] } };
       })?.response;
-
-      if (failure?.data?.code === 'ALREADY_BOOKED') {
-        checkoutKeyRef.current = newCheckoutKey();
-      }
 
       // the server found a clash the page could not see on its own — an area's spaces starting too
       // close together, a break, a slot taken since the page loaded. Ask for the PIN rather than

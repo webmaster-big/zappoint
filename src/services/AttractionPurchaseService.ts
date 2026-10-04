@@ -117,6 +117,7 @@ export interface AttractionPurchase {
 }
 
 export interface CreatePurchaseData {
+  checkout_key?: string;
   gift_card_code?: string | null;
   attraction_id: number;
   customer_id?: number;

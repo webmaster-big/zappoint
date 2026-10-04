@@ -139,7 +139,17 @@ export interface TicketOrder {
   custom_field_responses?: { id: number; label: string; value: boolean }[];
 }
 
+export class OrderAlreadyPlacedError extends Error {
+  order: TicketOrder;
+
+  constructor(message: string, order: TicketOrder) {
+    super(message);
+    this.order = order;
+  }
+}
+
 export interface CheckoutPayload {
+  checkout_key?: string;
   gift_card_code?: string | null;
   customer_id?: number | null;
   guest_name?: string;
@@ -279,6 +289,10 @@ const ticketOrderService = {
       if (data.qr_token) lastQrTokens[order.id] = data.qr_token as string;
       return order;
     } catch (error) {
+      const refusal = (error as { response?: { status?: number; data?: { code?: string; message?: string; data?: TicketOrder } } })?.response;
+      if (refusal?.status === 409 && refusal.data?.code === 'ALREADY_PURCHASED' && refusal.data.data) {
+        throw new OrderAlreadyPlacedError(refusal.data.message || 'This order already went through, so your card was not charged again.', refusal.data.data);
+      }
       throw new Error(messageFrom(error, 'We could not place your order just now.'));
     }
   },

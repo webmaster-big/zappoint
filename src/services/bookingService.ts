@@ -790,24 +790,20 @@ const bookingService = {
     return response.data;
   },
 
-  async rollbackBooking(id: number): Promise<'force-deleted' | 'soft-deleted' | 'kept' | 'gone'> {
+  async rollbackBooking(id: number): Promise<'force-deleted' | 'kept' | 'gone'> {
     try {
       await api.delete(`/bookings/${id}/force-delete`);
       return 'force-deleted';
     } catch (forceErr) {
       const refusedStatus = (forceErr as { response?: { status?: number } })?.response?.status;
-      if (refusedStatus === 403) {
-        return 'kept';
-      }
       if (refusedStatus === 404) {
         return 'gone';
       }
-      console.error('Force delete failed after payment failure, falling back to soft delete', forceErr);
+      if (refusedStatus !== 403) {
+        console.error('Rolling back the booking failed, so it was kept', forceErr);
+      }
+      return 'kept';
     }
-    await api.delete(`/bookings/${id}`, {
-      params: { change_reason: 'Payment failed - automatic rollback' },
-    });
-    return 'soft-deleted';
   },
 
   async bulkRestore(ids: number[]): Promise<{

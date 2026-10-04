@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
+import { newCheckoutKey } from '../../utils/checkoutKey';
 import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../utils/dayOffClosure';
 import { customerService, type Customer } from '../../services/CustomerService';
@@ -32,7 +33,7 @@ import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber,
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import { extractIdFromSlug } from '../../utils/slug';
 import { useCartSafe } from '../../contexts/CartContext';
-import ticketOrderService, { type CartQuote as OrderQuote, type TicketOrder as PlacedOrder } from '../../services/TicketOrderService';
+import ticketOrderService, { OrderAlreadyPlacedError, type CartQuote as OrderQuote, type TicketOrder as PlacedOrder } from '../../services/TicketOrderService';
 import { trackPageView } from '../../utils/analytics';
 import { setNextTrackingId } from '../../utils/analyticsHeaders';
 import Toast from '../../components/ui/Toast';
@@ -206,6 +207,7 @@ const PurchaseEvent = () => {
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
+  const checkoutKeyRef = useRef(newCheckoutKey());
 
   const pageViewFiredRef = useRef(false);
 
@@ -911,8 +913,18 @@ const PurchaseEvent = () => {
             payment_method: 'authorize.net',
             gift_card_code: giftCard?.code ?? null,
             notes: specialRequests || `Bulk order — ${orderItemsPayload.length} items`,
+            checkout_key: checkoutKeyRef.current,
           });
         } catch (createErr) {
+          if (createErr instanceof OrderAlreadyPlacedError) {
+            setPlacedOrder(createErr.order);
+            checkoutKeyRef.current = newCheckoutKey();
+            cart.clear();
+            setToast({ message: createErr.message, type: 'success' });
+            setPurchaseComplete(true);
+            setCurrentStep(4);
+            return;
+          }
           throw new Error(
             createErr instanceof Error && createErr.message
               ? createErr.message
@@ -928,6 +940,7 @@ const PurchaseEvent = () => {
 
         if (Number(order.total_amount) <= 0) {
           setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: 0, remaining_balance: 0, status: 'confirmed' })));
+          checkoutKeyRef.current = newCheckoutKey();
           cart.clear();
           setToast({ message: 'Order confirmed — your gift card covered it in full!', type: 'success' });
           setPurchaseComplete(true);
@@ -973,6 +986,7 @@ const PurchaseEvent = () => {
         }
 
         setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: order.total_amount, remaining_balance: 0, status: 'confirmed' })));
+        checkoutKeyRef.current = newCheckoutKey();
         cart.clear();
         setPurchaseComplete(true);
         setCurrentStep(4);
@@ -1028,8 +1042,17 @@ const PurchaseEvent = () => {
             return items.length > 0 ? items : undefined;
           })(),
           add_ons: addOnsPayload.length > 0 ? addOnsPayload : undefined,
+          checkout_key: checkoutKeyRef.current,
         });
       } catch (createErr) {
+        const refusal = (createErr as { response?: { status?: number; data?: { code?: string; message?: string } } })?.response;
+        if (refusal?.status === 409 && refusal.data?.code === 'ALREADY_PURCHASED') {
+          setToast({ message: refusal.data.message || 'This purchase already went through, so your card was not charged again.', type: 'success' });
+          checkoutKeyRef.current = newCheckoutKey();
+          setPurchaseComplete(true);
+          setCurrentStep(4);
+          return;
+        }
         console.error('Purchase creation failed:', createErr);
         throw new Error('We couldn\'t process your order right now. No charges were made. Please try again.');
       }
@@ -1040,6 +1063,7 @@ const PurchaseEvent = () => {
       const serverDue = Math.max(0, Math.round((serverTotal - serverPaid) * 100) / 100);
 
       if (serverDue <= 0 && createdPurchase.status === 'confirmed') {
+        checkoutKeyRef.current = newCheckoutKey();
         setToast({ message: 'Purchase confirmed — your gift card covered it in full!', type: 'success' });
         setPurchaseComplete(true);
         setCurrentStep(4);
@@ -1107,6 +1131,7 @@ const PurchaseEvent = () => {
         throw new Error(paymentResponse.message || 'Your payment could not be processed. No charges were made. Please check your card details and try again.');
       }
 
+      checkoutKeyRef.current = newCheckoutKey();
       setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
       localStorage.setItem('_lastEventPurchaseKey', dedupFingerprint);

@@ -1196,10 +1196,6 @@ const ManualBooking: React.FC = () => {
         response?: { status?: number; data?: { code?: string; requires_override?: boolean; conflicts?: string[] } };
       })?.response;
 
-      if (refused?.data?.code === 'ALREADY_BOOKED') {
-        checkoutKeyRef.current = newCheckoutKey();
-      }
-
       // the space is taken: show what it clashes with and ask a manager to approve it
       if (refused?.status === 409 && refused.data?.requires_override) {
         setOverrideGate({

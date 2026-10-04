@@ -762,7 +762,7 @@ const ManagePurchases = () => {
       loadTrashedPurchases(trashedCurrentPage);
     } catch (error) {
       console.error('Error force deleting purchase:', error);
-      setToast({ message: 'Failed to permanently delete purchase', type: 'error' });
+      setToast({ message: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to permanently delete purchase', type: 'error' });
     }
   };
 

@@ -64,10 +64,13 @@ export const chargePayment = async (
     const response = await api.post<PaymentChargeResponse>('/payments/charge', data, { timeout: 60000 });
     return response.data;
   } catch (error: unknown) {
-    const err = error as { code?: string; message?: string; response?: { status?: number } };
+    const err = error as { code?: string; message?: string; response?: { status?: number; data?: { error_code?: string; message?: string } } };
     const status = err.response?.status;
     if (err.code === 'ECONNABORTED' || (err.message || '').toLowerCase().includes('timeout') || !err.response || status === 502 || status === 504) {
       throw new PaymentOutcomeUnknownError("We didn't get an answer from the payment service, so we can't tell yet whether your card was charged. Please check your email for a confirmation before trying again.");
+    }
+    if (status === 409 && err.response?.data?.error_code === 'CHARGE_IN_PROGRESS') {
+      throw new PaymentOutcomeUnknownError(err.response.data.message || 'A payment for this is already being processed, so your card was not charged again. Please wait a moment and check your email before trying again.');
     }
     throw error;
   }
