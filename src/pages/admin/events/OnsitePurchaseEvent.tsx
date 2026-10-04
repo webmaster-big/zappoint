@@ -25,7 +25,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import EmailInput from '../../../components/ui/EmailInput';
 import type { Event, EventAddOn } from '../../../types/event.types';
 import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { feeSupportService } from '../../../services/FeeSupportService';
 import { resolveFeeTotal } from '../../../utils/feeTotal';
@@ -554,6 +554,9 @@ const OnsitePurchaseEvent = () => {
             customerData
           );
         } catch (paymentErr) {
+          if (paymentErr instanceof PaymentOutcomeUnknownError) {
+            throw new Error('No answer from the payment service, so the card may or may not have been charged. The purchase was kept: check it in the purchase list or in Authorize.Net before charging again.');
+          }
           console.error('❌ Payment processing error, force deleting purchase:', createdPurchase.id);
           try {
             await eventPurchaseService.forceDeletePurchase(createdPurchase.id);

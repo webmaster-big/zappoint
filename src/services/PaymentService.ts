@@ -55,6 +55,8 @@ api.interceptors.request.use(
 );
 
 
+export class PaymentOutcomeUnknownError extends Error {}
+
 export const chargePayment = async (
   data: PaymentChargeRequest
 ): Promise<PaymentChargeResponse> => {
@@ -62,9 +64,10 @@ export const chargePayment = async (
     const response = await api.post<PaymentChargeResponse>('/payments/charge', data, { timeout: 60000 });
     return response.data;
   } catch (error: unknown) {
-    const err = error as { code?: string; message?: string };
-    if (err.code === 'ECONNABORTED' || (err.message || '').toLowerCase().includes('timeout')) {
-      throw new Error('The payment service took too long to respond. Your card was not charged - please try again.');
+    const err = error as { code?: string; message?: string; response?: { status?: number } };
+    const status = err.response?.status;
+    if (err.code === 'ECONNABORTED' || (err.message || '').toLowerCase().includes('timeout') || !err.response || status === 502 || status === 504) {
+      throw new PaymentOutcomeUnknownError("We didn't get an answer from the payment service, so we can't tell yet whether your card was charged. Please check your email for a confirmation before trying again.");
     }
     throw error;
   }

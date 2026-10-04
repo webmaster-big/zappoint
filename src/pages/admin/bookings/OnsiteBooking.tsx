@@ -38,7 +38,8 @@ interface DayOffWithTime {
 }
 import { formatDurationDisplay, getMichiganNow, dateKey } from '../../../utils/timeFormat';
 import OverlapOverrideDialog from '../../../components/admin/bookings/OverlapOverrideDialog';
-import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
+import { newCheckoutKey } from '../../../utils/checkoutKey';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
@@ -446,6 +447,7 @@ const OnsiteBooking: React.FC = () => {
    */
   // held in a ref so the re-submit right after approval sees it without waiting for a render
   const overrideTokenRef = useRef<string | null>(null);
+  const checkoutKeyRef = useRef(newCheckoutKey());
   const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
   // taking the last online slot is worth telling staff about, but it is not an overlap, so it is
   // confirmed rather than approved by a manager
@@ -1529,6 +1531,7 @@ const OnsiteBooking: React.FC = () => {
     // an approval belongs to the booking it was given for. The page is not remounted between
     // bookings, so without this one PIN would wave through every overlap for the rest of the shift.
     overrideTokenRef.current = null;
+    checkoutKeyRef.current = newCheckoutKey();
     sideEffectsAcceptedRef.current = false;
     setOverrideGate(null);
     setSelectedPackage(null);
@@ -1760,6 +1763,7 @@ const OnsiteBooking: React.FC = () => {
         package_id: selectedPackage.id,
         room_id: selectedRoomId || undefined,
         overlap_override_token: overrideTokenRef.current || undefined,
+        checkout_key: checkoutKeyRef.current,
         // recording a booking for a date that has passed is what the separate manual page was for
         is_manual_entry: bookingData.date < dateKey(getMichiganNow().date) || undefined,
         type: 'package' as const,
@@ -1907,6 +1911,15 @@ const OnsiteBooking: React.FC = () => {
           }
           
           console.log('✅ Payment charged and linked successfully:', paymentResult.transaction_id);
+
+          try {
+            const charged = await bookingService.getBookingById(bookingId);
+            if (charged.success && charged.data) {
+              await bookingCacheService.updateBookingInCache(charged.data);
+            }
+          } catch (refreshErr) {
+            console.error('⚠️ Could not refresh the booking after payment:', refreshErr);
+          }
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
 
@@ -1923,20 +1936,28 @@ const OnsiteBooking: React.FC = () => {
             return;
           }
 
-          if (createdBookingIdForCleanup) {
+          if (createdBookingIdForCleanup && !(paymentErr instanceof PaymentOutcomeUnknownError)) {
             try {
-              await bookingService.rollbackBooking(createdBookingIdForCleanup);
-              await bookingCacheService.removeBookingFromCache(createdBookingIdForCleanup);
-              console.log('🗑️ Booking force deleted due to payment processing error');
+              const rollbackOutcome = await bookingService.rollbackBooking(createdBookingIdForCleanup);
+              if (rollbackOutcome !== 'kept') {
+                await bookingCacheService.removeBookingFromCache(createdBookingIdForCleanup);
+              }
+              console.log('🗑️ Booking rollback after payment processing error:', rollbackOutcome);
             } catch (deleteErr) {
               console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
             }
           }
           
-          if (paymentErr?.message?.includes('HTTPS') || paymentErr?.message?.includes('https')) {
+          if (paymentErr?.response?.data?.code === 'ALREADY_BOOKED') {
+            checkoutKeyRef.current = newCheckoutKey();
+          }
+
+          if (paymentErr instanceof PaymentOutcomeUnknownError) {
+            setPaymentError('No answer from the payment service, so the card may or may not have been charged. The booking was kept: check it in Bookings or in Authorize.Net before charging again.');
+          } else if (paymentErr?.message?.includes('HTTPS') || paymentErr?.message?.includes('https')) {
             setPaymentError('Authorize.Net requires HTTPS connection. Please use the manual card entry option or access via HTTPS.');
           } else {
-            setPaymentError(paymentErr?.message || 'Failed to process payment. Please try again.');
+            setPaymentError(paymentErr?.response?.data?.message || paymentErr?.message || 'Failed to process payment. Please try again.');
           }
           
           setIsProcessingPayment(false);
@@ -2007,8 +2028,12 @@ const OnsiteBooking: React.FC = () => {
     } catch (err) {
       console.error('❌ Error creating booking:', err);
       const failure = (err as {
-        response?: { status?: number; data?: { message?: string; requires_override?: boolean; conflicts?: string[] } };
+        response?: { status?: number; data?: { code?: string; message?: string; requires_override?: boolean; conflicts?: string[] } };
       })?.response;
+
+      if (failure?.data?.code === 'ALREADY_BOOKED') {
+        checkoutKeyRef.current = newCheckoutKey();
+      }
 
       // the server found a clash the page could not see on its own — an area's spaces starting too
       // close together, a break, a slot taken since the page loaded. Ask for the PIN rather than

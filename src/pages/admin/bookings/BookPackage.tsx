@@ -17,8 +17,9 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import { newCheckoutKey } from '../../../utils/checkoutKey';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
 import EmailInput from '../../../components/ui/EmailInput';
@@ -112,6 +113,8 @@ const countries: { code: string; name: string }[] = [
   { code: 'CO', name: 'Colombia' },
   { code: 'PE', name: 'Peru' },
 ];
+
+const QR_OPTIONS = { width: 300, margin: 2, color: { dark: '#000000', light: '#FFFFFF' } };
 
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -241,9 +244,19 @@ const BookPackage: React.FC = () => {
   const [confirmationData, setConfirmationData] = useState<{
     referenceNumber: string;
     qrCode: string;
-    bookingId: number;
+    bookingId?: number;
     waiverUrl?: string | null;
+    existing?: {
+      bookingDate: string;
+      bookingTime: string;
+      participants: number;
+      totalAmount: number;
+      amountPaid: number;
+      message: string;
+    };
+    notice?: string;
   } | null>(null);
+  const checkoutKeyRef = useRef(newCheckoutKey());
   const [countrySearch, setCountrySearch] = useState('United States');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
@@ -908,6 +921,7 @@ const BookPackage: React.FC = () => {
     setSelectedTime("");
     setShowConfirmation(false);
     setConfirmationData(null);
+    checkoutKeyRef.current = newCheckoutKey();
     setCardNumber("");
     setCardMonth("");
     setCardYear("");
@@ -1332,6 +1346,7 @@ const BookPackage: React.FC = () => {
         guest_zip: form.zip || undefined,
         guest_country: form.country || undefined,
         sms_consent: smsConsent,
+        checkout_key: checkoutKeyRef.current,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
         discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
@@ -1345,8 +1360,59 @@ const BookPackage: React.FC = () => {
       };
       
       setNextTrackingId();
-      const response = await bookingService.createBooking(bookingData);
-      
+      let response;
+      try {
+        response = await bookingService.createBooking(bookingData);
+      } catch (createErr) {
+        const refusal = (createErr as { response?: { status?: number; data?: {
+          code?: string;
+          reference_number?: string;
+          message?: string;
+          booking_id?: number;
+          confirmation_pending?: boolean;
+          booking?: { booking_date?: string; booking_time?: string; participants?: number; total_amount?: number; amount_paid?: number };
+        } } })?.response;
+        const refusalCode = refusal?.status === 409 ? refusal.data?.code : undefined;
+        const existingReference = refusal?.data?.reference_number;
+        if (refusalCode === 'ALREADY_BOOKED' && existingReference) {
+          const existingBooking = refusal?.data?.booking;
+          const existingQr = await QRCode.toDataURL(existingReference, QR_OPTIONS);
+          if (refusal?.data?.confirmation_pending && refusal.data.booking_id) {
+            try {
+              await bookingService.storeQrCode(refusal.data.booking_id, existingQr, true);
+            } catch (qrErr) {
+              console.error('⚠️ Booking is confirmed but the confirmation email could not be sent:', qrErr);
+            }
+          }
+          setConfirmationData({
+            referenceNumber: existingReference,
+            qrCode: existingQr,
+            waiverUrl: null,
+            existing: {
+              bookingDate: existingBooking?.booking_date || selectedDate,
+              bookingTime: existingBooking?.booking_time || selectedTime,
+              participants: Number(existingBooking?.participants ?? participants),
+              totalAmount: Number(existingBooking?.total_amount ?? 0),
+              amountPaid: Number(existingBooking?.amount_paid ?? 0),
+              message: refusal?.data?.message || `This booking already went through (reference ${existingReference}), so your card was not charged again.`,
+            },
+          });
+          setShowConfirmation(true);
+          checkoutKeyRef.current = newCheckoutKey();
+          return;
+        }
+        if (refusalCode !== 'BOOKED_SAME_TIME') {
+          throw createErr;
+        }
+        if (!window.confirm(refusal?.data?.message || 'You already have this time booked. Do you want to book another one for the same time?')) {
+          setPaymentError(existingReference
+            ? `No new booking was made, and your card was not charged. Your existing booking is ${existingReference}.`
+            : 'No new booking was made, and your card was not charged.');
+          return;
+        }
+        response = await bookingService.createBooking({ ...bookingData, book_another: true });
+      }
+
       if (!response.success || !response.data) {
         throw new Error('We couldn\'t reserve your spot right now. No charges were made. Please try again or contact us for help.');
       }
@@ -1358,14 +1424,7 @@ const BookPackage: React.FC = () => {
       
       let qrCodeBase64: string;
       try {
-        qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
-          width: 300,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
+        qrCodeBase64 = await QRCode.toDataURL(referenceNumber, QR_OPTIONS);
       } catch {
         console.error('❌ QR generation failed, force deleting booking:', bookingId);
         try {
@@ -1376,10 +1435,33 @@ const BookPackage: React.FC = () => {
         }
         throw new Error('Failed to prepare your booking confirmation. No charges were made. Please try again.');
       }
+
+      if (response.data.status === 'confirmed') {
+        let emailSent = true;
+        try {
+          await bookingService.storeQrCode(bookingId, qrCodeBase64, true);
+        } catch (qrErr) {
+          emailSent = false;
+          console.error('⚠️ Booking is confirmed but the confirmation email could not be sent:', qrErr);
+        }
+        setConfirmationData({
+          referenceNumber,
+          qrCode: qrCodeBase64,
+          bookingId,
+          waiverUrl,
+          notice: emailSent ? undefined : "We couldn't send your confirmation email. Please save or screenshot this confirmation.",
+        });
+        setShowConfirmation(true);
+        checkoutKeyRef.current = newCheckoutKey();
+        return;
+      }
+
+      const serverDue = Number(response.data.total_amount ?? 0) - Number(response.data.amount_paid ?? 0);
+      const chargeAmount = serverDue > 0 ? Math.min(amountToPay, Math.round(serverDue * 100) / 100) : amountToPay;
       
       const paymentData = {
         location_id: pkg.location_id,
-        amount: amountToPay,
+        amount: chargeAmount,
         order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
         description: `Package Booking: ${pkg.name}`,
         customer_id: customerId || undefined,
@@ -1401,12 +1483,14 @@ const BookPackage: React.FC = () => {
           customerData
         );
       } catch (paymentErr) {
-        console.error('❌ Payment processing error, force deleting booking:', bookingId);
-        try {
-          await bookingService.rollbackBooking(bookingId);
-          console.log('🗑️ Booking force deleted due to payment processing error');
-        } catch (deleteErr) {
-          console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+        if (!(paymentErr instanceof PaymentOutcomeUnknownError)) {
+          console.error('❌ Payment processing error, force deleting booking:', bookingId);
+          try {
+            await bookingService.rollbackBooking(bookingId);
+            console.log('🗑️ Booking force deleted due to payment processing error');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+          }
         }
         throw paymentErr; // Re-throw to outer catch for error display
       }
@@ -1432,6 +1516,7 @@ const BookPackage: React.FC = () => {
         waiverUrl
       });
       setShowConfirmation(true);
+      checkoutKeyRef.current = newCheckoutKey();
     } catch (err: any) {
       const userFriendlyMessage = getPaymentErrorMessage(err);
       setPaymentError(userFriendlyMessage);
@@ -1575,16 +1660,16 @@ const BookPackage: React.FC = () => {
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Date:</span>
                   <span className="font-medium text-gray-900 text-right ml-2">
-                    {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    {parseLocalDate(confirmationData.existing?.bookingDate ?? selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Time:</span>
-                  <span className="font-medium text-gray-900">{formatTimeTo12Hour(selectedTime)}</span>
+                  <span className="font-medium text-gray-900">{formatTimeTo12Hour(confirmationData.existing?.bookingTime ?? selectedTime)}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Participants:</span>
-                  <span className="font-medium text-gray-900">{participants}</span>
+                  <span className="font-medium text-gray-900">{confirmationData.existing?.participants ?? participants}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Space:</span>
@@ -1608,7 +1693,7 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {(Object.entries(selectedAttractions).some(([, qty]) => qty > 0) || Object.entries(selectedAddOns).some(([, qty]) => qty > 0)) && (
+            {!confirmationData.existing && (Object.entries(selectedAttractions).some(([, qty]) => qty > 0) || Object.entries(selectedAddOns).some(([, qty]) => qty > 0)) && (
               <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
                 <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Additional Items</h3>
                 <div className="space-y-2">
@@ -1660,6 +1745,7 @@ const BookPackage: React.FC = () => {
                 <div className="mb-3 text-xs text-gray-400 animate-pulse">Checking membership benefits…</div>
               )}
               <div className="space-y-2">
+                {!confirmationData.existing && (<>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{pkg?.pricing_type === 'per_person' ? `${participants} × $${Number(pkg?.price ?? 0).toFixed(2)} per ${(pkg?.participant_label || 'participant').toLowerCase()}:` : 'Base Price:'}</span>
                   <span className="font-medium text-gray-900">${basePrice.toFixed(2)}</span>
@@ -1696,18 +1782,19 @@ const BookPackage: React.FC = () => {
                     <span className="font-medium text-green-600">-${membershipDiscount.toFixed(2)}</span>
                   </div>
                 )}
+                </>)}
                 <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Amount:</span>
-                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${finalTotal.toFixed(2)}</span>
+                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${(confirmationData.existing?.totalAmount ?? finalTotal).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Amount Paid:</span>
-                  <span className="font-medium text-green-600">${amountDueNow.toFixed(2)}</span>
+                  <span className="font-medium text-green-600">${(confirmationData.existing?.amountPaid ?? amountDueNow).toFixed(2)}</span>
                 </div>
-                {remainingBalance > 0 && (
+                {(confirmationData.existing ? Math.max(0, confirmationData.existing.totalAmount - confirmationData.existing.amountPaid) : remainingBalance) > 0 && (
                   <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
-                    <span className="font-medium text-orange-600">${remainingBalance.toFixed(2)}</span>
+                    <span className="font-medium text-orange-600">${(confirmationData.existing ? Math.max(0, confirmationData.existing.totalAmount - confirmationData.existing.amountPaid) : remainingBalance).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
@@ -1725,7 +1812,7 @@ const BookPackage: React.FC = () => {
                 <div className="text-xs sm:text-sm text-yellow-800">
                   <p className="font-semibold mb-1">Important Information</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>A confirmation email has been sent to {form.email}</li>
+                    <li>{confirmationData.notice ?? (confirmationData.existing ? confirmationData.existing.message : `A confirmation email has been sent to ${form.email}`)}</li>
                     <li>Please present this QR code at check-in</li>
                     <li>Save or screenshot this confirmation for your records</li>
                   </ul>

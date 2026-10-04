@@ -2457,7 +2457,7 @@ const Bookings: React.FC = () => {
       loadTrashedBookings(trashedCurrentPage);
     } catch (error) {
       console.error('Error force deleting booking:', error);
-      alert('Failed to permanently delete booking');
+      alert((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to permanently delete booking');
     }
   };
 

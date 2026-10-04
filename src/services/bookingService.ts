@@ -226,6 +226,8 @@ export interface CreateBookingData {
   guest_zip?: string;
   guest_country?: string;
   custom_fields?: { id: number; value: boolean }[];
+  checkout_key?: string;
+  book_another?: boolean;
 }
 
 export interface BookingChangeLogEntry {
@@ -788,11 +790,18 @@ const bookingService = {
     return response.data;
   },
 
-  async rollbackBooking(id: number): Promise<'force-deleted' | 'soft-deleted'> {
+  async rollbackBooking(id: number): Promise<'force-deleted' | 'soft-deleted' | 'kept' | 'gone'> {
     try {
       await api.delete(`/bookings/${id}/force-delete`);
       return 'force-deleted';
     } catch (forceErr) {
+      const refusedStatus = (forceErr as { response?: { status?: number } })?.response?.status;
+      if (refusedStatus === 403) {
+        return 'kept';
+      }
+      if (refusedStatus === 404) {
+        return 'gone';
+      }
       console.error('Force delete failed after payment failure, falling back to soft delete', forceErr);
     }
     await api.delete(`/bookings/${id}`, {

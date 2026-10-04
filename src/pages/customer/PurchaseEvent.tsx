@@ -28,7 +28,7 @@ import { getGuestIdentity } from '../../utils/guestIdentity';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
 import { findLocationById } from '../../services/StorefrontLocationService';
 import useAbandonedCheckout from '../../hooks/useAbandonedCheckout';
-import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import { extractIdFromSlug } from '../../utils/slug';
 import { useCartSafe } from '../../contexts/CartContext';
@@ -961,7 +961,9 @@ const PurchaseEvent = () => {
             customerBillingData
           );
         } catch (paymentErr) {
-          await ticketOrderService.rollback(order.id);
+          if (!(paymentErr instanceof PaymentOutcomeUnknownError)) {
+            await ticketOrderService.rollback(order.id);
+          }
           throw paymentErr;
         }
 
@@ -1082,12 +1084,14 @@ const PurchaseEvent = () => {
           customerBillingData
         );
       } catch (paymentErr) {
-        console.error('❌ Payment processing error, force deleting purchase:', createdPurchase.id);
-        try {
-          await eventPurchaseService.forceDeletePurchase(createdPurchase.id);
-          console.log('🗑️ Purchase force deleted due to payment processing error');
-        } catch (deleteErr) {
-          console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
+        if (!(paymentErr instanceof PaymentOutcomeUnknownError)) {
+          console.error('❌ Payment processing error, force deleting purchase:', createdPurchase.id);
+          try {
+            await eventPurchaseService.forceDeletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase force deleted due to payment processing error');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
+          }
         }
         throw paymentErr;
       }

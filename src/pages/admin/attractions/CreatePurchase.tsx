@@ -28,7 +28,7 @@ import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import EmailInput from '../../../components/ui/EmailInput';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -920,6 +920,9 @@ const CreatePurchase = () => {
               },
             );
           } catch (chargeErr) {
+            if (chargeErr instanceof PaymentOutcomeUnknownError) {
+              throw new Error('No answer from the payment service, so the card may or may not have been charged. The order was kept: check it in Orders or in Authorize.Net before charging again.');
+            }
             await ticketOrderService.rollback(order.id).catch(() => undefined);
             throw chargeErr instanceof Error ? chargeErr : new Error('Card payment failed — the order was rolled back.');
           }
@@ -1057,6 +1060,9 @@ const CreatePurchase = () => {
             customerData
           );
         } catch (paymentErr) {
+          if (paymentErr instanceof PaymentOutcomeUnknownError) {
+            throw new Error('No answer from the payment service, so the card may or may not have been charged. The purchase was kept: check it in the purchase list or in Authorize.Net before charging again.');
+          }
           try {
             await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
             console.log('🗑️ Purchase force deleted due to payment processing error');

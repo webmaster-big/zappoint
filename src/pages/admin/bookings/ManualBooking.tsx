@@ -17,7 +17,8 @@ import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import StandardButton from '../../../components/ui/StandardButton';
 import roomService from '../../../services/RoomService';
-import { loadAcceptJS, processCardPayment, validateCardNumber, getCardType, formatCardNumber, createPayment } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, getCardType, formatCardNumber, createPayment, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
+import { newCheckoutKey } from '../../../utils/checkoutKey';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -105,6 +106,7 @@ const ManualBooking: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   // a booking saved on top of another needs a manager's PIN here too, not only on the onsite flow
   const overrideTokenRef = useRef<string | null>(null);
+  const checkoutKeyRef = useRef(newCheckoutKey());
   const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
 
   const [cardNumber, setCardNumber] = useState('');
@@ -946,6 +948,7 @@ const ManualBooking: React.FC = () => {
 
       const bookingData: ExtendedBookingData = {
         overlap_override_token: overrideTokenRef.current || undefined,
+        checkout_key: checkoutKeyRef.current,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
         guest_name: form.customerName,
         guest_email: form.email,
@@ -1098,16 +1101,31 @@ const ManualBooking: React.FC = () => {
           }
 
           console.log('✅ Card payment charged:', paymentResult.transaction_id);
-        } catch (paymentErr: any) {
+
           try {
-            await bookingService.rollbackBooking(bookingId);
-            await bookingCacheService.removeBookingFromCache(bookingId);
-          } catch (deleteErr) {
-            console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+            const charged = await bookingService.getBookingById(bookingId);
+            if (charged.success && charged.data) {
+              await bookingCacheService.updateBookingInCache(charged.data);
+            }
+          } catch (refreshErr) {
+            console.error('⚠️ Could not refresh the booking after payment:', refreshErr);
           }
-          const msg = /https/i.test(paymentErr?.message || '')
-            ? 'Authorize.Net requires a secure (HTTPS) connection to process card payments.'
-            : (paymentErr?.message || 'Failed to process payment. Please try again.');
+        } catch (paymentErr: any) {
+          if (!(paymentErr instanceof PaymentOutcomeUnknownError)) {
+            try {
+              const rollbackOutcome = await bookingService.rollbackBooking(bookingId);
+              if (rollbackOutcome !== 'kept') {
+                await bookingCacheService.removeBookingFromCache(bookingId);
+              }
+            } catch (deleteErr) {
+              console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+            }
+          }
+          const msg = paymentErr instanceof PaymentOutcomeUnknownError
+            ? 'No answer from the payment service, so the card may or may not have been charged. The booking was kept: check it in Bookings or in Authorize.Net before charging again.'
+            : /https/i.test(paymentErr?.message || '')
+              ? 'Authorize.Net requires a secure (HTTPS) connection to process card payments.'
+              : (paymentErr?.response?.data?.message || paymentErr?.message || 'Failed to process payment. Please try again.');
           setPaymentError(msg);
           setToast({ message: msg, type: 'error' });
           return;
@@ -1175,8 +1193,12 @@ const ManualBooking: React.FC = () => {
       console.error('❌ Error creating booking:', error);
 
       const refused = (error as {
-        response?: { status?: number; data?: { requires_override?: boolean; conflicts?: string[] } };
+        response?: { status?: number; data?: { code?: string; requires_override?: boolean; conflicts?: string[] } };
       })?.response;
+
+      if (refused?.data?.code === 'ALREADY_BOOKED') {
+        checkoutKeyRef.current = newCheckoutKey();
+      }
 
       // the space is taken: show what it clashes with and ask a manager to approve it
       if (refused?.status === 409 && refused.data?.requires_override) {
