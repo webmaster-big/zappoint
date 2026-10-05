@@ -77,6 +77,8 @@ import { attractionCacheService } from '../../services/AttractionCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { eventCacheService } from '../../services/EventCacheService';
 
+const UNREAD_COUNT_POLL_MS = 60000;
+
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
   const descriptions: Record<string, string> = {
     'Dashboard': 'Overview of your account and recent activity',
@@ -569,7 +571,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     return color || '#1e40af';
   };
 
-  const getUnreadCount = async () => {
+  const getUnreadCount = async (): Promise<number | null> => {
     try {
       const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
       const token = user.token;
@@ -602,18 +604,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
       const contentType = response.headers.get('content-type');
       if (contentType && !contentType.includes('application/json')) {
-        console.warn('[AdminSidebar] Received non-JSON response (likely HTML error page), logging out user');
-        forceLogout();
-        return 0;
+        console.warn('[AdminSidebar] Received non-JSON response (likely a gateway error page), keeping the last count');
+        return null;
       }
 
       let data;
       try {
         data = await response.json();
       } catch (parseError) {
-        console.warn('[AdminSidebar] Failed to parse JSON response (received HTML), logging out user');
-        forceLogout();
-        return 0;
+        console.warn('[AdminSidebar] Failed to parse the unread count response, keeping the last count');
+        return null;
       }
 
       if (
@@ -631,10 +631,22 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       if (data.success) {
         return data.data.pagination.total || 0;
       }
-      return 0;
+      return null;
     } catch (error) {
       console.error('[AdminSidebar] Error fetching unread notifications count:', error);
-      return 0;
+      return null;
+    }
+  };
+
+  const syncUnreadBadge = async () => {
+    const count = await getUnreadCount();
+    if (count === null) return;
+
+    setUnreadNotifications(count);
+
+    if (!countInitializedRef.current || count < notificationCountRef.current) {
+      notificationCountRef.current = count;
+      countInitializedRef.current = true;
     }
   };
 
@@ -664,6 +676,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   useEffect(() => {
     const initializeCount = async () => {
       const count = await getUnreadCount();
+      if (count === null) return;
       notificationCountRef.current = count;
       countInitializedRef.current = true;
     };
@@ -672,16 +685,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   }, []);
 
   useEffect(() => {
-    const updateUnread = async () => {
-      const count = await getUnreadCount();
-      setUnreadNotifications(count);
-    };
-    
-    updateUnread();
-    
-    window.addEventListener('zapzone_notifications_updated', updateUnread);
+    syncUnreadBadge();
+
+    const poll = window.setInterval(syncUnreadBadge, UNREAD_COUNT_POLL_MS);
+    window.addEventListener('zapzone_notifications_updated', syncUnreadBadge);
     return () => {
-      window.removeEventListener('zapzone_notifications_updated', updateUnread);
+      window.clearInterval(poll);
+      window.removeEventListener('zapzone_notifications_updated', syncUnreadBadge);
     };
   }, []);
 
@@ -728,7 +738,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       
       
       const newCount = await getUnreadCount();
-      
+      if (newCount === null) return;
+
       const countIncreased = countInitializedRef.current && newCount > notificationCountRef.current;
       
       notificationCountRef.current = newCount;
@@ -801,7 +812,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
   useEffect(() => {
     if (isOpen) {
-      getUnreadCount().then(count => setUnreadNotifications(count));
+      syncUnreadBadge();
     }
   }, [isOpen]);
   
