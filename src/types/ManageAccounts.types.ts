@@ -10,6 +10,9 @@ export interface ManageAccountsAccount {
   employeeId: string;
   department: string;
   location: string;
+  locationId?: number | null;
+  workLocationIds?: number[];
+  workLocationNames?: string[];
   userType: 'attendant' | 'manager' | 'company_admin';
   shift?: string;
   assignedAreas?: string[];

@@ -59,6 +59,7 @@ export interface CreateStaffAccountData {
   email: string;
   role: 'location_manager' | 'attendant' | 'company_admin';
   location_id?: number | null;
+  location_ids?: number[];
   phone?: string;
   employee_id?: string;
   department?: string;

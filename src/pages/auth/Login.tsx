@@ -6,6 +6,11 @@ import EmailInput from "../../components/ui/EmailInput";
 import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
+import {
+  activateStaffLocation,
+  rememberedManagerLocation,
+  storeStaffLocationState,
+} from '../../services/StaffLocationService';
 
 export default function Login() {
   const brandLogoSrc = getImageUrl(useCompanyBrand().logoPath) || DEFAULT_LOGO_SRC;
@@ -124,11 +129,28 @@ export default function Login() {
         company_id: user.company_id || null,
         location_id: user.location_id || null,
         location_name: role !== 'company_admin' ? (user.location?.name || '') : '',
+        home_location_id: user.home_location_id ?? user.location_id ?? null,
+        work_locations: Array.isArray(user.work_locations) ? user.work_locations : [],
         position: user.position || role.replace('_', ' '),
         role: role,
         token: token,
         last_login: user.last_login || null,
       }));
+
+      if (role === 'location_manager') {
+        const preferred = rememberedManagerLocation(user.id);
+        const canReopen = preferred !== null
+          && preferred !== user.location_id
+          && Array.isArray(user.work_locations)
+          && user.work_locations.some((l: { id: number }) => l.id === preferred);
+        if (canReopen) {
+          try {
+            storeStaffLocationState(await activateStaffLocation(preferred));
+          } catch (error) {
+            console.warn('Could not reopen the last location, starting at the home location:', error);
+          }
+        }
+      }
 
       await animateProgress(100, 400);
       setTimeout(() => {

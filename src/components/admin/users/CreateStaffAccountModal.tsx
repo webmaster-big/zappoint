@@ -22,6 +22,7 @@ import type {
 } from '../../../services/UserService';
 import { getStoredUser } from '../../../utils/storage';
 import CreateLocationModal from './CreateLocationModal';
+import ManagerLocationsPicker from './ManagerLocationsPicker';
 import Toast from '../../ui/Toast';
 
 interface CreateStaffAccountModalProps {
@@ -59,6 +60,7 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [extraLocationIds, setExtraLocationIds] = useState<number[]>([]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -89,6 +91,7 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
       location_id: lockedLocationId ?? initialForm.location_id,
     });
     setFieldErrors({});
+    setExtraLocationIds([]);
     setSuccess(null);
     setShowPassword(false);
     setCopied(false);
@@ -101,6 +104,8 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
   };
 
   const requiresLocation = form.role === 'location_manager' || form.role === 'attendant';
+  const offersExtraLocations = canCreateLocation && form.role === 'location_manager';
+  const chosenExtraLocationIds = extraLocationIds.filter((id) => id !== form.location_id);
 
   const validateLocally = (): string | null => {
     if (!form.first_name.trim()) return 'First name is required.';
@@ -135,6 +140,9 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
       };
       if (form.phone?.trim()) payload.phone = form.phone.trim();
       if (requiresLocation) payload.location_id = form.location_id ?? undefined;
+      if (offersExtraLocations && form.location_id && chosenExtraLocationIds.length > 0) {
+        payload.location_ids = [form.location_id, ...chosenExtraLocationIds];
+      }
       if (form.password_mode === 'custom') payload.password = form.password;
       payload.login_url = `${window.location.origin}/admin`;
 
@@ -400,13 +408,25 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
                 </select>
                 {isLocationManager && (
                   <p className="text-xs text-gray-500 mt-1">
-                    You can only create accounts for your assigned location.
+                    You can only create accounts for the location you are working in.
                   </p>
                 )}
                 {fieldErrors.location_id && (
                   <p className="text-xs text-red-600 mt-1">{fieldErrors.location_id[0]}</p>
                 )}
               </div>
+            )}
+
+            {offersExtraLocations && (
+              <ManagerLocationsPicker
+                locations={locations}
+                homeLocationId={form.location_id ?? null}
+                selectedIds={chosenExtraLocationIds}
+                onChange={setExtraLocationIds}
+                themeColor={themeColor}
+                disabled={submitting || loadingLocations}
+                error={fieldErrors.location_ids?.[0]}
+              />
             )}
 
             <div className="border-t border-gray-200 pt-4">

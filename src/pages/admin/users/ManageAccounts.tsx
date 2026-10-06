@@ -436,6 +436,13 @@ const ManageAccounts = () => {
         employeeId: String(user.employee_id || `ZAP-${user.id}`),
         department: String(user.department || 'Administration'),
         location: (user.location as { name?: string })?.name || 'Unknown',
+        locationId: typeof user.location_id === 'number' ? user.location_id : null,
+        workLocationIds: (Array.isArray(user.locations) ? (user.locations as Array<{ id: number }>) : [])
+          .map((l) => l.id)
+          .filter((id) => id !== user.location_id),
+        workLocationNames: (Array.isArray(user.locations) ? (user.locations as Array<{ id: number; name?: string }>) : [])
+          .filter((l) => l.id !== user.location_id && Boolean(l.name))
+          .map((l) => String(l.name)),
         userType: user.role === 'location_manager' ? 'manager' : (user.role === 'company_admin' ? 'company_admin' : 'attendant'),
         shift: String(user.shift || ''),
         assignedAreas: [],
@@ -615,6 +622,11 @@ const ManageAccounts = () => {
             <MapPin className="h-3 w-3" />
             {a.location}
           </div> : null}
+          {a.userType === 'manager' && (a.workLocationNames?.length ?? 0) > 0 ? (
+            <div className="text-xs text-gray-500" title={a.workLocationNames!.join(', ')}>
+              Also manages {a.workLocationNames!.join(', ')}
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -748,7 +760,7 @@ const ManageAccounts = () => {
       label: 'Location',
       allLabel: 'All Locations',
       options: locationOptions,
-      predicate: (a, value) => a.location === value,
+      predicate: (a, value) => a.location === value || (a.workLocationNames ?? []).includes(value),
     },
     {
       type: 'select',
@@ -799,6 +811,7 @@ const ManageAccounts = () => {
       a.employeeId,
       a.department,
       a.location,
+      ...(a.workLocationNames ?? []),
       a.position,
     ],
     defaultSort: (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
@@ -1071,6 +1084,8 @@ const ManageAccounts = () => {
         isOpen={editTarget !== null}
         onClose={() => setEditTarget(null)}
         account={editTarget}
+        locations={locationsData.map((l) => ({ id: l.id, name: l.name }))}
+        canManageLocations={isCompanyAdmin}
         onSaved={(updated) => {
           setAccounts((prev) =>
             prev.map((a) => (a.id === updated.id ? updated : a))

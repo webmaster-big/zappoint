@@ -56,6 +56,8 @@ export const sanitizeUserData = (userData: any, preserveToken: boolean = false) 
       (typeof userData.location_id === 'object' ? userData.location_id?.name : null) ||
       userData.location?.name ||
       '',
+    home_location_id: userData.home_location_id ?? null,
+    work_locations: Array.isArray(userData.work_locations) ? userData.work_locations : [],
     first_name: userData.first_name || '',
     last_name: userData.last_name || '',
     email: userData.email || '',

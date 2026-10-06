@@ -67,7 +67,7 @@ import BrandLogo from '../ui/BrandLogo';
 import { useStorefrontLocations } from '../../hooks/useStorefrontLocations';
 import { findLocationById } from '../../services/StorefrontLocationService';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
-import { API_BASE_URL, getImageUrl } from '../../utils/storage';
+import { API_BASE_URL, getImageUrl, getStoredUser } from '../../utils/storage';
 import { notificationStreamService, type NotificationObject } from '../../services/NotificationStreamService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { roomCacheService } from '../../services/RoomCacheService';
@@ -442,12 +442,39 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const { theme, toggleTheme } = useTheme();
   const { themeColor, fullColor } = useThemeColor();
   const location = useLocation();
-  const { selectedLocationId, setSelectedLocationId, locations: scopeLocations, isCompanyAdmin: canScopeLocation, effectiveLocationId } = useLocationScope();
+  const {
+    selectedLocationId,
+    setSelectedLocationId,
+    locations: scopeLocations,
+    isCompanyAdmin: canScopeLocation,
+    effectiveLocationId,
+    workLocations,
+    canSwitchLocation,
+    switchingLocationId,
+    switchLocation,
+  } = useLocationScope();
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const locationMenuRef = useRef<HTMLDivElement>(null);
-  const selectedLocationName = selectedLocationId === null
-    ? 'All Locations'
-    : (scopeLocations.find((l) => l.id === selectedLocationId)?.name || `Location #${selectedLocationId}`);
+  const showLocationPicker = canScopeLocation || canSwitchLocation;
+  const pickerLocations: Array<{ id: number; name: string }> = canScopeLocation ? scopeLocations : workLocations;
+  const pickedLocationId = canScopeLocation ? selectedLocationId : effectiveLocationId;
+  const homeLocationId: number | null = canScopeLocation ? null : (getStoredUser()?.home_location_id ?? null);
+  const switchingLocationName = switchingLocationId !== null
+    ? (workLocations.find((l) => l.id === switchingLocationId)?.name || 'the new location')
+    : null;
+  const selectedLocationName = canScopeLocation
+    ? (selectedLocationId === null
+      ? 'All Locations'
+      : (scopeLocations.find((l) => l.id === selectedLocationId)?.name || `Location #${selectedLocationId}`))
+    : (workLocations.find((l) => l.id === effectiveLocationId)?.name || user?.location_name || `Location #${effectiveLocationId}`);
+  const pickLocation = (id: number | null) => {
+    setLocationMenuOpen(false);
+    if (canScopeLocation) {
+      setSelectedLocationId(id);
+    } else if (id !== null) {
+      void switchLocation(id);
+    }
+  };
 
   const { locations: storefrontLocations } = useStorefrontLocations();
   const storefrontLocation = findLocationById(storefrontLocations, effectiveLocationId);
@@ -1269,20 +1296,40 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             </button>
           </div>
 
-          {LOCATION_SCOPE_ENABLED && canScopeLocation && !isMinimized && (
+          {LOCATION_SCOPE_ENABLED && showLocationPicker && isMinimized && (
+            <div className="px-3 pt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => { if (setIsMinimized) setIsMinimized(false); setLocationMenuOpen(true); }}
+                title={`Location: ${selectedLocationName}`}
+                aria-label={`Location: ${selectedLocationName}`}
+                className={`flex items-center justify-center w-9 h-9 rounded-xl bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors`}
+              >
+                <MapPin className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {LOCATION_SCOPE_ENABLED && showLocationPicker && !isMinimized && (
             <div className="px-3 pt-3 relative" ref={locationMenuRef}>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setLocationMenuOpen((o) => !o)}
-                  className={`flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-colors text-left ${locationMenuOpen ? 'bg-gray-50 border-gray-100' : ''}`}
+                  disabled={switchingLocationId !== null}
+                  aria-busy={switchingLocationId !== null}
+                  className={`flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-100 transition-colors text-left disabled:opacity-70 disabled:cursor-wait ${locationMenuOpen ? 'bg-gray-50 border-gray-100' : ''}`}
                 >
                   <span className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${themeColor}-50 text-${fullColor} flex-shrink-0`}>
                     <MapPin className="w-4 h-4" />
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Location</span>
-                    <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1">{selectedLocationName}</span>
+                    <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">
+                      {switchingLocationName ? 'Switching to' : 'Location'}
+                    </span>
+                    <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1" title={switchingLocationName ?? selectedLocationName}>
+                      {switchingLocationName ?? selectedLocationName}
+                    </span>
                   </span>
                   <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${locationMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -1303,25 +1350,34 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
               {locationMenuOpen && (
                 <div className="absolute left-3 right-3 z-50 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 max-h-72 overflow-y-auto">
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedLocationId(null); setLocationMenuOpen(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${selectedLocationId === null ? `text-${themeColor}-700 font-semibold` : 'text-gray-700'}`}
-                  >
-                    <Building2 className="w-4 h-4 flex-shrink-0 text-gray-400" />
-                    <span className="flex-1">All Locations</span>
-                    {selectedLocationId === null && <Check className={`w-4 h-4 text-${fullColor}`} />}
-                  </button>
-                  {scopeLocations.map((loc) => (
+                  {canScopeLocation ? (
+                    <button
+                      type="button"
+                      onClick={() => pickLocation(null)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${selectedLocationId === null ? `text-${themeColor}-700 font-semibold` : 'text-gray-700'}`}
+                    >
+                      <Building2 className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                      <span className="flex-1">All Locations</span>
+                      {selectedLocationId === null && <Check className={`w-4 h-4 text-${fullColor}`} />}
+                    </button>
+                  ) : (
+                    <p className="px-3 pt-1.5 pb-1 text-[11px] text-gray-400 leading-snug">
+                      You manage one location at a time. Pick where you are working.
+                    </p>
+                  )}
+                  {pickerLocations.map((loc) => (
                     <button
                       key={loc.id}
                       type="button"
-                      onClick={() => { setSelectedLocationId(loc.id); setLocationMenuOpen(false); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${selectedLocationId === loc.id ? `text-${themeColor}-700 font-semibold` : 'text-gray-700'}`}
+                      onClick={() => pickLocation(loc.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${pickedLocationId === loc.id ? `text-${themeColor}-700 font-semibold` : 'text-gray-700'}`}
                     >
                       <MapPin className="w-4 h-4 flex-shrink-0 text-gray-400" />
-                      <span className="flex-1 truncate">{loc.name}</span>
-                      {selectedLocationId === loc.id && <Check className={`w-4 h-4 text-${fullColor}`} />}
+                      <span className="flex-1 truncate" title={loc.name}>{loc.name}</span>
+                      {homeLocationId === loc.id && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-gray-400 flex-shrink-0">Home</span>
+                      )}
+                      {pickedLocationId === loc.id && <Check className={`w-4 h-4 text-${fullColor}`} />}
                     </button>
                   ))}
                 </div>
@@ -1329,7 +1385,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             </div>
           )}
 
-          {!canScopeLocation && !isMinimized && storefrontUrl && (
+          {!showLocationPicker && !isMinimized && storefrontUrl && (
             <div className="px-3 pt-3">
               <a
                 href={storefrontUrl}
