@@ -76,6 +76,7 @@ import { addOnCacheService } from '../../services/AddOnCacheService';
 import { attractionCacheService } from '../../services/AttractionCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { eventCacheService } from '../../services/EventCacheService';
+import { isTerminalLocked } from '../../utils/terminalLock';
 
 const UNREAD_COUNT_POLL_MS = 60000;
 
@@ -553,6 +554,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const isStreamConnectedRef = useRef<boolean>(false);
   const notificationCountRef = useRef<number>(0);
   const countInitializedRef = useRef<boolean>(false);
+  const unreadCountRequestRef = useRef<Promise<number | null> | null>(null);
   
   const [showToast, setShowToast] = useState(false);
   const [toastData, setToastData] = useState<{ title: string; message: string; type: string } | null>(null);
@@ -572,6 +574,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   const getUnreadCount = async (): Promise<number | null> => {
+    if (isTerminalLocked()) return null;
+
     try {
       const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
       const token = user.token;
@@ -597,6 +601,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       });
 
       if (response.status === 401 || response.status === 403) {
+        if (isTerminalLocked()) return null;
         console.warn('[AdminSidebar] Authentication failed (HTTP status), logging out user');
         forceLogout();
         return 0;
@@ -623,6 +628,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         data.error === 'Unauthenticated' ||
         (data.success === false && (data.message?.toLowerCase().includes('unauthenticated') || data.message?.toLowerCase().includes('unauthorized')))
       ) {
+        if (isTerminalLocked()) return null;
         console.warn('[AdminSidebar] Authentication failed (response body), logging out user');
         forceLogout();
         return 0;
@@ -636,6 +642,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       console.error('[AdminSidebar] Error fetching unread notifications count:', error);
       return null;
     }
+  };
+
+  const getSharedUnreadCount = (): Promise<number | null> => {
+    if (!unreadCountRequestRef.current) {
+      unreadCountRequestRef.current = getUnreadCount().finally(() => {
+        unreadCountRequestRef.current = null;
+      });
+    }
+    return unreadCountRequestRef.current;
   };
 
   const syncUnreadBadge = async () => {
@@ -737,7 +752,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       }
       
       
-      const newCount = await getUnreadCount();
+      const newCount = await getSharedUnreadCount();
       if (newCount === null) return;
 
       const countIncreased = countInitializedRef.current && newCount > notificationCountRef.current;
@@ -770,7 +785,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           new Notification(notification.title, {
             body: notification.message,
             icon: getImageUrl(brandLogoRef.current) || '/Zap-Zone.png',
-            tag: notification.id
+            tag: `${notification.type}_${notification.data.id}`
           });
         }
       }
@@ -778,7 +793,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
     const handleError = (error?: any) => {
       console.warn('[AdminSidebar] Notification stream connection error:', error);
-      
+
+      if (isTerminalLocked()) return;
+
       if (error && typeof error === 'object') {
         const errorMessage = error.message || error.toString?.() || '';
         if (

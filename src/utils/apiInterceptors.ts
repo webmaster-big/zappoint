@@ -88,7 +88,7 @@ const handleAuthError = (error: any) => {
   const url: string | undefined = error?.config?.url;
   const message: string | undefined = error?.response?.data?.message;
 
-  if (!isReportingEndpoint(url)) {
+  if (!isReportingEndpoint(url) && !url?.includes('/notifications/live')) {
     reportClientError({
       kind: 'api',
       status,

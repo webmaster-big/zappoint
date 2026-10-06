@@ -1,4 +1,6 @@
-import { API_BASE_URL } from '../utils/storage';
+import axios from 'axios';
+import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { isTerminalLocked } from '../utils/terminalLock';
 
 export interface StreamNotificationData {
   id: number;
@@ -37,10 +39,39 @@ export interface NotificationObject {
 }
 
 type NotificationCallback = (notification: NotificationObject) => void;
-type ErrorCallback = (error: Event) => void;
+type ErrorCallback = (error: unknown) => void;
+
+interface LiveFeed {
+  cursor?: string;
+  items?: StreamNotificationData[];
+}
+
+const LIVE_FEED_POLL_MS = 20000;
+const LIVE_FEED_TIMEOUT_MS = 15000;
+const LIVE_FEED_RESUME_WITHIN_MS = 60000;
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+});
+
+api.interceptors.request.use((config) => {
+  const token = getStoredUser()?.token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 class NotificationStreamService {
-  private eventSource: EventSource | null = null;
+  private generation = 0;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private cursor: string | null = null;
+  private locationId: number | null = null;
+  private disconnectedAt = 0;
   private onNotificationCallback: NotificationCallback | null = null;
   private onErrorCallback: ErrorCallback | null = null;
 
@@ -49,47 +80,59 @@ class NotificationStreamService {
     onNotification: NotificationCallback,
     onError?: ErrorCallback
   ): void {
-    if (this.eventSource) {
-      this.disconnect();
-    }
+    this.disconnect();
+
+    const resume = this.locationId === locationId && Date.now() - this.disconnectedAt < LIVE_FEED_RESUME_WITHIN_MS;
 
     this.onNotificationCallback = onNotification;
     this.onErrorCallback = onError || null;
+    this.locationId = locationId;
+    this.cursor = resume ? this.cursor : null;
 
-    const url = `${API_BASE_URL}/stream/notifications?location_id=${locationId}`;
+    void this.poll(this.generation);
+  }
 
-    this.eventSource = new EventSource(url);
+  private async poll(generation: number): Promise<void> {
+    if (generation !== this.generation) {
+      return;
+    }
 
-    this.eventSource.addEventListener('notification', (event: MessageEvent) => {
+    if (!isTerminalLocked()) {
       try {
-        const data: StreamNotificationData = JSON.parse(event.data);
-        const notification = this.transformToNotification(data);
+        const response = await api.get('/notifications/live', {
+          params: { location_id: this.locationId, ...(this.cursor ? { after: this.cursor } : {}) },
+          timeout: LIVE_FEED_TIMEOUT_MS,
+        });
 
-        if (this.onNotificationCallback) {
-          this.onNotificationCallback(notification);
+        if (generation !== this.generation) {
+          return;
+        }
+
+        if (!isTerminalLocked()) {
+          const feed = response.data?.data as LiveFeed | undefined;
+          if (feed?.cursor) {
+            this.cursor = feed.cursor;
+          }
+
+          for (const item of feed?.items ?? []) {
+            this.onNotificationCallback?.(this.transformToNotification(item));
+          }
         }
       } catch (error) {
-        console.error('[NotificationStream] Error parsing notification:', error);
+        if (generation !== this.generation) {
+          return;
+        }
+
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+        if (status !== 401 && status !== 403) {
+          this.onErrorCallback?.(error);
+        }
       }
-    });
+    }
 
-    this.eventSource.addEventListener('open', () => {
-    });
-
-    this.eventSource.addEventListener('error', (event: Event) => {
-      console.error('[NotificationStream] Connection error:', event);
-      
-      if (this.eventSource?.readyState === EventSource.CLOSED) {
-      } else if (this.eventSource?.readyState === EventSource.CONNECTING) {
-      }
-
-      if (this.onErrorCallback) {
-        this.onErrorCallback(event);
-      }
-    });
-
-    this.eventSource.addEventListener('message', (_event: MessageEvent) => {
-    });
+    if (generation === this.generation) {
+      this.timer = setTimeout(() => void this.poll(generation), LIVE_FEED_POLL_MS);
+    }
   }
 
   private formatBookingDate(dateString: string): string {
@@ -106,12 +149,12 @@ class NotificationStreamService {
   }
 
   private transformToNotification(data: StreamNotificationData): NotificationObject {
-    const title = data.type === 'booking' 
-      ? 'New Booking' 
-      : data.type === 'event_purchase' 
-        ? 'New Event Purchase' 
+    const title = data.type === 'booking'
+      ? 'New Booking'
+      : data.type === 'event_purchase'
+        ? 'New Event Purchase'
         : 'New Attraction Purchase';
-    
+
     let message: string;
     if (data.type === 'booking') {
       message = `${data.customer_name} booked ${data.package_name || 'a package'} for ${this.formatBookingDate(data.booking_date || '')}`;
@@ -136,20 +179,27 @@ class NotificationStreamService {
   }
 
   disconnect(): void {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-      this.onNotificationCallback = null;
-      this.onErrorCallback = null;
+    this.generation += 1;
+
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
     }
+
+    if (this.onNotificationCallback) {
+      this.disconnectedAt = Date.now();
+    }
+
+    this.onNotificationCallback = null;
+    this.onErrorCallback = null;
   }
 
   getConnectionState(): number | null {
-    return this.eventSource?.readyState ?? null;
+    return this.onNotificationCallback ? 1 : null;
   }
 
   isConnected(): boolean {
-    return this.eventSource?.readyState === EventSource.OPEN;
+    return this.onNotificationCallback !== null;
   }
 }
 

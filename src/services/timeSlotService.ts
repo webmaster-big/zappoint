@@ -57,15 +57,7 @@ export interface AvailableSlotsRequest {
 
 const timeSlotService = {
   getAvailableSlotsSSE(params: AvailableSlotsRequest): EventSource {
-    const token = getStoredUser()?.token;
-    
-    let url = `${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.date}`;
-    
-    if (token) {
-      url += `?token=${encodeURIComponent(token)}`;
-    }
-    
-    return new EventSource(url);
+    return new EventSource(`${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.date}`);
   },
 
   async getAvailableSlots(params: AvailableSlotsRequest): Promise<AvailableSlotsResponse> {
