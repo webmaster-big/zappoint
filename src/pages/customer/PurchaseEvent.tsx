@@ -20,7 +20,7 @@ import { newCheckoutKey } from '../../utils/checkoutKey';
 import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../utils/dayOffClosure';
 import { customerService, type Customer } from '../../services/CustomerService';
-import { getImageUrl, ASSET_URL } from '../../utils/storage';
+import { getImageUrl, ASSET_URL, getStoredUser } from '../../utils/storage';
 import ScheduleHelpModal from '../../components/customer/ScheduleHelpModal';
 import CallToBookPanel from '../../components/customer/CallToBookPanel';
 import CallToBookModal from '../../components/customer/CallToBookModal';
@@ -310,7 +310,13 @@ const PurchaseEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const staffSession = useMemo(() => !!getStoredUser(), []);
+
   useEffect(() => {
+    if (!staffSession) {
+      return;
+    }
+
     const searchCustomer = async () => {
       const email = guestEmail.trim();
       if (!email || email.length < 3) {
@@ -342,7 +348,7 @@ const PurchaseEvent = () => {
     const timeoutId = setTimeout(searchCustomer, 500);
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guestEmail]);
+  }, [guestEmail, staffSession]);
 
   useEffect(() => {
     let cancelled = false;

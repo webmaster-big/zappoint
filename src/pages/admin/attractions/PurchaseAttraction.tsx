@@ -693,6 +693,10 @@ const PurchaseAttraction = () => {
   }, [attraction?.locationId]);
 
   useEffect(() => {
+    if (isCustomerMode) {
+      return;
+    }
+
     const searchCustomer = async () => {
       const email = customerInfo.email.trim();
       
@@ -732,7 +736,7 @@ const PurchaseAttraction = () => {
 
     const timeoutId = setTimeout(searchCustomer, 500);
     return () => clearTimeout(timeoutId);
-  }, [customerInfo.email]);
+  }, [customerInfo.email, isCustomerMode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

@@ -186,8 +186,17 @@ const messageFrom = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+const customerToken = (): string | null => {
+  try {
+    const stored = localStorage.getItem('zapzone_customer');
+    return stored ? JSON.parse(stored)?.token || null : null;
+  } catch {
+    return null;
+  }
+};
+
 const authHeaders = () => {
-  const token = getStoredUser()?.token;
+  const token = getStoredUser()?.token || customerToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

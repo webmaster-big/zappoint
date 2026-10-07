@@ -33,7 +33,7 @@ import { SkeletonStatCard } from '../../../components/ui/Skeleton';
 import { formatMembershipDate, membershipStatusLabel } from '../../../utils/membershipFormat';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { API_BASE_URL } from '../../../utils/storage';
+import { API_BASE_URL, getStoredUser } from '../../../utils/storage';
 import {
   AdminDataTable,
   AdminTableToolbar,
@@ -167,7 +167,8 @@ function AddMemberModal({ onClose, onCreated, themeColor }: AddMemberModalProps)
     if (q.trim().length < 2) { setCustomerResults([]); setDidSearch(false); return; }
     setSearchLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/customers/search`, { params: { q } });
+      const token = getStoredUser()?.token;
+      const res = await axios.get(`${API_BASE_URL}/customers/search`, { params: { q }, headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const results: CustomerSearchResult[] = res.data?.data ?? [];
       setCustomerResults(results);
       setDidSearch(true);
