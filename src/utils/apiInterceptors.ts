@@ -72,6 +72,7 @@ const ADMIN_ROUTE_PREFIXES = [
   '/visitor-tracking',
   '/location-change-requests',
   '/photos',
+  '/staff-pins',
 ];
 
 const PUBLIC_PATH_PREFIXES = ['/photos/kiosk', '/photos/slideshow', '/photos/qr'];
@@ -88,7 +89,7 @@ const handleAuthError = (error: any) => {
   const url: string | undefined = error?.config?.url;
   const message: string | undefined = error?.response?.data?.message;
 
-  if (!isReportingEndpoint(url) && !url?.includes('/notifications/live')) {
+  if (!isReportingEndpoint(url) && !url?.includes('/notifications/feed')) {
     reportClientError({
       kind: 'api',
       status,

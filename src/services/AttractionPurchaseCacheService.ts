@@ -8,6 +8,7 @@ const LEGACY_CACHE_NAME = 'zapzone-attraction-purchases-cache-v1';
 let legacyCleared = false;
 const PURCHASES_CACHE_KEY = '/api/attraction-purchases/cached';
 const CACHE_METADATA_KEY = '/api/attraction-purchases/metadata';
+const BACKGROUND_SYNC_MIN_GAP_MS = 60 * 1000;
 
 let warmupCompleted = false;
 
@@ -34,6 +35,8 @@ class AttractionPurchaseCacheService {
   private isSyncing: boolean = false;
   private syncPromise: Promise<AttractionPurchase[]> | null = null;
   private listenerCount: number = 0;
+  private backgroundSyncStartedAt: number = 0;
+  private trailingSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
   private constructor() {}
 
@@ -196,7 +199,19 @@ class AttractionPurchaseCacheService {
   }
 
   syncInBackground(filters?: PurchaseFilters): void {
-    if (this.isSyncing || this.listenerCount === 0) return;
+    if (this.listenerCount === 0) return;
+
+    const wait = BACKGROUND_SYNC_MIN_GAP_MS - (Date.now() - this.backgroundSyncStartedAt);
+    if (this.isSyncing || wait > 0) {
+      if (!this.trailingSyncTimer) {
+        this.trailingSyncTimer = setTimeout(() => {
+          this.trailingSyncTimer = null;
+          this.syncInBackground(filters);
+        }, Math.max(wait, 1000));
+      }
+      return;
+    }
+    this.backgroundSyncStartedAt = Date.now();
 
     setTimeout(async () => {
       try {
@@ -311,6 +326,11 @@ class AttractionPurchaseCacheService {
   }
 
   async clearCache(): Promise<void> {
+    if (this.trailingSyncTimer) {
+      clearTimeout(this.trailingSyncTimer);
+      this.trailingSyncTimer = null;
+    }
+
     if (!this.isCacheAvailable()) return;
 
     try {

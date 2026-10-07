@@ -362,6 +362,16 @@ export interface BookingFilters {
   page?: number;
   user_id?: number;
   reference_number?: string;
+  updated_since?: string;
+  sync?: 1;
+  before_id?: number;
+}
+
+export interface BookingSyncInfo {
+  cursor: string;
+  scope: string;
+  total?: number;
+  deleted_ids?: number[];
 }
 
 export interface CreateTimeSlotData {
@@ -478,6 +488,7 @@ export interface PaginatedBookingResponse {
       from: number;
       to: number;
     };
+    sync?: BookingSyncInfo;
   };
 }
 
@@ -515,7 +526,7 @@ const bookingService = {
     return response.data;
   },
 
-  async getBookings(filters?: BookingFilters): Promise<PaginatedBookingResponse> {
+  async getBookings(filters?: BookingFilters, options?: { timeout?: number }): Promise<PaginatedBookingResponse> {
     const params = new URLSearchParams();
     
     if (filters) {
@@ -531,7 +542,7 @@ const bookingService = {
     const useCustomerEndpoint = filters?.customer_id || filters?.guest_email;
     const endpoint = useCustomerEndpoint ? '/customers/bookings' : '/bookings';
 
-    const response = await api.get(`${endpoint}?${params.toString()}`);
+    const response = await api.get(`${endpoint}?${params.toString()}`, options?.timeout ? { timeout: options.timeout } : undefined);
     return response.data;
   },
 

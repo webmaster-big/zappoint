@@ -45,6 +45,7 @@ import { resolvePaymentState, statusAfterPayment, DEFAULT_COLUMN_ORDER } from '.
 import type { BookingRepriceIntent } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
+import { fetchAllPages } from '../../../utils/fetchAllPages';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -629,9 +630,8 @@ const Bookings: React.FC = () => {
       setLoading(true);
       
       const hasCachedData = await bookingCacheService.hasCachedData();
-      const isCacheStale = hasCachedData ? await bookingCacheService.isCacheStale(2) : true;
       
-      if (hasCachedData && !isCacheStale) {
+      if (hasCachedData) {
         const cacheMeta = await bookingCacheService.getCacheMetadata();
         const cachedScope = cacheMeta?.locationId ?? null;
         const cacheCoversScope = cachedScope === null || cachedScope === selectedLocation;
@@ -660,41 +660,37 @@ const Bookings: React.FC = () => {
         }
       }
       
-      console.log('[Bookings] Fetching from API...');
-      const baseParams: any = {
-        per_page: 500,
-        user_id: getStoredUser()?.id,
-        sort_by: 'booking_date',
-        sort_order: 'asc',
-      };
-      if (selectedLocation !== null) {
-        baseParams.location_id = selectedLocation;
+      if (!hasCachedData && isCompanyAdmin && selectedLocation !== null) {
+        const locationBookings = await fetchAllPages<Booking>(async (page) => {
+          const response = await bookingService.getBookings({
+            location_id: selectedLocation,
+            sort_by: 'id',
+            sort_order: 'desc',
+            per_page: 100,
+            page,
+          });
+          return { items: response.data?.bookings || [], lastPage: response.data?.pagination?.last_page ?? 1 };
+        }, 1000);
+        const transformedLocationBookings: BookingsPageBooking[] = locationBookings.map(transformRawBooking);
+        extractFilterOptions(transformedLocationBookings);
+        setBookings(transformedLocationBookings);
+        setLoading(false);
+        bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
+        return;
       }
 
-      let allRawBookings: any[] = [];
-      let currentPage = 1;
-      let lastPage = 1;
+      console.log('[Bookings] Fetching from API...');
+      const allRawBookings = await bookingCacheService.fetchAndCacheBookings({ user_id: getStoredUser()?.id });
+      const scopedBookings = selectedLocation === null
+        ? allRawBookings
+        : allRawBookings.filter((booking) => booking.location_id === selectedLocation);
 
-      do {
-        const response = await bookingService.getBookings({ ...baseParams, page: currentPage });
-        if (response.success && response.data) {
-          allRawBookings = allRawBookings.concat(response.data.bookings);
-          lastPage = response.data.pagination?.last_page ?? 1;
-        } else {
-          break;
-        }
-        currentPage++;
-      } while (currentPage <= lastPage);
-
-      const transformedBookings: BookingsPageBooking[] = allRawBookings.map(transformRawBooking);
-      console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings across', lastPage, 'page(s)');
+      const transformedBookings: BookingsPageBooking[] = scopedBookings.map(transformRawBooking);
+      console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
 
       extractFilterOptions(transformedBookings);
       setBookings(transformedBookings);
-
-      if (allRawBookings.length > 0) {
-        bookingCacheService.syncInBackground();
-      }
+      bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
     } catch (error) {
       console.error('Error loading bookings:', error);
     } finally {

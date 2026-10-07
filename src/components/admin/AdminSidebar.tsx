@@ -78,7 +78,16 @@ import { attractionPurchaseCacheService } from '../../services/AttractionPurchas
 import { eventCacheService } from '../../services/EventCacheService';
 import { isTerminalLocked } from '../../utils/terminalLock';
 
-const UNREAD_COUNT_POLL_MS = 60000;
+const TOAST_TYPE_LABELS: Record<string, string> = {
+  booking: 'Booking',
+  payment: 'Payment',
+  gift_card: 'Gift card',
+  customer: 'Guest',
+  system: 'System',
+  staff: 'Staff',
+  promotion: 'Promotion',
+  reminder: 'Reminder',
+};
 
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
   const descriptions: Record<string, string> = {
@@ -578,10 +587,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
-  const isStreamConnectedRef = useRef<boolean>(false);
-  const notificationCountRef = useRef<number>(0);
-  const countInitializedRef = useRef<boolean>(false);
-  const unreadCountRequestRef = useRef<Promise<number | null> | null>(null);
+  const badgeAsOfRef = useRef<number>(0);
+  const feedUserId: number | null = user?.id ?? getStoredUser()?.id ?? null;
+  const feedToken: string | null = getStoredUser()?.token ?? null;
+  const feedLocationId: number | null = pickedLocationId ?? null;
   
   const [showToast, setShowToast] = useState(false);
   const [toastData, setToastData] = useState<{ title: string; message: string; type: string } | null>(null);
@@ -671,24 +680,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     }
   };
 
-  const getSharedUnreadCount = (): Promise<number | null> => {
-    if (!unreadCountRequestRef.current) {
-      unreadCountRequestRef.current = getUnreadCount().finally(() => {
-        unreadCountRequestRef.current = null;
-      });
-    }
-    return unreadCountRequestRef.current;
+  const showUnreadCount = (count: number, asOf: number) => {
+    if (asOf < badgeAsOfRef.current) return;
+    badgeAsOfRef.current = asOf;
+    setUnreadNotifications(count);
   };
 
   const syncUnreadBadge = async () => {
+    const startedAt = Date.now();
     const count = await getUnreadCount();
-    if (count === null) return;
-
-    setUnreadNotifications(count);
-
-    if (!countInitializedRef.current || count < notificationCountRef.current) {
-      notificationCountRef.current = count;
-      countInitializedRef.current = true;
+    if (count !== null) {
+      showUnreadCount(count, startedAt);
     }
   };
 
@@ -716,129 +718,85 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
 
   useEffect(() => {
-    const initializeCount = async () => {
-      const count = await getUnreadCount();
-      if (count === null) return;
-      notificationCountRef.current = count;
-      countInitializedRef.current = true;
-    };
-    
-    initializeCount();
-  }, []);
-
-  useEffect(() => {
     syncUnreadBadge();
 
-    const poll = window.setInterval(syncUnreadBadge, UNREAD_COUNT_POLL_MS);
     window.addEventListener('zapzone_notifications_updated', syncUnreadBadge);
     return () => {
-      window.clearInterval(poll);
       window.removeEventListener('zapzone_notifications_updated', syncUnreadBadge);
     };
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    const leaveWhenSignedOutElsewhere = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== 'zapzone_user') return;
+      if (isTerminalLocked() || localStorage.getItem('zapzone_user')) return;
+
+      notificationStreamService.disconnect();
+      window.location.replace('/admin');
+    };
+
+    window.addEventListener('storage', leaveWhenSignedOutElsewhere);
+    return () => window.removeEventListener('storage', leaveWhenSignedOutElsewhere);
+  }, []);
+
+  useEffect(() => {
+    if (!feedUserId || !feedToken) {
       return;
     }
 
-    let locationId = user.location_id;
-    let userId = user.id;
-    
-    if (!locationId || !userId) {
-      try {
-        const storedUser = localStorage.getItem('zapzone_user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          locationId = locationId || parsedUser.location_id;
-          userId = userId || parsedUser.id;
-        }
-      } catch (error) {
+    const handleNotifications = (notifications: NotificationObject[]) => {
+      const touchesBookings = notifications.filter((notification) => notification.type === 'booking' || notification.type === 'payment');
+      if (touchesBookings.length > 0) {
+        attractionPurchaseCacheService.syncInBackground();
+        bookingCacheService.syncNow(Math.max(...touchesBookings.map((notification) => notification.data.id)));
       }
-    }
-    
-    if (!locationId) {
-      console.warn('[AdminSidebar] User has no location_id, cannot connect to notification stream');
-      return;
-    }
 
-    if (isStreamConnectedRef.current) {
-      return;
-    }
+      const fromOthers = notifications.filter((notification) => notification.user_id === null || notification.user_id === undefined || notification.user_id !== feedUserId);
+      const latest = fromOthers[fromOthers.length - 1];
 
-    const handleNotification = async (notification: NotificationObject) => {
-      if (notification.user_id !== null && notification.user_id !== undefined && notification.user_id === userId) {
+      if (!latest) {
         return;
       }
 
-      if (user.role !== 'company_admin') {
-        if (notification.location_id !== null && notification.location_id !== undefined && notification.location_id !== locationId) {
-          return;
-        }
-        
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
       }
-      
-      
-      const newCount = await getSharedUnreadCount();
-      if (newCount === null) return;
 
-      const countIncreased = countInitializedRef.current && newCount > notificationCountRef.current;
-      
-      notificationCountRef.current = newCount;
-      countInitializedRef.current = true;
-      
-      setUnreadNotifications(newCount);
-      
-      if (countIncreased) {
-        attractionPurchaseCacheService.syncInBackground();
-        bookingCacheService.syncInBackground();
+      setToastData({
+        title: latest.title,
+        message: latest.message,
+        type: latest.type
+      });
+      setShowToast(true);
 
-        if (toastTimeoutRef.current) {
-          clearTimeout(toastTimeoutRef.current);
-        }
-        
-        setToastData({
-          title: notification.title,
-          message: notification.message,
-          type: notification.type
+      toastTimeoutRef.current = setTimeout(() => {
+        setShowToast(false);
+      }, 5000);
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(latest.title, {
+          body: latest.message,
+          icon: getImageUrl(brandLogoRef.current) || '/Zap-Zone.png',
+          tag: latest.id
         });
-        setShowToast(true);
-        
-        toastTimeoutRef.current = setTimeout(() => {
-          setShowToast(false);
-        }, 5000);
-        
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(notification.title, {
-            body: notification.message,
-            icon: getImageUrl(brandLogoRef.current) || '/Zap-Zone.png',
-            tag: `${notification.type}_${notification.data.id}`
-          });
-        }
       }
+    };
+
+    const handleUnread = (count: number, polledAt: number) => {
+      showUnreadCount(count, polledAt);
     };
 
     const handleError = (error?: any) => {
       console.warn('[AdminSidebar] Notification stream connection error:', error);
+    };
 
-      if (isTerminalLocked()) return;
-
-      if (error && typeof error === 'object') {
-        const errorMessage = error.message || error.toString?.() || '';
-        if (
-          errorMessage.toLowerCase().includes('401') ||
-          errorMessage.toLowerCase().includes('403') ||
-          errorMessage.toLowerCase().includes('unauthenticated') ||
-          errorMessage.toLowerCase().includes('unauthorized')
-        ) {
-          console.warn('[AdminSidebar] Stream authentication error detected, logging out user');
-          forceLogout();
-        }
+    const handleUnauthorized = () => {
+      if (!isTerminalLocked()) {
+        forceLogout();
       }
     };
 
-    notificationStreamService.connect(locationId, handleNotification, handleError);
-    isStreamConnectedRef.current = true;
+    notificationStreamService.connect(feedLocationId, handleNotifications, handleUnread, handleError, handleUnauthorized);
 
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -846,13 +804,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
     return () => {
       notificationStreamService.disconnect();
-      isStreamConnectedRef.current = false;
-      
+
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }
     };
-  }, [user]);
+  }, [feedUserId, feedToken, feedLocationId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1211,7 +1168,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                             border: `1px solid ${getThemeColorValue()}30`
                           }}
                         >
-                          {toastData.type === 'booking' ? 'Booking' : toastData.type === 'event_purchase' ? 'Event' : 'Purchase'}
+                          {TOAST_TYPE_LABELS[toastData.type] ?? 'Notice'}
                         </span>
                         <span className="text-xs font-medium text-gray-400">• Just now</span>
                       </div>
