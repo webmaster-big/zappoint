@@ -276,7 +276,7 @@ const ticketOrderService = {
 
   async rollback(id: number): Promise<void> {
     try {
-      await api.delete(`/ticket-orders/${id}/rollback`);
+      await api.delete(`/ticket-orders/${id}/rollback`, { data: { qr_token: lastQrTokens[id] } });
     } catch {
       /* the order stays pending for staff to clear; never mask the payment error */
     }
