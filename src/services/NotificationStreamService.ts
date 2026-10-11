@@ -41,6 +41,7 @@ const LIVE_FEED_POLL_MS = 20000;
 const LIVE_FEED_TIMEOUT_MS = 15000;
 const LIVE_FEED_RESUME_WITHIN_MS = 60000;
 const UNREAD_COUNT_EVERY_POLLS = 3;
+const SHOWN_IDS_KEPT = 200;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -65,6 +66,8 @@ class NotificationStreamService {
   private locationId: number | null = null;
   private disconnectedAt = 0;
   private pollCount = 0;
+  private shownIds: number[] = [];
+  private floorId: number | null = null;
   private onNotificationsCallback: NotificationsCallback | null = null;
   private onUnreadCallback: UnreadCallback | null = null;
   private onErrorCallback: ErrorCallback | null = null;
@@ -87,6 +90,9 @@ class NotificationStreamService {
     this.onUnauthorizedCallback = onUnauthorized || null;
     this.locationId = locationId;
     this.cursor = resume ? this.cursor : null;
+    if (!resume) {
+      this.floorId = null;
+    }
     this.pollCount = 0;
 
     void this.poll(this.generation);
@@ -109,6 +115,7 @@ class NotificationStreamService {
         }
         if (this.cursor) {
           params.after = this.cursor;
+          params.overlap = 1;
         }
         if (wantsCount) {
           params.count = 1;
@@ -123,13 +130,19 @@ class NotificationStreamService {
         if (!isTerminalLocked()) {
           const feed = response.data?.data as LiveFeed | undefined;
           if (feed?.cursor) {
+            if (this.floorId === null) {
+              this.floorId = Number(feed.cursor.replace(/^n/, '')) || 0;
+            }
             this.cursor = feed.cursor;
           }
           if (typeof feed?.unread === 'number') {
             this.onUnreadCallback?.(feed.unread, polledAt);
           }
 
-          const items = (feed?.items ?? []).map((item) => this.transformToNotification(item));
+          const floor = this.floorId ?? 0;
+          const fresh = (feed?.items ?? []).filter((item) => item.id > floor && !this.shownIds.includes(item.id));
+          this.shownIds = [...this.shownIds, ...fresh.map((item) => item.id)].slice(-SHOWN_IDS_KEPT);
+          const items = fresh.map((item) => this.transformToNotification(item));
           if (items.length > 0) {
             this.onNotificationsCallback?.(items);
           }

@@ -4,6 +4,7 @@ import { metricsCacheService } from './MetricsCacheService';
 import { getStoredUser } from '../utils/storage';
 
 const CACHE_NAME = 'zapzone-bookings-cache-v2';
+const LEGACY_CACHE_NAME = 'zapzone-bookings-cache-v1';
 const BOOKINGS_CACHE_KEY = '/api/bookings/cached';
 const CACHE_METADATA_KEY = '/api/bookings/metadata';
 const BROADCAST_CHANNEL_NAME = 'zapzone-bookings-cache';
@@ -25,8 +26,10 @@ const OTHER_TAB_REFRESH_DELAY_MS = 300;
 const SYNC_REQUEST_TIMEOUT_MS = 30 * 1000;
 const NOTICE_RETRY_MIN_MS = 30 * 1000;
 const NOTICE_RETRY_MAX_MS = 5 * 60 * 1000;
+const CACHE_EDIT_LOCK_WAIT_MS = 3000;
 
 let warmupCompleted = false;
+let legacyCleared = false;
 
 interface CacheMetadata {
   lastUpdated: number;
@@ -134,11 +137,19 @@ class BookingCacheService {
       console.warn('[BookingCacheService] Cache Storage not available');
       return null;
     }
+    if (!legacyCleared) {
+      legacyCleared = true;
+      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+    }
     return await caches.open(CACHE_NAME);
   }
 
   private currentUserId(): number | undefined {
     return getStoredUser()?.id ?? undefined;
+  }
+
+  private currentLocationId(): number | undefined {
+    return getStoredUser()?.location_id ?? undefined;
   }
 
   private remember(bookings: Booking[]): void {
@@ -150,13 +161,28 @@ class BookingCacheService {
     return this.memoryOwnerId !== undefined && this.memoryOwnerId === this.currentUserId() ? this.memoryCopy : null;
   }
 
-  private exclusive<T>(task: () => Promise<T>): Promise<T> {
-    const run = (): Promise<T> => (typeof navigator !== 'undefined' && navigator.locks
-      ? navigator.locks.request(WRITE_LOCK_NAME, task)
-      : task());
+  private exclusive<T>(task: () => Promise<T>, maxWaitMs?: number): Promise<T> {
+    const run = (): Promise<T> => {
+      if (typeof navigator === 'undefined' || !navigator.locks) {
+        return task();
+      }
+      return maxWaitMs !== undefined && typeof AbortSignal.timeout === 'function'
+        ? navigator.locks.request(WRITE_LOCK_NAME, { signal: AbortSignal.timeout(maxWaitMs) }, task)
+        : navigator.locks.request(WRITE_LOCK_NAME, task);
+    };
     const result = this.writeChain.then(run, run);
     this.writeChain = result.catch(() => undefined);
     return result;
+  }
+
+  private editCache(task: () => Promise<boolean>): Promise<boolean> {
+    return this.exclusive(task, CACHE_EDIT_LOCK_WAIT_MS).catch((error: unknown) => {
+      if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+        console.warn('[BookingCacheService] Another tab is busy with the bookings cache; this change will arrive with the next sync');
+        return false;
+      }
+      throw error;
+    });
   }
 
   private withFullSyncLock<T>(task: () => Promise<T | null>): Promise<T | null> {
@@ -409,6 +435,7 @@ class BookingCacheService {
   }
 
   private async syncChanges(startedAt: number, metadata: CacheMetadata, announce: boolean): Promise<{ bookings: Booking[]; wantsFull: boolean } | null> {
+    const locationAtStart = this.currentLocationId();
     const incoming: Booking[] = [];
     let first: BookingSyncInfo | undefined;
     let beforeId: number | undefined;
@@ -466,7 +493,7 @@ class BookingCacheService {
 
     const outcome = await this.exclusive(async () => {
       const cached = await this.getCachedBookings();
-      if (!cached) {
+      if (!cached || this.currentLocationId() !== locationAtStart) {
         return null;
       }
 
@@ -549,6 +576,7 @@ class BookingCacheService {
         await this.exclusive(() => this.patchMetadata({ fullSyncStartedAt: startedAt }));
       }
 
+      const locationAtStart = this.currentLocationId();
       const first: { sync?: BookingSyncInfo } = {};
       let downloaded: Booking[];
       try {
@@ -561,6 +589,9 @@ class BookingCacheService {
       }
 
       const merged = await this.exclusive(async () => {
+        if (this.currentLocationId() !== locationAtStart) {
+          return null;
+        }
         const kept = newestFirst(keepNewerCopies(downloaded, sameUser ? await this.getCachedBookings() : null));
         await this.cacheBookings(kept, {
           userId: filters?.user_id,
@@ -576,6 +607,9 @@ class BookingCacheService {
         });
         return kept;
       });
+      if (!merged) {
+        return null;
+      }
 
       let bookings = merged;
       try {
@@ -621,6 +655,9 @@ class BookingCacheService {
         const boundary = beforeId;
         if (boundary !== undefined && rows.some((row) => row.id >= boundary)) {
           throw new Error('[BookingCacheService] The bookings list did not page by booking id');
+        }
+        if (response.data?.sync?.scope !== first.sync?.scope) {
+          throw new Error('[BookingCacheService] The bookings list changed location while it was downloading');
         }
       }
 
@@ -708,7 +745,7 @@ class BookingCacheService {
   }
 
   async updateBookingInCache(updatedBooking: Booking): Promise<void> {
-    const written = await this.exclusive(async () => {
+    const written = await this.editCache(async () => {
       const cachedBookings = await this.getCachedBookings();
       if (!cachedBookings) return false;
 
@@ -733,7 +770,7 @@ class BookingCacheService {
   }
 
   async addBookingToCache(newBooking: Booking): Promise<void> {
-    const added = await this.exclusive(async () => {
+    const added = await this.editCache(async () => {
       const bookings = (await this.getCachedBookings()) || [];
 
       if (bookings.some(b => b.id === newBooking.id)) return false;
@@ -753,7 +790,7 @@ class BookingCacheService {
   }
 
   async removeBookingFromCache(bookingId: number): Promise<void> {
-    const written = await this.exclusive(async () => {
+    const written = await this.editCache(async () => {
       const cachedBookings = await this.getCachedBookings();
       if (!cachedBookings) return false;
 

@@ -11,6 +11,8 @@ import { addOnCacheService } from '../services/AddOnCacheService';
 import { attractionCacheService } from '../services/AttractionCacheService';
 import { eventCacheService } from '../services/EventCacheService';
 import { membershipCache } from '../services/MembershipCacheService';
+import { purgeAllZapzoneCaches } from '../utils/cacheGuard';
+import { clearSharedTerminalState } from '../utils/terminalLock';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface UserData {
@@ -114,6 +116,8 @@ const MainLayout: React.FC = () => {
       await attractionCacheService.clearCache();
       await eventCacheService.clearCache();
       await membershipCache.invalidate();
+      await purgeAllZapzoneCaches();
+      clearSharedTerminalState();
       
       localStorage.removeItem('zapzone_user');
       setUserData(null);

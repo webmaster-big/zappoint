@@ -89,6 +89,22 @@ const TOAST_TYPE_LABELS: Record<string, string> = {
   reminder: 'Reminder',
 };
 
+const DESKTOP_ALERTS_SHOWN_KEY = 'zapzone_desktop_alerts_shown';
+
+const claimDesktopAlert = (notificationId: number): boolean => {
+  try {
+    const shown: unknown = JSON.parse(localStorage.getItem(DESKTOP_ALERTS_SHOWN_KEY) || '[]');
+    const recent = Array.isArray(shown) ? shown.filter((id): id is number => typeof id === 'number') : [];
+    if (recent.includes(notificationId)) {
+      return false;
+    }
+    localStorage.setItem(DESKTOP_ALERTS_SHOWN_KEY, JSON.stringify([...recent, notificationId].slice(-50)));
+  } catch {
+    return true;
+  }
+  return true;
+};
+
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
   const descriptions: Record<string, string> = {
     'Dashboard': 'Overview of your account and recent activity',
@@ -773,7 +789,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         setShowToast(false);
       }, 5000);
 
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if ('Notification' in window && Notification.permission === 'granted' && claimDesktopAlert(latest.data.id)) {
         new Notification(latest.title, {
           body: latest.message,
           icon: getImageUrl(brandLogoRef.current) || '/Zap-Zone.png',
