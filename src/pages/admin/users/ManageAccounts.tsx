@@ -533,7 +533,7 @@ const ManageAccounts = () => {
       setAccounts(prev => prev.filter(account => account.id !== id));
     } catch (error) {
       console.error('Error deleting account:', error);
-      alert('Failed to delete account. Please try again.');
+      alert(error instanceof Error && error.message ? error.message : 'Failed to delete account. Please try again.');
     }
   };
 
@@ -834,14 +834,14 @@ const ManageAccounts = () => {
         throw new Error(response.message || 'Failed to delete accounts');
       }
 
-      const deletedCount = table.selectedIds.length;
-      setAccounts(prev => prev.filter(account => !table.selectedIds.includes(account.id)));
       table.clearSelection();
+      loadAccounts();
 
-      alert(`Successfully deleted ${deletedCount} account(s)`);
+      alert(response.message || 'Accounts deleted');
     } catch (error) {
       console.error('Error deleting accounts:', error);
-      alert('Failed to delete some accounts. Please try again.');
+      const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(serverMessage || 'Failed to delete some accounts. Please try again.');
     }
   };
 

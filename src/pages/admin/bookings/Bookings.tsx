@@ -46,6 +46,7 @@ import type { BookingRepriceIntent } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
 import { fetchAllPages } from '../../../utils/fetchAllPages';
+import { requestChangeReason } from '../../../utils/changeReasonPrompt';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -2340,10 +2341,16 @@ const Bookings: React.FC = () => {
     if (selectedBookings.length === 0) return;
     
     if (window.confirm(`Are you sure you want to delete ${selectedBookings.length} booking(s)?`)) {
+      const reason = await requestChangeReason({
+        summary: `Deleting ${selectedBookings.length} booking(s)`,
+        destructive: true,
+      });
+      if (!reason) return;
+
       try {
         await Promise.all(
           selectedBookings.map(async (id) => {
-            await bookingService.deleteBooking(Number(id));
+            await bookingService.deleteBooking(Number(id), reason);
             await bookingCacheService.removeBookingFromCache(Number(id));
           })
         );

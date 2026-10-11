@@ -3,17 +3,28 @@ import { Lock, LogIn } from 'lucide-react';
 import PinPad from './PinPad';
 import { useIdleTimer } from '../../../hooks/useIdleTimer';
 import { getStoredTerminal, clearStoredTerminal } from '../../../utils/staffTerminal';
-import { setTerminalLocked } from '../../../utils/terminalLock';
+import {
+  isTerminalLocked,
+  setTerminalLocked,
+  shareTerminalLock,
+  isTerminalLockShared,
+  subscribeSharedTerminalLock,
+  shareTerminalIdle,
+  sharedTerminalIdle,
+  clearSharedTerminalState,
+} from '../../../utils/terminalLock';
 import { setStoredUser, getStoredUser } from '../../../utils/storage';
+import { clearCustomerSession } from '../../../utils/auth';
 import { getTerminalContext, unlockWithPin, lockTerminal } from '../../../services/StaffPinService';
 import type { TerminalContext } from '../../../services/StaffPinService';
 
 const DEFAULT_PIN_LENGTH = 6;
+const SHARED_ACTIVITY_KEY = 'zapzone_terminal_activity';
 
 const TerminalLockHost: React.FC = () => {
   const [terminal] = useState(() => getStoredTerminal());
   const [context, setContext] = useState<TerminalContext | null>(null);
-  const [locked, setLocked] = useState(false);
+  const [locked, setLocked] = useState(() => isTerminalLocked());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idleSeconds, setIdleSeconds] = useState<number | null>(null);
@@ -26,10 +37,14 @@ const TerminalLockHost: React.FC = () => {
         if (cancelled) return;
         if (!next.registered) {
           clearStoredTerminal();
+          clearSharedTerminalState();
+          setTerminalLocked(false);
+          setLocked(false);
           return;
         }
         setContext(next);
-        setIdleSeconds(next.idle_disabled ? null : next.idle_seconds ?? null);
+        const shared = sharedTerminalIdle();
+        setIdleSeconds(shared !== undefined ? shared : (next.idle_disabled ? null : next.idle_seconds ?? null));
       })
       .catch(() => {
         /* offline or server down: leave the terminal unlocked rather than stranding the desk */
@@ -43,15 +58,39 @@ const TerminalLockHost: React.FC = () => {
     if (locked) return;
     setLocked(true);
     setTerminalLocked(true);
+    shareTerminalLock(true);
     void lockTerminal('idle').catch(() => {
       /* the overlay is up regardless; the token dies on the server or at expiry */
     });
   }, [locked]);
 
+  useEffect(() => {
+    if (!terminal) return;
+
+    if (isTerminalLockShared()) {
+      setLocked(true);
+      setTerminalLocked(true);
+    }
+
+    return subscribeSharedTerminalLock((lockedElsewhere) => {
+      setLocked(lockedElsewhere);
+      setTerminalLocked(lockedElsewhere);
+      if (!lockedElsewhere) {
+        const shared = sharedTerminalIdle();
+        if (shared !== undefined) {
+          setIdleSeconds(shared);
+        }
+        setError(null);
+        window.dispatchEvent(new Event('zapzone_profile_updated'));
+      }
+    });
+  }, [terminal]);
+
   useIdleTimer({
     seconds: idleSeconds,
     onIdle: lock,
     enabled: Boolean(terminal && context?.registered && !locked),
+    sharedActivityKey: SHARED_ACTIVITY_KEY,
   });
 
   const submit = useCallback(async (pin: string) => {
@@ -64,10 +103,14 @@ const TerminalLockHost: React.FC = () => {
         role: session.data.effective_role,
         token: session.token,
       };
+      const sessionIdle = session.data.idle_disabled ? null : session.data.idle_seconds ?? null;
+      clearCustomerSession();
       setStoredUser(merged, false);
-      setIdleSeconds(session.data.idle_disabled ? null : session.data.idle_seconds ?? null);
+      setIdleSeconds(sessionIdle);
+      shareTerminalIdle(sessionIdle);
       setLocked(false);
       setTerminalLocked(false);
+      shareTerminalLock(false);
       window.dispatchEvent(new Event('zapzone_profile_updated'));
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -77,9 +120,9 @@ const TerminalLockHost: React.FC = () => {
     }
   }, []);
 
-  if (!terminal || !context?.registered || !locked) return null;
+  if (!terminal || !locked || context?.registered === false) return null;
 
-  const pinLength = context.pin_length ?? DEFAULT_PIN_LENGTH;
+  const pinLength = context?.pin_length ?? DEFAULT_PIN_LENGTH;
   const signedInAs = getStoredUser();
 
   return (
@@ -89,7 +132,7 @@ const TerminalLockHost: React.FC = () => {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
             <Lock className="h-6 w-6 text-gray-700" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">{context.label || 'Shared terminal'}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{context?.label || terminal.label || 'Shared terminal'}</h2>
           <p className="mt-1 text-sm text-gray-600">
             Enter your PIN to carry on{signedInAs?.first_name ? `. ${signedInAs.first_name}'s work is still open underneath.` : '.'}
           </p>
@@ -107,6 +150,7 @@ const TerminalLockHost: React.FC = () => {
           type="button"
           onClick={() => {
             setTerminalLocked(false);
+            clearSharedTerminalState();
             try {
               localStorage.removeItem('zapzone_user');
             } catch {

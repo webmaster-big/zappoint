@@ -7,6 +7,7 @@ import customerService from '../../services/CustomerService';
 import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
+import { clearStaffSession } from '../../utils/auth';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' }, { code: 'CA', name: 'Canada' }, { code: 'GB', name: 'United Kingdom' },
@@ -164,6 +165,7 @@ const CustomerRegister = () => {
         ...(formData.country && { country: formData.country }),
       });
       if (response.success && response.data) {
+        clearStaffSession();
         localStorage.setItem('zapzone_customer', JSON.stringify({
           id: response.data.id, firstName: formData.firstName, lastName: formData.lastName,
           name: `${formData.firstName} ${formData.lastName}`, email: formData.email, phone: formData.phone,

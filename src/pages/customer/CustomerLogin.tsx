@@ -7,6 +7,7 @@ import customerService from '../../services/CustomerService';
 import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
+import { clearStaffSession } from '../../utils/auth';
 
 const carouselSlides = [
   {
@@ -103,6 +104,7 @@ const CustomerLogin = () => {
       await animateProgress(65, 600);
       if (response.token && response.user) {
         await animateProgress(85, 600);
+        clearStaffSession();
         localStorage.setItem('zapzone_customer', JSON.stringify({
           id: response.user.id,
           firstName: response.user.first_name || '', lastName: response.user.last_name || '',

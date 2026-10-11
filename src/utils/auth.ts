@@ -1,3 +1,4 @@
+import { clearSharedTerminalState } from './terminalLock';
 
 export interface UserData {
   id: number;
@@ -95,14 +96,23 @@ export const getCustomerToken = (): string | null => {
   return customer?.token || null;
 };
 
-export const logout = (): void => {
+export const clearStaffSession = (): void => {
   localStorage.removeItem('zapzone_user');
   localStorage.removeItem('zapzone_notifications');
+  clearSharedTerminalState();
+};
+
+export const clearCustomerSession = (): void => {
+  localStorage.removeItem('zapzone_customer');
+};
+
+export const logout = (): void => {
+  clearStaffSession();
   window.location.href = '/admin';
 };
 
 export const customerLogout = (): void => {
-  localStorage.removeItem('zapzone_customer');
+  clearCustomerSession();
   window.location.href = '/customer/login';
 };
 

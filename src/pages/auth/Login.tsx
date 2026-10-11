@@ -6,6 +6,8 @@ import EmailInput from "../../components/ui/EmailInput";
 import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
+import { clearCustomerSession } from '../../utils/auth';
+import { clearSharedTerminalState } from '../../utils/terminalLock';
 import {
   activateStaffLocation,
   rememberedManagerLocation,
@@ -117,6 +119,8 @@ export default function Login() {
       } catch {
       }
 
+      clearCustomerSession();
+      clearSharedTerminalState();
       localStorage.setItem('zapzone_user', JSON.stringify({
         id: user.id,
         name: `${user.first_name} ${user.last_name}`,

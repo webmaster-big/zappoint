@@ -511,7 +511,7 @@ const ManageAttendants = () => {
       setAttendants(prev => prev.filter(attendant => attendant.id !== id));
     } catch (error) {
       console.error('Error deleting attendant:', error);
-      alert('Failed to delete attendant. Please try again.');
+      alert(error instanceof Error && error.message ? error.message : 'Failed to delete attendant. Please try again.');
     }
   };
 
@@ -819,15 +819,14 @@ const ManageAttendants = () => {
         throw new Error(response.message || 'Failed to delete attendants');
       }
 
-      const deletedCount = table.selectedIds.length;
-      const deletedIds = [...table.selectedIds];
-      setAttendants(prev => prev.filter(attendant => !deletedIds.includes(attendant.id)));
       table.clearSelection();
+      loadAttendants();
 
-      alert(`Successfully deleted ${deletedCount} attendant(s)`);
+      alert(response.message || 'Attendants deleted');
     } catch (error) {
       console.error('Error deleting attendants:', error);
-      alert('Failed to delete some attendants. Please try again.');
+      const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(serverMessage || 'Failed to delete some attendants. Please try again.');
     }
   };
 
