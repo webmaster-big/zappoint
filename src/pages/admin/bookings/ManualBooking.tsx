@@ -107,6 +107,7 @@ const ManualBooking: React.FC = () => {
   // a booking saved on top of another needs a manager's PIN here too, not only on the onsite flow
   const overrideTokenRef = useRef<string | null>(null);
   const checkoutKeyRef = useRef(newCheckoutKey());
+  const checkoutAttemptRef = useRef<string | null>(null);
   const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
 
   const [cardNumber, setCardNumber] = useState('');
@@ -840,7 +841,7 @@ const ManualBooking: React.FC = () => {
       const freshFeeTotal = pkg
         ? await resolveFeeTotal('package', pkg.id, calculatedTotal, pkg.location_id || undefined)
         : null;
-      const feeTotal = freshFeeTotal !== null ? freshFeeTotal : calculatedTotal;
+      const feeTotal = Math.max(0, (freshFeeTotal !== null ? freshFeeTotal : calculatedTotal) - (specialPricingBreakdown?.total_discount || 0));
       const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : feeTotal;
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
       
@@ -945,6 +946,12 @@ const ManualBooking: React.FC = () => {
           return;
         }
       }
+
+      const attempt = JSON.stringify([form.packageId, form.bookingDate, form.bookingTime, form.roomId, form.participants]);
+      if (checkoutAttemptRef.current !== null && checkoutAttemptRef.current !== attempt) {
+        checkoutKeyRef.current = newCheckoutKey();
+      }
+      checkoutAttemptRef.current = attempt;
 
       const bookingData: ExtendedBookingData = {
         overlap_override_token: overrideTokenRef.current || undefined,

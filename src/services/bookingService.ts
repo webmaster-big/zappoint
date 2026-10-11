@@ -6,6 +6,7 @@ import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { changeReasonWasRequired, requestChangeReason } from '../utils/changeReasonPrompt';
 import { fetchAllPages } from '../utils/fetchAllPages';
+import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
 import type { VisitFollowUpSummary } from '../types/visitFollowUp.types';
 
 const getBestToken = (): string | null => {
@@ -572,6 +573,7 @@ const bookingService = {
 
   async createBooking(bookingData: CreateBookingData): Promise<BookingResponse> {
     const response = await api.post('/bookings', bookingData);
+    rememberCheckoutToken('booking', response.data?.data?.id, response.data?.checkout_token);
     return response.data;
   },
 
@@ -588,6 +590,7 @@ const bookingService = {
   async deleteBooking(id: number, changeReason?: string): Promise<{ success: boolean; message: string }> {
     const response = await api.delete(`/bookings/${id}`, {
       params: changeReason ? { change_reason: changeReason } : undefined,
+      data: checkoutTokenBody('booking', id),
     });
     return response.data;
   },
@@ -797,13 +800,13 @@ const bookingService = {
     success: boolean;
     message: string;
   }> {
-    const response = await api.delete(`/bookings/${id}/force-delete`);
+    const response = await api.delete(`/bookings/${id}/force-delete`, { data: checkoutTokenBody('booking', id) });
     return response.data;
   },
 
   async rollbackBooking(id: number): Promise<'force-deleted' | 'kept' | 'gone'> {
     try {
-      await api.delete(`/bookings/${id}/force-delete`);
+      await api.delete(`/bookings/${id}/force-delete`, { data: checkoutTokenBody('booking', id) });
       return 'force-deleted';
     } catch (forceErr) {
       const refusedStatus = (forceErr as { response?: { status?: number } })?.response?.status;

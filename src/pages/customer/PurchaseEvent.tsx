@@ -17,6 +17,7 @@ import {
 import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { newCheckoutKey } from '../../utils/checkoutKey';
+import { removeOrderedItems } from '../../utils/orderedCartItems';
 import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../utils/dayOffClosure';
 import { customerService, type Customer } from '../../services/CustomerService';
@@ -235,6 +236,7 @@ const PurchaseEvent = () => {
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [orderQuote, setOrderQuote] = useState<OrderQuote | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [existingPurchase, setExistingPurchase] = useState<{ date: string; time: string; quantity: number; paid: number } | null>(null);
   const [orderQrImage, setOrderQrImage] = useState<string | null>(null);
   const [orderPrefilled, setOrderPrefilled] = useState(false);
 
@@ -925,8 +927,8 @@ const PurchaseEvent = () => {
           if (createErr instanceof OrderAlreadyPlacedError) {
             setPlacedOrder(createErr.order);
             checkoutKeyRef.current = newCheckoutKey();
-            cart.clear();
-            setToast({ message: createErr.message, type: 'success' });
+            const stillInCart = removeOrderedItems(cart, createErr.order);
+            setToast({ message: stillInCart > 0 ? `${createErr.message} The other items in your cart still need checking out.` : createErr.message, type: 'success' });
             setPurchaseComplete(true);
             setCurrentStep(4);
             return;
@@ -1051,8 +1053,17 @@ const PurchaseEvent = () => {
           checkout_key: checkoutKeyRef.current,
         });
       } catch (createErr) {
-        const refusal = (createErr as { response?: { status?: number; data?: { code?: string; message?: string } } })?.response;
+        const refusal = (createErr as { response?: { status?: number; data?: { code?: string; message?: string; data?: { purchase_date?: string | null; purchase_time?: string | null; quantity?: number; amount_paid?: number } } } })?.response;
         if (refusal?.status === 409 && refusal.data?.code === 'ALREADY_PURCHASED') {
+          const earlier = refusal.data.data;
+          if (earlier) {
+            setExistingPurchase({
+              date: String(earlier.purchase_date ?? selectedDate).split('T')[0],
+              time: String(earlier.purchase_time ?? selectedTime).slice(0, 5),
+              quantity: Number(earlier.quantity ?? quantity),
+              paid: Number(earlier.amount_paid ?? 0),
+            });
+          }
           setToast({ message: refusal.data.message || 'This purchase already went through, so your card was not charged again.', type: 'success' });
           checkoutKeyRef.current = newCheckoutKey();
           setPurchaseComplete(true);
@@ -1060,7 +1071,9 @@ const PurchaseEvent = () => {
           return;
         }
         console.error('Purchase creation failed:', createErr);
-        throw new Error('We couldn\'t process your order right now. No charges were made. Please try again.');
+        const sentByServer = refusal?.data?.message;
+        const raisedHere = !(createErr as { isAxiosError?: boolean })?.isAxiosError && createErr instanceof Error ? createErr.message : '';
+        throw new Error(sentByServer || raisedHere || 'We couldn\'t process your order right now. No charges were made. Please try again.');
       }
 
       const createdPurchase = response.data || response;
@@ -2178,9 +2191,9 @@ const PurchaseEvent = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-gray-600">Event:</span><span className="font-medium text-gray-900">{event.name}</span></div>
                       {event.location && <div className="flex justify-between"><span className="text-gray-600">Location:</span><span className="font-medium text-gray-900">{event.location.name}</span></div>}
-                      <div className="flex justify-between"><span className="text-gray-600">Date:</span><span className="font-medium text-gray-900">{formatDate(selectedDate)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Time:</span><span className="font-medium text-gray-900">{formatTime(selectedTime)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Tickets:</span><span className="font-medium text-gray-900">{quantity}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Date:</span><span className="font-medium text-gray-900">{formatDate(existingPurchase?.date ?? selectedDate)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Time:</span><span className="font-medium text-gray-900">{formatTime(existingPurchase?.time ?? selectedTime)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Tickets:</span><span className="font-medium text-gray-900">{existingPurchase?.quantity ?? quantity}</span></div>
                       <div className="flex justify-between"><span className="text-gray-600">Payment Method:</span><span className="font-medium text-gray-900">{placedOrder && placedOrder.payment_method !== 'authorize.net' ? 'Pay on arrival' : 'Credit/Debit Card'}</span></div>
                       {orderMode && placedOrder ? (
                         <>
@@ -2190,7 +2203,7 @@ const PurchaseEvent = () => {
                           )}
                         </>
                       ) : (
-                        <div className="pt-3 mt-3 flex justify-between"><span className="text-gray-900 font-semibold">Total Paid:</span><span className="text-lg font-bold text-emerald-600">${totalAmount.toFixed(2)}</span></div>
+                        <div className="pt-3 mt-3 flex justify-between"><span className="text-gray-900 font-semibold">Total Paid:</span><span className="text-lg font-bold text-emerald-600">${(existingPurchase ? existingPurchase.paid : totalAmount).toFixed(2)}</span></div>
                       )}
                     </div>
                   </div>

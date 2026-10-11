@@ -231,7 +231,10 @@ const MembershipDetails = () => {
       showSuccess('Retry attempted');
       applyUpdate(await membershipService.getMembership(m.id));
     }
-    catch (e: unknown) { showError(e, 'Retry failed'); }
+    catch (e: unknown) {
+      const serverMessage = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showError(serverMessage ? new Error(serverMessage) : e, 'Retry failed');
+    }
     finally { setActing(null); }
   };
 

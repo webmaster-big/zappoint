@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
 import type {
   EventPurchase,
   CreateEventPurchaseData,
@@ -78,6 +79,7 @@ class EventPurchaseService {
     try {
       const response = await api.post('/event-purchases', data);
       this._lastCreateTime = Date.now();
+      rememberCheckoutToken('event_purchase', response.data?.id, response.data?.checkout_token);
       return response.data;
     } finally {
       this._createInFlight = false;
@@ -90,12 +92,12 @@ class EventPurchaseService {
   }
 
   async deletePurchase(id: number): Promise<ApiResponse<null>> {
-    const response = await api.delete(`/event-purchases/${id}`);
+    const response = await api.delete(`/event-purchases/${id}`, { data: checkoutTokenBody('event_purchase', id) });
     return response.data;
   }
 
   async forceDeletePurchase(id: number): Promise<ApiResponse<null>> {
-    const response = await api.delete(`/event-purchases/${id}/force-delete`);
+    const response = await api.delete(`/event-purchases/${id}/force-delete`, { data: checkoutTokenBody('event_purchase', id) });
     return response.data;
   }
 

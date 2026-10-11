@@ -2,6 +2,7 @@ import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { fetchAllPages } from '../utils/fetchAllPages';
+import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
 
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
@@ -292,6 +293,7 @@ class AttractionPurchaseService {
     try {
       const response = await api.post('/attraction-purchases', data);
       this._lastCreatePurchaseTime = Date.now();
+      rememberCheckoutToken('attraction_purchase', response.data?.data?.id, response.data?.checkout_token);
       return response.data;
     } finally {
       this._createPurchaseInFlight = false;
@@ -304,7 +306,7 @@ class AttractionPurchaseService {
   }
 
   async deletePurchase(id: number): Promise<ApiResponse<null>> {
-    const response = await api.delete(`/attraction-purchases/${id}`);
+    const response = await api.delete(`/attraction-purchases/${id}`, { data: checkoutTokenBody('attraction_purchase', id) });
     return response.data;
   }
 
@@ -379,7 +381,7 @@ class AttractionPurchaseService {
   }
 
   async forceDeletePurchase(id: number): Promise<ApiResponse<null>> {
-    const response = await api.delete(`/attraction-purchases/${id}/force-delete`);
+    const response = await api.delete(`/attraction-purchases/${id}/force-delete`, { data: checkoutTokenBody('attraction_purchase', id) });
     return response.data;
   }
 

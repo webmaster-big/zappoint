@@ -448,6 +448,7 @@ const OnsiteBooking: React.FC = () => {
   // held in a ref so the re-submit right after approval sees it without waiting for a render
   const overrideTokenRef = useRef<string | null>(null);
   const checkoutKeyRef = useRef(newCheckoutKey());
+  const checkoutAttemptRef = useRef<string | null>(null);
   const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
   // taking the last online slot is worth telling staff about, but it is not an overlap, so it is
   // confirmed rather than approved by a manager
@@ -544,7 +545,7 @@ const OnsiteBooking: React.FC = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        const basePrice = calculateTotal();
+        const basePrice = calculateBase();
         const response = await feeSupportService.getForEntity({
           entity_type: 'package',
           entity_id: selectedPackage.id,
@@ -1453,7 +1454,7 @@ const OnsiteBooking: React.FC = () => {
     return Math.min(baseDeposit, total);
   };
 
-  const calculateTotal = () => {
+  const calculateBase = () => {
     let total = 0;
     
     if (selectedPackage) {
@@ -1489,18 +1490,22 @@ const OnsiteBooking: React.FC = () => {
         total += addOnPrice * quantity;
       }
     });
-    
-    total -= promoDiscount;
-    total -= giftDiscount;
 
-    return Math.max(0, total);
+    return total;
+  };
+
+  const calculateTotal = () => Math.max(0, calculateBase() - promoDiscount - giftDiscount);
+
+  const payableTotal = () => {
+    const afterCodes = feeBreakdown ? Math.max(0, feeBreakdown.total - promoDiscount - giftDiscount) : calculateTotal();
+    return specialPricingBreakdown?.has_special_pricing ? afterCodes - specialPricingBreakdown.total_discount : afterCodes;
   };
 
   const validateOnsiteCode = async (type: 'promo' | 'giftcard') => {
     if (!selectedPackage) return;
     setCodeError(null);
 
-    const base = calculateTotal() + promoDiscount + giftDiscount;
+    const base = calculateBase();
     const locationId = selectedLocation ?? undefined;
     const items = [{ type: 'package' as const, id: selectedPackage.id }];
 
@@ -1717,9 +1722,10 @@ const OnsiteBooking: React.FC = () => {
         })
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
-      const submitBasePrice = calculateTotal();
+      const submitBasePrice = calculateBase();
       const freshFeeTotal = await resolveFeeTotal('package', selectedPackage.id, submitBasePrice, selectedLocation || undefined);
-      const totalAmount = freshFeeTotal !== null ? freshFeeTotal : (submitBasePrice + promoDiscount + giftDiscount);
+      const specialDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
+      const totalAmount = Math.max(0, (freshFeeTotal !== null ? freshFeeTotal : submitBasePrice) - specialDiscount);
       const netTotal = Math.max(0, totalAmount - promoDiscount - giftDiscount);
       const partialAmount = calculatePartialAmount();
       let amountPaid = netTotal;
@@ -1755,6 +1761,11 @@ const OnsiteBooking: React.FC = () => {
         isSubmittingRef.current = false;
         return;
       }
+      const attempt = JSON.stringify([selectedPackage.id, bookingData.date, bookingData.time, selectedRoomId ?? null, bookingData.participants]);
+      if (checkoutAttemptRef.current !== null && checkoutAttemptRef.current !== attempt) {
+        checkoutKeyRef.current = newCheckoutKey();
+      }
+      checkoutAttemptRef.current = attempt;
       const bookingData_request: ExtendedBookingData = {
         guest_name: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
         guest_email: bookingData.customer.email,
@@ -2070,10 +2081,7 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const renderLiveSummary = () => {
-    let total = feeBreakdown ? feeBreakdown.total : calculateTotal();
-    if (specialPricingBreakdown && specialPricingBreakdown.has_special_pricing) {
-      total = total - specialPricingBreakdown.total_discount;
-    }
+    const total = payableTotal();
     const partialAmount = calculatePartialAmount();
     
     return (
@@ -3612,7 +3620,7 @@ const OnsiteBooking: React.FC = () => {
               <div className="flex-1">
                 <div className="font-medium text-sm text-gray-900">Partial Payment</div>
                 <div className="text-xs text-gray-600 mt-1">
-                  Pay ${calculatePartialAmount().toFixed(2)} now, remaining ${((feeBreakdown ? feeBreakdown.total : calculateTotal()) - calculatePartialAmount()).toFixed(2)} later
+                  Pay ${calculatePartialAmount().toFixed(2)} now, remaining ${(payableTotal() - calculatePartialAmount()).toFixed(2)} later
                 </div>
               </div>
             </label>
@@ -3756,7 +3764,7 @@ const OnsiteBooking: React.FC = () => {
         
         <div className="flex justify-between font-bold text-lg mt-4 pt-4 border-t border-gray-200">
           <span>Total</span>
-          <span>${(feeBreakdown ? feeBreakdown.total : calculateTotal()).toFixed(2)}</span>
+          <span>${payableTotal().toFixed(2)}</span>
         </div>
         
         {bookingData.paymentMethod === 'paylater' ? (

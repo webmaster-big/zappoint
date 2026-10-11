@@ -9,6 +9,7 @@ import { loadAcceptJS, tokenizeCard } from '../../services/PaymentService';
 import axios from 'axios';
 import { API_BASE_URL } from '../../utils/storage';
 import Toast from '../../components/ui/Toast';
+import { newCheckoutKey } from '../../utils/checkoutKey';
 
 interface LocationOption {
   id: number;
@@ -63,6 +64,7 @@ const CustomerGiftCards = () => {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkoutKeyRef = useRef(newCheckoutKey());
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     if (toastTimeout.current) clearTimeout(toastTimeout.current);
@@ -208,14 +210,18 @@ const CustomerGiftCards = () => {
         purchaser_name: purchaserName.trim(),
         purchaser_email: purchaserEmail.trim(),
         opaque_data: { dataDescriptor: opaque.dataDescriptor, dataValue: opaque.dataValue },
+        checkout_key: checkoutKeyRef.current,
       });
       if (!res.success || !res.data) {
         setBuyError(res.message || 'That purchase did not go through.');
         return;
       }
-      setIssued({ code: res.data.code, initial_value: res.data.initial_value, location: res.data.location });
+      checkoutKeyRef.current = newCheckoutKey();
+      if (res.data.code) {
+        setIssued({ code: res.data.code, initial_value: res.data.initial_value, location: res.data.location });
+      }
       setCardNumber(''); setExpiry(''); setCvc(''); setCustomAmount('');
-      showToast(res.duplicate ? 'This card was already purchased.' : 'Gift card purchased!', 'success');
+      showToast(res.duplicate ? (res.data.code ? 'This card was already purchased.' : res.message) : 'Gift card purchased!', 'success');
       fetchOwnedCards();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } }; message?: string };

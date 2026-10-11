@@ -30,6 +30,7 @@ import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo, Purc
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
+import { removeOrderedItems } from '../../../utils/orderedCartItems';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
@@ -179,6 +180,7 @@ const PurchaseAttraction = () => {
   const [orderQuote, setOrderQuote] = useState<OrderQuote | null>(null);
   const [giftCard, setGiftCard] = useState<AppliedGiftCard | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
+  const [existingPurchase, setExistingPurchase] = useState<{ quantity: number; paid: number } | null>(null);
   const [orderQrImage, setOrderQrImage] = useState<string | null>(null);
   const [orderPrefilled, setOrderPrefilled] = useState(false);
 
@@ -1138,8 +1140,8 @@ const PurchaseAttraction = () => {
           if (createErr instanceof OrderAlreadyPlacedError) {
             setPlacedOrder(createErr.order);
             checkoutKeyRef.current = newCheckoutKey();
-            cart.clear();
-            setToast({ message: createErr.message, type: 'success' });
+            const stillInCart = removeOrderedItems(cart, createErr.order);
+            setToast({ message: stillInCart > 0 ? `${createErr.message} The other items in your cart still need checking out.` : createErr.message, type: 'success' });
             setPurchaseComplete(true);
             setCurrentStep(4);
             return;
@@ -1226,8 +1228,12 @@ const PurchaseAttraction = () => {
         setNextTrackingId();
         response = await attractionPurchaseService.createPurchase(purchaseData);
       } catch (createErr) {
-        const refusal = (createErr as { response?: { status?: number; data?: { code?: string; message?: string; data?: { id?: number } } } })?.response;
+        const refusal = (createErr as { response?: { status?: number; data?: { code?: string; message?: string; data?: { id?: number; quantity?: number; amount_paid?: number } } } })?.response;
         if (refusal?.status === 409 && refusal.data?.code === 'ALREADY_PURCHASED' && refusal.data.data?.id) {
+          setExistingPurchase({
+            quantity: Number(refusal.data.data.quantity ?? quantity),
+            paid: Number(refusal.data.data.amount_paid ?? 0),
+          });
           let existingQr = '';
           try {
             existingQr = await generatePurchaseQRCode(refusal.data.data.id);
@@ -1243,7 +1249,9 @@ const PurchaseAttraction = () => {
           return;
         }
         console.error('❌ Purchase creation failed:', createErr);
-        throw new Error('We couldn\'t process your order right now. No charges were made. Please try again or contact us for help.');
+        const sentByServer = refusal?.data?.message;
+        const raisedHere = !(createErr as { isAxiosError?: boolean })?.isAxiosError && createErr instanceof Error ? createErr.message : '';
+        throw new Error(sentByServer || raisedHere || 'We couldn\'t process your order right now. No charges were made. Please try again or contact us for help.');
       }
       const createdPurchase = response.data;
       console.log('✅ Purchase created, ID:', createdPurchase.id);
@@ -2590,7 +2598,7 @@ const PurchaseAttraction = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Quantity:</span>
-                        <span className="font-medium text-gray-900">{quantity} {quantity === 1 ? 'ticket' : 'tickets'}</span>
+                        <span className="font-medium text-gray-900">{existingPurchase?.quantity ?? quantity} {(existingPurchase?.quantity ?? quantity) === 1 ? 'ticket' : 'tickets'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Purchase Date:</span>
@@ -2616,7 +2624,7 @@ const PurchaseAttraction = () => {
                       ) : (
                         <div className="pt-3 mt-3 flex justify-between">
                           <span className="text-gray-900 font-semibold">Total Paid:</span>
-                          <span className="text-lg font-bold text-green-600">${total.toFixed(2)}</span>
+                          <span className="text-lg font-bold text-green-600">${(existingPurchase ? existingPurchase.paid : total).toFixed(2)}</span>
                         </div>
                       )}
                     </div>

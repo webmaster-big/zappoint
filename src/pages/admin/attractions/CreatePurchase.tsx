@@ -31,6 +31,7 @@ import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
+import { newCheckoutKey } from '../../../utils/checkoutKey';
 import StandardButton from '../../../components/ui/StandardButton';
 import { feeSupportService } from '../../../services/FeeSupportService';
 import { resolveFeeTotal } from '../../../utils/feeTotal';
@@ -582,6 +583,7 @@ const CreatePurchase = () => {
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
+  const checkoutKeyRef = useRef(newCheckoutKey());
 
   const orderLocationId = gatewayLocationId;
 
@@ -891,6 +893,7 @@ const CreatePurchase = () => {
           payment_method: paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
           notes: notes || `Staff order — ${items.length} items`,
           custom_fields: toCustomFieldPayload(customFieldAnswers),
+          checkout_key: checkoutKeyRef.current,
         });
 
         try {
@@ -1009,6 +1012,7 @@ const CreatePurchase = () => {
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
+        checkout_key: checkoutKeyRef.current,
       };
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);
@@ -1166,6 +1170,7 @@ const CreatePurchase = () => {
       setScheduledDate('');
       setScheduledTime('');
       setSelectedAddOns({});
+      checkoutKeyRef.current = newCheckoutKey();
 
     } catch (error: any) {
       // The server's wording first — a rejected purchase (capacity, a required

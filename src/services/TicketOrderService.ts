@@ -2,6 +2,7 @@ import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { fetchAllPages } from '../utils/fetchAllPages';
+import { rememberCheckoutToken } from '../utils/checkoutTokens';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -296,6 +297,7 @@ const ticketOrderService = {
       const { data } = await api.post('/ticket-orders', { items: toApiItems(items), ...payload }, { headers: authHeaders() });
       const order = data.data as TicketOrder;
       if (data.qr_token) lastQrTokens[order.id] = data.qr_token as string;
+      rememberCheckoutToken('ticket_order', order.id, data.qr_token);
       return order;
     } catch (error) {
       const refusal = (error as { response?: { status?: number; data?: { code?: string; message?: string; data?: TicketOrder } } })?.response;

@@ -21,6 +21,7 @@ import type {
   LinkPayableResponse,
 } from '../types/Payment.types';
 import { PAYMENT_TYPE } from '../types/Payment.types';
+import { checkoutTokenFor } from '../utils/checkoutTokens';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -61,7 +62,8 @@ export const chargePayment = async (
   data: PaymentChargeRequest
 ): Promise<PaymentChargeResponse> => {
   try {
-    const response = await api.post<PaymentChargeResponse>('/payments/charge', data, { timeout: 60000 });
+    const checkoutToken = data.payable_type && data.payable_id ? checkoutTokenFor(data.payable_type, data.payable_id) : undefined;
+    const response = await api.post<PaymentChargeResponse>('/payments/charge', checkoutToken ? { ...data, checkout_token: checkoutToken } : data, { timeout: 60000 });
     return response.data;
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string; response?: { status?: number; data?: { error_code?: string; message?: string } } };

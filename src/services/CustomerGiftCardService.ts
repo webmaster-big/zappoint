@@ -168,6 +168,7 @@ export interface GiftCardPurchaseRequest {
   purchaser_phone?: string;
   customer_id?: number;
   opaque_data: { dataDescriptor: string; dataValue: string };
+  checkout_key?: string;
 }
 
 export interface GiftCardPurchaseResponse {
@@ -176,7 +177,7 @@ export interface GiftCardPurchaseResponse {
   duplicate?: boolean;
   data?: {
     id: number;
-    code: string;
+    code?: string;
     balance: number;
     initial_value: number;
     location: string;

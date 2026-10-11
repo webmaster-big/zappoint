@@ -34,6 +34,7 @@ import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay'
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
+import { newCheckoutKey } from '../../../utils/checkoutKey';
 import { buildAppliedDiscounts } from '../../../utils/discounts';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -105,6 +106,7 @@ const OnsitePurchaseEvent = () => {
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
+  const checkoutKeyRef = useRef(newCheckoutKey());
 
   const formatEventDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -516,6 +518,7 @@ const OnsitePurchaseEvent = () => {
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : undefined,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
+        checkout_key: checkoutKeyRef.current,
       });
 
       const createdPurchase = purchaseRes.data || purchaseRes;
