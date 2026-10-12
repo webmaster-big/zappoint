@@ -520,20 +520,22 @@ const ManageAccounts = () => {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to delete account');
+      if (!response.ok || !data?.success) {
+        alert(response.status < 500 && typeof data?.message === 'string' && data.message ? data.message : 'Failed to delete account. Please try again.');
+        return;
       }
 
       setAccounts(prev => prev.filter(account => account.id !== id));
     } catch (error) {
       console.error('Error deleting account:', error);
-      alert(error instanceof Error && error.message ? error.message : 'Failed to delete account. Please try again.');
+      alert('Failed to delete account. Please try again.');
     }
   };
 

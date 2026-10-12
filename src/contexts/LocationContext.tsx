@@ -117,8 +117,8 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (cancelled || !state) return;
         setFetchedWorkLocations({ userId, list: Array.isArray(state.locations) ? state.locations : [] });
         if (Number(state.active_location_id ?? 0) !== Number(getStoredUser()?.location_id ?? 0)) {
-          await purgeAllZapzoneCaches();
           storeStaffLocationState(state);
+          await purgeAllZapzoneCaches();
           window.location.reload();
           return;
         }
@@ -156,8 +156,8 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSwitchingLocationId(id);
     try {
       const state = await activateStaffLocation(id);
-      await purgeAllZapzoneCaches();
       storeStaffLocationState(state);
+      await purgeAllZapzoneCaches();
       if (userId) rememberManagerLocation(userId, id);
       const target = pathAfterLocationSwitch(window.location.pathname, role);
       if (target) window.location.assign(target);

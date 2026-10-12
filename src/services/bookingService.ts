@@ -575,9 +575,15 @@ const bookingService = {
   },
 
   async createBooking(bookingData: CreateBookingData): Promise<BookingResponse> {
-    const response = await api.post('/bookings', bookingData);
-    rememberCheckoutToken('booking', response.data?.data?.id, response.data?.checkout_token);
-    return response.data;
+    try {
+      const response = await api.post('/bookings', bookingData);
+      rememberCheckoutToken('booking', response.data?.data?.id, response.data?.checkout_token);
+      return response.data;
+    } catch (error) {
+      const refusal = (error as { response?: { data?: { booking_id?: number; checkout_token?: unknown } } })?.response?.data;
+      rememberCheckoutToken('booking', refusal?.booking_id, refusal?.checkout_token);
+      throw error;
+    }
   },
 
   async updateBooking(id: number, data: UpdateBookingData): Promise<BookingResponse> {
@@ -690,7 +696,8 @@ const bookingService = {
   }> {
     const response = await api.post(`/bookings/${bookingId}/qrcode`, {
       qr_code: qrCodeBase64,
-      send_email: sendEmail
+      send_email: sendEmail,
+      ...checkoutTokenBody('booking', bookingId),
     });
     return response.data;
   },

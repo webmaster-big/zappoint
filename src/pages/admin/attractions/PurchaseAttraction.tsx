@@ -181,6 +181,7 @@ const PurchaseAttraction = () => {
   const [giftCard, setGiftCard] = useState<AppliedGiftCard | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [existingPurchase, setExistingPurchase] = useState<{ quantity: number; paid: number } | null>(null);
+  const [receiptEmailed, setReceiptEmailed] = useState(true);
   const [orderQrImage, setOrderQrImage] = useState<string | null>(null);
   const [orderPrefilled, setOrderPrefilled] = useState(false);
 
@@ -1342,7 +1343,8 @@ const PurchaseAttraction = () => {
 
       setQrCodeImage(qrData);
       checkoutKeyRef.current = newCheckoutKey();
-      setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
+      setReceiptEmailed(paymentResponse.email_sent !== false);
+      setToast({ message: paymentResponse.email_sent === false ? 'Purchase confirmed! Keep the QR code below for check-in.' : 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
       const dedupFp = `${attraction.id}-${customerInfo.email}-${quantity}-${total.toFixed(2)}`;
       localStorage.setItem('_lastAttractionPurchaseKey', dedupFp);
@@ -3388,7 +3390,7 @@ const PurchaseAttraction = () => {
                 )}
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Quantity:</span>
-                  <span className="font-medium text-gray-900">{quantity} {quantity === 1 ? 'ticket' : 'tickets'}</span>
+                  <span className="font-medium text-gray-900">{existingPurchase?.quantity ?? quantity} {(existingPurchase?.quantity ?? quantity) === 1 ? 'ticket' : 'tickets'}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Purchase Date:</span>
@@ -3419,15 +3421,15 @@ const PurchaseAttraction = () => {
                   <span className="text-gray-600">Price per {attraction.pricingType === 'per_person' ? 'person' : attraction.pricingType === 'per_group' ? 'group' : attraction.pricingType === 'per_hour' ? 'hour' : attraction.pricingType === 'per_game' ? 'game' : 'item'}:</span>
                   <span className="font-medium text-gray-900">${Number(attraction.price).toFixed(2)}</span>
                 </div>
-                {quantity > 1 && (
+                {(existingPurchase?.quantity ?? quantity) > 1 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Quantity:</span>
-                    <span className="font-medium text-gray-900">x{quantity}</span>
+                    <span className="font-medium text-gray-900">x{existingPurchase?.quantity ?? quantity}</span>
                   </div>
                 )}
                 <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Paid:</span>
-                  <span className="font-bold text-green-600 text-lg sm:text-xl">${total.toFixed(2)}</span>
+                  <span className="font-bold text-green-600 text-lg sm:text-xl">${(existingPurchase ? existingPurchase.paid : total).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Payment Method:</span>
@@ -3444,7 +3446,7 @@ const PurchaseAttraction = () => {
                 <div className="text-xs sm:text-sm text-yellow-800">
                   <p className="font-semibold mb-1">Important Information</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Receipt sent to {customerInfo.email}</li>
+                    {receiptEmailed && <li>Receipt sent to {customerInfo.email}</li>}
                     <li>Please present this QR code at the entrance</li>
                     <li>Save or screenshot this confirmation for your records</li>
                   </ul>

@@ -1,4 +1,4 @@
-import type { CartItem, TicketOrder } from '../services/TicketOrderService';
+import type { CartItem, OrderLine, TicketOrder } from '../services/TicketOrderService';
 
 interface OrderableCart {
   items: CartItem[];
@@ -6,26 +6,46 @@ interface OrderableCart {
   clear: () => void;
 }
 
-const sameTime = (a?: string | null, b?: string | null): boolean => (a ?? '').slice(0, 5) === (b ?? '').slice(0, 5);
+const day = (value?: string | null): string => (value ?? '').slice(0, 10);
+
+const time = (value?: string | null): string => (value ?? '').slice(0, 5);
+
+const closeness = (line: OrderLine, item: CartItem): number =>
+  (day(line.scheduled_date) === day(item.scheduledDate) ? 4 : 0)
+  + (item.scheduledTime && time(line.scheduled_time) === time(item.scheduledTime) ? 2 : 0)
+  + (line.quantity === item.quantity ? 1 : 0);
+
+let checkoutPageHeld = false;
+
+export const holdCheckoutPage = (held: boolean): void => {
+  checkoutPageHeld = held;
+};
+
+export const checkoutPageIsHeld = (): boolean => checkoutPageHeld;
 
 export const removeOrderedItems = (cart: OrderableCart, order: TicketOrder): number => {
-  const unmatched = [...order.lines];
-  const ordered = cart.items.filter((item) => {
-    const index = unmatched.findIndex((line) => line.type === item.type
-      && line.entity_id === item.id
-      && line.quantity === item.quantity
-      && (line.scheduled_date ?? '') === (item.scheduledDate ?? '')
-      && sameTime(line.scheduled_time, item.scheduledTime));
-    if (index < 0) return false;
-    unmatched.splice(index, 1);
-    return true;
+  const remaining = [...cart.items];
+  const ordered: string[] = [];
+
+  order.lines.forEach((line) => {
+    let best = -1;
+    remaining.forEach((item, index) => {
+      if (item.type !== line.type || item.id !== line.entity_id) return;
+      if (best < 0 || closeness(line, item) > closeness(line, remaining[best])) best = index;
+    });
+    if (best >= 0) {
+      ordered.push(remaining[best].key);
+      remaining.splice(best, 1);
+    }
   });
 
-  if (ordered.length === 0) {
+  holdCheckoutPage(true);
+
+  if (remaining.length === 0) {
     cart.clear();
     return 0;
   }
 
-  ordered.forEach((item) => cart.removeItem(item.key));
-  return cart.items.length - ordered.length;
+  ordered.forEach((key) => cart.removeItem(key));
+  return remaining.length;
 };

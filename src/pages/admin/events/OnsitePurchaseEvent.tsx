@@ -113,6 +113,7 @@ const OnsitePurchaseEvent = () => {
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
   const checkoutKeyRef = useRef(newCheckoutKey());
+  const checkoutAttemptRef = useRef<string | null>(null);
 
   const formatEventDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -548,6 +549,12 @@ const OnsitePurchaseEvent = () => {
       const total = freshFeeTotal !== null
         ? Math.max(0, freshFeeTotal - specialPricingDiscount)
         : calculateTotal();
+
+      const attempt = JSON.stringify([event!.id, selectedDate, selectedTime, quantity, selectedCustomerId ?? null, selectedCustomerId ? '' : guestEmail]);
+      if (checkoutAttemptRef.current !== null && checkoutAttemptRef.current !== attempt) {
+        checkoutKeyRef.current = newCheckoutKey();
+      }
+      checkoutAttemptRef.current = attempt;
 
       const purchaseRes = await eventPurchaseService.createPurchase({
         event_id: event!.id,

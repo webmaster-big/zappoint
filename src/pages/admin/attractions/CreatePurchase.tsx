@@ -609,6 +609,16 @@ const CreatePurchase = () => {
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
   const checkoutKeyRef = useRef(newCheckoutKey());
+  const checkoutAttemptRef = useRef<string | null>(null);
+
+  const checkoutKeyFor = (attempt: unknown[]): string => {
+    const fingerprint = JSON.stringify(attempt);
+    if (checkoutAttemptRef.current !== null && checkoutAttemptRef.current !== fingerprint) {
+      checkoutKeyRef.current = newCheckoutKey();
+    }
+    checkoutAttemptRef.current = fingerprint;
+    return checkoutKeyRef.current;
+  };
 
   const orderLocationId = gatewayLocationId;
 
@@ -920,7 +930,12 @@ const CreatePurchase = () => {
           payment_method: paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
           notes: notes || `Staff order — ${items.length} items`,
           custom_fields: toCustomFieldPayload(customFieldAnswers),
-          checkout_key: checkoutKeyRef.current,
+          checkout_key: checkoutKeyFor([
+            'order',
+            items.map(item => [item.type, item.id, item.quantity, item.scheduledDate ?? null, item.scheduledTime ?? null]),
+            selectedCustomerId || null,
+            customerInfo.email || '',
+          ]),
         });
 
         try {
@@ -1039,7 +1054,15 @@ const CreatePurchase = () => {
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
-        checkout_key: checkoutKeyRef.current,
+        checkout_key: checkoutKeyFor([
+          'attraction',
+          Number(selectedAttraction.id),
+          quantity,
+          scheduledDate || null,
+          scheduledTime || null,
+          selectedCustomerId || null,
+          customerInfo.email || '',
+        ]),
       };
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);

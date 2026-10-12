@@ -55,11 +55,13 @@ import { CartProvider } from "./contexts/CartContext";
 import LocationChooser from "./pages/customer/Locations";
 import Cart from "./pages/customer/Cart";
 import { useCart } from "./contexts/CartContext";
+import { checkoutPageIsHeld, holdCheckoutPage } from "./utils/orderedCartItems";
 
 const CheckoutGate = () => {
   const { items } = useCart();
   const lastKind = useRef<"attraction" | "event">("attraction");
-  if (items.length > 0) {
+  useEffect(() => () => holdCheckoutPage(false), []);
+  if (items.length > 0 && !checkoutPageIsHeld()) {
     lastKind.current = items[0].type;
   }
   return lastKind.current === "event" ? <PurchaseEvent /> : <PurchaseAttraction />;

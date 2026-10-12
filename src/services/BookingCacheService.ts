@@ -161,27 +161,38 @@ class BookingCacheService {
     return this.memoryOwnerId !== undefined && this.memoryOwnerId === this.currentUserId() ? this.memoryCopy : null;
   }
 
-  private exclusive<T>(task: () => Promise<T>, maxWaitMs?: number): Promise<T> {
-    const run = (): Promise<T> => {
-      if (typeof navigator === 'undefined' || !navigator.locks) {
-        return task();
-      }
-      return maxWaitMs !== undefined && typeof AbortSignal.timeout === 'function'
-        ? navigator.locks.request(WRITE_LOCK_NAME, { signal: AbortSignal.timeout(maxWaitMs) }, task)
-        : navigator.locks.request(WRITE_LOCK_NAME, task);
-    };
+  private exclusive<T>(task: () => Promise<T>): Promise<T> {
+    const run = (): Promise<T> => (typeof navigator === 'undefined' || !navigator.locks)
+      ? task()
+      : navigator.locks.request(WRITE_LOCK_NAME, task);
     const result = this.writeChain.then(run, run);
     this.writeChain = result.catch(() => undefined);
     return result;
   }
 
-  private editCache(task: () => Promise<boolean>): Promise<boolean> {
-    return this.exclusive(task, CACHE_EDIT_LOCK_WAIT_MS).catch((error: unknown) => {
-      if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-        console.warn('[BookingCacheService] Another tab is busy with the bookings cache; this change will arrive with the next sync');
-        return false;
-      }
-      throw error;
+  private editCache(task: () => Promise<boolean>, announce: () => void): Promise<void> {
+    let late = false;
+    const saved = this.exclusive(task).then(
+      (changed) => {
+        if (!changed) return;
+        announce();
+        if (late) void this.refreshFromOtherTab(0);
+      },
+      (error: unknown) => {
+        console.warn('[BookingCacheService] A change could not be saved to the bookings cache; the next sync brings it in', error);
+      },
+    );
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        late = true;
+        console.warn('[BookingCacheService] Another tab is busy with the bookings cache; this change is saved as soon as it is free');
+        resolve();
+      }, CACHE_EDIT_LOCK_WAIT_MS);
+      void saved.finally(() => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
   }
 
@@ -487,7 +498,12 @@ class BookingCacheService {
     const deletedIds = sync.deleted_ids ?? [];
 
     if (incoming.length === 0 && deletedIds.length === 0 && sync.total === metadata.totalRecords) {
-      await this.exclusive(() => this.patchMetadata({ cursor: sync.cursor, syncedAt: Date.now(), syncStartedAt: startedAt, lastUpdated: Date.now() }));
+      const patched = await this.exclusive(async () => {
+        if (this.currentLocationId() !== locationAtStart) return false;
+        await this.patchMetadata({ cursor: sync.cursor, syncedAt: Date.now(), syncStartedAt: startedAt, lastUpdated: Date.now() });
+        return true;
+      });
+      if (!patched) return null;
       return { bookings: this.memory() ?? (await this.getCachedBookings()) ?? [], wantsFull: false };
     }
 
@@ -745,7 +761,8 @@ class BookingCacheService {
   }
 
   async updateBookingInCache(updatedBooking: Booking): Promise<void> {
-    const written = await this.editCache(async () => {
+    void metricsCacheService.clearAllCaches();
+    await this.editCache(async () => {
       const cachedBookings = await this.getCachedBookings();
       if (!cachedBookings) return false;
 
@@ -759,18 +776,17 @@ class BookingCacheService {
 
       await this.cacheBookings(cachedBookings);
       return true;
+    }, () => {
+      window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
+        detail: { booking: updatedBooking, source: 'update' }
+      }));
+      this.broadcast(0);
     });
-    if (!written) return;
-
-    window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
-      detail: { booking: updatedBooking, source: 'update' }
-    }));
-    this.broadcast(0);
-    void metricsCacheService.clearAllCaches();
   }
 
   async addBookingToCache(newBooking: Booking): Promise<void> {
-    const added = await this.editCache(async () => {
+    void metricsCacheService.clearAllCaches();
+    await this.editCache(async () => {
       const bookings = (await this.getCachedBookings()) || [];
 
       if (bookings.some(b => b.id === newBooking.id)) return false;
@@ -778,32 +794,27 @@ class BookingCacheService {
       bookings.unshift(newBooking);
       await this.cacheBookings(bookings);
       return true;
-    });
-    if (added) {
-      this.broadcast(0);
-    }
+    }, () => this.broadcast(0));
 
     window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
       detail: { booking: newBooking, source: 'create' }
     }));
-    void metricsCacheService.clearAllCaches();
   }
 
   async removeBookingFromCache(bookingId: number): Promise<void> {
-    const written = await this.editCache(async () => {
+    void metricsCacheService.clearAllCaches();
+    await this.editCache(async () => {
       const cachedBookings = await this.getCachedBookings();
       if (!cachedBookings) return false;
 
       await this.cacheBookings(cachedBookings.filter(b => b.id !== bookingId));
       return true;
+    }, () => {
+      window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
+        detail: { bookingId, source: 'delete' }
+      }));
+      this.broadcast(0);
     });
-    if (!written) return;
-
-    window.dispatchEvent(new CustomEvent('bookings-cache-updated', {
-      detail: { bookingId, source: 'delete' }
-    }));
-    this.broadcast(0);
-    void metricsCacheService.clearAllCaches();
   }
 
   async getBookingFromCache(bookingId: number): Promise<Booking | null> {

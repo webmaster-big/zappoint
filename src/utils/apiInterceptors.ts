@@ -84,6 +84,12 @@ const isAdminRoute = (path: string): boolean => {
   return ADMIN_ROUTE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 };
 
+const sentAuthorization = (error: { config?: { headers?: unknown } }): string | null => {
+  const headers = error?.config?.headers as { get?: (name: string) => unknown; Authorization?: unknown; authorization?: unknown } | undefined;
+  const value = typeof headers?.get === 'function' ? headers.get('Authorization') : headers?.Authorization ?? headers?.authorization;
+  return typeof value === 'string' ? value : null;
+};
+
 const handleAuthError = (error: any) => {
   const status = error?.response?.status;
   const url: string | undefined = error?.config?.url;
@@ -109,7 +115,8 @@ const handleAuthError = (error: any) => {
 
     let hadSession = false;
     try {
-      hadSession = !!localStorage.getItem('zapzone_user');
+      const storedToken = JSON.parse(localStorage.getItem('zapzone_user') || 'null')?.token;
+      hadSession = !!storedToken && sentAuthorization(error) === `Bearer ${storedToken}`;
     } catch {
     }
 

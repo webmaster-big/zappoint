@@ -498,20 +498,22 @@ const ManageAttendants = () => {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to delete attendant');
+      if (!response.ok || !data?.success) {
+        alert(response.status < 500 && typeof data?.message === 'string' && data.message ? data.message : 'Failed to delete attendant. Please try again.');
+        return;
       }
 
       setAttendants(prev => prev.filter(attendant => attendant.id !== id));
     } catch (error) {
       console.error('Error deleting attendant:', error);
-      alert(error instanceof Error && error.message ? error.message : 'Failed to delete attendant. Please try again.');
+      alert('Failed to delete attendant. Please try again.');
     }
   };
 

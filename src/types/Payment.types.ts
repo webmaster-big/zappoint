@@ -64,6 +64,7 @@ export interface PaymentChargeResponse {
   transaction_id?: string;
   auth_code?: string;
   payment?: Payment;
+  email_sent?: boolean;
 }
 
 export interface PaymentBooking {

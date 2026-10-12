@@ -790,12 +790,13 @@ const ManualBooking: React.FC = () => {
         return;
       }
       try {
-        const basePrice = calculateTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'package',
           entity_id: pkg.id,
-          base_price: basePrice,
+          base_price: Number(pkg.price ?? 0),
           date: form.bookingDate,
+          time: form.bookingTime || undefined,
+          location_id: pkg.location_id || undefined,
         });
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
@@ -808,7 +809,7 @@ const ManualBooking: React.FC = () => {
       }
     };
     fetchSpecialPricing();
-  }, [pkg, form.bookingDate]);
+  }, [pkg, form.bookingDate, form.bookingTime]);
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);

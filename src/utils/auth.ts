@@ -1,4 +1,3 @@
-import { clearSharedTerminalState } from './terminalLock';
 
 export interface UserData {
   id: number;
@@ -99,7 +98,6 @@ export const getCustomerToken = (): string | null => {
 export const clearStaffSession = (): void => {
   localStorage.removeItem('zapzone_user');
   localStorage.removeItem('zapzone_notifications');
-  clearSharedTerminalState();
 };
 
 export const clearCustomerSession = (): void => {

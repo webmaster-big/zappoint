@@ -55,8 +55,10 @@ const readCacheUserId = async (cache: Cache): Promise<number | undefined> => {
   return undefined;
 };
 
-export const purgeAllZapzoneCaches = async (): Promise<void> => {
-  if (!isCacheStorageAvailable()) return;
+const BOOKINGS_WRITE_LOCK = 'zapzone-bookings-cache-write';
+const PURGE_LOCK_WAIT_MS = 3000;
+
+const deleteZapzoneCaches = async (): Promise<void> => {
   try {
     const names = await caches.keys();
     await Promise.all(
@@ -65,6 +67,24 @@ export const purgeAllZapzoneCaches = async (): Promise<void> => {
         .map((name) => caches.delete(name).catch(() => false)),
     );
   } catch {
+  }
+};
+
+export const purgeAllZapzoneCaches = async (): Promise<void> => {
+  if (!isCacheStorageAvailable()) return;
+  if (typeof navigator === 'undefined' || !navigator.locks) {
+    await deleteZapzoneCaches();
+    return;
+  }
+
+  const waited = new AbortController();
+  const timer = setTimeout(() => waited.abort(), PURGE_LOCK_WAIT_MS);
+  try {
+    await navigator.locks.request(BOOKINGS_WRITE_LOCK, { signal: waited.signal }, deleteZapzoneCaches);
+  } catch {
+    await deleteZapzoneCaches();
+  } finally {
+    clearTimeout(timer);
   }
 };
 

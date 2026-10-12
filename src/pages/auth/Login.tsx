@@ -7,7 +7,7 @@ import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import { clearCustomerSession } from '../../utils/auth';
-import { clearSharedTerminalState } from '../../utils/terminalLock';
+import { clearSharedTerminalState, setTerminalLocked } from '../../utils/terminalLock';
 import {
   activateStaffLocation,
   rememberedManagerLocation,
@@ -120,7 +120,6 @@ export default function Login() {
       }
 
       clearCustomerSession();
-      clearSharedTerminalState();
       localStorage.setItem('zapzone_user', JSON.stringify({
         id: user.id,
         name: `${user.first_name} ${user.last_name}`,
@@ -140,6 +139,8 @@ export default function Login() {
         token: token,
         last_login: user.last_login || null,
       }));
+      clearSharedTerminalState();
+      setTerminalLocked(false);
 
       if (role === 'location_manager') {
         const preferred = rememberedManagerLocation(user.id);

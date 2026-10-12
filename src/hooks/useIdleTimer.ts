@@ -44,9 +44,7 @@ export function useIdleTimer({ seconds, onIdle, enabled = true, sharedActivityKe
     if (!enabled || !seconds || seconds <= 0) return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let lastSharedWrite = 0;
     const idleMs = seconds * 1000;
-    const sharedWriteEveryMs = Math.min(SHARED_ACTIVITY_WRITE_EVERY_MS, idleMs / 4);
 
     const fire = () => {
       timer = null;
@@ -63,10 +61,6 @@ export function useIdleTimer({ seconds, onIdle, enabled = true, sharedActivityKe
     const reset = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(fire, idleMs);
-      if (sharedActivityKey && Date.now() - lastSharedWrite >= sharedWriteEveryMs) {
-        lastSharedWrite = Date.now();
-        writeSharedActivity(sharedActivityKey, lastSharedWrite);
-      }
     };
 
     reset();
@@ -86,4 +80,37 @@ export function useIdleTimer({ seconds, onIdle, enabled = true, sharedActivityKe
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [seconds, enabled, sharedActivityKey]);
+}
+
+export function useSharedActivity(key: string, enabled: boolean, seconds: number | null): void {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const writeEveryMs = seconds && seconds > 0
+      ? Math.min(SHARED_ACTIVITY_WRITE_EVERY_MS, (seconds * 1000) / 4)
+      : SHARED_ACTIVITY_WRITE_EVERY_MS;
+    let lastWrite = 0;
+
+    const publish = () => {
+      if (Date.now() - lastWrite < writeEveryMs) return;
+      lastWrite = Date.now();
+      writeSharedActivity(key, lastWrite);
+    };
+
+    publish();
+
+    ACTIVITY_EVENTS.forEach((event) => {
+      window.addEventListener(event, publish, { passive: true });
+    });
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') publish();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, publish));
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [key, enabled, seconds]);
 }

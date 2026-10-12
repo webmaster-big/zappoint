@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Lock, LogIn } from 'lucide-react';
 import PinPad from './PinPad';
-import { useIdleTimer } from '../../../hooks/useIdleTimer';
-import { getStoredTerminal, clearStoredTerminal } from '../../../utils/staffTerminal';
+import { useIdleTimer, useSharedActivity } from '../../../hooks/useIdleTimer';
+import { getStoredTerminal, clearStoredTerminal, subscribeStoredTerminal } from '../../../utils/staffTerminal';
 import {
   isTerminalLocked,
   setTerminalLocked,
@@ -20,37 +20,51 @@ import type { TerminalContext } from '../../../services/StaffPinService';
 
 const DEFAULT_PIN_LENGTH = 6;
 const SHARED_ACTIVITY_KEY = 'zapzone_terminal_activity';
+const CONTEXT_RETRY_MS = 30000;
 
 const TerminalLockHost: React.FC = () => {
-  const [terminal] = useState(() => getStoredTerminal());
+  const [terminal, setTerminal] = useState(() => getStoredTerminal());
   const [context, setContext] = useState<TerminalContext | null>(null);
   const [locked, setLocked] = useState(() => isTerminalLocked());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idleSeconds, setIdleSeconds] = useState<number | null>(null);
 
+  useEffect(() => subscribeStoredTerminal((next) => {
+    setTerminal(next);
+    if (!next) {
+      setTerminalLocked(false);
+      setLocked(false);
+    }
+  }), []);
+
   useEffect(() => {
     if (!terminal) return;
     let cancelled = false;
-    getTerminalContext()
-      .then((next) => {
-        if (cancelled) return;
-        if (!next.registered) {
-          clearStoredTerminal();
-          clearSharedTerminalState();
-          setTerminalLocked(false);
-          setLocked(false);
-          return;
-        }
-        setContext(next);
-        const shared = sharedTerminalIdle();
-        setIdleSeconds(shared !== undefined ? shared : (next.idle_disabled ? null : next.idle_seconds ?? null));
-      })
-      .catch(() => {
-        /* offline or server down: leave the terminal unlocked rather than stranding the desk */
-      });
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    const load = () => {
+      getTerminalContext()
+        .then((next) => {
+          if (cancelled) return;
+          if (!next.registered) {
+            clearStoredTerminal();
+            clearSharedTerminalState();
+            setTerminalLocked(false);
+            setLocked(false);
+            return;
+          }
+          setContext(next);
+          const shared = sharedTerminalIdle();
+          setIdleSeconds(shared !== undefined ? shared : (next.idle_disabled ? null : next.idle_seconds ?? null));
+        })
+        .catch(() => {
+          if (!cancelled) retry = setTimeout(load, CONTEXT_RETRY_MS);
+        });
+    };
+    load();
     return () => {
       cancelled = true;
+      if (retry) clearTimeout(retry);
     };
   }, [terminal]);
 
@@ -67,12 +81,11 @@ const TerminalLockHost: React.FC = () => {
   useEffect(() => {
     if (!terminal) return;
 
-    if (isTerminalLockShared()) {
-      setLocked(true);
-      setTerminalLocked(true);
-    }
-
-    return subscribeSharedTerminalLock((lockedElsewhere) => {
+    const followSharedLock = (lockedElsewhere: boolean) => {
+      if (!lockedElsewhere && !getStoredUser()?.token) {
+        window.location.replace('/admin');
+        return;
+      }
       setLocked(lockedElsewhere);
       setTerminalLocked(lockedElsewhere);
       if (!lockedElsewhere) {
@@ -83,7 +96,14 @@ const TerminalLockHost: React.FC = () => {
         setError(null);
         window.dispatchEvent(new Event('zapzone_profile_updated'));
       }
-    });
+    };
+
+    const lockedNow = isTerminalLockShared();
+    if (lockedNow !== isTerminalLocked()) {
+      followSharedLock(lockedNow);
+    }
+
+    return subscribeSharedTerminalLock(followSharedLock);
   }, [terminal]);
 
   useIdleTimer({
@@ -92,6 +112,8 @@ const TerminalLockHost: React.FC = () => {
     enabled: Boolean(terminal && context?.registered && !locked),
     sharedActivityKey: SHARED_ACTIVITY_KEY,
   });
+
+  useSharedActivity(SHARED_ACTIVITY_KEY, Boolean(terminal && !locked), idleSeconds);
 
   const submit = useCallback(async (pin: string) => {
     setBusy(true);
@@ -150,7 +172,6 @@ const TerminalLockHost: React.FC = () => {
           type="button"
           onClick={() => {
             setTerminalLocked(false);
-            clearSharedTerminalState();
             try {
               localStorage.removeItem('zapzone_user');
             } catch {

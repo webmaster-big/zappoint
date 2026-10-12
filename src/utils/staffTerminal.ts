@@ -40,6 +40,16 @@ export const clearStoredTerminal = (): void => {
 
 export const isSharedTerminal = (): boolean => getStoredTerminal() !== null;
 
+export const subscribeStoredTerminal = (listener: (terminal: StoredTerminal | null) => void): (() => void) => {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === TERMINAL_KEY || event.key === null) {
+      listener(getStoredTerminal());
+    }
+  };
+  window.addEventListener('storage', onStorage);
+  return () => window.removeEventListener('storage', onStorage);
+};
+
 export const terminalHeaders = (): Record<string, string> => {
   const terminal = getStoredTerminal();
   return terminal ? { 'X-Staff-Terminal': terminal.token } : {};

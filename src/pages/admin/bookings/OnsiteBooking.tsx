@@ -194,7 +194,10 @@ const OnsiteBooking: React.FC = () => {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
-  const [giftDiscount, setGiftDiscount] = useState(0);
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoAppliedOn, setPromoAppliedOn] = useState<number | null>(null);
+  const [appliedGiftCardCode, setAppliedGiftCardCode] = useState<string | null>(null);
+  const [giftCardBalance, setGiftCardBalance] = useState(0);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
@@ -1436,6 +1439,15 @@ const OnsiteBooking: React.FC = () => {
         participants: validValue
       }));
     } else {
+      if (name === 'promoCode' && value.trim() !== appliedPromoCode) {
+        setAppliedPromoCode(null);
+        setPromoAppliedOn(null);
+        setPromoDiscount(0);
+      }
+      if (name === 'giftCardCode' && value.trim() !== appliedGiftCardCode) {
+        setAppliedGiftCardCode(null);
+        setGiftCardBalance(0);
+      }
       setBookingData(prev => ({
         ...prev,
         [name]: value
@@ -1478,7 +1490,7 @@ const OnsiteBooking: React.FC = () => {
   const calculatePartialAmount = () => {
     if (!selectedPackage) return 0;
     
-    const total = calculateTotal();
+    const total = payableTotal();
     let baseDeposit = 0;
     
     if (selectedPackage.partialPaymentPercentage != null && selectedPackage.partialPaymentPercentage > 0) {
@@ -1534,36 +1546,51 @@ const OnsiteBooking: React.FC = () => {
     return total;
   };
 
-  const calculateTotal = () => Math.max(0, calculateBase() - promoDiscount - giftDiscount);
+  const codeBase = Math.max(0, (feeBreakdown ? feeBreakdown.total : calculateBase()) - (specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0));
+  const giftDiscount = appliedGiftCardCode ? Math.min(giftCardBalance, Math.max(0, codeBase - promoDiscount)) : 0;
+  const promoBase = Math.round(codeBase * 100) / 100;
 
-  const payableTotal = () => {
-    const afterCodes = feeBreakdown ? Math.max(0, feeBreakdown.total - promoDiscount - giftDiscount) : calculateTotal();
-    return specialPricingBreakdown?.has_special_pricing ? afterCodes - specialPricingBreakdown.total_discount : afterCodes;
-  };
+  const payableTotal = () => Math.max(0, codeBase - promoDiscount - giftDiscount);
+
+  useEffect(() => {
+    if (promoAppliedOn === null || promoAppliedOn === promoBase) return;
+    setPromoAppliedOn(null);
+    setAppliedPromoCode(null);
+    setPromoDiscount(0);
+    setCodeError('The total changed, so press Apply again to use the promo code.');
+  }, [promoBase, promoAppliedOn]);
 
   const validateOnsiteCode = async (type: 'promo' | 'giftcard') => {
     if (!selectedPackage) return;
     setCodeError(null);
 
-    const base = calculateBase();
+    const base = codeBase;
     const locationId = selectedLocation ?? undefined;
     const items = [{ type: 'package' as const, id: selectedPackage.id }];
 
     try {
       if (type === 'promo') {
-        const res = await promoService.validateCode(bookingData.promoCode, { location_id: locationId, subtotal: base, items });
+        const code = bookingData.promoCode.trim();
+        const res = await promoService.validateCode(code, { location_id: locationId, subtotal: base, items });
         if (res.success && res.data.is_valid) {
           setPromoDiscount(Number(res.data.discount_amount || 0));
+          setAppliedPromoCode(code);
+          setPromoAppliedOn(Math.round(base * 100) / 100);
         } else {
           setPromoDiscount(0);
+          setAppliedPromoCode(null);
+          setPromoAppliedOn(null);
           setCodeError(res.message || 'Promo code is not valid for this order');
         }
       } else {
-        const res = await giftCardService.validateCode(bookingData.giftCardCode, { location_id: locationId, subtotal: Math.max(0, base - promoDiscount), items });
+        const code = bookingData.giftCardCode.trim();
+        const res = await giftCardService.validateCode(code, { location_id: locationId, subtotal: Math.max(0, base - promoDiscount), items });
         if (res.success && res.data.is_valid) {
-          setGiftDiscount(Number(res.data.discount_amount || 0));
+          setGiftCardBalance(Number(res.data.balance ?? res.data.discount_amount ?? 0));
+          setAppliedGiftCardCode(code);
         } else {
-          setGiftDiscount(0);
+          setGiftCardBalance(0);
+          setAppliedGiftCardCode(null);
           setCodeError(res.message || 'Gift card is not valid for this order');
         }
       }
@@ -1582,7 +1609,10 @@ const OnsiteBooking: React.FC = () => {
     setSelectedPackage(null);
     setCustomFieldAnswers({});
     setPromoDiscount(0);
-    setGiftDiscount(0);
+    setAppliedPromoCode(null);
+    setPromoAppliedOn(null);
+    setAppliedGiftCardCode(null);
+    setGiftCardBalance(0);
     setCodeError(null);
     setBookingData({
       packageId: null,
@@ -1649,6 +1679,13 @@ const OnsiteBooking: React.FC = () => {
     
     if (!selectedPackage) {
       setToast({ message: 'Please select a package', type: 'error' });
+      isSubmittingRef.current = false;
+      return;
+    }
+
+    if ((bookingData.promoCode.trim() && bookingData.promoCode.trim() !== appliedPromoCode)
+      || (bookingData.giftCardCode.trim() && bookingData.giftCardCode.trim() !== appliedGiftCardCode)) {
+      setToast({ message: 'Press Apply next to the promo code or gift card, or clear it, before creating the booking.', type: 'error' });
       isSubmittingRef.current = false;
       return;
     }
@@ -1766,7 +1803,8 @@ const OnsiteBooking: React.FC = () => {
       const freshFeeTotal = await resolveFeeTotal('package', selectedPackage.id, submitBasePrice, selectedLocation || undefined);
       const specialDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
       const totalAmount = Math.max(0, (freshFeeTotal !== null ? freshFeeTotal : submitBasePrice) - specialDiscount);
-      const netTotal = Math.max(0, totalAmount - promoDiscount - giftDiscount);
+      const submitGiftDiscount = appliedGiftCardCode ? Math.min(giftCardBalance, Math.max(0, totalAmount - promoDiscount)) : 0;
+      const netTotal = Math.max(0, totalAmount - promoDiscount - submitGiftDiscount);
       const partialAmount = calculatePartialAmount();
       let amountPaid = netTotal;
       
@@ -1774,11 +1812,11 @@ const OnsiteBooking: React.FC = () => {
         amountPaid = 0;
       } else if (bookingData.paymentMethod === 'in-store') {
         if (bookingData.inStoreAmountPaid > 0) {
-          amountPaid = bookingData.inStoreAmountPaid;
+          amountPaid = Math.min(bookingData.inStoreAmountPaid, netTotal);
         } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
           amountPaid = Math.min(bookingData.customPaymentAmount, netTotal);
         } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
-          amountPaid = partialAmount;
+          amountPaid = Math.min(partialAmount, netTotal);
         } else if (bookingData.paymentType === 'full') {
           amountPaid = netTotal;
         } else {
@@ -1787,7 +1825,7 @@ const OnsiteBooking: React.FC = () => {
       } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
         amountPaid = Math.min(bookingData.customPaymentAmount, netTotal);
       } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
-        amountPaid = partialAmount;
+        amountPaid = Math.min(partialAmount, netTotal);
       }
       
       const currentUser = getStoredUser();
@@ -1833,8 +1871,8 @@ const OnsiteBooking: React.FC = () => {
           payment_status: 'pending' as const,
         } : {
         }),
-        promo_code: bookingData.promoCode || undefined,
-        gift_card_code: bookingData.giftCardCode || undefined,
+        promo_code: appliedPromoCode ?? undefined,
+        gift_card_code: appliedGiftCardCode ?? undefined,
         notes: bookingData.notes || undefined,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
@@ -1902,7 +1940,7 @@ const OnsiteBooking: React.FC = () => {
           });
 
           const serverDue = Math.round((Number(response.data.total_amount ?? 0) - Number(response.data.amount_paid ?? 0)) * 100) / 100;
-          const chargeAmount = Math.min(amountPaid, serverDue);
+          const chargeAmount = bookingData.paymentType === 'full' ? serverDue : Math.min(amountPaid, serverDue);
 
           if (response.data.status === 'confirmed') {
             try {
@@ -2052,7 +2090,7 @@ const OnsiteBooking: React.FC = () => {
               payable_id: bookingId,
               payable_type: PAYMENT_TYPE.BOOKING,
               customer_id: customerId || null,
-              amount: amountPaid,
+              amount: Math.min(amountPaid, Number(response.data.total_amount ?? amountPaid)),
               currency: 'USD',
               method: bookingData.paymentMethod as 'in-store' | 'authorize.net',
               status: 'completed' as const,
@@ -3547,12 +3585,12 @@ const OnsiteBooking: React.FC = () => {
               <input
                 type="number"
                 min="0"
-                max={calculateTotal()}
+                max={payableTotal()}
                 step="0.01"
                 value={bookingData.inStoreAmountPaid || ''}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value) || 0;
-                  const maxAmount = calculateTotal();
+                  const maxAmount = payableTotal();
                   setBookingData(prev => ({ 
                     ...prev, 
                     inStoreAmountPaid: Math.min(Math.max(0, value), maxAmount)
@@ -3563,7 +3601,7 @@ const OnsiteBooking: React.FC = () => {
                 className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-2">Total: ${calculateTotal().toFixed(2)} | Remaining: ${(calculateTotal() - (bookingData.inStoreAmountPaid || 0)).toFixed(2)}</p>
+            <p className="text-xs text-gray-500 mt-2">Total: ${payableTotal().toFixed(2)} | Remaining: ${(payableTotal() - (bookingData.inStoreAmountPaid || 0)).toFixed(2)}</p>
           </div>
         </div>
       )}
@@ -3726,12 +3764,12 @@ const OnsiteBooking: React.FC = () => {
                 <input
                   type="number"
                   min="0.01"
-                  max={calculateTotal()}
+                  max={payableTotal()}
                   step="0.01"
                   value={bookingData.customPaymentAmount || ''}
                   onChange={(e) => {
                     const value = parseFloat(e.target.value) || 0;
-                    const maxAmount = calculateTotal();
+                    const maxAmount = payableTotal();
                     setBookingData(prev => ({ 
                       ...prev, 
                       customPaymentAmount: Math.min(Math.max(0, value), maxAmount) 
@@ -3743,10 +3781,10 @@ const OnsiteBooking: React.FC = () => {
                 />
               </div>
               <div className="flex justify-between mt-2 text-xs text-gray-600">
-                <span>Remaining: ${Math.max(0, calculateTotal() - (bookingData.customPaymentAmount || 0)).toFixed(2)}</span>
-                <span>Total: ${calculateTotal().toFixed(2)}</span>
+                <span>Remaining: ${Math.max(0, payableTotal() - (bookingData.customPaymentAmount || 0)).toFixed(2)}</span>
+                <span>Total: ${payableTotal().toFixed(2)}</span>
               </div>
-              {bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount >= calculateTotal() && (
+              {bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount >= payableTotal() && (
                 <p className="mt-2 text-xs text-green-600 font-medium">✓ This covers the full amount</p>
               )}
             </div>
@@ -3850,7 +3888,7 @@ const OnsiteBooking: React.FC = () => {
         ) : bookingData.paymentMethod === 'in-store' && bookingData.inStoreAmountPaid > 0 ? (
           <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-green-700">
             <span>In-Store Amount Paid</span>
-            <span>${Math.min(bookingData.inStoreAmountPaid, calculateTotal()).toFixed(2)}</span>
+            <span>${Math.min(bookingData.inStoreAmountPaid, payableTotal()).toFixed(2)}</span>
           </div>
         ) : bookingData.paymentType === 'partial' && calculatePartialAmount() > 0 ? (
           <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-blue-700">
@@ -3860,7 +3898,7 @@ const OnsiteBooking: React.FC = () => {
         ) : bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && (
           <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-green-700">
             <span>Custom Amount Due Now</span>
-            <span>${Math.min(bookingData.customPaymentAmount, calculateTotal()).toFixed(2)}</span>
+            <span>${Math.min(bookingData.customPaymentAmount, payableTotal()).toFixed(2)}</span>
           </div>
         )}
       </div>

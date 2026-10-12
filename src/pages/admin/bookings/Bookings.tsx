@@ -2357,8 +2357,7 @@ const Bookings: React.FC = () => {
           })
         );
         
-        const updatedBookings = bookings.filter(booking => !selectedBookings.includes(booking.id));
-        setBookings(updatedBookings);
+        setBookings(prev => prev.filter(booking => !selectedBookings.includes(booking.id)));
         setSelectedBookings([]);
       } catch (error) {
         console.error('Error deleting bookings:', error);
@@ -2374,8 +2373,7 @@ const Bookings: React.FC = () => {
         
         await bookingCacheService.removeBookingFromCache(Number(id));
         
-        const updatedBookings = bookings.filter(booking => booking.id !== id);
-        setBookings(updatedBookings);
+        setBookings(prev => prev.filter(booking => booking.id !== id));
       } catch (error) {
         console.error('Error deleting booking:', error);
         alert('Failed to delete booking. Please try again.');

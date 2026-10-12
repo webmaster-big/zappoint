@@ -118,9 +118,8 @@ const MainLayout: React.FC = () => {
       await eventCacheService.clearCache();
       await membershipCache.invalidate();
       await purgeAllZapzoneCaches();
-      clearSharedTerminalState();
-      
       localStorage.removeItem('zapzone_user');
+      clearSharedTerminalState();
       setUserData(null);
       
       setTimeout(() => {
