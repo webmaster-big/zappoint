@@ -27,7 +27,7 @@ import { getStoredUser, getImageUrl, formatTimeTo12Hour } from '../../../utils/s
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { derivePaymentStatus } from '../../../types/Bookings.types';
 import { feeSupportService } from '../../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -851,10 +851,11 @@ const ManualBooking: React.FC = () => {
       
       const user = getStoredUser();
       const calculatedTotal = calculateTotal();
-      const freshFeeTotal = pkg
-        ? await resolveFeeTotal('package', pkg.id, calculatedTotal, pkg.location_id || undefined)
+      const freshBreakdown = pkg
+        ? await resolveFeeBreakdown('package', pkg.id, calculatedTotal, pkg.location_id || undefined)
         : null;
-      const feeTotal = Math.max(0, (freshFeeTotal !== null ? freshFeeTotal : calculatedTotal) - (specialPricingBreakdown?.total_discount || 0));
+      const submitBreakdown = freshBreakdown ?? feeBreakdown;
+      const feeTotal = Math.max(0, (submitBreakdown ? submitBreakdown.total : calculatedTotal) - (specialPricingBreakdown?.total_discount || 0));
       const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : feeTotal;
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
       
@@ -1002,7 +1003,7 @@ const ManualBooking: React.FC = () => {
         sent_email_to_staff: sendEmailToStaff,
         skip_date_validation: bookingMode === 'flexible',
         is_manual_entry: true,
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : null,
         discount_amount: specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
       };
