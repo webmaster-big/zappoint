@@ -2313,7 +2313,7 @@ const EscapeRoomSessions = () => {
                         : 'Players scan this to choose their room and time and sign on their own phones.'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      For the venue tablet, use Open on this device. That version clears itself between guests.
+                      For the venue tablet, use Open on this device. That version also turns off browser autofill, so one guest&apos;s details are not suggested to the next.
                     </p>
                     <div className="flex justify-center" ref={qrWrap}>
                       <QRCodeCanvas value={target} size={220} includeMargin />

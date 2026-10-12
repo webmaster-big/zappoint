@@ -36,7 +36,10 @@ const DATE_PARAM = /^\d{4}-\d{2}-\d{2}$/;
 const dayLabel = (key: string): string =>
   parseLocalDate(key).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-const openTimes = (times: EscapeRoomGuestTime[]): EscapeRoomGuestTime[] => times.filter((t) => !t.just_finished);
+const openTimes = (times: EscapeRoomGuestTime[], keep?: string | null): EscapeRoomGuestTime[] =>
+  times.filter((t) => !t.just_finished || (!!keep && t.time === keep));
+
+const holdFor = (ad: KioskAd | null | undefined): number => (ad ? Math.max(SUCCESS_HOLD_SECONDS, 2 + ad.display_seconds) : SUCCESS_HOLD_SECONDS);
 
 const refusedField = (err: unknown, field: string): boolean => {
   const e = err as { response?: { data?: { errors?: Record<string, unknown> } } };
@@ -102,6 +105,7 @@ const EscapeRoomWaiverKiosk = () => {
   const [completedWaiverId, setCompletedWaiverId] = useState<number | null>(null);
   const [completedWaiverRef, setCompletedWaiverRef] = useState<string | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [linkSpent, setLinkSpent] = useState(false);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,6 +151,9 @@ const EscapeRoomWaiverKiosk = () => {
   }, [loadKiosk]);
 
   const activeLink = kiosk && gameLink && kiosk.date === gameLink.date ? gameLink : null;
+  const pinnedGame = !!kiosk && (!!kiosk.ahead || (!!kiosk.today && kiosk.date !== kiosk.today));
+  const linkedTime = (roomId: number): string | null =>
+    activeLink && (!kioskMode || !linkSpent) && Number(activeLink.room) === roomId ? activeLink.time ?? null : null;
 
   useEffect(() => {
     if (!error || hasLoaded.current || linkBroken) return;
@@ -162,6 +169,7 @@ const EscapeRoomWaiverKiosk = () => {
       completeTimer.current = null;
     }
     stepSequence.current++;
+    setLinkSpent(true);
     setFormKey((k) => k + 1);
     setPhase('room');
     setRoom(null);
@@ -180,19 +188,19 @@ const EscapeRoomWaiverKiosk = () => {
   }, [loadKiosk]);
 
   useEffect(() => {
-    if (!kioskMode || loading || error || justCompleted) return;
+    if (loading || error || justCompleted || submitting || formLoading || (!kioskMode && !!linkSig)) return;
     const arm = () => {
       if (idleTimer.current) clearTimeout(idleTimer.current);
       idleTimer.current = setTimeout(resetAll, timeoutSeconds * 1000);
     };
-    const events: Array<keyof DocumentEventMap> = ['mousedown', 'keydown', 'touchstart', 'pointerdown', 'wheel'];
-    events.forEach((e) => document.addEventListener(e, arm));
+    const events: Array<keyof DocumentEventMap> = ['mousedown', 'keydown', 'touchstart', 'pointerdown', 'wheel', 'scroll', 'focusin'];
+    events.forEach((e) => document.addEventListener(e, arm, true));
     arm();
     return () => {
-      events.forEach((e) => document.removeEventListener(e, arm));
+      events.forEach((e) => document.removeEventListener(e, arm, true));
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
-  }, [kioskMode, loading, error, justCompleted, timeoutSeconds, resetAll]);
+  }, [kioskMode, linkSig, loading, error, justCompleted, submitting, formLoading, timeoutSeconds, resetAll]);
 
   useEffect(
     () => () => {
@@ -283,7 +291,7 @@ const EscapeRoomWaiverKiosk = () => {
       if (sequence !== stepSequence.current) return;
       setTime(null);
       setPhase('time');
-      setNotice(errorMessage(err, 'This room is not ready for check-in. Please see the front desk.'));
+      setNotice(errorMessage(err, 'We could not load your waiver. Please tap your time again. If this keeps happening, please see the front desk.'));
     } finally {
       if (sequence === stepSequence.current) setFormLoading(false);
     }
@@ -351,6 +359,7 @@ const EscapeRoomWaiverKiosk = () => {
   };
 
   const handleSubmit = async (data: WaiverSubmission) => {
+    if (justCompleted || submitting) return;
     if (!room) {
       backToRooms();
       return;
@@ -374,8 +383,8 @@ const EscapeRoomWaiverKiosk = () => {
       setCompletedWaiverId(result.id ?? null);
       setCompletedWaiverRef(result.reference_number ?? null);
       setJustCompleted(true);
-      const holdSeconds = result.ad ? 2 + result.ad.display_seconds : SUCCESS_HOLD_SECONDS;
-      completeTimer.current = setTimeout(resetAll, kioskMode ? (holdSeconds + 90) * 1000 : 10 * 60 * 1000);
+      const holdSeconds = holdFor(result.ad);
+      completeTimer.current = setTimeout(resetAll, (holdSeconds + 90) * 1000);
     } catch (err: unknown) {
       if (refusedField(err, 'waiver_template_version')) {
         const message = errorMessage(err, 'This waiver was updated while you were filling it in. Please read it again before signing.');
@@ -500,8 +509,9 @@ const EscapeRoomWaiverKiosk = () => {
           {hasRooms && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {kiosk.rooms.map((r) => {
-                const available = openTimes(r.times);
+                const available = openTimes(r.times, linkedTime(r.id));
                 const hasTimes = available.length > 0;
+                const upcoming = available.filter((t) => !t.just_finished).length;
                 return (
                   <button
                     key={r.id}
@@ -516,9 +526,11 @@ const EscapeRoomWaiverKiosk = () => {
                         ? hasTimes
                           ? `${r.duration_minutes} min · ${available.length} booked ${available.length === 1 ? 'game' : 'games'} that day`
                           : 'No booked games that day'
-                        : hasTimes
-                          ? `${r.duration_minutes} min · ${available.length} ${available.length === 1 ? 'game' : 'games'} left today`
-                          : 'No more games today'}
+                        : upcoming > 0
+                          ? `${r.duration_minutes} min · ${upcoming} ${upcoming === 1 ? 'game' : 'games'} left today`
+                          : hasTimes
+                            ? `${r.duration_minutes} min · Your game`
+                            : 'No more games today'}
                     </span>
                   </button>
                 );
@@ -535,10 +547,10 @@ const EscapeRoomWaiverKiosk = () => {
             <h2 className="text-lg font-bold text-gray-900 mt-1">What time is your game?</h2>
             <p className="text-sm text-gray-500 mt-1">Choose the start time on your booking.</p>
           </div>
-          {openTimes(room.times).length === 0 ? (
+          {openTimes(room.times, linkedTime(room.id)).length === 0 ? (
             <p className="text-sm text-gray-600 text-center py-6">{noGamesText}</p>
           ) : (
-            <TimeGrid times={openTimes(room.times)} onPick={chooseTime} />
+            <TimeGrid times={openTimes(room.times, linkedTime(room.id))} onPick={chooseTime} />
           )}
           <div className="flex justify-center">
             <button
@@ -584,12 +596,12 @@ const EscapeRoomWaiverKiosk = () => {
             </div>
             <p className="text-xs text-blue-900">After your game, we&apos;ll email your group photo to the email address you enter below.</p>
             {!time &&
-              (openTimes(room.times).length === 0 ? (
+              (openTimes(room.times, linkedTime(room.id)).length === 0 ? (
                 <p className="text-sm text-gray-700">{noGamesText}</p>
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-gray-700">Choose your game time. What you typed below is kept.</p>
-                  <TimeGrid times={openTimes(room.times)} onPick={chooseTime} />
+                  <TimeGrid times={openTimes(room.times, linkedTime(room.id))} onPick={chooseTime} />
                 </div>
               ))}
           </div>
@@ -615,15 +627,16 @@ const EscapeRoomWaiverKiosk = () => {
         <WaiverSuccessModal
           signerFirstName={completedName}
           locationId={locationId}
-          autoCloseSeconds={completedAd ? 2 + completedAd.display_seconds : SUCCESS_HOLD_SECONDS}
+          autoCloseSeconds={holdFor(completedAd)}
           onStartNext={startNextPlayer}
           onAutoClose={resetAll}
           ad={completedAd}
           waiverId={completedWaiverId}
           waiverReference={completedWaiverRef}
-          nextLabel={kioskMode ? 'Next player for this game' : 'Sign for another player'}
+          nextLabel={room && time ? `Sign for another player on ${room.name} ·\u00a0${time.label.replace(/ /g, '\u00a0')}` : 'Sign for another player'}
+          secondaryLabel={pinnedGame ? undefined : 'Sign for a different room or time'}
+          onSecondary={resetAll}
           closingText="Returning to the room list"
-          persist={!kioskMode}
           note="Your group photo will be emailed to you after the game."
         />
       )}

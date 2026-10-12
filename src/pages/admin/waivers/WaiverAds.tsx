@@ -62,6 +62,7 @@ const WaiverAds = () => {
   const { themeColor, fullColor } = useThemeColor();
 
   const [templateTitle, setTemplateTitle] = useState('');
+  const [templateKind, setTemplateKind] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<WaiverAdSettings | null>(null);
   const [secondsInput, setSecondsInput] = useState('3');
   const [ads, setAds] = useState<WaiverAdRecord[]>([]);
@@ -103,7 +104,10 @@ const WaiverAds = () => {
       setLoading(true);
       try {
         const res = await waiverService.getTemplate(templateId);
-        if (res.success) setTemplateTitle(res.data.title);
+        if (res.success) {
+          setTemplateTitle(res.data.title);
+          setTemplateKind(res.data.kind);
+        }
       } catch {
         setToast({ message: 'Failed to load the template', type: 'error' });
       }
@@ -452,6 +456,11 @@ const WaiverAds = () => {
                 <p className="text-[11px] text-gray-400 mt-1">
                   How long the ad holds before the kiosk returns to the start screen
                 </p>
+                {templateKind === 'escape_room' && (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Escape-room check-in keeps the confirmation up for at least 25 seconds, so each player can tap Sign for another player.
+                  </p>
+                )}
               </div>
             </div>
           </div>

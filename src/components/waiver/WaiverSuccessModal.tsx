@@ -33,6 +33,8 @@ interface Props {
   waiverId?: number | null;
   waiverReference?: string | null;
   nextLabel?: string;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   closingText?: string;
   note?: string;
   persist?: boolean;
@@ -209,7 +211,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   };
 };
 
-const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, onAutoClose, ad = null, waiverId = null, waiverReference = null, nextLabel = 'Start Next Waiver', closingText, note, persist = false }: Props) => {
+const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25, onStartNext, onAutoClose, ad = null, waiverId = null, waiverReference = null, nextLabel = 'Start Next Waiver', secondaryLabel, onSecondary, closingText, note, persist = false }: Props) => {
   const [takeaway, setTakeaway] = useState<Takeaway | null>(null);
   const [beatDone, setBeatDone] = useState(false);
   const [handingOver, setHandingOver] = useState(false);
@@ -271,6 +273,16 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
   };
 
   const hasTakeaway = !!takeaway && !!(takeaway.bookUrl || takeaway.picks.length > 0);
+  const secondaryButton =
+    secondaryLabel && onSecondary ? (
+      <button
+        type="button"
+        onClick={onSecondary}
+        className="mt-2.5 w-full py-3 bg-white text-gray-700 text-sm font-semibold rounded-lg border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+      >
+        {secondaryLabel}
+      </button>
+    ) : null;
   const showAd = beatDone && !!ad;
   const showTakeaway = beatDone && !ad && hasTakeaway;
 
@@ -280,7 +292,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
         role="dialog"
         aria-modal="true"
         aria-labelledby="waiver-success-title"
-        className="zz-card-in bg-white w-full max-w-md rounded-2xl border border-gray-100 shadow-xl overflow-hidden my-6"
+        className="zz-card-in bg-white w-full max-w-md rounded-2xl border border-gray-100 shadow-xl overflow-hidden my-auto"
       >
         {showAd && ad ? (
           <div className="zz-step-in">
@@ -355,6 +367,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
               >
                 {nextLabel}
               </button>
+              {secondaryButton}
               {!persist && (
                 <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
                   {secondsLeft > 0 ? `${closingText ?? 'Returning to the start screen'} in ${secondsLeft}s` : `${closingText ?? 'Returning to the start screen'}…`}
@@ -390,12 +403,15 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
             )}
 
             {beatDone && !hasTakeaway && (
-              <button
-                onClick={onStartNext}
-                className="zz-step-in mt-8 w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
-              >
-                {nextLabel}
-              </button>
+              <div className="zz-step-in mt-8">
+                <button
+                  onClick={onStartNext}
+                  className="w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+                >
+                  {nextLabel}
+                </button>
+                {secondaryButton}
+              </div>
             )}
           </div>
         ) : (
@@ -474,6 +490,7 @@ const WaiverSuccessModal = ({ signerFirstName, locationId, autoCloseSeconds = 25
             >
               {nextLabel}
             </button>
+            {secondaryButton}
             {!persist && (
               <p className="text-[11px] text-gray-400 text-center mt-2.5 tabular-nums">
                 {secondsLeft > 0

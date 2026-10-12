@@ -33,7 +33,7 @@ const escapeRoomService = {
     (await publicApi.get(`/waivers/escape-room/${locationId}`, { params: { recent: 1, ...(link ?? {}) } })).data.data,
 
   getRoomForm: async (locationId: number, packageId: number, link?: EscapeRoomGameLink | null): Promise<EscapeRoomFormContext> =>
-    (await publicApi.get(`/waivers/escape-room/${locationId}/rooms/${packageId}`, { params: { recent: 1, ...(link ?? {}) } })).data.data,
+    (await publicApi.get(`/waivers/escape-room/${locationId}/rooms/${packageId}`, { params: { recent: 1, ...(link ?? {}) }, timeout: 60000 })).data.data,
 
   submit: async (
     locationId: number,
@@ -50,7 +50,7 @@ const escapeRoomService = {
       ...(shown?.templateId ? { waiver_template_id: shown.templateId } : {}),
       ...(shown?.templateVersion ? { waiver_template_version: shown.templateVersion } : {}),
       ...(shown?.gameSignature ? { game_signature: shown.gameSignature } : {}),
-    })).data.data,
+    }, { timeout: 60000 })).data.data,
 
   getDay: async (locationId: number, date?: string): Promise<EscapeRoomDay> =>
     (await api.get('/escape-rooms/day', { params: date ? { location_id: locationId, date } : { location_id: locationId } })).data.data,
