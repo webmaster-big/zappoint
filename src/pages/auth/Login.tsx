@@ -68,6 +68,7 @@ export default function Login() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ email, password }),
       });
@@ -76,7 +77,9 @@ export default function Login() {
       await animateProgress(45, 500);
 
       if (!response.ok) {
-        if (data.errors) {
+        if (response.status === 429) {
+          setErrorMessage('Too many sign-in attempts. Please wait a minute and try again.');
+        } else if (data.errors) {
           const errorMessages = Object.values(data.errors).flat().join(' ');
           setErrorMessage(errorMessages);
         } else if (data.message) {

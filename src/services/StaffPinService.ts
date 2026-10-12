@@ -73,7 +73,10 @@ export interface TerminalRecord {
 
 export async function getTerminalContext(): Promise<TerminalContext> {
   const response = await api.get('/staff-pin/terminal-context');
-  return (response.data?.data ?? { registered: false }) as TerminalContext;
+  if (typeof response.data?.data?.registered !== 'boolean') {
+    throw new Error('The terminal check did not get a usable answer.');
+  }
+  return response.data.data as TerminalContext;
 }
 
 export async function unlockWithPin(pin: string): Promise<PinSession> {

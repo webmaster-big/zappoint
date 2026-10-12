@@ -22,6 +22,12 @@ const DEFAULT_PIN_LENGTH = 6;
 const SHARED_ACTIVITY_KEY = 'zapzone_terminal_activity';
 const CONTEXT_RETRY_MS = 30000;
 
+const leaveWithoutStaffSession = (): boolean => {
+  if (getStoredUser()?.token) return false;
+  window.location.replace('/admin');
+  return true;
+};
+
 const TerminalLockHost: React.FC = () => {
   const [terminal, setTerminal] = useState(() => getStoredTerminal());
   const [context, setContext] = useState<TerminalContext | null>(null);
@@ -31,6 +37,7 @@ const TerminalLockHost: React.FC = () => {
   const [idleSeconds, setIdleSeconds] = useState<number | null>(null);
 
   useEffect(() => subscribeStoredTerminal((next) => {
+    if (!next && leaveWithoutStaffSession()) return;
     setTerminal(next);
     if (!next) {
       setTerminalLocked(false);
@@ -49,6 +56,7 @@ const TerminalLockHost: React.FC = () => {
           if (!next.registered) {
             clearStoredTerminal();
             clearSharedTerminalState();
+            if (leaveWithoutStaffSession()) return;
             setTerminalLocked(false);
             setLocked(false);
             return;
@@ -82,10 +90,7 @@ const TerminalLockHost: React.FC = () => {
     if (!terminal) return;
 
     const followSharedLock = (lockedElsewhere: boolean) => {
-      if (!lockedElsewhere && !getStoredUser()?.token) {
-        window.location.replace('/admin');
-        return;
-      }
+      if (!lockedElsewhere && leaveWithoutStaffSession()) return;
       setLocked(lockedElsewhere);
       setTerminalLocked(lockedElsewhere);
       if (!lockedElsewhere) {

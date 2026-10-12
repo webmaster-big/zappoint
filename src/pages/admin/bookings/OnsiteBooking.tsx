@@ -51,7 +51,7 @@ import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
 import { feeSupportService } from '../../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
@@ -1800,9 +1800,21 @@ const OnsiteBooking: React.FC = () => {
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
       const submitBasePrice = calculateBase();
-      const freshFeeTotal = await resolveFeeTotal('package', selectedPackage.id, submitBasePrice, selectedLocation || undefined);
+      const freshBreakdown = await resolveFeeBreakdown('package', selectedPackage.id, submitBasePrice, selectedLocation || undefined);
+      const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const specialDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
-      const totalAmount = Math.max(0, (freshFeeTotal !== null ? freshFeeTotal : submitBasePrice) - specialDiscount);
+      const totalAmount = Math.max(0, (submitBreakdown ? submitBreakdown.total : submitBasePrice) - specialDiscount);
+      if (appliedPromoCode && Math.round(totalAmount * 100) / 100 !== promoAppliedOn) {
+        if (freshBreakdown) setFeeBreakdown(freshBreakdown);
+        setPromoAppliedOn(null);
+        setAppliedPromoCode(null);
+        setPromoDiscount(0);
+        setCodeError('The total changed, so press Apply again to use the promo code.');
+        setToast({ message: 'The total changed, so press Apply again to use the promo code.', type: 'error' });
+        setSubmitting(false);
+        isSubmittingRef.current = false;
+        return;
+      }
       const submitGiftDiscount = appliedGiftCardCode ? Math.min(giftCardBalance, Math.max(0, totalAmount - promoDiscount)) : 0;
       const netTotal = Math.max(0, totalAmount - promoDiscount - submitGiftDiscount);
       const partialAmount = calculatePartialAmount();
@@ -1886,7 +1898,7 @@ const OnsiteBooking: React.FC = () => {
         guest_zip: bookingData.guestZip || undefined,
         guest_country: bookingData.guestCountry || undefined,
         sent_email_to_staff: sendEmailToStaff,
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : null,
         discount_amount: specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
