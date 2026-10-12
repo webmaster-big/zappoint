@@ -31,6 +31,8 @@ import type { FreeState, StretchSpan, TimeRange } from '../../../utils/scheduleG
 import { buildMinuteScale, freeState, freeUntilMinute, nextFreeMinute } from '../../../utils/scheduleGeometry';
 import { buildBookingUrl } from '../../../utils/bookingPrefill';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
+import BlockedPeriodBanner from '../../../components/admin/availability/BlockedPeriodBanner';
+import { blockBookingPath } from '../../../utils/blockBookingPath';
 
 const WALK_IN_STEP_MINUTES = 5;
 
@@ -1912,6 +1914,16 @@ const SpaceSchedule = () => {
           New Booking
         </Link>
       </div>
+
+      <BlockedPeriodBanner
+        periods={dayWindow?.date === dateKeyOf(selectedDate) ? dayWindow?.blocked_periods : null}
+        className="mb-6 rounded-lg border"
+        onBook={isPastDate ? undefined : (kind, locationId) => navigate(blockBookingPath(
+          kind,
+          locationId ?? effectiveLocationId ?? dayWindow?.location_id ?? null,
+          dateKeyOf(selectedDate),
+        ))}
+      />
 
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

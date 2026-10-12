@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { installBlockedPeriodRetry } from '../utils/blockedPeriodPrompt';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
 import type {
@@ -41,6 +42,8 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+installBlockedPeriodRetry(api);
 
 interface ApiResponse<T> {
   success: boolean;

@@ -1,5 +1,6 @@
 import type { CardBearingPayment } from '../utils/cardLabel';
 import axios from 'axios';
+import { installBlockedPeriodRetry } from '../utils/blockedPeriodPrompt';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { fetchAllPages } from '../utils/fetchAllPages';
 import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
@@ -39,6 +40,8 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+installBlockedPeriodRetry(api);
 
 export interface AttractionPurchase {
   payments?: CardBearingPayment[] | null;

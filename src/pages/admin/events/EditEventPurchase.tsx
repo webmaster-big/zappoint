@@ -17,6 +17,9 @@ import type { AppliedFee } from '../../../utils/fees';
 import type { AppliedDiscount } from '../../../utils/discounts';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
+import BlockedPeriodList, { type BlockedPeriodSummary } from '../../../components/admin/availability/BlockedPeriodList';
+import { closureTimeToMinutes, isSlotBlockedByClosure, type PartialClosure } from '../../../utils/dayOffClosure';
+import { orderClockSlots } from '../../../utils/timeSlots';
 import type { VisitFollowUpSummary } from '../../../types/visitFollowUp.types';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 
@@ -88,8 +91,12 @@ const EditEventPurchase: React.FC = () => {
   const [purchaseTime, setPurchaseTime] = useState('');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<string[]>([]);
+  const [closuresByDate, setClosuresByDate] = useState<Record<string, PartialClosure[]>>({});
+  const [keptOriginalSlot, setKeptOriginalSlot] = useState<string | null>(null);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   const [partialDayOffDates, setPartialDayOffDates] = useState<Set<string>>(new Set());
+  const [blockNotes, setBlockNotes] = useState<Record<string, BlockedPeriodSummary[]>>({});
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
@@ -160,8 +167,8 @@ const EditEventPurchase: React.FC = () => {
         }
 
         try {
-          const dateRes = await eventService.getAvailableDates(purchase.event_id);
-          setAvailableDates(dateRes.dates || []);
+          const dateRes = await eventService.getAvailableDates(purchase.event_id, true);
+          setAvailableDates([...(dateRes.dates || []), ...(dateRes.blocked_dates || [])]);
         } catch {
         }
       } catch {
@@ -279,6 +286,9 @@ const EditEventPurchase: React.FC = () => {
     const fetchDayOffs = async () => {
       if (!locationId || !eventId) {
         setDayOffDates(new Set());
+        setPartialDayOffDates(new Set());
+        setBlockNotes({});
+        setClosuresByDate({});
         return;
       }
       try {
@@ -286,6 +296,8 @@ const EditEventPurchase: React.FC = () => {
         if (response.success && response.data) {
           const blocked = new Set<string>();
           const partial = new Set<string>();
+          const notes: Record<string, BlockedPeriodSummary[]> = {};
+          const closures: Record<string, PartialClosure[]> = {};
           const now = new Date();
           now.setHours(0, 0, 0, 0);
           const toDateStr = (d: Date) =>
@@ -307,15 +319,30 @@ const EditEventPurchase: React.FC = () => {
               targetDates.push(normalizedDate);
             }
             targetDates.forEach(dateStr => {
+              (closures[dateStr] ??= []).push({ time_start: dayOff.time_start ?? null, time_end: dayOff.time_end ?? null });
               if (hasTimeRestriction) {
                 partial.add(dateStr);
               } else {
                 blocked.add(dateStr);
               }
+              if (!notes[dateStr]) notes[dateStr] = [];
+              if (!notes[dateStr].some(note => note.id === dayOff.id)) {
+                notes[dateStr].push({
+                  id: dayOff.id,
+                  date: dateStr,
+                  group_name: dayOff.group_name ?? null,
+                  reason: dayOff.reason ?? null,
+                  window_label: dayOff.window_label ?? 'Blocked',
+                  scope_label: dayOff.scope_label ?? 'Blocked',
+                  set_by: dayOff.set_by ?? null,
+                });
+              }
             });
           });
           setDayOffDates(blocked);
           setPartialDayOffDates(partial);
+          setBlockNotes(notes);
+          setClosuresByDate(closures);
         }
       } catch {
       }
@@ -323,31 +350,52 @@ const EditEventPurchase: React.FC = () => {
     fetchDayOffs();
   }, [locationId, eventId]);
 
-  const effectiveDayOffDates = useMemo(() => {
-    const set = new Set(dayOffDates);
-    if (originalPurchaseDate) set.delete(originalPurchaseDate);
-    return set;
-  }, [dayOffDates, originalPurchaseDate]);
-
   useEffect(() => {
+    let cancelled = false;
     const loadSlots = async () => {
       if (!purchaseDate || !eventId) {
         setAvailableTimeSlots([]);
+        setBlockedTimeSlots([]);
+        setKeptOriginalSlot(null);
         return;
       }
       try {
-        const res = await eventService.getAvailableTimeSlots(eventId, purchaseDate);
+        const res = await eventService.getAvailableTimeSlots(eventId, purchaseDate, true);
+        if (cancelled) return;
         let slots = res.time_slots || [];
-        if (purchaseDate === originalPurchaseDate && originalPurchaseTime && !slots.includes(originalPurchaseTime)) {
-          slots = [...slots, originalPurchaseTime].sort();
+        const blockedSlots = res.blocked_time_slots || [];
+        const keepsOriginal = purchaseDate === originalPurchaseDate && !!originalPurchaseTime && !slots.includes(originalPurchaseTime) && !blockedSlots.includes(originalPurchaseTime);
+        if (keepsOriginal) {
+          slots = orderClockSlots([...slots, originalPurchaseTime]);
         }
         setAvailableTimeSlots(slots);
+        setBlockedTimeSlots(blockedSlots);
+        setKeptOriginalSlot(keepsOriginal ? originalPurchaseTime : null);
       } catch {
-        setAvailableTimeSlots(purchaseDate === originalPurchaseDate && originalPurchaseTime ? [originalPurchaseTime] : []);
+        if (cancelled) return;
+        const keepsOriginal = purchaseDate === originalPurchaseDate && !!originalPurchaseTime;
+        setAvailableTimeSlots(keepsOriginal ? [originalPurchaseTime] : []);
+        setBlockedTimeSlots([]);
+        setKeptOriginalSlot(keepsOriginal ? originalPurchaseTime : null);
       }
     };
     loadSlots();
+    return () => { cancelled = true; };
   }, [purchaseDate, eventId, originalPurchaseDate, originalPurchaseTime]);
+
+  const shownSlots = useMemo(() => {
+    if (!keptOriginalSlot) return { available: availableTimeSlots, blocked: blockedTimeSlots };
+    const interval = Number(eventFull?.interval_minutes ?? originalPurchase?.event?.interval_minutes) || 60;
+    const end = closureTimeToMinutes(keptOriginalSlot) + interval;
+    const slotEnd = `${String(Math.floor(end / 60) % 24).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+    if (!isSlotBlockedByClosure(keptOriginalSlot, slotEnd, closuresByDate[purchaseDate] ?? [])) {
+      return { available: availableTimeSlots, blocked: blockedTimeSlots };
+    }
+    return {
+      available: availableTimeSlots.filter(slot => slot !== keptOriginalSlot),
+      blocked: orderClockSlots([...blockedTimeSlots, keptOriginalSlot]),
+    };
+  }, [keptOriginalSlot, availableTimeSlots, blockedTimeSlots, closuresByDate, purchaseDate, eventFull, originalPurchase]);
 
   const buildAddOns = () => {
     return Object.entries(selectedAddOns)
@@ -415,8 +463,9 @@ const EditEventPurchase: React.FC = () => {
         setToast({ message: 'Failed to update purchase. Please try again.', type: 'error' });
         setSubmitting(false);
       }
-    } catch {
-      setToast({ message: 'Error updating purchase. Please try again.', type: 'error' });
+    } catch (error) {
+      const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToast({ message: serverMessage || 'Error updating purchase. Please try again.', type: 'error' });
       setSubmitting(false);
     }
   };
@@ -579,17 +628,36 @@ const EditEventPurchase: React.FC = () => {
                 </p>
               </div>
               {scheduleAvailability.length > 0 ? (
-                <ScheduleCalendar
-                  availability={scheduleAvailability}
-                  dayOffDates={effectiveDayOffDates}
-                  partialDayOffDates={partialDayOffDates}
-                  scheduledDate={purchaseDate}
-                  scheduledTime={purchaseTime}
-                  availableTimeSlots={availableTimeSlots}
-                  onDateSelect={(dateStr) => { setPurchaseDate(dateStr); setPurchaseTime(''); }}
-                  onTimeSelect={(time) => setPurchaseTime(time)}
-                  themeColor={themeColor}
-                />
+                <>
+                  <ScheduleCalendar
+                    availability={scheduleAvailability}
+                    dayOffDates={dayOffDates}
+                    partialDayOffDates={partialDayOffDates}
+                    scheduledDate={purchaseDate}
+                    scheduledTime={purchaseTime}
+                    availableTimeSlots={shownSlots.available}
+                    blockedTimeSlots={shownSlots.blocked}
+                    allowBlockedDates
+                    onDateSelect={(dateStr) => { setPurchaseDate(dateStr); setPurchaseTime(''); }}
+                    onTimeSelect={(time) => setPurchaseTime(time)}
+                    themeColor={themeColor}
+                  />
+                  {purchaseDate && (blockNotes[purchaseDate]?.length ?? 0) > 0 && (
+                    <div className={`mt-3 rounded-lg border px-3 py-2 ${shownSlots.blocked.includes(purchaseTime) ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <p className={`text-sm font-semibold ${shownSlots.blocked.includes(purchaseTime) ? 'text-red-800' : 'text-amber-900'}`}>
+                        {!shownSlots.blocked.includes(purchaseTime)
+                          ? 'This date has a blocked period'
+                          : purchaseDate === originalPurchaseDate && purchaseTime === originalPurchaseTime
+                            ? 'This purchase is inside a blocked period'
+                            : 'The time you picked is inside a blocked period'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-700">Guests cannot buy these times online. Moving the purchase to a blocked time asks you to confirm when you save.</p>
+                      <div className="mt-2">
+                        <BlockedPeriodList compact periods={blockNotes[purchaseDate]} />
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <p className="text-sm text-gray-600">No available dates configured for this event.</p>

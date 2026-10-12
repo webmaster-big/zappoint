@@ -3,11 +3,14 @@ import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { fetchAllPages } from '../utils/fetchAllPages';
 import { rememberCheckoutToken } from '../utils/checkoutTokens';
+import { installBlockedPeriodRetry } from '../utils/blockedPeriodPrompt';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 });
+
+installBlockedPeriodRetry(api);
 
 export type CartItemType = 'attraction' | 'event';
 
@@ -283,9 +286,9 @@ const ticketOrderService = {
     }
   },
 
-  async quote(items: CartItem[]): Promise<CartQuote> {
+  async quote(items: CartItem[], asStaff = false): Promise<CartQuote> {
     try {
-      const { data } = await api.post('/ticket-orders/quote', { items: toApiItems(items) });
+      const { data } = await api.post('/ticket-orders/quote', { items: toApiItems(items) }, asStaff ? { headers: authHeaders() } : undefined);
       return data.data as CartQuote;
     } catch (error) {
       throw new Error(messageFrom(error, 'We could not price your cart just now.'));

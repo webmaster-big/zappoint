@@ -22,26 +22,77 @@ api.interceptors.request.use(
   }
 );
 
-export type BlockingScope = 'location' | 'packages' | 'rooms' | 'attractions' | 'events' | 'both';
+export type BlockingScope = 'location' | 'packages' | 'rooms' | 'attractions' | 'events';
+
+export type BlockType = 'full_day' | 'operating_window' | 'legacy_closure';
+
+export type BlockScopeKey = BlockingScope | 'mixed';
+
+export interface BlockPerson {
+  id: number;
+  name: string;
+  role?: string | null;
+}
+
+export interface BlockedRange {
+  start_minutes: number;
+  end_minutes: number;
+}
 
 export interface DayOff {
   id: number;
   location_id: number;
   date: string;
   reason?: string;
+  group_name?: string;
   is_recurring: boolean;
-  time_start?: string | null;  // Close starting at this time (e.g., "16:00" for close at 4 PM)
-  time_end?: string | null;    // Delayed opening until this time (e.g., "16:00" for open at 4 PM)
-  package_ids?: number[] | null;  // Array of package IDs to block, null = all packages
-  room_ids?: number[] | null;     // Array of room IDs to block, null = all rooms
+  block_type?: BlockType;
+  time_start?: string | null;
+  time_end?: string | null;
+  opens_at?: string | null;
+  closes_at?: string | null;
+  package_ids?: number[] | null;
+  room_ids?: number[] | null;
   attraction_ids?: number[] | null;
   event_ids?: number[] | null;
-  created_at: string;
-  updated_at: string;
+  window_label?: string;
+  scope_label?: string;
+  set_by?: BlockPerson | null;
+  created_at?: string;
+  updated_at?: string;
   location?: {
     id: number;
     name: string;
-  };
+  } | null;
+}
+
+export interface AvailabilityBlock {
+  id: number;
+  location_id: number;
+  location_name: string | null;
+  date: string;
+  occurrence_date?: string;
+  is_recurring: boolean;
+  block_type: BlockType;
+  opens_at: string | null;
+  closes_at: string | null;
+  time_start: string | null;
+  time_end: string | null;
+  window_label: string;
+  blocked_ranges: BlockedRange[];
+  scope: BlockScopeKey;
+  scope_label: string;
+  package_ids: number[] | null;
+  room_ids: number[] | null;
+  attraction_ids: number[] | null;
+  event_ids: number[] | null;
+  reason: string | null;
+  group_name: string | null;
+  set_by: BlockPerson | null;
+  last_changed_by: BlockPerson | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  location?: { id: number; name: string } | null;
 }
 
 export interface DayOffFilters {
@@ -55,39 +106,33 @@ export interface DayOffFilters {
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
-  user_id?: number;
-  package_id?: number;         // Filter day offs that apply to this package
-  room_id?: number;            // Filter day offs that apply to this room
+  search?: string;
+  package_id?: number;
+  room_id?: number;
   attraction_id?: number;
   event_id?: number;
-  location_wide_only?: boolean; // Only return location-wide blocks
+  location_wide_only?: boolean;
 }
 
-export interface CreateDayOffData {
+export interface BlockPayload {
   location_id: number;
   date: string;
-  reason?: string;
-  is_recurring?: boolean;
-  time_start?: string | null;  // Close starting at this time
-  time_end?: string | null;    // Delayed opening until this time
-  package_ids?: number[] | null;  // Array of package IDs to block
-  room_ids?: number[] | null;     // Array of room IDs to block
+  block_type: Exclude<BlockType, 'legacy_closure'>;
+  opens_at?: string | null;
+  closes_at?: string | null;
+  scope: BlockingScope;
+  package_ids?: number[] | null;
+  room_ids?: number[] | null;
   attraction_ids?: number[] | null;
   event_ids?: number[] | null;
+  reason: string;
+  group_name: string;
+  is_recurring?: boolean;
 }
 
-export interface UpdateDayOffData {
-  location_id?: number;
-  date?: string;
-  reason?: string;
-  is_recurring?: boolean;
-  time_start?: string | null;  // Close starting at this time
-  time_end?: string | null;    // Delayed opening until this time
-  package_ids?: number[] | null;  // Array of package IDs to block
-  room_ids?: number[] | null;     // Array of room IDs to block
-  attraction_ids?: number[] | null;
-  event_ids?: number[] | null;
-}
+export type CreateDayOffData = BlockPayload;
+
+export type UpdateDayOffData = Partial<BlockPayload>;
 
 export interface CheckDateData {
   location_id: number;
@@ -100,27 +145,74 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
+export interface Pagination {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
 export interface PaginatedResponse<T> {
   success: boolean;
   data: {
     day_offs: T[];
-    pagination: {
-      current_page: number;
-      last_page: number;
-      per_page: number;
-      total: number;
-      from: number;
-      to: number;
-    };
+    pagination: Pagination;
   };
 }
 
-export interface CheckDateResponse {
-  success: boolean;
-  data: {
-    is_blocked: boolean;
-    day_off: DayOff | null;
-  };
+export type ChangeAction = 'created' | 'updated' | 'deleted' | 'booked_inside_block' | 'booking_removed';
+
+export interface BlockSnapshot {
+  id: number | null;
+  location_id: number | null;
+  date: string | null;
+  is_recurring: boolean;
+  block_type: BlockType;
+  opens_at: string | null;
+  closes_at: string | null;
+  time_start: string | null;
+  time_end: string | null;
+  reason: string | null;
+  group_name: string | null;
+  package_ids: number[] | null;
+  room_ids: number[] | null;
+  attraction_ids: number[] | null;
+  event_ids: number[] | null;
+  created_by: number | null;
+  updated_by: number | null;
+}
+
+export interface AvailabilityChange {
+  id: number;
+  day_off_id: number | null;
+  location_id: number | null;
+  location_name: string | null;
+  previous_location_id?: number | null;
+  previous_location_name?: string | null;
+  action: ChangeAction;
+  summary: string;
+  changed_by: (BlockPerson & { email?: string | null }) | null;
+  before: BlockSnapshot | null;
+  after: BlockSnapshot | null;
+  changed_fields: string[] | null;
+  context: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface ChangeLogFilters {
+  day_off_id?: number;
+  location_id?: number;
+  action?: ChangeAction;
+  page?: number;
+  per_page?: number;
+}
+
+export interface CalendarRange {
+  start_date: string;
+  end_date: string;
+  location_id?: number | null;
 }
 
 interface CacheEntry<T> {
@@ -128,7 +220,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL = 60000; // 1 minute cache TTL
+const CACHE_TTL = 60000;
 
 class DayOffService {
   private cache: Map<string, CacheEntry<unknown>> = new Map();
@@ -158,46 +250,31 @@ class DayOffService {
     }
   }
 
-  async getDayOffs(filters?: DayOffFilters): Promise<PaginatedResponse<DayOff>> {
-    const cacheKey = `dayoffs_list_${JSON.stringify(filters || {})}`;
-    const cached = this.getCached<PaginatedResponse<DayOff>>(cacheKey);
-    if (cached) {
-      console.log('📦 Returning cached day offs list');
-      return cached;
-    }
-
+  async getDayOffs(filters?: DayOffFilters): Promise<PaginatedResponse<AvailabilityBlock>> {
     const response = await api.get('/day-offs', { params: filters });
-    this.setCache(cacheKey, response.data);
     return response.data;
   }
 
-  async getDayOff(id: number): Promise<ApiResponse<DayOff>> {
-    const cacheKey = `dayoff_${id}`;
-    const cached = this.getCached<ApiResponse<DayOff>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
+  async getDayOff(id: number): Promise<ApiResponse<AvailabilityBlock>> {
     const response = await api.get(`/day-offs/${id}`);
-    this.setCache(cacheKey, response.data);
     return response.data;
   }
 
-  async createDayOff(data: CreateDayOffData): Promise<ApiResponse<DayOff>> {
+  async createDayOff(data: CreateDayOffData): Promise<ApiResponse<AvailabilityBlock>> {
     const response = await api.post('/day-offs', data);
-    this.invalidateCacheByPattern('dayoffs_');
+    this.invalidateCache();
     return response.data;
   }
 
-  async updateDayOff(id: number, data: UpdateDayOffData): Promise<ApiResponse<DayOff>> {
+  async updateDayOff(id: number, data: UpdateDayOffData): Promise<ApiResponse<AvailabilityBlock> & { merged_day_off_ids?: number[] }> {
     const response = await api.put(`/day-offs/${id}`, data);
-    this.invalidateCache(); // Invalidate all cache on update
+    this.invalidateCache();
     return response.data;
   }
 
   async deleteDayOff(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/day-offs/${id}`);
-    this.invalidateCache(); // Invalidate all cache on delete
+    this.invalidateCache();
     return response.data;
   }
 
@@ -205,7 +282,6 @@ class DayOffService {
     const cacheKey = `dayoffs_location_${locationId}`;
     const cached = this.getCached<ApiResponse<DayOff[]>>(cacheKey);
     if (cached) {
-      console.log('📦 Returning cached day offs for location', locationId);
       return cached;
     }
 
@@ -214,14 +290,37 @@ class DayOffService {
     return response.data;
   }
 
-  async checkDate(data: CheckDateData): Promise<CheckDateResponse> {
+  async getCalendar(range: CalendarRange): Promise<ApiResponse<{ start_date: string; end_date: string; occurrences: AvailabilityBlock[] }>> {
+    const params: Record<string, string | number> = {
+      start_date: range.start_date,
+      end_date: range.end_date,
+    };
+    if (range.location_id) params.location_id = range.location_id;
+
+    const cacheKey = `dayoffs_calendar_${JSON.stringify(params)}`;
+    const cached = this.getCached<ApiResponse<{ start_date: string; end_date: string; occurrences: AvailabilityBlock[] }>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await api.get('/day-offs/calendar', { params });
+    this.setCache(cacheKey, response.data);
+    return response.data;
+  }
+
+  async getChangeLog(filters: ChangeLogFilters = {}): Promise<ApiResponse<{ changes: AvailabilityChange[]; pagination: Pagination }>> {
+    const response = await api.get('/day-offs/change-log', { params: filters });
+    return response.data;
+  }
+
+  async checkDate(data: CheckDateData) {
     const response = await api.post('/day-offs/check-date', data);
     return response.data;
   }
 
   async bulkDeleteDayOffs(ids: number[]): Promise<ApiResponse<{ deleted_count: number }>> {
     const response = await api.post('/day-offs/bulk-delete', { ids });
-    this.invalidateCache(); // Invalidate all cache on bulk delete
+    this.invalidateCache();
     return response.data;
   }
 }

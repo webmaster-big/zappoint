@@ -14,6 +14,7 @@ import { packageService } from '../../../services/PackageService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
+import { orderByClockStart } from '../../../utils/timeSlots';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import StandardButton from '../../../components/ui/StandardButton';
 import roomService from '../../../services/RoomService';
@@ -123,6 +124,7 @@ const ManualBooking: React.FC = () => {
 
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
@@ -193,7 +195,7 @@ const ManualBooking: React.FC = () => {
     return daysUntilEndOfMonth < 7;
   };
 
-  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
+  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string, roomId?: number | null): boolean => {
     if (!form.bookingDate || dayOffsWithTime.length === 0 || !pkg) return false;
 
     const selectedDateObj = parseLocalDate(form.bookingDate);
@@ -203,13 +205,11 @@ const ManualBooking: React.FC = () => {
           dayOff.date.getDate() !== selectedDateObj.getDate()) {
         return false;
       }
-      if (dayOff.package_ids && dayOff.package_ids.length > 0) {
-        return dayOff.package_ids.includes(pkg.id);
-      }
-      if (dayOff.room_ids && dayOff.room_ids.length > 0) {
-        return false;
-      }
-      return true;
+      const targetsPackages = !!dayOff.package_ids?.length;
+      const targetsRooms = !!dayOff.room_ids?.length;
+      if (!targetsPackages && !targetsRooms) return true;
+      return (targetsPackages && dayOff.package_ids!.includes(pkg.id))
+        || (targetsRooms && roomId != null && dayOff.room_ids!.includes(roomId));
     });
 
     if (closures.length === 0) return false;
@@ -219,9 +219,16 @@ const ManualBooking: React.FC = () => {
 
   const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? pkg?.min_participants ?? 1));
 
-  const filteredTimeSlots = availableTimeSlots.filter(slot =>
-    !isTimeSlotRestricted(slot.start_time, slot.end_time)
-  );
+  const filteredTimeSlots = availableTimeSlots;
+
+  const mergedTimeSlots: TimeSlot[] = [...filteredTimeSlots];
+  [
+    ...blockedTimeSlots,
+  ].forEach(slot => {
+    if (mergedTimeSlots.some(existing => existing.start_time === slot.start_time)) return;
+    mergedTimeSlots.push({ ...slot, blocked: true });
+  });
+  const shownTimeSlots = orderByClockStart(mergedTimeSlots);
 
   const flexibleClosureWarning = React.useMemo(() => {
     if (bookingMode !== 'flexible' || !form.bookingDate || !form.bookingTime || !pkg) return null;
@@ -231,9 +238,10 @@ const ManualBooking: React.FC = () => {
     if (Number.isNaN(h)) return null;
     const endTotal = (h * 60 + (m || 0) + minutes) % (24 * 60);
     const end = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`;
-    if (!isTimeSlotRestricted(form.bookingTime, end)) return null;
-    return 'The venue is closed at this time, so this booking will be refused on save.';
-  }, [bookingMode, form.bookingDate, form.bookingTime, pkg, dayOffsWithTime]);
+    const roomId = form.roomId ? Number(form.roomId) : null;
+    if (!isTimeSlotRestricted(form.bookingTime, end, Number.isFinite(roomId) ? roomId : null)) return null;
+    return 'This time is inside a blocked period. Guests cannot book it online; you will be asked to confirm when you save.';
+  }, [bookingMode, form.bookingDate, form.bookingTime, form.roomId, pkg, dayOffsWithTime]);
 
   const filteredDayOffsWithTime = pkg
     ? dayOffsWithTime.filter(d => (d.package_ids && d.package_ids.length > 0) ? d.package_ids.includes(pkg.id) : !(d.room_ids && d.room_ids.length > 0))
@@ -540,6 +548,7 @@ const ManualBooking: React.FC = () => {
   useEffect(() => {
     if (bookingMode !== 'standard' || !pkg || !form.bookingDate) {
       setAvailableTimeSlots([]);
+      setBlockedTimeSlots([]);
       return;
     }
     
@@ -554,6 +563,7 @@ const ManualBooking: React.FC = () => {
     const eventSource = timeSlotService.getAvailableSlotsSSE({
       package_id: pkg.id,
       date: form.bookingDate,
+      include_blocked: true,
     });
     
     eventSource.onmessage = (event) => {
@@ -563,7 +573,9 @@ const ManualBooking: React.FC = () => {
           available_count: data.available_slots?.length || 0,
         });
         
-        setAvailableTimeSlots(data.available_slots);
+        const slots: TimeSlot[] = Array.isArray(data.available_slots) ? data.available_slots : [];
+        setAvailableTimeSlots(slots.filter(slot => !slot.blocked));
+        setBlockedTimeSlots(slots.filter(slot => slot.blocked));
         setLoadingTimeSlots(false);
       } catch (err) {
         console.error('❌ Error parsing SSE data:', err);
@@ -1546,6 +1558,7 @@ const ManualBooking: React.FC = () => {
                             availableDates={availableDates}
                             dayOffs={dayOffs}
                             dayOffsWithTime={filteredDayOffsWithTime}
+                            allowBlockedDates
                           />
                         </div>
 
@@ -1560,20 +1573,26 @@ const ManualBooking: React.FC = () => {
                                 <div className={`animate-spin rounded-full h-6 w-6 border-2 border-gray-200 border-t-${themeColor}-600`}></div>
                                 <p className="text-sm text-gray-500 mt-2">Loading available times...</p>
                               </div>
-                            ) : filteredTimeSlots.length > 0 ? (
+                            ) : shownTimeSlots.length > 0 ? (
                               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5">
-                                {filteredTimeSlots.map((slot) => (
+                                {shownTimeSlots.map((slot) => (
                                   <button
                                     key={`${slot.start_time}-${slot.room_id}`}
                                     type="button"
                                     onClick={() => handleTimeSlotSelect(slot)}
+                                    title={slot.blocked ? 'Inside a blocked period — guests cannot book this time online' : undefined}
                                     className={`px-2 py-1.5 rounded border text-xs font-medium transition-all ${
                                       form.bookingTime === slot.start_time
-                                        ? `border-${themeColor}-500 bg-${themeColor}-50 text-${fullColor}`
-                                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                                        ? slot.blocked
+                                          ? 'border-red-500 bg-red-50 text-red-800'
+                                          : `border-${themeColor}-500 bg-${themeColor}-50 text-${fullColor}`
+                                        : slot.blocked
+                                          ? 'border-dashed border-red-200 bg-red-50/40 text-red-800 hover:border-red-300'
+                                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
                                     }`}
                                   >
                                     {formatTimeTo12Hour(slot.start_time)}
+                                    {slot.blocked && <span className="block text-[10px] font-semibold text-red-700">Blocked</span>}
                                     {slot.remaining_tickets != null && !slot.exclusive && (
                                       <span className={`block text-[10px] font-semibold ${slot.remaining_tickets <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>{slot.remaining_tickets} left</span>
                                     )}
@@ -1584,6 +1603,12 @@ const ManualBooking: React.FC = () => {
                               <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-md text-xs">
                                 No available time slots for this date
                               </div>
+                            )}
+
+                            {form.bookingTime && shownTimeSlots.some(slot => slot.blocked && slot.start_time === form.bookingTime) && (
+                              <p className="mt-2 text-xs text-red-700">
+                                This time is inside a blocked period. Guests cannot book it online; you will be asked to confirm when you save.
+                              </p>
                             )}
 
                             {form.bookingTime && selectedRoomId && (

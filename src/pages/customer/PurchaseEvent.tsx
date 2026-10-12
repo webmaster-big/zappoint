@@ -537,14 +537,27 @@ const PurchaseEvent = () => {
         };
         const interval = event.interval_minutes || 60;
         const startM = toMinutes(event.time_start ?? '00:00');
-        const endM = toMinutes(event.time_end ?? '00:00');
+        const rawEndM = toMinutes(event.time_end ?? '00:00');
+        const endM = rawEndM <= startM ? rawEndM + 24 * 60 : rawEndM;
         const eventSlots: string[] = [];
-        for (let cur = startM; cur < endM; cur += interval) {
-          if (cur + interval > endM) break;
-          eventSlots.push(fromMinutes(cur));
+        if (event.time_start && event.time_end) {
+          for (let cur = startM; cur < endM; cur += interval) {
+            if (cur + interval > endM) break;
+            eventSlots.push(fromMinutes(cur));
+          }
         }
+        const wrapsPastMidnight = rawEndM <= startM && rawEndM > 0;
+        const tonight = (time?: string | null) => {
+          if (!time || !wrapsPastMidnight) return time ?? null;
+          const minutes = toMinutes(time);
+          return minutes <= rawEndM ? fromMinutes(minutes + 24 * 60) : time;
+        };
         const isSlotBlocked = (slotStart: string, slotEnd: string, closures: Array<{ time_start?: string | null; time_end?: string | null }>) =>
-          isSlotBlockedByClosure(slotStart, slotEnd, closures);
+          isSlotBlockedByClosure(slotStart, slotEnd, closures.map(closure => (
+            closure.time_start && closure.time_end && toMinutes(closure.time_end) > rawEndM
+              ? closure
+              : { time_start: tonight(closure.time_start), time_end: tonight(closure.time_end) }
+          )));
         const partialByDate: Record<string, Array<{ time_start?: string | null; time_end?: string | null }>> = {};
         const fullDay = new Set<string>();
         response.data.forEach((dayOff: DayOff) => {
@@ -577,7 +590,7 @@ const PurchaseEvent = () => {
         Object.entries(partialByDate).forEach(([dateStr, closures]) => {
           if (fullDay.has(dateStr)) return;
           const openSlots = eventSlots.filter(slot => !isSlotBlocked(slot, fromMinutes(toMinutes(slot) + interval), closures));
-          if (openSlots.length === 0) {
+          if (eventSlots.length > 0 && openSlots.length === 0) {
             blocked.add(dateStr);
           } else {
             partial.add(dateStr);

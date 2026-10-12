@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { installBlockedPeriodRetry } from '../utils/blockedPeriodPrompt';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
 const api = axios.create({
@@ -14,6 +15,8 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+installBlockedPeriodRetry(api);
 
 export type LocationChangeRequestStatus = 'pending' | 'approved' | 'rejected';
 

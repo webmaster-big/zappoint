@@ -5,6 +5,7 @@ import type { BookingQuote, BookingRepriceIntent } from '../types/Bookings.types
 import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import { changeReasonWasRequired, requestChangeReason } from '../utils/changeReasonPrompt';
+import { installBlockedPeriodRetry } from '../utils/blockedPeriodPrompt';
 import { fetchAllPages } from '../utils/fetchAllPages';
 import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
 import type { VisitFollowUpSummary } from '../types/visitFollowUp.types';
@@ -105,6 +106,8 @@ api.interceptors.response.use(
     return api.request(config);
   }
 );
+
+installBlockedPeriodRetry(api);
 
 function requestAlreadyCarriedReason(config: { params?: unknown; data?: unknown }): boolean {
   const params = config.params as Record<string, unknown> | undefined;

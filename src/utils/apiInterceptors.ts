@@ -89,7 +89,7 @@ const handleAuthError = (error: any) => {
   const url: string | undefined = error?.config?.url;
   const message: string | undefined = error?.response?.data?.message;
 
-  if (!isReportingEndpoint(url) && !url?.includes('/notifications/feed')) {
+  if (!isReportingEndpoint(url) && !url?.includes('/notifications/feed') && error?.response?.data?.code !== 'BLOCKED_PERIOD') {
     reportClientError({
       kind: 'api',
       status,

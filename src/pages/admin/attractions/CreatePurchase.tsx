@@ -60,6 +60,7 @@ import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQua
 import { generateTimeSlots } from '../../../utils/timeSlots';
 import { isSlotBlockedByClosure, type PartialClosure } from '../../../utils/dayOffClosure';
 import { addMinutesToTime } from '../../../utils/attractionSchedule';
+import BlockedPeriodList, { type BlockedPeriodSummary } from '../../../components/admin/availability/BlockedPeriodList';
 
 const CreatePurchase = () => {
   const { themeColor } = useThemeColor();
@@ -105,9 +106,11 @@ const CreatePurchase = () => {
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<string[]>([]);
   const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   const [partialDayOffs, setPartialDayOffs] = useState<Record<string, PartialClosure[]>>({});
+  const [blockNotes, setBlockNotes] = useState<Record<string, BlockedPeriodSummary[]>>({});
   const partialDayOffDateSet = useMemo(() => new Set(Object.keys(partialDayOffs)), [partialDayOffs]);
   
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
@@ -118,6 +121,7 @@ const CreatePurchase = () => {
   const [eventDate, setEventDate] = useState('');
   const [eventTime, setEventTime] = useState('');
   const [eventSlots, setEventSlots] = useState<string[]>([]);
+  const [eventBlockedSlots, setEventBlockedSlots] = useState<string[]>([]);
   const [eventSlotsLeft, setEventSlotsLeft] = useState<Record<string, number> | null>(null);
   const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
   const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<CreatePurchaseAddOn | null>(null);
@@ -495,6 +499,7 @@ const CreatePurchase = () => {
       if (!selectedAttraction) {
         setDayOffDates(new Set());
         setPartialDayOffs({});
+        setBlockNotes({});
         return;
       }
       const locationId = selectedAttraction.locationId || selectedLocation;
@@ -504,6 +509,7 @@ const CreatePurchase = () => {
         if (response.success && response.data) {
           const blocked = new Set<string>();
           const partial: Record<string, PartialClosure[]> = {};
+          const notes: Record<string, BlockedPeriodSummary[]> = {};
           const now = new Date();
           now.setHours(0, 0, 0, 0);
           const toDateStr = (d: Date) =>
@@ -531,10 +537,23 @@ const CreatePurchase = () => {
               } else {
                 blocked.add(dateStr);
               }
+              if (!notes[dateStr]) notes[dateStr] = [];
+              if (!notes[dateStr].some(note => note.id === dayOff.id)) {
+                notes[dateStr].push({
+                  id: dayOff.id,
+                  date: dateStr,
+                  group_name: dayOff.group_name ?? null,
+                  reason: dayOff.reason ?? null,
+                  window_label: dayOff.window_label ?? 'Blocked',
+                  scope_label: dayOff.scope_label ?? 'Blocked',
+                  set_by: dayOff.set_by ?? null,
+                });
+              }
             });
           });
           setDayOffDates(blocked);
           setPartialDayOffs(partial);
+          setBlockNotes(notes);
         }
       } catch {
       }
@@ -545,6 +564,7 @@ const CreatePurchase = () => {
   useEffect(() => {
     if (!scheduledDate || !selectedAttraction) {
       setAvailableTimeSlots([]);
+      setBlockedTimeSlots([]);
       return;
     }
     const date = new Date(scheduledDate + 'T00:00:00');
@@ -553,15 +573,20 @@ const CreatePurchase = () => {
     const daySlot = availability.find(slot => slot.days.map(d => d.toLowerCase()).includes(dayName));
     if (daySlot) {
       const closures = partialDayOffs[scheduledDate] || [];
-      const slots = generateTimeSlots(daySlot.start_time, daySlot.end_time, 60)
-        .filter(slot => !isSlotBlockedByClosure(slot, addMinutesToTime(slot, 60), closures));
+      const closedAllDay = dayOffDates.has(scheduledDate);
+      const allSlots = generateTimeSlots(daySlot.start_time, daySlot.end_time, 60);
+      const isBlocked = (slot: string) => closedAllDay || isSlotBlockedByClosure(slot, addMinutesToTime(slot, 60), closures);
+      const slots = allSlots.filter(slot => !isBlocked(slot));
+      const blockedSlots = allSlots.filter(isBlocked);
       setAvailableTimeSlots(slots);
-      if (!slots.includes(scheduledTime)) setScheduledTime('');
+      setBlockedTimeSlots(blockedSlots);
+      if (!slots.includes(scheduledTime) && !blockedSlots.includes(scheduledTime)) setScheduledTime('');
     } else {
       setAvailableTimeSlots([]);
+      setBlockedTimeSlots([]);
       setScheduledTime('');
     }
-  }, [scheduledDate, selectedAttraction, partialDayOffs]);
+  }, [scheduledDate, selectedAttraction, partialDayOffs, dayOffDates]);
 
   useEffect(() => {
     if (!scheduledDate || !selectedAttraction?.id) {
@@ -703,7 +728,7 @@ const CreatePurchase = () => {
     }
     let cancelled = false;
     const t = setTimeout(() => {
-      ticketOrderService.quote(items)
+      ticketOrderService.quote(items, true)
         .then(q => { if (!cancelled) setOrderQuote(q); })
         .catch(() => undefined);
     }, 400);
@@ -739,24 +764,26 @@ const CreatePurchase = () => {
     const evDate = eventDate || (evStart > today ? evStart : today);
     if (!selectedEvent?.id || !evDate) {
       setEventSlots([]);
+      setEventBlockedSlots([]);
       setEventSlotsLeft(null);
       setEventTime('');
       return;
     }
     let cancelled = false;
-    eventService.getAvailableTimeSlots(Number(selectedEvent.id), evDate)
+    eventService.getAvailableTimeSlots(Number(selectedEvent.id), evDate, true)
       .then(res => {
         if (cancelled) return;
         setEventSlots(res.time_slots || []);
+        setEventBlockedSlots(res.blocked_time_slots || []);
         setEventSlotsLeft(res.remaining_tickets ?? null);
         setEventTime(prev => {
-          const kept = (res.time_slots || []).includes(prev) ? prev : '';
+          const kept = [...(res.time_slots || []), ...(res.blocked_time_slots || [])].includes(prev) ? prev : '';
           const left = kept && res.remaining_tickets ? res.remaining_tickets[kept] : null;
           if (left != null) setEventQty(q => Math.min(q, Math.max(1, left)));
           return kept;
         });
       })
-      .catch(() => { if (!cancelled) { setEventSlots([]); setEventSlotsLeft(null); } });
+      .catch(() => { if (!cancelled) { setEventSlots([]); setEventBlockedSlots([]); setEventSlotsLeft(null); } });
     return () => { cancelled = true; };
   }, [selectedEvent?.id, eventDate]);
 
@@ -1282,7 +1309,7 @@ const CreatePurchase = () => {
                               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
                             />
                           </div>
-                          {eventSlots.length > 0 && (
+                          {eventSlots.length + eventBlockedSlots.length > 0 && (
                             <div>
                               <label className="block text-xs font-medium text-gray-600 mb-1">Time</label>
                               <select
@@ -1295,12 +1322,15 @@ const CreatePurchase = () => {
                                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
                               >
                                 <option value="">Pick a time…</option>
-                                {eventSlots.map(slot => (
+                                {(eventBlockedSlots.length === 0 ? eventSlots : Array.from(new Set([...eventSlots, ...eventBlockedSlots])).sort()).map(slot => (
                                   <option key={slot} value={slot}>
-                                    {convertTo12Hour(slot)}{eventSlotsLeft?.[slot] != null ? ` — ${eventSlotsLeft[slot]} left` : ''}
+                                    {convertTo12Hour(slot)}{eventSlotsLeft?.[slot] != null ? ` — ${eventSlotsLeft[slot]} left` : ''}{eventBlockedSlots.includes(slot) ? ' — blocked' : ''}
                                   </option>
                                 ))}
                               </select>
+                              {eventBlockedSlots.includes(eventTime) && (
+                                <p className="mt-1 max-w-xs text-xs text-red-700">Inside a blocked period. Guests cannot buy this time online; you will be asked to confirm when you save.</p>
+                              )}
                             </div>
                           )}
                           <div>
@@ -1594,6 +1624,8 @@ const CreatePurchase = () => {
                       scheduledDate={scheduledDate}
                       scheduledTime={scheduledTime}
                       availableTimeSlots={availableTimeSlots}
+                      blockedTimeSlots={blockedTimeSlots}
+                      allowBlockedDates
                       slotRemaining={slotRemaining}
                       onDateSelect={(dateStr) => setScheduledDate(dateStr)}
                       onTimeSelect={(time) => {
@@ -1603,6 +1635,17 @@ const CreatePurchase = () => {
                       }}
                       themeColor={themeColor}
                     />
+                    {scheduledDate && (blockNotes[scheduledDate]?.length ?? 0) > 0 && (
+                      <div className={`mt-3 rounded-lg border px-3 py-2 ${blockedTimeSlots.includes(scheduledTime) ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                        <p className={`text-sm font-semibold ${blockedTimeSlots.includes(scheduledTime) ? 'text-red-800' : 'text-amber-900'}`}>
+                          {blockedTimeSlots.includes(scheduledTime) ? 'The time you picked is inside a blocked period' : 'This date has a blocked period'}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-700">Guests cannot buy these times online. You can still sell them; you will be asked to confirm when you save.</p>
+                        <div className="mt-2">
+                          <BlockedPeriodList compact periods={blockNotes[scheduledDate]} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

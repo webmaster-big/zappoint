@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { readBookingPrefill } from '../../../utils/bookingPrefill';
-import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
+import { AlertTriangle, Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -25,14 +25,21 @@ import customerService from '../../../services/CustomerService';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
+import { orderByClockStart } from '../../../utils/timeSlots';
+import BlockedPeriodList from '../../../components/admin/availability/BlockedPeriodList';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
 import { packagePriceForParticipants, participantLabelFor } from '../../../utils/packagePricing';
 
 interface DayOffWithTime {
+  id?: number;
   date: Date;
   time_start?: string | null;
   time_end?: string | null;
   reason?: string;
+  group_name?: string;
+  window_label?: string;
+  scope_label?: string;
+  set_by?: { name: string } | null;
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
@@ -158,6 +165,8 @@ const OnsiteBooking: React.FC = () => {
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
+  const [blockDetails, setBlockDetails] = useState<DayOffWithTime[]>([]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
@@ -267,7 +276,7 @@ const OnsiteBooking: React.FC = () => {
     return ids.length === 0 ? true : ids.includes(roomId);
   };
 
-  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
+  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string, roomId?: number | null): boolean => {
     if (!bookingData.date || dayOffsWithTime.length === 0 || !selectedPackage) return false;
 
     const selectedDateObj = parseLocalDate(bookingData.date);
@@ -277,13 +286,11 @@ const OnsiteBooking: React.FC = () => {
           dayOff.date.getDate() !== selectedDateObj.getDate()) {
         return false;
       }
-      if (dayOff.package_ids && dayOff.package_ids.length > 0) {
-        return dayOff.package_ids.includes(selectedPackage.id);
-      }
-      if (dayOff.room_ids && dayOff.room_ids.length > 0) {
-        return false;
-      }
-      return true;
+      const targetsPackages = !!dayOff.package_ids?.length;
+      const targetsRooms = !!dayOff.room_ids?.length;
+      if (!targetsPackages && !targetsRooms) return true;
+      return (targetsPackages && dayOff.package_ids!.includes(selectedPackage.id))
+        || (targetsRooms && roomId != null && dayOff.room_ids!.includes(roomId));
     });
 
     if (closures.length === 0) return false;
@@ -313,9 +320,7 @@ const OnsiteBooking: React.FC = () => {
 
   const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? selectedPackage?.minParticipants ?? 1));
 
-  const filteredTimeSlots = availableTimeSlots.filter(slot => 
-    !isTimeSlotRestricted(slot.start_time, slot.end_time)
-  );
+  const filteredTimeSlots = availableTimeSlots;
 
   const packageDurationMinutes = useMemo(() => {
     if (!selectedPackage) return 0;
@@ -351,8 +356,8 @@ const OnsiteBooking: React.FC = () => {
     }
 
     const endTime = `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`;
-
-    if (isTimeSlotRestricted(slotPrefill.time, `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`)) return null;
+    const insideBlock = isTimeSlotRestricted(slotPrefill.time, `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`, slotPrefill.roomId)
+      || blockedTimeSlots.some(slot => slot.start_time === slotPrefill.time);
 
     return {
       start_time: slotPrefill.time,
@@ -360,11 +365,12 @@ const OnsiteBooking: React.FC = () => {
       duration: Number(selectedPackage.duration) || 0,
       duration_unit: selectedPackage.durationUnit || 'hours',
       room_id: slotPrefill.roomId ?? null,
+      blocked: insideBlock,
     };
-  }, [slotPrefill, selectedPackage, bookingData.date, availableTimeSlots, packageDurationMinutes, dayOffsWithTime]);
+  }, [slotPrefill, selectedPackage, bookingData.date, availableTimeSlots, blockedTimeSlots, packageDurationMinutes, dayOffsWithTime]);
 
   /**
-   * Why the start carried over from the schedule could not be kept. walkInSlot bails for five
+   * Why the start carried over from the schedule could not be kept. walkInSlot bails for four
    * different reasons and staff were told the same thing for all of them.
    */
   const walkInBlockedReason = useMemo<string | null>(() => {
@@ -398,17 +404,6 @@ const OnsiteBooking: React.FC = () => {
       }
     }
 
-    // this only ever fires for a package-wide or venue-wide closure; a closure on the room itself is
-    // deliberately ignored here, so do not blame the space
-    if (isTimeSlotRestricted(
-      slotPrefill.time,
-      `${String(Math.floor(endAbsolute / 60))}:${String(endAbsolute % 60).padStart(2, '0')}`
-    )) {
-      return `${selectedPackage.name} is closed for part of ${formatTimeTo12Hour(slotPrefill.time)} to ${formatTimeTo12Hour(
-        `${String(Math.floor((endAbsolute % (24 * 60)) / 60)).padStart(2, '0')}:${String(endAbsolute % 60).padStart(2, '0')}`
-      )}, so that start could not be kept.`;
-    }
-
     return null;
   }, [
     slotPrefill,
@@ -417,7 +412,6 @@ const OnsiteBooking: React.FC = () => {
     bookingData.date,
     availableTimeSlots,
     packageDurationMinutes,
-    dayOffsWithTime,
   ]);
 
   /** A start staff picked from earlier today — availability no longer offers it, so say so plainly. */
@@ -529,13 +523,43 @@ const OnsiteBooking: React.FC = () => {
       .map(slot => formatTimeTo12Hour(slot.start_time));
   }, [bookingData.time, selectedPackage, selectedRoomId, packageDurationMinutes, availableTimeSlots]);
 
-  const displayedTimeSlots = useMemo(
-    () =>
-      (walkInSlots.length > 0 ? [...filteredTimeSlots, ...walkInSlots] : filteredTimeSlots)
-        .slice()
-        .sort((a, b) => a.start_time.localeCompare(b.start_time)),
-    [filteredTimeSlots, walkInSlots]
-  );
+  const bookableStarts = new Set([...filteredTimeSlots, ...walkInSlots].map(slot => slot.start_time));
+  const blockedDisplaySlots: TimeSlot[] = [];
+  [
+    ...blockedTimeSlots,
+  ].forEach(slot => {
+    if (bookableStarts.has(slot.start_time) || blockedDisplaySlots.some(existing => existing.start_time === slot.start_time)) return;
+    blockedDisplaySlots.push({ ...slot, blocked: true });
+  });
+
+  const displayedTimeSlots = orderByClockStart([...filteredTimeSlots, ...walkInSlots, ...blockedDisplaySlots]);
+
+  const selectedSlotIsBlocked = displayedTimeSlots.some(slot => slot.blocked && slot.start_time === bookingData.time);
+
+  const blocksOnSelectedDate = useMemo(() => {
+    if (!bookingData.date || !selectedPackage) return [];
+    const selectedDay = parseLocalDate(bookingData.date).toDateString();
+    const packageRoomIds = (selectedPackage.rooms ?? [])
+      .map(room => (typeof room === 'object' && room !== null ? Number((room as OnsiteBookingRoom).id) : NaN))
+      .filter(id => Number.isInteger(id));
+    const seen = new Set<number>();
+
+    return blockDetails.filter(block => {
+      if (block.date.toDateString() !== selectedDay) return false;
+      const appliesToPackage = block.package_ids && block.package_ids.length > 0
+        ? block.package_ids.includes(selectedPackage.id)
+        : false;
+      const appliesToRoom = block.room_ids && block.room_ids.length > 0
+        ? block.room_ids.some(roomId => (selectedRoomId ? roomId === selectedRoomId : packageRoomIds.includes(roomId)))
+        : false;
+      const locationWide = !(block.package_ids?.length) && !(block.room_ids?.length);
+      if (!locationWide && !appliesToPackage && !appliesToRoom) return false;
+      const key = block.id ?? -1;
+      if (key !== -1 && seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [blockDetails, bookingData.date, selectedPackage, selectedRoomId]);
 
 
   useEffect(() => {
@@ -954,9 +978,14 @@ const OnsiteBooking: React.FC = () => {
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
             const dayOffData = {
+              id: dayOff.id,
               time_start: hasTimeRestriction ? dayOff.time_start : null,
               time_end: hasTimeRestriction ? dayOff.time_end : null,
               reason: dayOff.reason,
+              group_name: dayOff.group_name,
+              window_label: dayOff.window_label,
+              scope_label: dayOff.scope_label,
+              set_by: dayOff.set_by ?? null,
               package_ids: dayOff.package_ids || null,
               room_ids: dayOff.room_ids || null
             };
@@ -986,6 +1015,7 @@ const OnsiteBooking: React.FC = () => {
           
           setDayOffs(fullDayOffDates);
           setDayOffsWithTime(partialOrSpecificDayOffs);
+          setBlockDetails(allDayOffs);
           console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full location-wide days,', partialOrSpecificDayOffs.length, 'partial/resource-specific days');
         }
       } catch (error) {
@@ -999,6 +1029,7 @@ const OnsiteBooking: React.FC = () => {
   useEffect(() => {
     if (!selectedPackage || !bookingData.date) {
       setAvailableTimeSlots([]);
+      setBlockedTimeSlots([]);
       return;
     }
     
@@ -1013,6 +1044,7 @@ const OnsiteBooking: React.FC = () => {
     const eventSource = timeSlotService.getAvailableSlotsSSE({
       package_id: selectedPackage.id,
       date: bookingData.date,
+      include_blocked: true,
     });
     
     let isFirstUpdate = true;
@@ -1028,7 +1060,9 @@ const OnsiteBooking: React.FC = () => {
           booked_slots: data.booked_slots,
         });
         
-        setAvailableTimeSlots(data.available_slots);
+        const slots: TimeSlot[] = Array.isArray(data.available_slots) ? data.available_slots : [];
+        setAvailableTimeSlots(slots.filter(slot => !slot.blocked));
+        setBlockedTimeSlots(slots.filter(slot => slot.blocked));
         setLoadingTimeSlots(false);
         slotsAnsweredFor.current = `${selectedPackage.id}|${bookingData.date}`;
         
@@ -1187,7 +1221,7 @@ const OnsiteBooking: React.FC = () => {
       applyDateTimeRoom();
       if (slotPrefill.date || slotPrefill.time) {
         setToast({
-          message: 'Date and time carried over — choose the package to continue.',
+          message: slotPrefill.time ? 'Date and time carried over — choose the package to continue.' : 'Date carried over — choose the package to continue.',
           type: 'info',
         });
       }
@@ -1202,7 +1236,8 @@ const OnsiteBooking: React.FC = () => {
 
     prefillTimeChecked.current = true;
 
-    const serverSlot = availableTimeSlots.find(slot => slot.start_time === slotPrefill.time);
+    const serverSlot = availableTimeSlots.find(slot => slot.start_time === slotPrefill.time)
+      ?? blockedTimeSlots.find(slot => slot.start_time === slotPrefill.time);
     if (serverSlot) {
       // keep the space the user actually clicked on the schedule whenever it is free at this
       // time; the slot only names one of possibly several free spaces
@@ -1225,6 +1260,11 @@ const OnsiteBooking: React.FC = () => {
       if (clicked != null && !clickedIsFree) {
         setToast({
           message: 'That space is taken at this time — the booking moved to the next free one.',
+          type: 'info',
+        });
+      } else if (serverSlot.blocked) {
+        setToast({
+          message: `${formatTimeTo12Hour(serverSlot.start_time)} is inside a blocked period — you will be asked to confirm when you save.`,
           type: 'info',
         });
       }
@@ -1254,7 +1294,7 @@ const OnsiteBooking: React.FC = () => {
         'That start time is no longer offered for this package — pick another below.',
       type: walkInBlockedReason ? 'error' : 'info',
     });
-  }, [availableTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, walkInOverlapMinutes, walkInBlockedReason, bookingData.date, selectedPackage]);
+  }, [availableTimeSlots, blockedTimeSlots, loadingTimeSlots, slotPrefill.time, walkInSlot, walkInOverlapMinutes, walkInBlockedReason, bookingData.date, selectedPackage]);
 
   const handleAttractionToggle = (attractionId: string) => {
     setBookingData(prev => {
@@ -2549,6 +2589,7 @@ const OnsiteBooking: React.FC = () => {
               }
               dayOffs={filteredDayOffs}
               dayOffsWithTime={filteredDayOffsWithTime}
+              allowBlockedDates
             />
           </div>
 
@@ -2652,6 +2693,33 @@ const OnsiteBooking: React.FC = () => {
               </span>
             </div>
           )}
+          {blocksOnSelectedDate.length > 0 && (
+            <div className={`mb-3 rounded-lg border px-3 py-2 ${selectedSlotIsBlocked ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+              <p className={`flex items-center gap-1.5 text-sm font-semibold ${selectedSlotIsBlocked ? 'text-red-800' : 'text-amber-900'}`}>
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {selectedSlotIsBlocked
+                  ? 'The time you picked is inside a blocked period'
+                  : 'This date has a blocked period'}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-700">
+                Guests cannot book these times online. You can still book them; you will be asked to confirm when you save.
+              </p>
+              <div className="mt-2">
+                <BlockedPeriodList
+                  compact
+                  periods={blocksOnSelectedDate.map(block => ({
+                    id: block.id ?? 0,
+                    date: bookingData.date,
+                    group_name: block.group_name ?? null,
+                    reason: block.reason ?? null,
+                    window_label: block.window_label ?? 'Blocked',
+                    scope_label: block.scope_label ?? 'Blocked',
+                    set_by: block.set_by ?? null,
+                  }))}
+                />
+              </div>
+            </div>
+          )}
           {loadingTimeSlots ? (
             <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg">
               <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
@@ -2663,10 +2731,15 @@ const OnsiteBooking: React.FC = () => {
                 displayedTimeSlots.map((slot) => (
                   <label 
                     key={slot.start_time} 
+                    title={slot.blocked ? 'Inside a blocked period — guests cannot book this time online' : undefined}
                     className={`flex flex-col p-3 rounded-lg border-2 cursor-pointer transition-all ${
                       bookingData.time === slot.start_time 
-                        ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
-                        : `border-gray-200 hover:border-${themeColor}-300 hover:bg-gray-50`
+                        ? slot.blocked
+                          ? 'border-red-500 bg-red-50 shadow-sm'
+                          : `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
+                        : slot.blocked
+                          ? 'border-dashed border-red-200 bg-red-50/40 hover:border-red-300'
+                          : `border-gray-200 hover:border-${themeColor}-300 hover:bg-gray-50`
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -2679,7 +2752,9 @@ const OnsiteBooking: React.FC = () => {
                         className={`accent-${fullColor} w-4 h-4`}
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
-                      {isWalkInStart(slot.start_time) ? (
+                      {slot.blocked ? (
+                        <span className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-800">Blocked</span>
+                      ) : isWalkInStart(slot.start_time) ? (
                         <span
                           className={`ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${
                             walkInOverlapMinutes > 0 ? 'bg-rose-200 text-rose-900' : 'bg-amber-100 text-amber-800'

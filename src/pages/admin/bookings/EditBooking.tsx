@@ -108,6 +108,7 @@ const EditBooking: React.FC = () => {
 
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
@@ -604,38 +605,50 @@ const EditBooking: React.FC = () => {
 
   // the package's advance booking notice is a rule for CUSTOMERS booking online; staff working
   // the desk are not held to it, so it never thins the admin list
-  const filteredTimeSlots = availableTimeSlots.filter(
-    slot => !isTimeSlotRestricted(slot.start_time, slot.end_time)
-  );
+  const filteredTimeSlots = availableTimeSlots;
 
   /**
    * Availability no longer offers starts that have already passed, so a booking being edited later
    * the same day would lose its own time from the list. Keep it selectable and clearly marked.
    */
   const displayedTimeSlots: TimeSlot[] = (() => {
-    if (!formData.time) return filteredTimeSlots;
-    if (filteredTimeSlots.some(slot => slot.start_time === formData.time)) return filteredTimeSlots;
-    if (originalBooking?.booking_time?.slice(0, 5) !== formData.time) return filteredTimeSlots;
-    if (originalBooking?.booking_date?.split('T')[0] !== formData.date) return filteredTimeSlots;
+    const listed: TimeSlot[] = [...filteredTimeSlots];
+    const isListed = (start: string) => listed.some(slot => slot.start_time === start);
 
-    const unit = originalBooking.duration_unit || 'hours';
-    const raw = Number(originalBooking.duration) || 0;
-    const durationMinutes = unit === 'minutes' ? Math.round(raw) : Math.round(raw * 60);
-    const [startHours, startMinutes] = formData.time.split(':').map(Number);
-    const endTotal = (startHours * 60 + startMinutes + durationMinutes) % (24 * 60);
+    [
+      ...blockedTimeSlots,
+    ].forEach(slot => {
+      if (!isListed(slot.start_time)) listed.push({ ...slot, blocked: true });
+    });
 
-    const current: TimeSlot = {
-      start_time: formData.time,
-      end_time: `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`,
-      duration: raw,
-      duration_unit: unit,
-      room_id: originalBooking.room_id ?? null,
-    };
+    if (
+      formData.time &&
+      !isListed(formData.time) &&
+      originalBooking &&
+      originalBooking.booking_time?.slice(0, 5) === formData.time &&
+      originalBooking.booking_date?.split('T')[0] === formData.date
+    ) {
+      const unit = originalBooking.duration_unit || 'hours';
+      const raw = Number(originalBooking.duration) || 0;
+      const durationMinutes = unit === 'minutes' ? Math.round(raw) : Math.round(raw * 60);
+      const [startHours, startMinutes] = formData.time.split(':').map(Number);
+      const endTotal = (startHours * 60 + startMinutes + durationMinutes) % (24 * 60);
 
-    if (isTimeSlotRestricted(current.start_time, current.end_time)) return filteredTimeSlots;
+      const current: TimeSlot = {
+        start_time: formData.time,
+        end_time: `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`,
+        duration: raw,
+        duration_unit: unit,
+        room_id: originalBooking.room_id ?? null,
+      };
 
-    return [current, ...filteredTimeSlots].sort((a, b) => a.start_time.localeCompare(b.start_time));
+      listed.push(isTimeSlotRestricted(current.start_time, current.end_time) ? { ...current, blocked: true } : current);
+    }
+
+    return listed.sort((a, b) => a.start_time.localeCompare(b.start_time));
   })();
+
+  const selectedSlotIsBlocked = displayedTimeSlots.some(slot => slot.blocked && slot.start_time === formData.time);
 
   const getWeekOfMonth = (date: Date): number => {
     const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -725,6 +738,7 @@ const EditBooking: React.FC = () => {
   useEffect(() => {
     if (!packageDetails || !formData.date) {
       setAvailableTimeSlots([]);
+      setBlockedTimeSlots([]);
       return;
     }
 
@@ -733,12 +747,15 @@ const EditBooking: React.FC = () => {
     const eventSource = timeSlotService.getAvailableSlotsSSE({
       package_id: packageDetails.id,
       date: formData.date,
+      include_blocked: true,
     });
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        setAvailableTimeSlots(data.available_slots);
+        const slots: TimeSlot[] = Array.isArray(data.available_slots) ? data.available_slots : [];
+        setAvailableTimeSlots(slots.filter(slot => !slot.blocked));
+        setBlockedTimeSlots(slots.filter(slot => slot.blocked));
         setLoadingTimeSlots(false);
       } catch {
       }
@@ -1176,9 +1193,11 @@ const EditBooking: React.FC = () => {
                       onChange={(date) => {
                         setFormData(prev => ({ ...prev, date, time: '' }));
                         setAvailableTimeSlots([]);
+                        setBlockedTimeSlots([]);
                       }}
                       dayOffs={dayOffs}
                       dayOffsWithTime={filteredDayOffsWithTime}
+                      allowBlockedDates
                     />
                   ) : (
                     <input
@@ -1206,10 +1225,15 @@ const EditBooking: React.FC = () => {
                       {displayedTimeSlots.map((slot) => (
                         <label
                           key={slot.start_time}
+                          title={slot.blocked ? 'Inside a blocked period — guests cannot book this time online' : undefined}
                           className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
                             formData.time === slot.start_time
-                              ? `border-${themeColor}-600 bg-${themeColor}-50`
-                              : 'border-gray-300 bg-white hover:border-gray-400'
+                              ? slot.blocked
+                                ? 'border-red-500 bg-red-50'
+                                : `border-${themeColor}-600 bg-${themeColor}-50`
+                              : slot.blocked
+                                ? 'border-dashed border-red-200 bg-red-50/40 hover:border-red-300'
+                                : 'border-gray-300 bg-white hover:border-gray-400'
                           }`}
                         >
                           <input
@@ -1230,6 +1254,9 @@ const EditBooking: React.FC = () => {
                             <span className="text-sm text-gray-800">{formatTimeTo12Hour(slot.start_time)}</span>
                             <span className="text-xs text-gray-500">{formatTimeTo12Hour(slot.end_time)}</span>
                           </div>
+                          {slot.blocked && (
+                            <span className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-800">Blocked</span>
+                          )}
                         </label>
                       ))}
                     </div>
@@ -1239,6 +1266,11 @@ const EditBooking: React.FC = () => {
                   {formData.time && (
                     <p className="text-xs text-gray-500 mt-2">
                       Selected: <span className="font-medium text-gray-700">{formatTimeTo12Hour(formData.time)}</span>
+                    </p>
+                  )}
+                  {selectedSlotIsBlocked && (
+                    <p className="text-xs text-red-700 mt-1">
+                      This time is inside a blocked period. Guests cannot book it online; if you move the booking here you will be asked to confirm when you save.
                     </p>
                   )}
                 </div>

@@ -39,6 +39,8 @@ import { buildAppliedDiscounts } from '../../../utils/discounts';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomFieldChecks from '../../../components/customer/CustomFieldChecks';
+import BlockedPeriodList, { type BlockedPeriodSummary } from '../../../components/admin/availability/BlockedPeriodList';
+import { dayOffService } from '../../../services/DayOffService';
 import customFieldService, {
   pruneCustomFieldAnswers,
   firstMissingRequired,
@@ -62,8 +64,12 @@ const OnsitePurchaseEvent = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [blockNotes, setBlockNotes] = useState<Record<string, BlockedPeriodSummary[]>>({});
   const [selectedDate, setSelectedDate] = useState('');
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<string[]>([]);
+  const notesForEventRef = useRef<number | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotRemaining, setSlotRemaining] = useState<Record<string, number> | null>(null);
@@ -193,6 +199,9 @@ const OnsitePurchaseEvent = () => {
     setSelectedDate('');
     setSelectedTime('');
     setTimeSlots([]);
+    setBlockedTimeSlots([]);
+    setBlockedDates([]);
+    setBlockNotes({});
     setQuantity(1);
     setDiscount(0);
     setSelectedAddOns({});
@@ -200,11 +209,15 @@ const OnsitePurchaseEvent = () => {
     setFeeBreakdown(null);
     setSpecialPricingBreakdown(null);
     try {
-      const dateRes = await eventService.getAvailableDates(ev.id);
-      setAvailableDates(dateRes.dates || []);
-      if (ev.date_type === 'one_time' && dateRes.dates?.length === 1) {
-        setSelectedDate(dateRes.dates[0]);
+      const dateRes = await eventService.getAvailableDates(ev.id, true);
+      const openDates = dateRes.dates || [];
+      const closedDates = dateRes.blocked_dates || [];
+      setAvailableDates(openDates);
+      setBlockedDates(closedDates);
+      if (ev.date_type === 'one_time' && openDates.length + closedDates.length === 1) {
+        setSelectedDate(openDates[0] ?? closedDates[0]);
       }
+      loadBlockNotes(ev);
     } catch {
       setToast({ message: 'Failed to load available dates', type: 'error' });
     } finally {
@@ -218,7 +231,11 @@ const OnsitePurchaseEvent = () => {
     setSelectedDate('');
     setSelectedTime('');
     setTimeSlots([]);
+    setBlockedTimeSlots([]);
     setAvailableDates([]);
+    setBlockedDates([]);
+    setBlockNotes({});
+    notesForEventRef.current = null;
     setQuantity(1);
     setDiscount(0);
     setSelectedAddOns({});
@@ -226,16 +243,56 @@ const OnsitePurchaseEvent = () => {
     setSpecialPricingBreakdown(null);
   };
 
+  const loadBlockNotes = async (ev: Event) => {
+    notesForEventRef.current = Number(ev.id);
+    if (!ev.location_id) return;
+    try {
+      const response = await dayOffService.getDayOffsByLocation(Number(ev.location_id));
+      if (notesForEventRef.current !== Number(ev.id)) return;
+      const notes: Record<string, BlockedPeriodSummary[]> = {};
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      (response.data || []).forEach(dayOff => {
+        const locationWide = !dayOff.package_ids?.length && !dayOff.room_ids?.length && !dayOff.attraction_ids?.length && !dayOff.event_ids?.length;
+        if (!locationWide && !dayOff.event_ids?.includes(Number(ev.id))) return;
+        const base = new Date(dayOff.date.split('T')[0] + 'T00:00:00');
+        const dates = dayOff.is_recurring
+          ? [new Date(today.getFullYear(), base.getMonth(), base.getDate()), new Date(today.getFullYear() + 1, base.getMonth(), base.getDate())]
+          : [base];
+        dates.filter(d => d >= today && d.getMonth() === base.getMonth() && d.getDate() === base.getDate()).forEach(d => {
+          const dateKey = key(d);
+          if (!notes[dateKey]) notes[dateKey] = [];
+          if (notes[dateKey].some(note => note.id === dayOff.id)) return;
+          notes[dateKey].push({
+            id: dayOff.id,
+            date: dateKey,
+            group_name: dayOff.group_name ?? null,
+            reason: dayOff.reason ?? null,
+            window_label: dayOff.window_label ?? 'Blocked',
+            scope_label: dayOff.scope_label ?? 'Blocked',
+            set_by: dayOff.set_by ?? null,
+          });
+        });
+      });
+      setBlockNotes(notes);
+    } catch {
+      if (notesForEventRef.current === Number(ev.id)) setBlockNotes({});
+    }
+  };
+
   const loadTimeSlots = async (date: string) => {
     if (!event) return;
     setLoadingSlots(true);
     try {
-      const res = await eventService.getAvailableTimeSlots(event.id, date);
+      const res = await eventService.getAvailableTimeSlots(event.id, date, true);
       setTimeSlots(res.time_slots || []);
+      setBlockedTimeSlots(res.blocked_time_slots || []);
       setSlotRemaining(res.remaining_tickets ?? null);
       setSelectedTime('');
     } catch {
       setTimeSlots([]);
+      setBlockedTimeSlots([]);
       setSlotRemaining(null);
     } finally {
       setLoadingSlots(false);
@@ -949,9 +1006,10 @@ const OnsitePurchaseEvent = () => {
                         required
                       >
                         <option value="">Select a date...</option>
-                        {availableDates.map(d => (
+                        {Array.from(new Set([...availableDates, ...blockedDates])).sort().map(d => (
                           <option key={d} value={d}>
                             {new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                            {blockedDates.includes(d) ? ' — blocked' : ''}
                           </option>
                         ))}
                       </select>
@@ -966,29 +1024,38 @@ const OnsitePurchaseEvent = () => {
                           <div className={`w-4 h-4 border-2 border-gray-200 border-t-${themeColor}-500 rounded-full animate-spin`} />
                           Loading time slots...
                         </div>
-                      ) : timeSlots.length === 0 ? (
+                      ) : timeSlots.length + blockedTimeSlots.length === 0 ? (
                         <p className="text-sm text-gray-400">No available time slots for this date.</p>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                          {timeSlots.map(slot => {
+                          {(blockedTimeSlots.length === 0 ? timeSlots : Array.from(new Set([...timeSlots, ...blockedTimeSlots])).sort()).map(slot => {
                             const left = slotRemaining?.[slot];
                             const soldOut = left != null && left <= 0;
+                            const blocked = blockedTimeSlots.includes(slot);
                             return (
                             <button
                               key={slot}
                               type="button"
                               disabled={soldOut}
+                              title={blocked ? 'Inside a blocked period — guests cannot buy this time online' : undefined}
                               onClick={() => {
                                 setSelectedTime(slot);
                                 if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
                               }}
                               className={`px-3 py-2 text-sm rounded-lg border transition disabled:opacity-50 disabled:cursor-not-allowed ${
                                 selectedTime === slot
-                                  ? `bg-${themeColor}-600 text-white border-${themeColor}-600`
-                                  : `bg-white text-gray-700 border-gray-200 hover:border-${themeColor}-400`
+                                  ? blocked
+                                    ? 'bg-red-600 text-white border-red-600'
+                                    : `bg-${themeColor}-600 text-white border-${themeColor}-600`
+                                  : blocked
+                                    ? 'bg-red-50 text-red-800 border-dashed border-red-200 hover:border-red-300'
+                                    : `bg-white text-gray-700 border-gray-200 hover:border-${themeColor}-400`
                               }`}
                             >
                               {formatTime(slot)}
+                              {blocked && (
+                                <span className={`block text-[10px] font-semibold ${selectedTime === slot ? 'text-white/80' : 'text-red-700'}`}>Blocked</span>
+                              )}
                               {left != null && (
                                 <span className={`block text-[10px] font-semibold ${selectedTime === slot ? 'text-white/80' : soldOut ? 'text-red-600' : 'text-emerald-600'}`}>{soldOut ? 'Sold out' : `${left} left`}</span>
                               )}
@@ -997,6 +1064,18 @@ const OnsitePurchaseEvent = () => {
                           })}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {selectedDate && (blockNotes[selectedDate.substring(0, 10)]?.length ?? 0) > 0 && (
+                    <div className={`rounded-lg border px-3 py-2 ${blockedTimeSlots.includes(selectedTime) || blockedDates.includes(selectedDate) ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <p className={`text-sm font-semibold ${blockedTimeSlots.includes(selectedTime) || blockedDates.includes(selectedDate) ? 'text-red-800' : 'text-amber-900'}`}>
+                        {blockedTimeSlots.includes(selectedTime) || blockedDates.includes(selectedDate) ? 'This time is inside a blocked period' : 'This date has a blocked period'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-700">Guests cannot buy these times online. You can still sell them; you will be asked to confirm when you save.</p>
+                      <div className="mt-2">
+                        <BlockedPeriodList compact periods={blockNotes[selectedDate.substring(0, 10)]} />
+                      </div>
                     </div>
                   )}
                 </div>

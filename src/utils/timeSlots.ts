@@ -43,3 +43,36 @@ export function scheduleWindowMinutes(startTime: string, endTime: string): numbe
 }
 
 export const DEFAULT_SLOT_CLEANUP_MINUTES = 15;
+
+const AFTER_MIDNIGHT_LIMIT = 6 * 60;
+
+const slotMinutes = (slot: string): number => {
+  const [hours, minutes] = slot.split(':').map(Number);
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+};
+
+export function orderClockSlots(slots: string[]): string[] {
+  const sorted = Array.from(new Set(slots)).sort();
+  if (sorted.length < 2) return sorted;
+
+  const minutes = sorted.map(slotMinutes);
+  let widestGap = minutes[0] + MINUTES_PER_DAY - minutes[minutes.length - 1];
+  let startIndex = 0;
+
+  for (let index = 1; index < minutes.length; index++) {
+    const gap = minutes[index] - minutes[index - 1];
+    if (gap > widestGap) {
+      widestGap = gap;
+      startIndex = index;
+    }
+  }
+
+  if (startIndex === 0 || minutes[startIndex - 1] >= AFTER_MIDNIGHT_LIMIT) return sorted;
+
+  return [...sorted.slice(startIndex), ...sorted.slice(0, startIndex)];
+}
+
+export function orderByClockStart<T extends { start_time: string }>(slots: T[]): T[] {
+  const rank = new Map(orderClockSlots(slots.map(slot => slot.start_time)).map((time, index) => [time, index]));
+  return [...slots].sort((a, b) => (rank.get(a.start_time) ?? 0) - (rank.get(b.start_time) ?? 0));
+}

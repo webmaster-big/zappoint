@@ -1074,7 +1074,7 @@ const Bookings: React.FC = () => {
       logBookingActivity(booking, 'Booking Status Update', `Status changed to ${newStatus}`);
     } catch (error) {
       console.error('Error updating booking status:', error);
-      alert('Failed to update booking status. Please try again.');
+      alert((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update booking status. Please try again.');
     } finally {
       setSavingStatusBookingId(null);
     }
@@ -1221,7 +1221,7 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating package:', error);
-      alert('Failed to update package. Please try again.');
+      alert((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update package. Please try again.');
     } finally {
       setSavingPackage(false);
     }
@@ -1313,7 +1313,7 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating room:', error);
-      alert('Failed to update room. Please try again.');
+      alert((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update room. Please try again.');
     } finally {
       setSavingRoom(false);
     }
@@ -1650,8 +1650,10 @@ const Bookings: React.FC = () => {
 
       handleCloseLocationModal();
     } catch (error) {
-      const axiosError = error as { response?: { status?: number; data?: { conflicts?: Array<{ type: string; message: string }> } } };
-      if (axiosError?.response?.status === 409) {
+      const axiosError = error as { response?: { status?: number; data?: { code?: string; message?: string; conflicts?: Array<{ type: string; message: string }> } } };
+      if (axiosError?.response?.status === 409 && axiosError.response.data?.code === 'BLOCKED_PERIOD') {
+        alert(axiosError.response.data.message || 'Not saved: that time is inside a blocked period.');
+      } else if (axiosError?.response?.status === 409) {
         setLocationConflicts(axiosError.response.data?.conflicts || []);
       } else {
         console.error('Error updating location:', error);
@@ -2504,7 +2506,7 @@ const Bookings: React.FC = () => {
       let thanksSent = 0;
       let reviewsScheduled = 0;
       let heldForDate = 0;
-      await Promise.all(
+      const results = await Promise.allSettled(
         selectedBookings.map(async (id) => {
           let response;
           if (newStatus === 'checked-in') {
@@ -2522,8 +2524,13 @@ const Bookings: React.FC = () => {
           if (followUp?.thanks.some((row) => row.sent_in_this_action)) thanksSent++;
           if (followUp?.reviews.some((row) => row.status === 'scheduled')) reviewsScheduled++;
           if (followUp?.thanks.some((row) => row.reason === 'visit_date')) heldForDate++;
+          return id;
         })
       );
+      const succeeded = results
+        .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled')
+        .map(result => result.value);
+      const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
 
       if (newStatus === 'completed' && (thanksSent > 0 || reviewsScheduled > 0 || heldForDate > 0)) {
         setFollowUpNotice(
@@ -2533,10 +2540,15 @@ const Bookings: React.FC = () => {
       }
       
       const updatedBookings = bookings.map(booking =>
-        selectedBookings.includes(booking.id) ? { ...booking, status: newStatus } : booking
+        succeeded.includes(booking.id) ? { ...booking, status: newStatus } : booking
       );
       setBookings(updatedBookings);
-      setSelectedBookings([]);
+      setSelectedBookings(prev => prev.filter(id => !succeeded.includes(id)));
+
+      if (failures.length > 0) {
+        const reason = (failures[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        alert(`${failures.length} of ${selectedBookings.length} ${selectedBookings.length === 1 ? 'booking was' : 'bookings were'} not updated.${reason ? ` ${reason}` : ''}`);
+      }
     } catch (error) {
       console.error('Error updating booking statuses:', error);
       alert('Failed to update some bookings. Please try again.');

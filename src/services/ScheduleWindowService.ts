@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import type { AvailabilityBlock } from './DayOffService';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -60,6 +61,7 @@ export interface ScheduleDayWindow {
   interval_minutes: number;
   has_schedule: boolean;
   location_closed: boolean;
+  blocked_periods?: AvailabilityBlock[];
   rooms: ScheduleRoomWindow[];
   packages: SchedulePackageWindow[];
 }

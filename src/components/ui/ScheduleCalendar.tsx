@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Clock, CheckCircle } from 'lucide-react';
+import { orderClockSlots } from '../../utils/timeSlots';
 
 interface AvailabilitySlot {
   days: string[];
@@ -19,6 +20,8 @@ interface ScheduleCalendarProps {
   onTimeSelect: (time: string) => void;
   themeColor?: string;
   compact?: boolean; // For admin panels with less space
+  allowBlockedDates?: boolean;
+  blockedTimeSlots?: string[];
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -43,6 +46,8 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   onTimeSelect,
   themeColor = 'blue',
   compact = false,
+  allowBlockedDates = false,
+  blockedTimeSlots = [],
 }) => {
   const today = useMemo(() => {
     const d = new Date();
@@ -74,10 +79,10 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
       const dayName = DAY_NUMBER_TO_NAME[date.getDay()];
       if (availableDayNames.size > 0 && !availableDayNames.has(dayName)) return false;
       const dateStr = formatDateStr(date);
-      if (dayOffDates.has(dateStr)) return false;
+      if (dayOffDates.has(dateStr) && !allowBlockedDates) return false;
       return true;
     };
-  }, [today, availableDayNames, dayOffDates]);
+  }, [today, availableDayNames, dayOffDates, allowBlockedDates]);
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
@@ -144,6 +149,13 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
     });
     return indices;
   }, [availableDayNames]);
+
+  const shownTimeSlots = useMemo(
+    () => (blockedTimeSlots.length === 0
+      ? availableTimeSlots
+      : orderClockSlots([...availableTimeSlots, ...blockedTimeSlots])),
+    [availableTimeSlots, blockedTimeSlots]
+  );
 
   const availableDaysDisplay = useMemo(() => {
     return [...availableDayNames].map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ');
@@ -217,6 +229,8 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
               className={`aspect-square flex flex-col items-center justify-center rounded-lg font-medium transition-all relative
                 ${day.isSelected
                   ? `bg-${themeColor}-600 text-white shadow-md ring-2 ring-${themeColor}-200`
+                  : day.isDayOff
+                  ? 'text-red-700 bg-red-50 ring-1 ring-red-200 hover:bg-red-100'
                   : day.isPartialDayOff
                   ? 'text-amber-800 bg-amber-50 ring-1 ring-amber-200 hover:bg-amber-100'
                   : day.isToday
@@ -224,11 +238,11 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
                   : `text-gray-800 bg-${themeColor}-50/60 hover:bg-${themeColor}-100 hover:shadow-sm`
                 }
                 text-[11px]`}
-              title={day.isPartialDayOff ? 'Limited hours — some times unavailable' : day.isToday ? 'Today' : undefined}
+              title={day.isDayOff ? 'Blocked all day — guests cannot book; you will be asked to confirm' : day.isPartialDayOff ? 'Limited hours — some times unavailable' : day.isToday ? 'Today' : undefined}
             >
               {dateNum}
               {!day.isSelected && (
-                <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${day.isPartialDayOff ? 'bg-amber-500' : day.isToday ? `bg-${themeColor}-600` : `bg-${themeColor}-400`}`} />
+                <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${day.isDayOff ? 'bg-red-500' : day.isPartialDayOff ? 'bg-amber-500' : day.isToday ? `bg-${themeColor}-600` : `bg-${themeColor}-400`}`} />
               )}
             </button>
           );
@@ -273,24 +287,33 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
             <p className="text-xs">Select a date to see available times</p>
           </div>
         </div>
-      ) : availableTimeSlots.length > 0 ? (
+      ) : shownTimeSlots.length > 0 ? (
         <div className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'} gap-1.5`}>
-          {availableTimeSlots.map((time) => {
+          {shownTimeSlots.map((time) => {
             const left = slotRemaining ? (slotRemaining[time] ?? slotRemaining['__cap']) : null;
             const soldOut = left != null && left <= 0;
+            const blocked = blockedTimeSlots.includes(time);
             return (
             <button
               key={time}
               type="button"
               disabled={soldOut}
               onClick={() => onTimeSelect(time)}
+              title={blocked ? 'Inside a blocked period — guests cannot book this time online' : undefined}
               className={`px-2 py-2.5 text-xs rounded-lg font-medium transition-all border disabled:opacity-50 disabled:cursor-not-allowed
                 ${scheduledTime === time
-                  ? `bg-${themeColor}-600 text-white border-${themeColor}-600 shadow-sm`
+                  ? blocked
+                    ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                    : `bg-${themeColor}-600 text-white border-${themeColor}-600 shadow-sm`
+                  : blocked
+                  ? 'bg-red-50 text-red-800 border-dashed border-red-200 hover:border-red-300'
                   : `bg-white text-gray-700 border-gray-200 hover:border-${themeColor}-300 hover:bg-${themeColor}-50`
                 }`}
             >
               {formatTime12Hour(time)}
+              {blocked && (
+                <span className={`block text-[10px] font-semibold ${scheduledTime === time ? 'text-white/80' : 'text-red-700'}`}>Blocked</span>
+              )}
               {left != null && (
                 <span className={`block text-[10px] font-semibold ${scheduledTime === time ? 'text-white/80' : soldOut ? 'text-red-600' : left <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
                   {soldOut ? 'Sold out' : `${left} left`}

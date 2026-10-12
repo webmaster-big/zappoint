@@ -121,13 +121,17 @@ class EventService {
     return { success: false, data: null as unknown as Event, message: 'Event not found' };
   }
 
-  async getAvailableDates(eventId: number): Promise<{ dates: string[] }> {
-    const response = await api.get(`/events/${eventId}/available-dates`);
+  async getAvailableDates(eventId: number, includeBlocked = false): Promise<{ dates: string[]; blocked_dates?: string[] }> {
+    const response = await api.get(`/events/${eventId}/available-dates`, {
+      params: includeBlocked ? { include_blocked: 1 } : undefined,
+    });
     return response.data;
   }
 
-  async getAvailableTimeSlots(eventId: number, date: string): Promise<{ date: string; time_slots: string[]; remaining_tickets?: Record<string, number> | null }> {
-    const response = await api.get(`/events/${eventId}/available-time-slots/${date}`);
+  async getAvailableTimeSlots(eventId: number, date: string, includeBlocked = false): Promise<{ date: string; time_slots: string[]; blocked_time_slots?: string[]; remaining_tickets?: Record<string, number> | null }> {
+    const response = await api.get(`/events/${eventId}/available-time-slots/${date}`, {
+      params: includeBlocked ? { include_blocked: 1 } : undefined,
+    });
     return response.data;
   }
 }

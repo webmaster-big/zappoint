@@ -22,6 +22,7 @@ interface DatePickerProps {
   breakTimes?: BreakTime[]; // Optional break times to show which days have breaks
   dayOffs?: Date[]; // Optional day offs (holidays, blocked dates) - full day only (legacy)
   dayOffsWithTime?: DayOffInfo[]; // Day offs with partial closure support
+  allowBlockedDates?: boolean;
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({
@@ -30,7 +31,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
   onChange,
   breakTimes = [],
   dayOffs = [],
-  dayOffsWithTime = []
+  dayOffsWithTime = [],
+  allowBlockedDates = false
 }) => {
   const [currentMonth, setCurrentMonth] = useState<Date>(
     selectedDate ? new Date(selectedDate) : new Date()
@@ -160,14 +162,17 @@ const DatePicker: React.FC<DatePickerProps> = ({
       const hasBreak = hasBreakTime(date);
       const breakInfo = getBreakTimeInfo(date);
 
-      const isDisabled = !available || isPast || isFullOff;
+      const isDisabled = !available || isPast || (isFullOff && !allowBlockedDates);
       
       const showFullDayOff = available && isFullOff;
+      const blockedButSelectable = showFullDayOff && allowBlockedDates && !isPast;
       const showPartialOff = available && partialOff && !isFullOff;
       const showBreak = available && hasBreak && !isFullOff && !partialOff;
 
       let tooltip: string | undefined;
-      if (showFullDayOff) {
+      if (blockedButSelectable) {
+        tooltip = 'Blocked all day — guests cannot book; you will be asked to confirm';
+      } else if (showFullDayOff) {
         tooltip = 'Day Off - Unavailable';
       } else if (showPartialOff) {
         tooltip = partialInfo || 'Partial Day Off';
@@ -189,6 +194,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
               ? isPast
                 ? 'text-gray-300 cursor-not-allowed'
                 : 'text-gray-400 cursor-not-allowed'
+              : blockedButSelectable
+              ? selected
+                ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-600 ring-offset-2'
+                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-300'
               : showFullDayOff
               ? 'bg-red-50 text-red-400 cursor-not-allowed border border-red-200'
               : showPartialOff
@@ -207,6 +216,9 @@ const DatePicker: React.FC<DatePickerProps> = ({
           <span>{day}</span>
           {showPartialOff && !selected && (
             <AlertCircle className="w-2.5 h-2.5 absolute bottom-0.5 right-0.5 text-orange-500" />
+          )}
+          {blockedButSelectable && !selected && (
+            <AlertCircle className="w-2.5 h-2.5 absolute bottom-0.5 right-0.5 text-red-500" />
           )}
           {showBreak && !selected && (
             <Clock className="w-2.5 h-2.5 absolute bottom-0.5 right-0.5 text-amber-500" />
@@ -280,7 +292,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
         {(dayOffs.length > 0 || dayOffsWithTime.length > 0) && (
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 bg-red-50 border border-red-200 rounded"></div>
-            <span className="text-gray-600">Closed</span>
+            <span className="text-gray-600">{allowBlockedDates ? 'Blocked (staff can still book)' : 'Closed'}</span>
           </div>
         )}
         <div className="flex items-center gap-1.5">

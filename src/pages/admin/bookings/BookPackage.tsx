@@ -17,6 +17,13 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
+
+interface AttractionClosure {
+  date: Date;
+  time_start: string | null;
+  time_end: string | null;
+  attraction_ids: number[];
+}
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
@@ -239,6 +246,7 @@ const BookPackage: React.FC = () => {
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
+  const [attractionClosures, setAttractionClosures] = useState<AttractionClosure[]>([]);
   
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{
@@ -570,13 +578,39 @@ const BookPackage: React.FC = () => {
           const futureLimit = new Date();
           futureLimit.setFullYear(futureLimit.getFullYear() + 1); // Look 1 year ahead
           
+          const addOnClosures: AttractionClosure[] = [];
+
           response.data.forEach((dayOff: DayOff) => {
             const targetsAttractionOrEvent = !!(dayOff.attraction_ids?.length || dayOff.event_ids?.length);
             const targetsPackageOrRoom = !!(dayOff.package_ids?.length || dayOff.room_ids?.length);
-            if (targetsAttractionOrEvent && !targetsPackageOrRoom) return;
             const offDate = new Date(dayOff.date.split('T')[0] + 'T00:00:00');
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
-            
+            const dates: Date[] = [];
+
+            if (dayOff.is_recurring) {
+              const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
+              const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+
+              if (currentYearDate >= today) {
+                dates.push(currentYearDate);
+              }
+              dates.push(nextYearDate);
+            } else if (offDate >= today) {
+              dates.push(offDate);
+            }
+
+            if (dayOff.attraction_ids?.length) {
+              const attractionIds = dayOff.attraction_ids.map(Number);
+              dates.forEach(date => addOnClosures.push({
+                date,
+                time_start: hasTimeRestriction ? dayOff.time_start ?? null : null,
+                time_end: hasTimeRestriction ? dayOff.time_end ?? null : null,
+                attraction_ids: attractionIds,
+              }));
+            }
+
+            if (targetsAttractionOrEvent && !targetsPackageOrRoom) return;
+
             const dayOffData = {
               time_start: hasTimeRestriction ? dayOff.time_start : null,
               time_end: hasTimeRestriction ? dayOff.time_end : null,
@@ -584,21 +618,11 @@ const BookPackage: React.FC = () => {
               package_ids: dayOff.package_ids || null,
               room_ids: dayOff.room_ids || null
             };
-            
-            if (dayOff.is_recurring) {
-              const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
-              const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
-              
-              if (currentYearDate >= today) {
-                allDayOffs.push({ ...dayOffData, date: currentYearDate });
-              }
-              allDayOffs.push({ ...dayOffData, date: nextYearDate });
-            } else {
-              if (offDate >= today) {
-                allDayOffs.push({ ...dayOffData, date: offDate });
-              }
-            }
+
+            dates.forEach(date => allDayOffs.push({ ...dayOffData, date }));
           });
+
+          setAttractionClosures(addOnClosures);
           
           const fullDayOffDates = allDayOffs
             .filter(d => !d.time_start && !d.time_end && !d.package_ids && !d.room_ids)
@@ -618,29 +642,37 @@ const BookPackage: React.FC = () => {
     fetchDayOffs();
   }, [pkg?.location_id]);
 
-  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
-    if (!selectedDate || dayOffsWithTime.length === 0 || !pkg) return false;
+  const blockedAttractionIds = React.useMemo(() => {
+    const blocked = new Set<number>();
+    if (!selectedDate || !selectedTime) return blocked;
 
-    const selectedDateObj = parseLocalDate(selectedDate);
-    const closures = dayOffsWithTime.filter(dayOff => {
-      if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
-          dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
-          dayOff.date.getDate() !== selectedDateObj.getDate()) {
-        return false;
+    const day = parseLocalDate(selectedDate);
+    const slotEnd = availableTimeSlots.find(slot => slot.start_time === selectedTime)?.end_time ?? null;
+
+    attractionClosures.forEach(closure => {
+      if (closure.date.getFullYear() !== day.getFullYear() ||
+          closure.date.getMonth() !== day.getMonth() ||
+          closure.date.getDate() !== day.getDate()) {
+        return;
       }
-      if (dayOff.package_ids && dayOff.package_ids.length > 0) {
-        return dayOff.package_ids.includes(pkg.id);
+      if (isSlotBlockedByClosure(selectedTime, slotEnd, [closure])) {
+        closure.attraction_ids.forEach(id => blocked.add(id));
       }
-      if (dayOff.room_ids && dayOff.room_ids.length > 0) {
-        return false;
-      }
-      return true;
     });
 
-    if (closures.length === 0) return false;
+    return blocked;
+  }, [attractionClosures, selectedDate, selectedTime, availableTimeSlots]);
 
-    return isSlotBlockedByClosure(slotStartTime, slotEndTime, closures);
-  };
+  useEffect(() => {
+    if (blockedAttractionIds.size === 0) return;
+    setSelectedAttractions(prev => {
+      const blockedSelected = Object.keys(prev).filter(id => prev[Number(id)] > 0 && blockedAttractionIds.has(Number(id)));
+      if (blockedSelected.length === 0) return prev;
+      const next = { ...prev };
+      blockedSelected.forEach(id => { delete next[Number(id)]; });
+      return next;
+    });
+  }, [blockedAttractionIds]);
 
   const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null; room_ids?: number[] | null }, packageId: number): boolean => {
     if (dayOff.package_ids && dayOff.package_ids.length > 0) {
@@ -658,8 +690,6 @@ const BookPackage: React.FC = () => {
   }, [dayOffsWithTime, pkg]);
 
   const filteredTimeSlots = availableTimeSlots.filter(slot => {
-    if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
-    
     const noticeHoursValue = Number(pkg?.min_booking_notice_hours) || 0;
     if (noticeHoursValue > 0 && selectedDate) {
       const now = new Date();
@@ -2261,9 +2291,10 @@ const BookPackage: React.FC = () => {
                         const minQty = attraction.min_quantity ?? 0;
                         const maxQty = attraction.max_quantity ?? 99;
                         const currentQty = selectedAttractions[attraction.id] || 0;
+                        const unavailable = blockedAttractionIds.has(attraction.id);
                         
                         return (
-                        <div key={attraction.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4">
+                        <div key={attraction.id} className={`flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4 ${unavailable ? 'opacity-60' : ''}`}>
                           {attraction.image && (
                             <img 
                               src={getImageUrl(attraction.image)} 
@@ -2283,6 +2314,9 @@ const BookPackage: React.FC = () => {
                                 {maxQty < 99 && `Max: ${maxQty}`}
                               </span>
                             )}
+                            {unavailable && (
+                              <span className="block text-xs font-medium text-red-600 mt-0.5">Not available at this time</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                             <button 
@@ -2297,17 +2331,18 @@ const BookPackage: React.FC = () => {
                               min={0}
                               max={maxQty}
                               value={currentQty} 
+                              disabled={unavailable}
                               onChange={e => {
                                 let newQty = Number(e.target.value);
                                 if (newQty > maxQty) newQty = maxQty;
                                 handleAttractionQty(attraction.id, newQty);
                               }} 
-                              className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm" 
+                              className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm disabled:bg-gray-100" 
                             />
                             <button 
                               className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm disabled:opacity-50"
                               onClick={() => handleAttractionQty(attraction.id, currentQty + 1)}
-                              disabled={currentQty >= maxQty}
+                              disabled={currentQty >= maxQty || unavailable}
                             >
                               +
                             </button>

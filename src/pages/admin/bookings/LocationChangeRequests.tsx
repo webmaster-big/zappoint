@@ -81,8 +81,10 @@ const LocationChangeRequests = () => {
         load();
       }
     } catch (err: unknown) {
-      const e = err as { response?: { status?: number; data?: { conflicts?: ConflictInfo[]; message?: string } } };
-      if (e?.response?.status === 409) {
+      const e = err as { response?: { status?: number; data?: { code?: string; conflicts?: ConflictInfo[]; message?: string } } };
+      if (e?.response?.status === 409 && e.response.data?.code === 'BLOCKED_PERIOD') {
+        setToast({ message: e.response.data.message || 'Not saved: that time is inside a blocked period.', type: 'error' });
+      } else if (e?.response?.status === 409) {
         setConflicts((c) => ({ ...c, [r.id]: e.response?.data?.conflicts || [] }));
       } else {
         setToast({ message: e?.response?.data?.message || 'Failed to approve', type: 'error' });

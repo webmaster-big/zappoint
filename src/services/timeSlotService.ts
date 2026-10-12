@@ -34,6 +34,7 @@ export interface TimeSlot {
   remaining_tickets?: number | null;
   min_participants?: number;
   exclusive?: boolean;
+  blocked?: boolean;
 }
 
 export interface BookedSlot {
@@ -53,11 +54,13 @@ export interface AvailableSlotsResponse {
 export interface AvailableSlotsRequest {
   package_id: number;
   date: string;
+  include_blocked?: boolean;
 }
 
 const timeSlotService = {
   getAvailableSlotsSSE(params: AvailableSlotsRequest): EventSource {
-    return new EventSource(`${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.date}`);
+    const query = params.include_blocked ? '?include_blocked=1' : '';
+    return new EventSource(`${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.date}${query}`);
   },
 
   async getAvailableSlots(params: AvailableSlotsRequest): Promise<AvailableSlotsResponse> {

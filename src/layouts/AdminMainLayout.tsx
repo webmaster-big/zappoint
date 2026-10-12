@@ -1,5 +1,6 @@
 import Sidebar from './../components/admin/AdminSidebar';
 import ChangeReasonHost from '../components/admin/bookings/ChangeReasonHost';
+import BlockedPeriodHost from '../components/admin/availability/BlockedPeriodHost';
 import TerminalLockHost from '../components/admin/pin/TerminalLockHost';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Outlet } from 'react-router-dom';
@@ -155,6 +156,7 @@ const MainLayout: React.FC = () => {
       </div>
     </div>
     <ChangeReasonHost />
+    <BlockedPeriodHost />
     <TerminalLockHost />
     </>
   );

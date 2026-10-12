@@ -1,2851 +1,677 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers, LayoutGrid, List, Filter, RefreshCcw, Edit3, Check, Copy } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Calendar, CalendarOff, Check, CheckSquare, Clock, Copy, Edit2, Edit3, Filter, History, LayoutGrid, List, MapPin, Plus, RefreshCcw, RefreshCw, Search, Square, Trash2, User, Users, X } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
-import { dayOffService, packageService, roomService, attractionService } from '../../../services';
-import { eventService } from '../../../services/EventService';
-import LocationSelector from '../../../components/admin/LocationSelector';
-import type { DayOff, DayOffFilters, BlockingScope } from '../../../services/DayOffService';
-import { describeClosure, closureRangeIsValid } from '../../../utils/dayOffClosure';
-import type { Package } from '../../../services/PackageService';
-import type { Room } from '../../../services/RoomService';
-import type { Attraction } from '../../../services/AttractionService';
-import type { Event } from '../../../types/event.types';
+import AvailabilityBlockForm from '../../../components/admin/availability/AvailabilityBlockForm';
+import AvailabilityChangeLog from '../../../components/admin/availability/AvailabilityChangeLog';
+import { dayOffService, type AvailabilityBlock, type DayOffFilters, type Pagination as PageInfo } from '../../../services/DayOffService';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
 
+type ListFilters = Pick<DayOffFilters, 'upcoming_only' | 'is_recurring' | 'sort_by' | 'sort_order'>;
+
+interface FormState {
+    mode: 'create' | 'edit' | 'bulk';
+    source?: AvailabilityBlock | null;
+    duplicate?: boolean;
+    partners?: AvailabilityBlock[];
+}
+
+const DEFAULT_FILTERS: ListFilters = {
+    upcoming_only: true,
+    is_recurring: undefined,
+    sort_by: 'date',
+    sort_order: 'asc',
+};
+
+const VIEW_MODE_KEY = 'dayoffs_view_mode';
+
+const readViewMode = (): 'card' | 'table' => {
+    try {
+        const saved = localStorage.getItem(VIEW_MODE_KEY);
+        return saved === 'table' ? 'table' : 'card';
+    } catch {
+        return 'card';
+    }
+};
+
+const parseLocalDate = (value: string): Date => {
+    const [year, month, day] = value.split('T')[0].split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
+
+const formatDay = (value: string): string =>
+    parseLocalDate(value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+const isPastBlock = (block: AvailabilityBlock): boolean => {
+    if (block.is_recurring) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return parseLocalDate(block.date) < today;
+};
+
+const windowBadgeClass = (block: AvailabilityBlock): string => {
+    if (block.block_type === 'full_day') return 'bg-red-100 text-red-700';
+    if (block.block_type === 'operating_window') return 'bg-amber-100 text-amber-800';
+    return 'bg-gray-100 text-gray-700';
+};
+
+const errorText = (error: unknown, fallback: string): string =>
+    (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+    || (error instanceof Error ? error.message : fallback);
+
+const targetKey = (block: AvailabilityBlock): string =>
+    [block.package_ids, block.room_ids, block.attraction_ids, block.event_ids]
+        .map(ids => [...(ids ?? [])].map(Number).sort((a, b) => a - b).join(','))
+        .join('|');
+
+const olderPartnersOf = (source: AvailabilityBlock | null | undefined, blocks: AvailabilityBlock[]): AvailabilityBlock[] => {
+    if (!source || source.block_type !== 'legacy_closure') return [];
+    const day = source.date.split('T')[0];
+    const seen = new Set<number>();
+    return blocks.filter(block => {
+        if (block.id === source.id || seen.has(block.id)) return false;
+        const partner = block.block_type === 'legacy_closure'
+            && block.location_id === source.location_id
+            && block.date.split('T')[0] === day
+            && block.is_recurring === source.is_recurring
+            && targetKey(block) === targetKey(source);
+        if (partner) seen.add(block.id);
+        return partner;
+    });
+};
+
 const DayOffs: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
-    
-    const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filters, setFilters] = useState<DayOffFilters>({
-        is_recurring: undefined,
-        upcoming_only: true,
-        sort_by: 'date',
-        sort_order: 'asc',
-        per_page: 20,
-        page: 1
-    });
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [selectedDayOff, setSelectedDayOff] = useState<DayOff | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    
-    const [selectionMode, setSelectionMode] = useState(false);
-    const [selectedDayOffIds, setSelectedDayOffIds] = useState<Set<number>>(new Set());
-    
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
     const { effectiveLocationId, locations: scopeLocations } = useLocationScope();
-    const selectedLocationId = effectiveLocationId;
-    const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
-    const [formData, setFormData] = useState({
-        date: '',
-        reason: '',
-        is_recurring: false,
-        time_start: '',  // Close starting at this time (partial day closure)
-        time_end: ''     // Delayed opening until this time
-    });
-
-    const [blockingScope, setBlockingScope] = useState<BlockingScope>('location');
-    const [selectedPackageIds, setSelectedPackageIds] = useState<number[]>([]);
-    const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
-    const [selectedAttractionIds, setSelectedAttractionIds] = useState<number[]>([]);
-    const [selectedEventIds, setSelectedEventIds] = useState<number[]>([]);
-
-    const [availablePackages, setAvailablePackages] = useState<Package[]>([]);
-    const [availableRooms, setAvailableRooms] = useState<Room[]>([]); // Called "spaces" in UI
-    const [availableAttractions, setAvailableAttractions] = useState<Attraction[]>([]);
-    const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
-    const [loadingResources, setLoadingResources] = useState(false);
-    const [resourcesCache, setResourcesCache] = useState<{
-        locationId: number | null;
-        packages: Package[];
-        rooms: Room[];
-        attractions: Attraction[];
-        events: Event[];
-        timestamp: number;
-    } | null>(null);
-
-    const [bulkBlockingScope, setBulkBlockingScope] = useState<BlockingScope>('location');
-    const [bulkSelectedPackageIds, setBulkSelectedPackageIds] = useState<number[]>([]);
-    const [bulkSelectedRoomIds, setBulkSelectedRoomIds] = useState<number[]>([]);
-    const [bulkSelectedAttractionIds, setBulkSelectedAttractionIds] = useState<number[]>([]);
-    const [bulkSelectedEventIds, setBulkSelectedEventIds] = useState<number[]>([]);
-
-    const [showBulkModal, setShowBulkModal] = useState(false);
-    const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
-    const [bulkSelectedDates, setBulkSelectedDates] = useState<Set<string>>(new Set());
-    const [bulkReason, setBulkReason] = useState('');
-    const [bulkIsRecurring, setBulkIsRecurring] = useState(false);
-    const [bulkTimeStart, setBulkTimeStart] = useState('');  // Close starting at this time
-    const [bulkTimeEnd, setBulkTimeEnd] = useState('');      // Delayed opening until this time
-    const [bulkCreating, setBulkCreating] = useState(false);
-
-    const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
-    const showToast = (message: string, type?: "success" | "error" | "info") => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
-    };
-
-    const [viewMode, setViewMode] = useState<'card' | 'table'>(() => {
-        const saved = localStorage.getItem('dayoffs_view_mode');
-        return (saved === 'table' || saved === 'card') ? saved : 'card';
-    });
-
-    const toggleViewMode = (mode: 'card' | 'table') => {
-        setViewMode(mode);
-        localStorage.setItem('dayoffs_view_mode', mode);
-    };
-
+    const [tab, setTab] = useState<'blocks' | 'history'>('blocks');
+    const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [filters, setFilters] = useState<ListFilters>(DEFAULT_FILTERS);
     const [showFilters, setShowFilters] = useState(false);
-
-    const [editingCell, setEditingCell] = useState<{ dayOffId: number; field: string } | null>(null);
+    const [page, setPage] = useState(1);
+    const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
+    const [viewMode, setViewMode] = useState<'card' | 'table'>(readViewMode);
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [formState, setFormState] = useState<FormState | null>(null);
+    const [historyFor, setHistoryFor] = useState<AvailabilityBlock | null>(null);
+    const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' } | null>(null);
+    const [editingCell, setEditingCell] = useState<{ id: number; field: 'reason' | 'group_name' } | null>(null);
     const [editValue, setEditValue] = useState('');
-    const [savingCell, setSavingCell] = useState<{ dayOffId: number; field: string } | null>(null);
+    const [savingCell, setSavingCell] = useState(false);
+    const [formBusy, setFormBusy] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const toastTimer = useRef<number | null>(null);
+    const blocksRequest = useRef(0);
 
-    const fetchDayOffs = React.useCallback(async () => {
+    const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setToast({ message, type });
+        if (toastTimer.current) window.clearTimeout(toastTimer.current);
+        toastTimer.current = window.setTimeout(() => setToast(null), 4000);
+    }, []);
+
+    useEffect(() => () => {
+        if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    }, []);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedSearch(search.trim());
+            setPage(1);
+        }, 300);
+        return () => window.clearTimeout(timer);
+    }, [search]);
+
+    const fetchBlocks = useCallback(async () => {
+        const request = ++blocksRequest.current;
+        setLoading(true);
+        setLoadError(null);
         try {
-            setLoading(true);
-            const searchFilters: DayOffFilters = {
+            const response = await dayOffService.getDayOffs({
                 ...filters,
-                page: currentPage,
-                user_id: getStoredUser()?.id,
-                location_id: isCompanyAdmin && selectedLocationId ? selectedLocationId : undefined
-            };
-            
-            const response = await dayOffService.getDayOffs(searchFilters);
-            
-            if (response.data) {
-                let filteredDayOffs = response.data.day_offs || [];
-                
-                if (searchTerm) {
-                    filteredDayOffs = filteredDayOffs.filter(dayOff => 
-                        dayOff.reason?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        dayOff.date.includes(searchTerm)
-                    );
-                }
-                
-                setDayOffs(filteredDayOffs);
-                const pagination = response.data.pagination;
-                setTotalPages(pagination?.last_page || 1);
-            }
-        } catch {
-            showToast('Error loading Day Offs', 'error');
-        } finally {
-            setLoading(false);
-        }
-    }, [filters, searchTerm, currentPage, isCompanyAdmin, selectedLocationId]);
-
-    useEffect(() => {
-        fetchDayOffs();
-    }, [fetchDayOffs]);
-
-    useEffect(() => {
-        const fetchPackagesAndRooms = async () => {
-            const locationId = isCompanyAdmin
-                ? (modalLocationId ?? selectedLocationId ?? undefined)
-                : currentUser?.location_id;
-
-            if (!locationId) return;
-            
-            const CACHE_TTL = 120000;
-            if (resourcesCache &&
-                resourcesCache.locationId === locationId &&
-                Date.now() - resourcesCache.timestamp < CACHE_TTL) {
-                setAvailablePackages(resourcesCache.packages);
-                setAvailableRooms(resourcesCache.rooms);
-                setAvailableAttractions(resourcesCache.attractions);
-                setAvailableEvents(resourcesCache.events);
+                page,
+                per_page: 20,
+                search: debouncedSearch || undefined,
+                location_id: isCompanyAdmin && effectiveLocationId ? effectiveLocationId : undefined,
+            });
+            if (request !== blocksRequest.current) return;
+            const pagination = response.data.pagination ?? null;
+            if ((response.data.day_offs ?? []).length === 0 && pagination && pagination.current_page > 1 && pagination.total > 0) {
+                setPage(pagination.last_page);
                 return;
             }
-
-            setLoadingResources(true);
-            try {
-                const [packagesRes, roomsRes, attractionsRes, eventsRes] = await Promise.all([
-                    packageService.getAllPackages({ location_id: locationId, is_active: true }),
-                    roomService.getAllRooms({ location_id: locationId, is_available: true }),
-                    attractionService.getAllAttractions({ location_id: locationId, is_active: true }),
-                    eventService.getEvents({ location_id: locationId, is_active: true, per_page: 100 })
-                ]);
-
-                const packages = packagesRes;
-                const rooms = roomsRes;
-                const attractions = attractionsRes;
-                const events = eventsRes.success && Array.isArray(eventsRes.data) ? eventsRes.data : [];
-
-                setAvailablePackages(packages);
-                setAvailableRooms(rooms);
-                setAvailableAttractions(attractions);
-                setAvailableEvents(events);
-
-                setResourcesCache({
-                    locationId,
-                    packages,
-                    rooms,
-                    attractions,
-                    events,
-                    timestamp: Date.now()
-                });
-            } catch {
-            } finally {
-                setLoadingResources(false);
-            }
-        };
-        
-        if (showCreateModal || showEditModal || showBulkModal) {
-            fetchPackagesAndRooms();
-        }
-    }, [modalLocationId, selectedLocationId, showCreateModal, showEditModal, showBulkModal, isCompanyAdmin, currentUser?.location_id, resourcesCache]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value, type } = e.target;
-        if (type === 'checkbox') {
-            const checked = (e.target as HTMLInputElement).checked;
-            setFormData(prev => ({ ...prev, [name]: checked }));
-        } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
-        }
-    };
-
-    const resetForm = () => {
-        setFormData({
-            date: '',
-            reason: '',
-            is_recurring: false,
-            time_start: '',
-            time_end: ''
-        });
-        setSelectedDayOff(null);
-        setBlockingScope('location');
-        setSelectedPackageIds([]);
-        setSelectedRoomIds([]);
-        setSelectedAttractionIds([]);
-        setSelectedEventIds([]);
-    };
-
-    const handleCreateDayOff = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        if ((blockingScope === 'packages' || blockingScope === 'both') && selectedPackageIds.length === 0) {
-            showToast('Please select at least one package', 'error');
-            return;
-        }
-        if ((blockingScope === 'rooms' || blockingScope === 'both') && selectedRoomIds.length === 0) {
-            showToast('Please select at least one space', 'error');
-            return;
-        }
-        if (blockingScope === 'attractions' && selectedAttractionIds.length === 0) {
-            showToast('Please select at least one attraction', 'error');
-            return;
-        }
-        if (blockingScope === 'events' && selectedEventIds.length === 0) {
-            showToast('Please select at least one event', 'error');
-            return;
-        }
-
-        const locationId = isCompanyAdmin ? modalLocationId : (currentUser?.location_id ?? null);
-
-        if (!locationId) {
-            showToast(
-                isCompanyAdmin
-                    ? 'Select which location this closure applies to first'
-                    : 'Your account has no location assigned, so a closure cannot be created',
-                'error'
-            );
-            return;
-        }
-
-        if (closureRangeIsInvalid(formData.time_start, formData.time_end)) {
-            showToast('"Closed Until" has to be later than "Closed From"', 'error');
-            return;
-        }
-
-        try {
-
-            let package_ids: number[] | null = null;
-            let room_ids: number[] | null = null;
-            let attraction_ids: number[] | null = null;
-            let event_ids: number[] | null = null;
-
-            switch (blockingScope) {
-                case 'packages':
-                    package_ids = selectedPackageIds;
-                    break;
-                case 'rooms':
-                    room_ids = selectedRoomIds;
-                    break;
-                case 'both':
-                    package_ids = selectedPackageIds;
-                    room_ids = selectedRoomIds;
-                    break;
-                case 'attractions':
-                    attraction_ids = selectedAttractionIds;
-                    break;
-                case 'events':
-                    event_ids = selectedEventIds;
-                    break;
-            }
-
-            await dayOffService.createDayOff({
-                location_id: locationId,
-                date: formData.date,
-                reason: formData.reason || undefined,
-                is_recurring: formData.is_recurring,
-                time_start: sanitizeTimeValue(formData.time_start),
-                time_end: sanitizeTimeValue(formData.time_end),
-                package_ids,
-                room_ids,
-                attraction_ids,
-                event_ids
-            });
-            
-            showToast('Day Off created successfully!', 'success');
-            setShowCreateModal(false);
-            resetForm();
-            fetchDayOffs();
-        } catch (error: unknown) {
-            const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
-                || (error instanceof Error ? error.message : 'Error creating Day Off');
-            showToast(message, 'error');
-        }
-    };
-
-    const handleUpdateDayOff = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedDayOff) return;
-
-        if ((blockingScope === 'packages' || blockingScope === 'both') && selectedPackageIds.length === 0) {
-            showToast('Please select at least one package', 'error');
-            return;
-        }
-        if ((blockingScope === 'rooms' || blockingScope === 'both') && selectedRoomIds.length === 0) {
-            showToast('Please select at least one space', 'error');
-            return;
-        }
-        if (blockingScope === 'attractions' && selectedAttractionIds.length === 0) {
-            showToast('Please select at least one attraction', 'error');
-            return;
-        }
-        if (blockingScope === 'events' && selectedEventIds.length === 0) {
-            showToast('Please select at least one event', 'error');
-            return;
-        }
-
-        if (closureRangeIsInvalid(formData.time_start, formData.time_end)) {
-            showToast('"Closed Until" has to be later than "Closed From"', 'error');
-            return;
-        }
-
-        try {
-            let package_ids: number[] | null = null;
-            let room_ids: number[] | null = null;
-            let attraction_ids: number[] | null = null;
-            let event_ids: number[] | null = null;
-
-            switch (blockingScope) {
-                case 'packages':
-                    package_ids = selectedPackageIds;
-                    break;
-                case 'rooms':
-                    room_ids = selectedRoomIds;
-                    break;
-                case 'both':
-                    package_ids = selectedPackageIds;
-                    room_ids = selectedRoomIds;
-                    break;
-                case 'attractions':
-                    attraction_ids = selectedAttractionIds;
-                    break;
-                case 'events':
-                    event_ids = selectedEventIds;
-                    break;
-            }
-
-            const updateData = {
-                location_id: selectedDayOff.location_id, // Include location_id from the original day off
-                date: formData.date,
-                reason: formData.reason || undefined,
-                is_recurring: formData.is_recurring,
-                time_start: sanitizeTimeValue(formData.time_start),
-                time_end: sanitizeTimeValue(formData.time_end),
-                package_ids,
-                room_ids,
-                attraction_ids,
-                event_ids
-            };
-            
-            await dayOffService.updateDayOff(selectedDayOff.id, updateData);
-            
-            showToast('Day Off updated successfully!', 'success');
-            setShowEditModal(false);
-            resetForm();
-            fetchDayOffs();
-        } catch (error: unknown) {
-            const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
-                || (error instanceof Error ? error.message : 'Error updating Day Off');
-            showToast(message, 'error');
-        }
-    };
-
-    const handleDeleteDayOff = async (dayOffId: number, dayOffDate: string) => {
-        if (!window.confirm(`Are you sure you want to delete the Day Off on "${dayOffDate}"?`)) {
-            return;
-        }
-
-        try {
-            await dayOffService.deleteDayOff(dayOffId);
-            showToast('Day Off deleted successfully!', 'success');
-            fetchDayOffs();
-        } catch {
-            showToast('Error deleting Day Off', 'error');
-        }
-    };
-
-    const startEditing = (dayOffId: number, field: string, currentValue: string) => {
-        setEditingCell({ dayOffId, field });
-        setEditValue(currentValue || '');
-        setTimeout(() => inputRef.current?.focus(), 0);
-    };
-
-    const cancelEdit = () => {
-        setEditingCell(null);
-        setEditValue('');
-    };
-
-    const saveEdit = async () => {
-        if (!editingCell) return;
-        
-        setSavingCell(editingCell);
-        try {
-            const dayOff = dayOffs.find(d => d.id === editingCell.dayOffId);
-            if (!dayOff) return;
-
-            await dayOffService.updateDayOff(editingCell.dayOffId, {
-                reason: editingCell.field === 'reason' ? editValue : dayOff.reason,
-            });
-
-            setDayOffs(prev => prev.map(d => 
-                d.id === editingCell.dayOffId 
-                    ? { ...d, [editingCell.field]: editValue }
-                    : d
-            ));
-            showToast('Updated successfully!', 'success');
-        } catch (error: unknown) {
-            const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
-                || 'Error updating day off';
-            showToast(message, 'error');
+            setBlocks(response.data.day_offs ?? []);
+            setPageInfo(pagination);
+            setSelectedIds(new Set());
+        } catch (error) {
+            if (request !== blocksRequest.current) return;
+            setBlocks([]);
+            setPageInfo(null);
+            setLoadError(errorText(error, 'Could not load blocked dates.'));
         } finally {
-            setSavingCell(null);
+            if (request === blocksRequest.current) setLoading(false);
+        }
+    }, [filters, page, debouncedSearch, isCompanyAdmin, effectiveLocationId]);
+
+    useEffect(() => {
+        if (tab === 'blocks') fetchBlocks();
+    }, [fetchBlocks, tab]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [effectiveLocationId]);
+
+    useEffect(() => {
+        if (!formState && !historyFor) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || formBusy) return;
+            setFormState(null);
+            setHistoryFor(null);
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [formState, historyFor, formBusy]);
+
+    const changeViewMode = (mode: 'card' | 'table') => {
+        setViewMode(mode);
+        try {
+            localStorage.setItem(VIEW_MODE_KEY, mode);
+        } catch {
+            return;
+        }
+    };
+
+    const defaultLocationId = isCompanyAdmin
+        ? (effectiveLocationId ?? null)
+        : (currentUser?.location_id ?? null);
+
+    const formLocations = scopeLocations.map(location => ({ id: location.id, name: location.name }));
+
+    const closeForm = (message?: string, type?: 'success' | 'error' | 'info') => {
+        setFormState(null);
+        setFormBusy(false);
+        if (message) {
+            showToast(message, type);
+            fetchBlocks();
+        }
+    };
+
+    const handleDelete = async (block: AvailabilityBlock) => {
+        const label = block.group_name ? ` for ${block.group_name}` : '';
+        if (!window.confirm(`Remove the block on ${formatDay(block.date)}${label}? Online booking reopens for that time. The removal is recorded permanently.`)) {
+            return;
+        }
+        try {
+            await dayOffService.deleteDayOff(block.id);
+            showToast('Block removed.', 'success');
+            fetchBlocks();
+        } catch (error) {
+            showToast(errorText(error, 'Could not remove this block.'), 'error');
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) {
+            showToast('Choose the blocks to remove first.', 'info');
+            return;
+        }
+        if (!window.confirm(`Remove ${selectedIds.size} block${selectedIds.size === 1 ? '' : 's'}? Each removal is recorded permanently.`)) {
+            return;
+        }
+        try {
+            const response = await dayOffService.bulkDeleteDayOffs(Array.from(selectedIds));
+            const removed = response.data?.deleted_count ?? 0;
+            showToast(`Removed ${removed} block${removed === 1 ? '' : 's'}.`, removed === selectedIds.size ? 'success' : 'info');
+            setSelectionMode(false);
+            fetchBlocks();
+        } catch (error) {
+            showToast(errorText(error, 'Could not remove the selected blocks.'), 'error');
+        }
+    };
+
+    const toggleSelected = (id: number) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const allSelected = blocks.length > 0 && selectedIds.size === blocks.length;
+
+    const startEditing = (block: AvailabilityBlock, field: 'reason' | 'group_name') => {
+        setEditingCell({ id: block.id, field });
+        setEditValue(block[field] ?? '');
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+    };
+
+    const saveCell = async () => {
+        if (!editingCell) return;
+        const value = editValue.trim();
+        if (!value) {
+            showToast(editingCell.field === 'reason' ? 'The reason cannot be empty.' : 'The group or event name cannot be empty.', 'error');
+            return;
+        }
+        setSavingCell(true);
+        try {
+            const response = await dayOffService.updateDayOff(editingCell.id, { [editingCell.field]: value });
+            setBlocks(prev => prev.map(block => (block.id === editingCell.id ? response.data : block)));
+            showToast(response.message === 'Nothing changed' ? 'Nothing changed.' : 'Saved.', response.message === 'Nothing changed' ? 'info' : 'success');
             setEditingCell(null);
-            setEditValue('');
+        } catch (error) {
+            showToast(errorText(error, 'Could not save that change.'), 'error');
+        } finally {
+            setSavingCell(false);
         }
     };
 
-    const handleEditKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            saveEdit();
-        } else if (e.key === 'Escape') {
-            cancelEdit();
-        }
-    };
-
-    const renderEditableCell = (
-        dayOff: DayOff, 
-        field: string, 
-        displayValue: React.ReactNode,
-        className: string = ''
-    ) => {
-        const isEditing = editingCell?.dayOffId === dayOff.id && editingCell?.field === field;
-        const isSaving = savingCell?.dayOffId === dayOff.id && savingCell?.field === field;
-
-        if (isEditing) {
+    const renderEditable = (block: AvailabilityBlock, field: 'reason' | 'group_name', display: React.ReactNode) => {
+        if (editingCell?.id === block.id && editingCell.field === field) {
             return (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1" onClick={event => event.stopPropagation()}>
                     <input
                         ref={inputRef}
                         type="text"
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={handleEditKeyDown}
-                        className={`w-full px-1.5 py-0.5 text-xs border border-${themeColor}-400 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-${themeColor}-500`}
-                        disabled={isSaving}
-                        autoFocus
+                        maxLength={field === 'reason' ? 255 : 150}
+                        onChange={event => setEditValue(event.target.value)}
+                        onKeyDown={event => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault();
+                                saveCell();
+                            } else if (event.key === 'Escape') {
+                                setEditingCell(null);
+                            }
+                        }}
+                        disabled={savingCell}
+                        className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-900"
                     />
-                    <button
-                        onClick={(e) => { e.stopPropagation(); saveEdit(); }}
-                        className="p-0.5 text-green-600 hover:text-green-700"
-                        disabled={isSaving}
-                    >
-                        <Check className="w-3 h-3" />
+                    <button type="button" onClick={saveCell} disabled={savingCell} className="p-0.5 text-green-600 hover:text-green-700" aria-label="Save">
+                        <Check className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
-                        className="p-0.5 text-red-600 hover:text-red-700"
-                        disabled={isSaving}
-                    >
-                        <X className="w-3 h-3" />
+                    <button type="button" onClick={() => setEditingCell(null)} disabled={savingCell} className="p-0.5 text-red-600 hover:text-red-700" aria-label="Cancel">
+                        <X className="h-3.5 w-3.5" />
                     </button>
                 </div>
             );
         }
 
         return (
-            <div
-                className={`group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 min-h-[20px] ${className}`}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    const value = dayOff[field as keyof DayOff];
-                    startEditing(dayOff.id, field, typeof value === 'string' ? value : '');
+            <button
+                type="button"
+                className="group flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100"
+                onClick={event => {
+                    event.stopPropagation();
+                    startEditing(block, field);
                 }}
                 title="Click to edit"
             >
-                <span className="truncate">{displayValue || <span className="text-gray-400 italic">—</span>}</span>
-                <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-            </div>
+                <span className="truncate">{display || <span className="italic text-gray-400">—</span>}</span>
+                <Edit3 className="h-3 w-3 shrink-0 text-gray-400 opacity-0 group-hover:opacity-100" />
+            </button>
         );
     };
 
-    const clearFilters = () => {
-        setFilters({
-            is_recurring: undefined,
-            upcoming_only: true,
-            sort_by: 'date',
-            sort_order: 'asc',
-            per_page: 20,
-            page: 1
-        });
-        setSearchTerm('');
-    };
+    const renderActions = (block: AvailabilityBlock) => (
+        <div className="flex shrink-0 gap-1">
+            <button type="button" onClick={event => { event.stopPropagation(); void openEdit(block); }} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit">
+                <Edit2 className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={event => { event.stopPropagation(); setFormState({ mode: 'create', source: block, duplicate: true }); }} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Copy to another date">
+                <Copy className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={event => { event.stopPropagation(); setHistoryFor(block); }} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="History">
+                <History className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={event => { event.stopPropagation(); handleDelete(block); }} className="rounded-lg p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600" title="Remove">
+                <Trash2 className="h-4 w-4" />
+            </button>
+        </div>
+    );
 
-    const toggleSelectionMode = () => {
-        setSelectionMode(!selectionMode);
-        setSelectedDayOffIds(new Set());
-    };
+    const renderPeople = (block: AvailabilityBlock) => (
+        <span className="inline-flex items-center gap-1">
+            <User className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+                Set by {block.set_by?.name ?? 'not recorded'}
+                {block.last_changed_by && block.last_changed_by.id !== block.set_by?.id ? ` · changed by ${block.last_changed_by.name}` : ''}
+            </span>
+        </span>
+    );
 
-    const toggleDayOffSelection = (dayOffId: number) => {
-        const newSelected = new Set(selectedDayOffIds);
-        if (newSelected.has(dayOffId)) {
-            newSelected.delete(dayOffId);
-        } else {
-            newSelected.add(dayOffId);
-        }
-        setSelectedDayOffIds(newSelected);
-    };
+    const openCreate = () => setFormState({ mode: 'create' });
 
-    const selectAllDayOffs = () => {
-        if (selectedDayOffIds.size === dayOffs.length) {
-            setSelectedDayOffIds(new Set());
-        } else {
-            setSelectedDayOffIds(new Set(dayOffs.map(dayOff => dayOff.id)));
-        }
-    };
-
-    const handleBulkDelete = async () => {
-        if (selectedDayOffIds.size === 0) {
-            showToast('Please select Day Offs to delete', 'info');
+    const openEdit = async (block: AvailabilityBlock) => {
+        if (block.block_type !== 'legacy_closure') {
+            setFormState({ mode: 'edit', source: block });
             return;
         }
-
-        if (!window.confirm(`Are you sure you want to delete ${selectedDayOffIds.size} Day Off(s)?`)) {
-            return;
-        }
-
+        const day = block.date.split('T')[0];
+        let candidates = blocks;
         try {
-            await dayOffService.bulkDeleteDayOffs(Array.from(selectedDayOffIds));
-            showToast(`${selectedDayOffIds.size} Day Off(s) deleted successfully!`, 'success');
-            setSelectedDayOffIds(new Set());
-            setSelectionMode(false);
-            fetchDayOffs();
+            const response = await dayOffService.getDayOffs({ location_id: block.location_id, start_date: day, end_date: day, per_page: 100 });
+            candidates = [...(response.data.day_offs ?? []), ...blocks];
         } catch {
-            showToast('Error deleting Day Offs', 'error');
+            candidates = blocks;
         }
+        setFormState({ mode: 'edit', source: block, partners: olderPartnersOf(block, candidates) });
     };
-
-    const normalizeTimeValue = (time: string | null | undefined): string => {
-        if (!time) return '';
-        const match = time.match(/^(\d{2}:\d{2})/);
-        return match ? match[1] : time;
-    };
-
-    const applyBlockingScopeFromDayOff = (dayOff: DayOff) => {
-        const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
-        const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
-        const hasAttractions = dayOff.attraction_ids && dayOff.attraction_ids.length > 0;
-        const hasEvents = dayOff.event_ids && dayOff.event_ids.length > 0;
-
-        if (hasAttractions) {
-            setBlockingScope('attractions');
-            setSelectedAttractionIds(dayOff.attraction_ids || []);
-            setSelectedEventIds([]);
-            setSelectedPackageIds([]);
-            setSelectedRoomIds([]);
-        } else if (hasEvents) {
-            setBlockingScope('events');
-            setSelectedEventIds(dayOff.event_ids || []);
-            setSelectedAttractionIds([]);
-            setSelectedPackageIds([]);
-            setSelectedRoomIds([]);
-        } else if (hasPackages && hasRooms) {
-            setBlockingScope('both');
-            setSelectedPackageIds(dayOff.package_ids || []);
-            setSelectedRoomIds(dayOff.room_ids || []);
-            setSelectedAttractionIds([]);
-            setSelectedEventIds([]);
-        } else if (hasPackages) {
-            setBlockingScope('packages');
-            setSelectedPackageIds(dayOff.package_ids || []);
-            setSelectedRoomIds([]);
-            setSelectedAttractionIds([]);
-            setSelectedEventIds([]);
-        } else if (hasRooms) {
-            setBlockingScope('rooms');
-            setSelectedPackageIds([]);
-            setSelectedRoomIds(dayOff.room_ids || []);
-            setSelectedAttractionIds([]);
-            setSelectedEventIds([]);
-        } else {
-            setBlockingScope('location');
-            setSelectedPackageIds([]);
-            setSelectedRoomIds([]);
-            setSelectedAttractionIds([]);
-            setSelectedEventIds([]);
-        }
-    };
-
-    const handleEditClick = (dayOff: DayOff) => {
-        setSelectedDayOff(dayOff);
-
-        setFormData({
-            date: dayOff.date.split('T')[0], // Extract date part
-            reason: dayOff.reason || '',
-            is_recurring: dayOff.is_recurring,
-            time_start: normalizeTimeValue(dayOff.time_start),
-            time_end: normalizeTimeValue(dayOff.time_end)
-        });
-
-        applyBlockingScopeFromDayOff(dayOff);
-
-        if (dayOff.location_id) {
-            setModalLocationId(dayOff.location_id);
-        }
-
-        setShowEditModal(true);
-    };
-
-    const handleDuplicateClick = (dayOff: DayOff) => {
-        setSelectedDayOff(null);
-
-        setFormData({
-            date: '',
-            reason: dayOff.reason || '',
-            is_recurring: dayOff.is_recurring,
-            time_start: normalizeTimeValue(dayOff.time_start),
-            time_end: normalizeTimeValue(dayOff.time_end)
-        });
-
-        applyBlockingScopeFromDayOff(dayOff);
-
-        if (dayOff.location_id) {
-            setModalLocationId(dayOff.location_id);
-        }
-
-        setShowCreateModal(true);
-    };
-
-    const handleFilterChange = (key: keyof DayOffFilters, value: boolean | undefined) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
-        setCurrentPage(1);
-    };
-
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-        setCurrentPage(1);
-    };
-
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-    };
-
-    const parseLocalDate = (isoDateString: string): Date => {
-        const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
-        return new Date(year, month - 1, day);
-    };
-
-    const formatDate = (dateString: string) => {
-        const date = parseLocalDate(dateString);
-        return date.toLocaleDateString('en-US', { 
-            weekday: 'short',
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
-        });
-    };
-
-    const isPastDate = (dateString: string) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const date = parseLocalDate(dateString);
-        return date < today;
-    };
-
-    const sanitizeTimeValue = (time: string | null | undefined): string | null => {
-        if (time === null || time === undefined) return null;
-        
-        const trimmed = time.trim();
-        if (trimmed === '') {
-            return null;
-        }
-        
-        const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
-        if (!timeRegex.test(trimmed)) {
-            return null; // Return null for invalid formats
-        }
-        
-        return trimmed.substring(0, 5);
-    };
-
-    const closureRangeIsInvalid = (start: string, end: string): boolean =>
-        !!start && !!end && !closureRangeIsValid({ time_start: start, time_end: end });
-
-    const closurePreview = (start: string, end: string): string =>
-        describeClosure({ time_start: start || null, time_end: end || null });
-
-    const getClosureTypeLabel = (dayOff: DayOff): { label: string; color: string } | null => {
-        const hasStart = !!dayOff.time_start && dayOff.time_start !== '';
-        const hasEnd = !!dayOff.time_end && dayOff.time_end !== '';
-
-        if (!hasStart && !hasEnd) {
-            return null;
-        }
-
-        const closure = { time_start: dayOff.time_start ?? null, time_end: dayOff.time_end ?? null };
-        const label = describeClosure(closure);
-
-        if (!closureRangeIsValid(closure)) {
-            return { label: `${label} (invalid range)`, color: 'bg-red-100 text-red-700' };
-        }
-        if (hasStart && !hasEnd) {
-            return { label, color: 'bg-orange-100 text-orange-700' };
-        }
-        if (!hasStart && hasEnd) {
-            return { label, color: 'bg-blue-100 text-blue-700' };
-        }
-        return { label, color: 'bg-yellow-100 text-yellow-700' };
-    };
-
-    const renderItemLocation = (locationId?: number, nestedName?: string) => {
-        if (!isCompanyAdmin) return null;
-        const name = nestedName || scopeLocations.find(loc => loc.id === locationId)?.name || '';
-        if (!name) return null;
-        return <span className="text-xs text-gray-400 truncate">{name}</span>;
-    };
-
-    const getBlockingScopeBadge = (dayOff: DayOff): { label: string; color: string; icon: typeof Building2 } | null => {
-        const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
-        const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
-        const hasAttractions = dayOff.attraction_ids && dayOff.attraction_ids.length > 0;
-        const hasEvents = dayOff.event_ids && dayOff.event_ids.length > 0;
-
-        if (hasAttractions) {
-            return { label: `${dayOff.attraction_ids!.length} Attraction${dayOff.attraction_ids!.length > 1 ? 's' : ''}`, color: 'bg-indigo-100 text-indigo-700', icon: LayoutGrid };
-        }
-        if (hasEvents) {
-            return { label: `${dayOff.event_ids!.length} Event${dayOff.event_ids!.length > 1 ? 's' : ''}`, color: 'bg-emerald-100 text-emerald-700', icon: Calendar };
-        }
-        if (!hasPackages && !hasRooms) {
-            return { label: 'Entire Location', color: 'bg-red-100 text-red-700', icon: Building2 };
-        }
-        if (hasPackages && hasRooms) {
-            const count = dayOff.package_ids!.length + dayOff.room_ids!.length;
-            return { label: `${count} Resources`, color: 'bg-purple-100 text-purple-700', icon: Layers };
-        }
-        if (hasPackages) {
-            return { label: `${dayOff.package_ids!.length} Package${dayOff.package_ids!.length > 1 ? 's' : ''}`, color: 'bg-amber-100 text-amber-700', icon: PackageIcon };
-        }
-        if (hasRooms) {
-            return { label: `${dayOff.room_ids!.length} Space${dayOff.room_ids!.length > 1 ? 's' : ''}`, color: 'bg-cyan-100 text-cyan-700', icon: DoorOpen };
-        }
-        return null;
-    };
-
-    const getDaysInMonth = (year: number, month: number) => {
-        return new Date(year, month + 1, 0).getDate();
-    };
-
-    const getFirstDayOfMonth = (year: number, month: number) => {
-        return new Date(year, month, 1).getDay();
-    };
-
-    const formatDateString = (year: number, month: number, day: number) => {
-        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    };
-
-    const toggleBulkDate = (dateStr: string) => {
-        setBulkSelectedDates(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(dateStr)) {
-                newSet.delete(dateStr);
-            } else {
-                newSet.add(dateStr);
-            }
-            return newSet;
-        });
-    };
-
-    const isBulkDatePast = (dateStr: string) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const date = parseLocalDate(dateStr);
-        return date < today;
-    };
-
-    const handleBulkCreateDayOffs = async () => {
-        if (bulkSelectedDates.size === 0) {
-            setToast({ message: 'Please select at least one date', type: 'info' });
-            return;
-        }
-        
-        if ((bulkBlockingScope === 'packages' || bulkBlockingScope === 'both') && bulkSelectedPackageIds.length === 0) {
-            setToast({ message: 'Please select at least one package', type: 'error' });
-            return;
-        }
-        if ((bulkBlockingScope === 'rooms' || bulkBlockingScope === 'both') && bulkSelectedRoomIds.length === 0) {
-            setToast({ message: 'Please select at least one space', type: 'error' });
-            return;
-        }
-        if (bulkBlockingScope === 'attractions' && bulkSelectedAttractionIds.length === 0) {
-            setToast({ message: 'Please select at least one attraction', type: 'error' });
-            return;
-        }
-        if (bulkBlockingScope === 'events' && bulkSelectedEventIds.length === 0) {
-            setToast({ message: 'Please select at least one event', type: 'error' });
-            return;
-        }
-
-        setBulkCreating(true);
-        let successCount = 0;
-        let failCount = 0;
-
-        const sortedDates = Array.from(bulkSelectedDates).sort();
-
-        const locationId = isCompanyAdmin ? modalLocationId : (currentUser?.location_id ?? null);
-
-        if (!locationId) {
-            setBulkCreating(false);
-            setToast({
-                message: isCompanyAdmin
-                    ? 'Select which location these closures apply to first'
-                    : 'Your account has no location assigned, so closures cannot be created',
-                type: 'error',
-            });
-            return;
-        }
-
-        if (closureRangeIsInvalid(bulkTimeStart, bulkTimeEnd)) {
-            setBulkCreating(false);
-            setToast({ message: '"Closed Until" has to be later than "Closed From"', type: 'error' });
-            return;
-        }
-
-        let package_ids: number[] | null = null;
-        let room_ids: number[] | null = null;
-        let attraction_ids: number[] | null = null;
-        let event_ids: number[] | null = null;
-
-        switch (bulkBlockingScope) {
-            case 'packages':
-                package_ids = bulkSelectedPackageIds;
-                break;
-            case 'rooms':
-                room_ids = bulkSelectedRoomIds;
-                break;
-            case 'both':
-                package_ids = bulkSelectedPackageIds;
-                room_ids = bulkSelectedRoomIds;
-                break;
-            case 'attractions':
-                attraction_ids = bulkSelectedAttractionIds;
-                break;
-            case 'events':
-                event_ids = bulkSelectedEventIds;
-                break;
-        }
-
-        for (const dateStr of sortedDates) {
-            try {
-                await dayOffService.createDayOff({
-                    location_id: locationId,
-                    date: dateStr,
-                    reason: bulkReason || undefined,
-                    is_recurring: bulkIsRecurring,
-                    time_start: sanitizeTimeValue(bulkTimeStart),
-                    time_end: sanitizeTimeValue(bulkTimeEnd),
-                    package_ids,
-                    room_ids,
-                    attraction_ids,
-                    event_ids
-                });
-                successCount++;
-            } catch {
-                failCount++;
-            }
-        }
-
-        setBulkCreating(false);
-
-        if (successCount > 0) {
-            setToast({ 
-                message: `Created ${successCount} day off${successCount > 1 ? 's' : ''}${failCount > 0 ? ` (${failCount} failed)` : ''}`, 
-                type: failCount > 0 ? 'info' : 'success' 
-            });
-            fetchDayOffs();
-        } else {
-            setToast({ message: 'Failed to create day offs', type: 'error' });
-        }
-
-        setShowBulkModal(false);
-        setBulkSelectedDates(new Set());
-        setBulkReason('');
-        setBulkIsRecurring(false);
-        setBulkTimeStart('');
-        setBulkTimeEnd('');
-        setBulkBlockingScope('location');
-        setBulkSelectedPackageIds([]);
-        setBulkSelectedRoomIds([]);
-        setBulkSelectedAttractionIds([]);
-        setBulkSelectedEventIds([]);
-    };
-
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December'];
 
     return (
-        <div className="px-6 py-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div className="px-4 py-6 sm:px-6 sm:py-8">
+            <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Day Offs</h1>
-                    <p className="text-gray-600 mt-2">Manage blocked dates and holidays for your locations</p>
+                    <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Days Off &amp; Availability</h1>
+                    <p className="mt-1 text-gray-600">Block the location, birthday packages, rooms or attractions for a day or outside set hours.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {dayOffs.length > 0 && (
-                        <StandardButton
-                            onClick={toggleSelectionMode}
-                            variant={selectionMode ? "secondary" : "secondary"}
-                            size="md"
-                            icon={selectionMode ? X : CheckSquare}
-                        >
+                <div className="flex flex-wrap items-center gap-2">
+                    {tab === 'blocks' && blocks.length > 0 && (
+                        <StandardButton onClick={() => { setSelectionMode(!selectionMode); setSelectedIds(new Set()); }} variant="secondary" size="md" icon={selectionMode ? X : CheckSquare}>
                             {selectionMode ? 'Cancel' : 'Select'}
                         </StandardButton>
                     )}
-                    <StandardButton
-                        onClick={() => {
-                            setBulkYear(new Date().getFullYear());
-                            setBulkSelectedDates(new Set());
-                            setBulkReason('');
-                            setBulkIsRecurring(false);
-                            if (isCompanyAdmin) {
-                                setModalLocationId(selectedLocationId ?? (scopeLocations.length > 0 ? scopeLocations[0].id : null));
-                            }
-                            setShowBulkModal(true);
-                        }}
-                        variant="secondary"
-                        size="md"
-                        icon={Calendar}
-                    >
-                        Bulk Add
+                    <StandardButton onClick={() => setFormState({ mode: 'bulk' })} variant="secondary" size="md" icon={Calendar}>
+                        Several dates
                     </StandardButton>
-                    <StandardButton
-                        onClick={() => {
-                            resetForm();
-                            if (isCompanyAdmin) {
-                                setModalLocationId(selectedLocationId ?? (scopeLocations.length > 0 ? scopeLocations[0].id : null));
-                            }
-                            setShowCreateModal(true);
-                        }}
-                        variant="primary"
-                        size="md"
-                        icon={Plus}
-                    >
-                        Add Day Off
+                    <StandardButton onClick={openCreate} variant="primary" size="md" icon={Plus}>
+                        Add block
                     </StandardButton>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                {selectionMode && dayOffs.length > 0 && (
-                    <div className={`mb-4 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedDayOffIds.size === dayOffs.length}
-                                    onChange={selectAllDayOffs}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm font-medium text-gray-700">
-                                    Select All
-                                </span>
-                            </label>
-                            <span className="text-sm text-gray-600">
-                                {selectedDayOffIds.size} Day Off{selectedDayOffIds.size !== 1 ? 's' : ''} selected
-                            </span>
-                            {selectedDayOffIds.size > 0 && (
-                                <StandardButton
-                                    onClick={handleBulkDelete}
-                                    variant="danger"
-                                    size="sm"
-                                    icon={Trash2}
-                                >
-                                    Delete {selectedDayOffIds.size}
-                                </StandardButton>
-                            )}
-                        </div>
-                    </div>
-                )}
+            <div className="mb-4 inline-flex rounded-lg bg-gray-100 p-1" role="tablist">
+                <button type="button" role="tab" aria-selected={tab === 'blocks'} onClick={() => setTab('blocks')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === 'blocks' ? 'bg-white text-gray-900 shadow' : 'text-gray-600 hover:text-gray-800'}`}>
+                    Blocks
+                </button>
+                <button type="button" role="tab" aria-selected={tab === 'history'} onClick={() => setTab('history')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === 'history' ? 'bg-white text-gray-900 shadow' : 'text-gray-600 hover:text-gray-800'}`}>
+                    Change history
+                </button>
+            </div>
 
-                {!loading && (
-                    <div className="mb-6">
-                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                            <div className="relative flex-1 max-w-lg">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Search className="h-4 w-4 text-gray-600" />
-                                </div>
-                                <input
-                                    type="text"
-                                    placeholder="Search by date or reason..."
-                                    value={searchTerm}
-                                    onChange={handleSearch}
-                                    className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                                />
-                            </div>
-                            <div className="flex gap-1">
-                                <StandardButton
-                                    variant="secondary"
-                                    size="sm"
-                                    icon={Filter}
-                                    onClick={() => setShowFilters(!showFilters)}
-                                >
-                                    Filters
-                                </StandardButton>
-                                <StandardButton
-                                    variant="secondary"
-                                    size="sm"
-                                    icon={RefreshCcw}
-                                    onClick={() => fetchDayOffs()}
-                                >
-                                    {''}
-                                </StandardButton>
-                            </div>
-                        </div>
-
-                        {showFilters && (
-                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
-                                        <select
-                                            value={filters.upcoming_only === true ? 'upcoming' : 'all'}
-                                            onChange={(e) => handleFilterChange('upcoming_only', e.target.value === 'upcoming' ? true : undefined)}
-                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                                        >
-                                            <option value="upcoming">Upcoming Only</option>
-                                            <option value="all">All Dates</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
-                                        <select
-                                            value={filters.is_recurring === true ? 'recurring' : filters.is_recurring === false ? 'one-time' : 'all'}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                handleFilterChange('is_recurring', value === 'recurring' ? true : value === 'one-time' ? false : undefined);
-                                            }}
-                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                                        >
-                                            <option value="all">All Types</option>
-                                            <option value="recurring">Recurring Only</option>
-                                            <option value="one-time">One-time Only</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-800 mb-1">Sort By</label>
-                                        <select
-                                            value={filters.sort_by || 'date'}
-                                            onChange={(e) => setFilters(prev => ({ ...prev, sort_by: e.target.value as 'date' | 'created_at' }))}
-                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                                        >
-                                            <option value="date">Date</option>
-                                            <option value="created_at">Created</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-800 mb-1">Sort Order</label>
-                                        <select
-                                            value={filters.sort_order || 'asc'}
-                                            onChange={(e) => setFilters(prev => ({ ...prev, sort_order: e.target.value as 'asc' | 'desc' }))}
-                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                                        >
-                                            <option value="asc">Ascending</option>
-                                            <option value="desc">Descending</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex justify-end">
-                                    <StandardButton
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={clearFilters}
-                                    >
-                                        Clear Filters
+            {tab === 'history' ? (
+                <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
+                    <AvailabilityChangeLog showLocation={isCompanyAdmin} locationId={isCompanyAdmin ? effectiveLocationId : null} />
+                </div>
+            ) : (
+                <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
+                    {selectionMode && blocks.length > 0 && (
+                        <div className={`mb-4 flex flex-col items-start justify-between gap-3 rounded-lg border border-${themeColor}-200 bg-${themeColor}-50 p-3 sm:flex-row sm:items-center`}>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                                    <input type="checkbox" checked={allSelected} onChange={() => setSelectedIds(allSelected ? new Set() : new Set(blocks.map(block => block.id)))} className="h-4 w-4 rounded border-gray-300" />
+                                    Select all on this page
+                                </label>
+                                <span className="text-sm text-gray-600">{selectedIds.size} selected</span>
+                                {selectedIds.size > 0 && (
+                                    <StandardButton onClick={handleBulkDelete} variant="danger" size="sm" icon={Trash2}>
+                                        Remove {selectedIds.size}
                                     </StandardButton>
-                                </div>
+                                )}
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        <div className="flex items-center justify-between mt-3">
-                            <div className="text-sm text-gray-500">
-                                Showing {dayOffs.length} day off{dayOffs.length !== 1 ? 's' : ''}
-                            </div>
-                            
-                            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                                <button
-                                    onClick={() => toggleViewMode('card')}
-                                    className={`p-1.5 rounded transition-all ${
-                                        viewMode === 'card' 
-                                            ? `bg-white shadow text-${fullColor}` 
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                    title="Card View"
-                                >
-                                    <LayoutGrid className="w-4 h-4" />
+                    <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                        <div className="relative w-full max-w-lg flex-1">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <input
+                                type="search"
+                                placeholder="Search group, event or reason…"
+                                value={search}
+                                onChange={event => setSearch(event.target.value)}
+                                className="w-full rounded-lg border border-gray-200 py-1.5 pl-9 pr-3 text-sm"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <StandardButton variant="secondary" size="sm" icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filters</StandardButton>
+                            <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={fetchBlocks} title="Refresh">{''}</StandardButton>
+                            <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1">
+                                <button type="button" onClick={() => changeViewMode('card')} className={`rounded p-1.5 ${viewMode === 'card' ? `bg-white shadow text-${fullColor}` : 'text-gray-500 hover:text-gray-700'}`} title="Cards">
+                                    <LayoutGrid className="h-4 w-4" />
                                 </button>
-                                <button
-                                    onClick={() => toggleViewMode('table')}
-                                    className={`p-1.5 rounded transition-all ${
-                                        viewMode === 'table' 
-                                            ? `bg-white shadow text-${fullColor}` 
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                    title="Table View"
-                                >
-                                    <List className="w-4 h-4" />
+                                <button type="button" onClick={() => changeViewMode('table')} className={`rounded p-1.5 ${viewMode === 'table' ? `bg-white shadow text-${fullColor}` : 'text-gray-500 hover:text-gray-700'}`} title="Table">
+                                    <List className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
                     </div>
-                )}
 
-                {loading ? (
-                    <div className="flex justify-center items-center py-12">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
-                    </div>
-                ) : dayOffs.length > 0 ? (
-                    <>
-                        {viewMode === 'card' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {dayOffs.map((dayOff) => {
-                                    const closureType = getClosureTypeLabel(dayOff);
-                                    const blockingScopeBadge = getBlockingScopeBadge(dayOff);
-                                    const isPast = isPastDate(dayOff.date) && !dayOff.is_recurring;
-                                    
-                                    return (
-                                        <div 
-                                            key={dayOff.id} 
-                                            className={`relative border rounded-xl p-4 transition-all ${
-                                                selectionMode 
-                                                    ? 'cursor-pointer hover:shadow-lg hover:-translate-y-1' 
-                                                    : 'hover:shadow-md'
-                                            } ${
-                                                selectedDayOffIds.has(dayOff.id)
-                                                    ? `border-${fullColor} bg-${themeColor}-50 shadow-lg ring-2 ring-${fullColor}/20`
-                                                    : isPast
-                                                        ? 'border-gray-200 bg-gray-50/50'
-                                                        : 'border-gray-200 bg-white hover:border-gray-300'
-                                            }`}
-                                            onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
-                                        >
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                    {selectionMode ? (
-                                                        selectedDayOffIds.has(dayOff.id) ? (
-                                                            <CheckSquare className={`w-5 h-5 flex-shrink-0 text-${fullColor}`} />
-                                                        ) : (
-                                                            <Square className="w-5 h-5 flex-shrink-0 text-gray-400" />
-                                                        )
-                                                    ) : (
-                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isPast ? 'bg-gray-100' : `bg-${themeColor}-100`}`}>
-                                                            <Calendar className={`w-5 h-5 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
-                                                        </div>
-                                                    )}
-                                                    <div className="min-w-0">
-                                                        <h3 className="font-semibold text-base text-gray-900 truncate">
-                                                            {formatDate(dayOff.date)}
-                                                        </h3>
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            {dayOff.is_recurring && (
-                                                                <span className="inline-flex items-center gap-1 text-xs text-purple-600">
-                                                                    <RefreshCw className="w-3 h-3" />
-                                                                    Recurring
-                                                                </span>
-                                                            )}
-                                                            {isPast && (
-                                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">Past</span>
-                                                            )}
-                                                        </div>
+                    {showFilters && (
+                        <div className="mb-4 rounded-lg bg-gray-50 p-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+                                <label className="text-xs font-medium text-gray-800">
+                                    Dates
+                                    <select value={filters.upcoming_only ? 'upcoming' : 'all'} onChange={event => { setFilters(prev => ({ ...prev, upcoming_only: event.target.value === 'upcoming' ? true : undefined })); setPage(1); }} className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm font-normal">
+                                        <option value="upcoming">Upcoming only</option>
+                                        <option value="all">All dates</option>
+                                    </select>
+                                </label>
+                                <label className="text-xs font-medium text-gray-800">
+                                    Repeats
+                                    <select value={filters.is_recurring === true ? 'recurring' : filters.is_recurring === false ? 'one-time' : 'all'} onChange={event => { const value = event.target.value; setFilters(prev => ({ ...prev, is_recurring: value === 'recurring' ? true : value === 'one-time' ? false : undefined })); setPage(1); }} className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm font-normal">
+                                        <option value="all">All</option>
+                                        <option value="recurring">Every year</option>
+                                        <option value="one-time">One time</option>
+                                    </select>
+                                </label>
+                                <label className="text-xs font-medium text-gray-800">
+                                    Sort by
+                                    <select value={filters.sort_by} onChange={event => setFilters(prev => ({ ...prev, sort_by: event.target.value as 'date' | 'created_at' }))} className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm font-normal">
+                                        <option value="date">Date</option>
+                                        <option value="created_at">Created</option>
+                                    </select>
+                                </label>
+                                <label className="text-xs font-medium text-gray-800">
+                                    Order
+                                    <select value={filters.sort_order} onChange={event => setFilters(prev => ({ ...prev, sort_order: event.target.value as 'asc' | 'desc' }))} className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm font-normal">
+                                        <option value="asc">Ascending</option>
+                                        <option value="desc">Descending</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div className="mt-3 flex justify-end">
+                                <StandardButton variant="ghost" size="sm" onClick={() => { setFilters(DEFAULT_FILTERS); setSearch(''); setPage(1); }}>Clear filters</StandardButton>
+                            </div>
+                        </div>
+                    )}
+
+                    {!loading && pageInfo && (
+                        <p className="mb-3 text-sm text-gray-500">{pageInfo.total} block{pageInfo.total === 1 ? '' : 's'}</p>
+                    )}
+
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-gray-300" />
+                        </div>
+                    ) : loadError ? (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {loadError} <button type="button" onClick={fetchBlocks} className="ml-2 underline">Try again</button>
+                        </div>
+                    ) : blocks.length === 0 ? (
+                        <div className="flex flex-col items-center py-14">
+                            <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-${themeColor}-100`}>
+                                <CalendarOff className={`h-8 w-8 text-${fullColor}`} />
+                            </div>
+                            <h3 className="mb-2 text-lg font-semibold text-gray-900">No blocked dates</h3>
+                            <p className="mb-6 max-w-sm text-center text-sm text-gray-600">
+                                {debouncedSearch || filters.is_recurring !== undefined || !filters.upcoming_only
+                                    ? 'Nothing matches these filters.'
+                                    : 'Block a date for a private group, a holiday, maintenance or shorter hours.'}
+                            </p>
+                            <StandardButton onClick={openCreate} variant="primary" size="md" icon={Plus}>Add block</StandardButton>
+                        </div>
+                    ) : viewMode === 'card' ? (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {blocks.map(block => {
+                                const past = isPastBlock(block);
+                                const chosen = selectedIds.has(block.id);
+                                return (
+                                    <div
+                                        key={block.id}
+                                        onClick={() => selectionMode && toggleSelected(block.id)}
+                                        className={`relative rounded-xl border p-4 transition-shadow ${selectionMode ? 'cursor-pointer hover:shadow-lg' : 'hover:shadow-md'} ${chosen ? `border-${fullColor} bg-${themeColor}-50` : past ? 'border-gray-200 bg-gray-50/60' : 'border-gray-200 bg-white'}`}
+                                    >
+                                        <div className="mb-2 flex items-start justify-between gap-2">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                {selectionMode && (chosen ? <CheckSquare className={`h-5 w-5 shrink-0 text-${fullColor}`} /> : <Square className="h-5 w-5 shrink-0 text-gray-400" />)}
+                                                <div className="min-w-0">
+                                                    <h3 className="truncate text-base font-semibold text-gray-900">{formatDay(block.date)}</h3>
+                                                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                                        {block.is_recurring && (
+                                                            <span className="inline-flex items-center gap-1 text-xs text-purple-700"><RefreshCw className="h-3 w-3" />Every year</span>
+                                                        )}
+                                                        {past && <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">Past</span>}
+                                                        {block.block_type === 'legacy_closure' && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">Older format</span>}
                                                     </div>
                                                 </div>
-                                                {!selectionMode && (
-                                                    <div className="flex gap-1 flex-shrink-0 ml-2">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleEditClick(dayOff);
-                                                            }}
-                                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit2 className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDuplicateClick(dayOff);
-                                                            }}
-                                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                                                            title="Duplicate"
-                                                        >
-                                                            <Copy className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
-                                                            }}
-                                                            className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                )}
                                             </div>
-
-                                            <div className="flex items-center gap-2 flex-wrap mb-3">
-                                                {blockingScopeBadge && (
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${blockingScopeBadge.color}`}>
-                                                        <blockingScopeBadge.icon className="w-3 h-3" />
-                                                        {blockingScopeBadge.label}
-                                                    </span>
-                                                )}
-                                                {closureType ? (
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${closureType.color}`}>
-                                                        <Clock className="w-3 h-3" />
-                                                        {closureType.label}
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
-                                                        Full Day
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {(dayOff.reason || dayOff.location) && (
-                                                <div className="text-sm text-gray-500 space-y-1 pt-2 border-t border-gray-100">
-                                                    {dayOff.reason && (
-                                                        <p className="line-clamp-2">{dayOff.reason}</p>
-                                                    )}
-                                                    {dayOff.location && (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                                                            <span className="truncate">{dayOff.location.name}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                            {!selectionMode && renderActions(block)}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
 
-                        {viewMode === 'table' && (
-                            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-gray-50 border-b border-gray-100">
-                                            <tr>
-                                                {selectionMode && (
-                                                    <th className="w-12 px-4 py-3 text-left">
-                                                        <button
-                                                            onClick={() => {
-                                                                if (selectedDayOffIds.size === dayOffs.length) {
-                                                                    setSelectedDayOffIds(new Set());
-                                                                } else {
-                                                                    setSelectedDayOffIds(new Set(dayOffs.map(d => d.id)));
-                                                                }
-                                                            }}
-                                                            className="text-gray-500 hover:text-gray-700"
-                                                        >
-                                                            {selectedDayOffIds.size === dayOffs.length ? (
-                                                                <CheckSquare className="w-4 h-4" />
-                                                            ) : (
-                                                                <Square className="w-4 h-4" />
-                                                            )}
-                                                        </button>
-                                                    </th>
-                                                )}
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Scope</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
-                                                {isCompanyAdmin && (
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                                                )}
-                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {dayOffs.map((dayOff) => {
-                                                const closureType = getClosureTypeLabel(dayOff);
-                                                const blockingScopeBadge = getBlockingScopeBadge(dayOff);
-                                                const isPast = isPastDate(dayOff.date) && !dayOff.is_recurring;
-                                                
-                                                return (
-                                                    <tr 
-                                                        key={dayOff.id} 
-                                                        className={`transition-colors ${
-                                                            selectionMode ? 'cursor-pointer' : ''
-                                                        } ${
-                                                            selectedDayOffIds.has(dayOff.id)
-                                                                ? `bg-${themeColor}-50`
-                                                                : isPast
-                                                                    ? 'bg-gray-50/50 text-gray-500'
-                                                                    : 'hover:bg-gray-50'
-                                                        }`}
-                                                        onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
-                                                    >
-                                                        {selectionMode && (
-                                                            <td className="px-4 py-3">
-                                                                {selectedDayOffIds.has(dayOff.id) ? (
-                                                                    <CheckSquare className={`w-4 h-4 text-${fullColor}`} />
-                                                                ) : (
-                                                                    <Square className="w-4 h-4 text-gray-400" />
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <Calendar className={`w-4 h-4 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
-                                                                <span className={`font-medium ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
-                                                                    {formatDate(dayOff.date)}
-                                                                </span>
-                                                                {dayOff.is_recurring && (
-                                                                    <span title="Recurring annually">
-                                                                        <RefreshCw className="w-3.5 h-3.5 text-purple-500" />
-                                                                    </span>
-                                                                )}
-                                                                {isPast && (
-                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600">Past</span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {blockingScopeBadge && (
-                                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${blockingScopeBadge.color}`}>
-                                                                    <blockingScopeBadge.icon className="w-3 h-3" />
-                                                                    {blockingScopeBadge.label}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {closureType ? (
-                                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${closureType.color}`}>
-                                                                    <Clock className="w-3 h-3" />
-                                                                    {closureType.label}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
-                                                                    Full Day
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {renderEditableCell(
-                                                                dayOff,
-                                                                'reason',
-                                                                <span className="text-sm text-gray-600 line-clamp-1 max-w-[200px]">
-                                                                    {dayOff.reason || '—'}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        {isCompanyAdmin && (
-                                                            <td className="px-4 py-3">
-                                                                {dayOff.location && (
-                                                                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                                                                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                                                                        <span className="truncate max-w-[150px]">{dayOff.location.name}</span>
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3 text-right">
-                                                            {!selectionMode && (
-                                                                <div className="flex items-center justify-end gap-1">
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleEditClick(dayOff);
-                                                                        }}
-                                                                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                                                                        title="Edit"
-                                                                    >
-                                                                        <Edit2 className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDuplicateClick(dayOff);
-                                                                        }}
-                                                                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                                                                        title="Duplicate"
-                                                                    >
-                                                                        <Copy className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
-                                                                        }}
-                                                                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
-                                                                        title="Delete"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center py-16">
-                        <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
-                            <CalendarOff className={`w-8 h-8 text-${fullColor}`} />
+                                        <p className="mb-2 flex items-start gap-1.5 text-sm font-semibold text-gray-900">
+                                            <Users className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+                                            <span className="break-words">{block.group_name || <span className="font-normal italic text-gray-400">No group or event name</span>}</span>
+                                        </p>
+
+                                        <div className="mb-2 flex flex-wrap gap-1.5">
+                                            <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${windowBadgeClass(block)}`}>
+                                                <Clock className="h-3 w-3" />
+                                                {block.window_label}
+                                            </span>
+                                            <span className="inline-flex max-w-full items-center rounded-lg bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700" title={block.scope_label}>
+                                                <span className="truncate">{block.scope_label}</span>
+                                            </span>
+                                        </div>
+
+                                        {block.reason && <p className="mb-2 line-clamp-2 text-sm text-gray-600">{block.reason}</p>}
+
+                                        <div className="space-y-1 border-t border-gray-100 pt-2 text-xs text-gray-500">
+                                            {isCompanyAdmin && block.location_name && (
+                                                <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{block.location_name}</span>
+                                            )}
+                                            {renderPeople(block)}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Day Offs found</h3>
-                        <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
-                            {searchTerm || filters.is_recurring !== undefined 
-                                ? 'No day offs match your search criteria. Try adjusting your filters.'
-                                : 'Get started by adding blocked dates or holidays for your location'}
-                        </p>
-                        <StandardButton
-                            onClick={() => {
-                                resetForm();
-                                if (isCompanyAdmin) {
-                                    setModalLocationId(selectedLocationId ?? (scopeLocations.length > 0 ? scopeLocations[0].id : null));
-                                }
-                                setShowCreateModal(true);
-                            }}
-                            variant="primary"
-                            size="md"
-                        >
-                            Add Day Off
-                        </StandardButton>
-                    </div>
-                )}
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl border border-gray-100">
+                            <table className="w-full min-w-[56rem]">
+                                <thead className="border-b border-gray-100 bg-gray-50">
+                                    <tr>
+                                        {selectionMode && (
+                                            <th className="w-10 px-3 py-3 text-left">
+                                                <button type="button" onClick={() => setSelectedIds(allSelected ? new Set() : new Set(blocks.map(block => block.id)))} className="text-gray-500 hover:text-gray-700" aria-label="Select all">
+                                                    {allSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                                                </button>
+                                            </th>
+                                        )}
+                                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date</th>
+                                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Group or event</th>
+                                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Blocked</th>
+                                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">When</th>
+                                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Reason</th>
+                                        <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Set by</th>
+                                        {isCompanyAdmin && <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Location</th>}
+                                        <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {blocks.map(block => {
+                                        const past = isPastBlock(block);
+                                        const chosen = selectedIds.has(block.id);
+                                        return (
+                                            <tr key={block.id} onClick={() => selectionMode && toggleSelected(block.id)} className={`${selectionMode ? 'cursor-pointer' : ''} ${chosen ? `bg-${themeColor}-50` : past ? 'bg-gray-50/60 text-gray-500' : 'hover:bg-gray-50'}`}>
+                                                {selectionMode && (
+                                                    <td className="px-3 py-3">{chosen ? <CheckSquare className={`h-4 w-4 text-${fullColor}`} /> : <Square className="h-4 w-4 text-gray-400" />}</td>
+                                                )}
+                                                <td className="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900">
+                                                    {formatDay(block.date)}
+                                                    {block.is_recurring && <RefreshCw className="ml-1.5 inline h-3.5 w-3.5 text-purple-500" aria-label="Every year" />}
+                                                    {past && <span className="ml-1.5 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">Past</span>}
+                                                </td>
+                                                <td className="max-w-[14rem] px-3 py-3 text-sm text-gray-900">{renderEditable(block, 'group_name', block.group_name)}</td>
+                                                <td className="max-w-[14rem] px-3 py-3 text-xs text-gray-700"><span className="line-clamp-2" title={block.scope_label}>{block.scope_label}</span></td>
+                                                <td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${windowBadgeClass(block)}`}><Clock className="h-3 w-3" />{block.window_label}</span></td>
+                                                <td className="max-w-[14rem] px-3 py-3 text-sm text-gray-600">{renderEditable(block, 'reason', block.reason)}</td>
+                                                <td className="px-3 py-3 text-xs text-gray-600">{block.set_by?.name ?? 'Not recorded'}</td>
+                                                {isCompanyAdmin && <td className="px-3 py-3 text-xs text-gray-600">{block.location_name}</td>}
+                                                <td className="px-3 py-3"><div className="flex justify-end">{!selectionMode && renderActions(block)}</div></td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
-                {!loading && totalPages > 1 && (
-                    <div className="flex items-center justify-center mt-6">
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={handlePageChange}
+                    {!loading && pageInfo && pageInfo.last_page > 1 && (
+                        <div className="mt-6 flex justify-center">
+                            <Pagination currentPage={pageInfo.current_page} totalPages={pageInfo.last_page} onPageChange={setPage} />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {formState && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4" onClick={() => !formBusy && closeForm()}>
+                    <div
+                        className={`my-6 w-full rounded-xl bg-white shadow-xl ${formState.mode === 'bulk' ? 'max-w-5xl' : 'max-w-2xl'}`}
+                        onClick={event => event.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="availability-block-form-title"
+                    >
+                        <AvailabilityBlockForm
+                            key={`${formState.mode}-${formState.source?.id ?? 'new'}-${formState.duplicate ? 'copy' : ''}`}
+                            mode={formState.mode}
+                            source={formState.source}
+                            duplicate={formState.duplicate}
+                            isCompanyAdmin={isCompanyAdmin}
+                            locations={formLocations}
+                            defaultLocationId={defaultLocationId}
+                            themeColor={themeColor}
+                            fullColor={fullColor}
+                            onCancel={() => closeForm()}
+                            onSaved={(message, type) => closeForm(message, type)}
+                            onPartialSave={fetchBlocks}
+                            onBusyChange={setFormBusy}
+                            olderPartners={formState.mode === 'edit' ? formState.partners ?? [] : []}
                         />
                     </div>
-                )}
-            </div>
-
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowCreateModal(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6 max-h-[85vh] overflow-y-auto">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Day Off</h2>
-                            
-                            <form onSubmit={handleCreateDayOff} className="space-y-4">
-                                {!isCompanyAdmin && (
-                                    <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${currentUser?.location_id ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
-                                        <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${currentUser?.location_id ? `text-${fullColor}` : 'text-amber-700'}`} />
-                                        <p className="text-sm text-neutral-700">
-                                            Closing <span className="font-semibold text-neutral-900">{currentUser?.location_name || 'no location assigned'}</span>
-                                        </p>
-                                    </div>
-                                )}
-
-                                {isCompanyAdmin && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Location <span className="text-red-500">*</span>
-                                        </label>
-                                        <LocationSelector
-                                            locations={scopeLocations.map(loc => ({
-                                                id: loc.id.toString(),
-                                                name: loc.name,
-                                                address: '',
-                                                city: '',
-                                                state: ''
-                                            }))}
-                                            selectedLocation={modalLocationId?.toString() || ''}
-                                            onLocationChange={(locationId) => {
-                                                const next = locationId ? Number(locationId) : null;
-                                                if (next !== modalLocationId) {
-                                                    setSelectedPackageIds([]);
-                                                    setSelectedRoomIds([]);
-                                                    setSelectedAttractionIds([]);
-                                                    setSelectedEventIds([]);
-                                                }
-                                                setModalLocationId(next);
-                                            }}
-                                            themeColor={themeColor}
-                                            fullColor={fullColor}
-                                            layout="grid"
-                                            maxWidth="100%"
-                                            showAllOption={false}
-                                        />
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Date <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        name="date"
-                                        value={formData.date}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Reason
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="reason"
-                                        value={formData.reason}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="e.g., Holiday, Maintenance, etc."
-                                    />
-                                </div>
-
-                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        What should be blocked?
-                                    </label>
-                                    
-                                    <div className="grid grid-cols-2 gap-2 mb-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('location')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'location' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'location' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <Building2 className={`w-5 h-5 ${blockingScope === 'location' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'location' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Entire Location</div>
-                                                <div className="text-xs text-gray-500">All packages & rooms</div>
-                                            </div>
-                                        </button>
-                                        
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('packages')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'packages' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'packages' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <PackageIcon className={`w-5 h-5 ${blockingScope === 'packages' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'packages' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Packages Only</div>
-                                                <div className="text-xs text-gray-500">Select packages</div>
-                                            </div>
-                                        </button>
-                                        
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('rooms')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'rooms' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'rooms' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <DoorOpen className={`w-5 h-5 ${blockingScope === 'rooms' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'rooms' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Spaces Only</div>
-                                                <div className="text-xs text-gray-500">Select spaces</div>
-                                            </div>
-                                        </button>
-                                        
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('both')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'both'
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <Layers className={`w-5 h-5 ${blockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'both' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Both</div>
-                                                <div className="text-xs text-gray-500">Packages & rooms</div>
-                                            </div>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('attractions')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'attractions'
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'attractions' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <LayoutGrid className={`w-5 h-5 ${blockingScope === 'attractions' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'attractions' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Attractions Only</div>
-                                                <div className="text-xs text-gray-500">Select attractions</div>
-                                            </div>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('events')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'events'
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'events' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <Calendar className={`w-5 h-5 ${blockingScope === 'events' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'events' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Events Only</div>
-                                                <div className="text-xs text-gray-500">Select events</div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    
-                                    {(blockingScope === 'packages' || blockingScope === 'both') && (
-                                        <div className="mb-3">
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select Packages <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading packages...</div>
-                                            ) : availablePackages.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No active packages found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availablePackages.map(pkg => (
-                                                        <label key={pkg.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedPackageIds.includes(pkg.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedPackageIds([...selectedPackageIds, pkg.id]);
-                                                                    } else {
-                                                                        setSelectedPackageIds(selectedPackageIds.filter(id => id !== pkg.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{pkg.name}</span>
-                                                                {renderItemLocation(pkg.location_id, pkg.location?.name)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    
-                                    {(blockingScope === 'rooms' || blockingScope === 'both') && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select spaces <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading rooms...</div>
-                                            ) : availableRooms.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No available spaces found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availableRooms.map(room => (
-                                                        <label key={room.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedRoomIds.includes(room.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedRoomIds([...selectedRoomIds, room.id]);
-                                                                    } else {
-                                                                        setSelectedRoomIds(selectedRoomIds.filter(id => id !== room.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{room.name}</span>
-                                                                {renderItemLocation(room.location_id)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {blockingScope === 'attractions' && (
-                                        <div className="mb-3">
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select Attractions <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading attractions...</div>
-                                            ) : availableAttractions.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No active attractions found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availableAttractions.map(attraction => (
-                                                        <label key={attraction.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedAttractionIds.includes(attraction.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedAttractionIds([...selectedAttractionIds, attraction.id]);
-                                                                    } else {
-                                                                        setSelectedAttractionIds(selectedAttractionIds.filter(id => id !== attraction.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{attraction.name}</span>
-                                                                {renderItemLocation(attraction.location_id)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {blockingScope === 'events' && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select Events <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading events...</div>
-                                            ) : availableEvents.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No active events found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availableEvents.map(event => (
-                                                        <label key={event.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedEventIds.includes(event.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedEventIds([...selectedEventIds, event.id]);
-                                                                    } else {
-                                                                        setSelectedEventIds(selectedEventIds.filter(id => id !== event.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{event.name}</span>
-                                                                {renderItemLocation(event.location_id, event.location?.name)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
-                                    </label>
-                                    <p className="text-xs text-gray-500 mb-3">
-                                        These times mark the window that is <span className="font-medium">closed</span>. Leave both empty to close the whole day. Set only &quot;Closed Until&quot; for a delayed opening &mdash; that is the time it reopens.
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Closed From
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="time"
-                                                    name="time_start"
-                                                    value={formData.time_start}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                />
-                                                {formData.time_start && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData(prev => ({ ...prev, time_start: '' }))}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        title="Clear time"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Blank means closed from opening time</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Closed Until
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="time"
-                                                    name="time_end"
-                                                    value={formData.time_end}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                />
-                                                {formData.time_end && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        title="Clear time"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Reopens at this time; blank means closed for the rest of the day</p>
-                                        </div>
-                                    </div>
-                                    {closureRangeIsInvalid(formData.time_start, formData.time_end) ? (
-                                        <p className="text-xs text-red-600 mt-2">
-                                            &quot;Closed Until&quot; has to be later than &quot;Closed From&quot;.
-                                        </p>
-                                    ) : (
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            {closurePreview(formData.time_start, formData.time_end)}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        name="is_recurring"
-                                        checked={formData.is_recurring}
-                                        onChange={handleInputChange}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                    />
-                                    <label className="ml-2 block text-sm text-gray-900">
-                                        Recurring annually
-                                    </label>
-                                </div>
-
-                                <div className="flex gap-3 pt-4">
-                                    <StandardButton
-                                        type="submit"
-                                        variant="primary"
-                                        size="md"
-                                        className="flex-1"
-                                    >
-                                        Add Day Off
-                                    </StandardButton>
-                                    <StandardButton
-                                        type="button"
-                                        onClick={() => {
-                                            setShowCreateModal(false);
-                                            resetForm();
-                                        }}
-                                        variant="secondary"
-                                        size="md"
-                                        className="flex-1"
-                                    >
-                                        Cancel
-                                    </StandardButton>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
                 </div>
             )}
 
-            {showEditModal && selectedDayOff && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowEditModal(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6 max-h-[85vh] overflow-y-auto">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Day Off</h2>
-                            <form onSubmit={handleUpdateDayOff} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Date <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        name="date"
-                                        value={formData.date}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Reason
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="reason"
-                                        value={formData.reason}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="e.g., Holiday, Maintenance, etc."
-                                    />
-                                </div>
-
-                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        What should be blocked?
-                                    </label>
-                                    
-                                    <div className="grid grid-cols-2 gap-2 mb-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('location')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'location' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'location' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <Building2 className={`w-5 h-5 ${blockingScope === 'location' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'location' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Entire Location</div>
-                                                <div className="text-xs text-gray-500">All packages & rooms</div>
-                                            </div>
-                                        </button>
-                                        
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('packages')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'packages' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'packages' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <PackageIcon className={`w-5 h-5 ${blockingScope === 'packages' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'packages' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Packages Only</div>
-                                                <div className="text-xs text-gray-500">Select packages</div>
-                                            </div>
-                                        </button>
-                                        
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('rooms')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'rooms' 
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'rooms' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <DoorOpen className={`w-5 h-5 ${blockingScope === 'rooms' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'rooms' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Spaces Only</div>
-                                                <div className="text-xs text-gray-500">Select spaces</div>
-                                            </div>
-                                        </button>
-                                        
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('both')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'both'
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <Layers className={`w-5 h-5 ${blockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'both' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Both</div>
-                                                <div className="text-xs text-gray-500">Packages & rooms</div>
-                                            </div>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('attractions')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'attractions'
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'attractions' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <LayoutGrid className={`w-5 h-5 ${blockingScope === 'attractions' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'attractions' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Attractions Only</div>
-                                                <div className="text-xs text-gray-500">Select attractions</div>
-                                            </div>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setBlockingScope('events')}
-                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                blockingScope === 'events'
-                                                    ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            style={blockingScope === 'events' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                        >
-                                            <Calendar className={`w-5 h-5 ${blockingScope === 'events' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'events' ? { color: fullColor } : undefined} />
-                                            <div>
-                                                <div className="font-medium text-sm">Events Only</div>
-                                                <div className="text-xs text-gray-500">Select events</div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    
-                                    {(blockingScope === 'packages' || blockingScope === 'both') && (
-                                        <div className="mb-3">
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select Packages <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading packages...</div>
-                                            ) : availablePackages.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No active packages found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availablePackages.map(pkg => (
-                                                        <label key={pkg.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedPackageIds.includes(pkg.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedPackageIds([...selectedPackageIds, pkg.id]);
-                                                                    } else {
-                                                                        setSelectedPackageIds(selectedPackageIds.filter(id => id !== pkg.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{pkg.name}</span>
-                                                                {renderItemLocation(pkg.location_id, pkg.location?.name)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    
-                                    {(blockingScope === 'rooms' || blockingScope === 'both') && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select spaces <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading rooms...</div>
-                                            ) : availableRooms.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No available spaces found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availableRooms.map(room => (
-                                                        <label key={room.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedRoomIds.includes(room.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedRoomIds([...selectedRoomIds, room.id]);
-                                                                    } else {
-                                                                        setSelectedRoomIds(selectedRoomIds.filter(id => id !== room.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{room.name}</span>
-                                                                {renderItemLocation(room.location_id)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {blockingScope === 'attractions' && (
-                                        <div className="mb-3">
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select Attractions <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading attractions...</div>
-                                            ) : availableAttractions.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No active attractions found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availableAttractions.map(attraction => (
-                                                        <label key={attraction.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedAttractionIds.includes(attraction.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedAttractionIds([...selectedAttractionIds, attraction.id]);
-                                                                    } else {
-                                                                        setSelectedAttractionIds(selectedAttractionIds.filter(id => id !== attraction.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{attraction.name}</span>
-                                                                {renderItemLocation(attraction.location_id)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {blockingScope === 'events' && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                Select Events <span className="text-red-500">*</span>
-                                            </label>
-                                            {loadingResources ? (
-                                                <div className="text-sm text-gray-500">Loading events...</div>
-                                            ) : availableEvents.length === 0 ? (
-                                                <div className="text-sm text-gray-500">No active events found</div>
-                                            ) : (
-                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                    {availableEvents.map(event => (
-                                                        <label key={event.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedEventIds.includes(event.id)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        setSelectedEventIds([...selectedEventIds, event.id]);
-                                                                    } else {
-                                                                        setSelectedEventIds(selectedEventIds.filter(id => id !== event.id));
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                            />
-                                                            <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{event.name}</span>
-                                                                {renderItemLocation(event.location_id, event.location?.name)}
-                                                            </span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
-                                    </label>
-                                    <p className="text-xs text-gray-500 mb-3">
-                                        These times mark the window that is <span className="font-medium">closed</span>. Leave both empty to close the whole day. Set only &quot;Closed Until&quot; for a delayed opening &mdash; that is the time it reopens.
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Closed From
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="time"
-                                                    name="time_start"
-                                                    value={formData.time_start}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                />
-                                                {formData.time_start && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData(prev => ({ ...prev, time_start: '' }))}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        title="Clear time"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Blank means closed from opening time</p>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                Closed Until
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type="time"
-                                                    name="time_end"
-                                                    value={formData.time_end}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                />
-                                                {formData.time_end && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        title="Clear time"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Reopens at this time; blank means closed for the rest of the day</p>
-                                        </div>
-                                    </div>
-                                    {closureRangeIsInvalid(formData.time_start, formData.time_end) ? (
-                                        <p className="text-xs text-red-600 mt-2">
-                                            &quot;Closed Until&quot; has to be later than &quot;Closed From&quot;.
-                                        </p>
-                                    ) : (
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            {closurePreview(formData.time_start, formData.time_end)}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        name="is_recurring"
-                                        checked={formData.is_recurring}
-                                        onChange={handleInputChange}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                    />
-                                    <label className="ml-2 block text-sm text-gray-900">
-                                        Recurring annually
-                                    </label>
-                                </div>
-
-                                <div className="flex gap-3 pt-4">
-                                    <StandardButton
-                                        type="submit"
-                                        variant="primary"
-                                        size="md"
-                                        className="flex-1"
-                                    >
-                                        Update Day Off
-                                    </StandardButton>
-                                    <StandardButton
-                                        type="button"
-                                        onClick={() => {
-                                            setShowEditModal(false);
-                                            resetForm();
-                                        }}
-                                        variant="secondary"
-                                        size="md"
-                                        className="flex-1"
-                                    >
-                                        Cancel
-                                    </StandardButton>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showBulkModal && (
-                <div 
-                    className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50 overflow-y-auto" 
-                    onClick={() => !bulkCreating && setShowBulkModal(false)}
-                >
-                    <div 
-                        className="bg-white rounded-lg shadow-xl w-full max-w-6xl my-8" 
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10 rounded-t-lg">
-                            <h3 className="text-lg font-semibold text-gray-900">Bulk Add Day Offs</h3>
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => setBulkYear(prev => prev - 1)}
-                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                    disabled={bulkCreating}
-                                >
-                                    <ChevronLeft className="w-5 h-5" />
-                                </button>
-                                <span className="text-lg font-bold min-w-[60px] text-center">{bulkYear}</span>
-                                <button
-                                    onClick={() => setBulkYear(prev => prev + 1)}
-                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                    disabled={bulkCreating}
-                                >
-                                    <ChevronRight className="w-5 h-5" />
-                                </button>
+            {historyFor && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4" onClick={() => setHistoryFor(null)}>
+                    <div className="my-6 w-full max-w-2xl rounded-xl bg-white shadow-xl" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="block-history-title">
+                        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
+                            <div className="min-w-0">
+                                <h2 id="block-history-title" className="text-lg font-semibold text-gray-900">History</h2>
+                                <p className="mt-0.5 truncate text-sm text-gray-600">{formatDay(historyFor.date)} · {historyFor.group_name || historyFor.scope_label}</p>
                             </div>
-                            <button
-                                onClick={() => !bulkCreating && setShowBulkModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                                disabled={bulkCreating}
-                            >
-                                <X className="w-5 h-5" />
+                            <button type="button" onClick={() => setHistoryFor(null)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close">
+                                <X className="h-5 w-5" />
                             </button>
                         </div>
-
-                        <div className="p-6">
-                                {!isCompanyAdmin && (
-                                    <div className={`mb-4 flex items-start gap-2 rounded-lg border px-3 py-2 ${currentUser?.location_id ? `border-${themeColor}-200 bg-${themeColor}-50` : 'border-amber-200 bg-amber-50'}`}>
-                                        <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${currentUser?.location_id ? `text-${fullColor}` : 'text-amber-700'}`} />
-                                        <p className="text-sm text-neutral-700">
-                                            Closing <span className="font-semibold text-neutral-900">{currentUser?.location_name || 'no location assigned'}</span>
-                                        </p>
-                                    </div>
-                                )}
-
-                                {isCompanyAdmin && (
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                                        <select
-                                            value={modalLocationId || ''}
-                                            onChange={(e) => {
-                                                const next = Number(e.target.value);
-                                                if (next !== modalLocationId) {
-                                                    setBulkSelectedPackageIds([]);
-                                                    setBulkSelectedRoomIds([]);
-                                                    setBulkSelectedAttractionIds([]);
-                                                    setBulkSelectedEventIds([]);
-                                                }
-                                                setModalLocationId(next);
-                                            }}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            disabled={bulkCreating}
-                                        >
-                                            {scopeLocations.map(loc => (
-                                                <option key={loc.id} value={loc.id}>{loc.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                <div className="mb-4 flex items-center justify-between">
-                                    <span className="text-sm text-gray-600">
-                                        {bulkSelectedDates.size} date{bulkSelectedDates.size !== 1 ? 's' : ''} selected
-                                    </span>
-                                    {bulkSelectedDates.size > 0 && (
-                                        <button
-                                            onClick={() => setBulkSelectedDates(new Set())}
-                                            className="text-sm text-red-600 hover:text-red-800"
-                                            disabled={bulkCreating}
-                                        >
-                                            Clear all
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-                                    {monthNames.map((monthName, monthIndex) => (
-                                        <div key={monthIndex} className="border border-gray-200 rounded-lg p-3">
-                                            <h4 className="text-sm font-semibold text-gray-700 mb-2 text-center">{monthName}</h4>
-                                            <div className="grid grid-cols-7 gap-1 text-xs">
-                                                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-                                                    <div key={i} className="text-center text-gray-400 font-medium py-1">{day}</div>
-                                                ))}
-                                                {Array.from({ length: getFirstDayOfMonth(bulkYear, monthIndex) }).map((_, i) => (
-                                                    <div key={`empty-${i}`} />
-                                                ))}
-                                                {Array.from({ length: getDaysInMonth(bulkYear, monthIndex) }).map((_, dayIndex) => {
-                                                    const day = dayIndex + 1;
-                                                    const dateStr = formatDateString(bulkYear, monthIndex, day);
-                                                    const isSelected = bulkSelectedDates.has(dateStr);
-                                                    const isPast = isBulkDatePast(dateStr);
-                                                    
-                                                    return (
-                                                        <button
-                                                            key={day}
-                                                            onClick={() => !isPast && !bulkCreating && toggleBulkDate(dateStr)}
-                                                            disabled={isPast || bulkCreating}
-                                                            className={`
-                                                                p-1 rounded text-center transition-colors
-                                                                ${isPast 
-                                                                    ? 'text-gray-300 cursor-not-allowed' 
-                                                                    : isSelected 
-                                                                        ? `bg-${themeColor}-500 text-white hover:bg-${themeColor}-600` 
-                                                                        : 'hover:bg-gray-100 text-gray-700'
-                                                                }
-                                                            `}
-                                                            style={isSelected && !isPast ? { backgroundColor: fullColor, color: 'white' } : undefined}
-                                                        >
-                                                            {day}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="space-y-4 border-t pt-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Reason (optional - applies to all selected dates)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={bulkReason}
-                                            onChange={(e) => setBulkReason(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            placeholder="e.g., Holiday, Maintenance, etc."
-                                            disabled={bulkCreating}
-                                        />
-                                    </div>
-
-                                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                                            What should be blocked? <span className="text-xs text-gray-500">(Applies to all selected dates)</span>
-                                        </label>
-                                        
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-                                            <button
-                                                type="button"
-                                                onClick={() => setBulkBlockingScope('location')}
-                                                disabled={bulkCreating}
-                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'location' 
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                                style={bulkBlockingScope === 'location' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                            >
-                                                <Building2 className={`w-5 h-5 ${bulkBlockingScope === 'location' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'location' ? { color: fullColor } : undefined} />
-                                                <div>
-                                                    <div className="font-medium text-sm">Entire Location</div>
-                                                </div>
-                                            </button>
-                                            
-                                            <button
-                                                type="button"
-                                                onClick={() => setBulkBlockingScope('packages')}
-                                                disabled={bulkCreating}
-                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'packages' 
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                                style={bulkBlockingScope === 'packages' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                            >
-                                                <PackageIcon className={`w-5 h-5 ${bulkBlockingScope === 'packages' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'packages' ? { color: fullColor } : undefined} />
-                                                <div>
-                                                    <div className="font-medium text-sm">Packages Only</div>
-                                                </div>
-                                            </button>
-                                            
-                                            <button
-                                                type="button"
-                                                onClick={() => setBulkBlockingScope('rooms')}
-                                                disabled={bulkCreating}
-                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'rooms' 
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                                style={bulkBlockingScope === 'rooms' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                            >
-                                                <DoorOpen className={`w-5 h-5 ${bulkBlockingScope === 'rooms' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'rooms' ? { color: fullColor } : undefined} />
-                                                <div>
-                                                    <div className="font-medium text-sm">Spaces Only</div>
-                                                </div>
-                                            </button>
-                                            
-                                            <button
-                                                type="button"
-                                                onClick={() => setBulkBlockingScope('both')}
-                                                disabled={bulkCreating}
-                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'both'
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                                style={bulkBlockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                            >
-                                                <Layers className={`w-5 h-5 ${bulkBlockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'both' ? { color: fullColor } : undefined} />
-                                                <div>
-                                                    <div className="font-medium text-sm">Both</div>
-                                                </div>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setBulkBlockingScope('attractions')}
-                                                disabled={bulkCreating}
-                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'attractions'
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                                style={bulkBlockingScope === 'attractions' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                            >
-                                                <LayoutGrid className={`w-5 h-5 ${bulkBlockingScope === 'attractions' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'attractions' ? { color: fullColor } : undefined} />
-                                                <div>
-                                                    <div className="font-medium text-sm">Attractions Only</div>
-                                                </div>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setBulkBlockingScope('events')}
-                                                disabled={bulkCreating}
-                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
-                                                    bulkBlockingScope === 'events'
-                                                        ? `border-${themeColor}-500 bg-${themeColor}-50`
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                                style={bulkBlockingScope === 'events' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
-                                            >
-                                                <Calendar className={`w-5 h-5 ${bulkBlockingScope === 'events' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'events' ? { color: fullColor } : undefined} />
-                                                <div>
-                                                    <div className="font-medium text-sm">Events Only</div>
-                                                </div>
-                                            </button>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {(bulkBlockingScope === 'packages' || bulkBlockingScope === 'both') && (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                        Select Packages <span className="text-red-500">*</span>
-                                                    </label>
-                                                    {loadingResources ? (
-                                                        <div className="text-sm text-gray-500">Loading packages...</div>
-                                                    ) : availablePackages.length === 0 ? (
-                                                        <div className="text-sm text-gray-500">No active packages found</div>
-                                                    ) : (
-                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                            {availablePackages.map(pkg => (
-                                                                <label key={pkg.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={bulkSelectedPackageIds.includes(pkg.id)}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                setBulkSelectedPackageIds([...bulkSelectedPackageIds, pkg.id]);
-                                                                            } else {
-                                                                                setBulkSelectedPackageIds(bulkSelectedPackageIds.filter(id => id !== pkg.id));
-                                                                            }
-                                                                        }}
-                                                                        disabled={bulkCreating}
-                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                    />
-                                                                    <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{pkg.name}</span>
-                                                                {renderItemLocation(pkg.location_id, pkg.location?.name)}
-                                                            </span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                            
-                                            {(bulkBlockingScope === 'rooms' || bulkBlockingScope === 'both') && (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                        Select spaces <span className="text-red-500">*</span>
-                                                    </label>
-                                                    {loadingResources ? (
-                                                        <div className="text-sm text-gray-500">Loading rooms...</div>
-                                                    ) : availableRooms.length === 0 ? (
-                                                        <div className="text-sm text-gray-500">No available spaces found</div>
-                                                    ) : (
-                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                            {availableRooms.map(room => (
-                                                                <label key={room.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={bulkSelectedRoomIds.includes(room.id)}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                setBulkSelectedRoomIds([...bulkSelectedRoomIds, room.id]);
-                                                                            } else {
-                                                                                setBulkSelectedRoomIds(bulkSelectedRoomIds.filter(id => id !== room.id));
-                                                                            }
-                                                                        }}
-                                                                        disabled={bulkCreating}
-                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                    />
-                                                                    <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{room.name}</span>
-                                                                {renderItemLocation(room.location_id)}
-                                                            </span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {bulkBlockingScope === 'attractions' && (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                        Select Attractions <span className="text-red-500">*</span>
-                                                    </label>
-                                                    {loadingResources ? (
-                                                        <div className="text-sm text-gray-500">Loading attractions...</div>
-                                                    ) : availableAttractions.length === 0 ? (
-                                                        <div className="text-sm text-gray-500">No active attractions found</div>
-                                                    ) : (
-                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                            {availableAttractions.map(attraction => (
-                                                                <label key={attraction.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={bulkSelectedAttractionIds.includes(attraction.id)}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                setBulkSelectedAttractionIds([...bulkSelectedAttractionIds, attraction.id]);
-                                                                            } else {
-                                                                                setBulkSelectedAttractionIds(bulkSelectedAttractionIds.filter(id => id !== attraction.id));
-                                                                            }
-                                                                        }}
-                                                                        disabled={bulkCreating}
-                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                    />
-                                                                    <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{attraction.name}</span>
-                                                                {renderItemLocation(attraction.location_id)}
-                                                            </span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {bulkBlockingScope === 'events' && (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                                                        Select Events <span className="text-red-500">*</span>
-                                                    </label>
-                                                    {loadingResources ? (
-                                                        <div className="text-sm text-gray-500">Loading events...</div>
-                                                    ) : availableEvents.length === 0 ? (
-                                                        <div className="text-sm text-gray-500">No active events found</div>
-                                                    ) : (
-                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-                                                            {availableEvents.map(event => (
-                                                                <label key={event.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={bulkSelectedEventIds.includes(event.id)}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                setBulkSelectedEventIds([...bulkSelectedEventIds, event.id]);
-                                                                            } else {
-                                                                                setBulkSelectedEventIds(bulkSelectedEventIds.filter(id => id !== event.id));
-                                                                            }
-                                                                        }}
-                                                                        disabled={bulkCreating}
-                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                    />
-                                                                    <span className="flex flex-col min-w-0">
-                                                                <span className="text-sm text-gray-700">{event.name}</span>
-                                                                {renderItemLocation(event.location_id, event.location?.name)}
-                                                            </span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                                            Partial Day Closure <span className="text-xs text-gray-500">(Optional - applies to all selected dates)</span>
-                                        </label>
-                                        <p className="text-xs text-gray-500 mb-3">
-                                            These times mark the window that is <span className="font-medium">closed</span>. Leave both empty to close the whole day. Set only &quot;Closed Until&quot; for a delayed opening &mdash; that is the time it reopens.
-                                        </p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                    Closed From
-                                                </label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="time"
-                                                        value={bulkTimeStart}
-                                                        onChange={(e) => setBulkTimeStart(e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                        disabled={bulkCreating}
-                                                    />
-                                                    {bulkTimeStart && !bulkCreating && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setBulkTimeStart('')}
-                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                            title="Clear time"
-                                                        >
-                                                            <X className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-gray-400 mt-1">Blank means closed from opening time</p>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                    Closed Until
-                                                </label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="time"
-                                                        value={bulkTimeEnd}
-                                                        onChange={(e) => setBulkTimeEnd(e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                        disabled={bulkCreating}
-                                                    />
-                                                    {bulkTimeEnd && !bulkCreating && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setBulkTimeEnd('')}
-                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                            title="Clear time"
-                                                        >
-                                                            <X className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-gray-400 mt-1">Reopens at this time; blank means closed for the rest of the day</p>
-                                            </div>
-                                        </div>
-                                        {closureRangeIsInvalid(bulkTimeStart, bulkTimeEnd) ? (
-                                            <p className="text-xs text-red-600 mt-2">
-                                                &quot;Closed Until&quot; has to be later than &quot;Closed From&quot;.
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs text-gray-500 mt-2">
-                                                {closurePreview(bulkTimeStart, bulkTimeEnd)}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={bulkIsRecurring}
-                                            onChange={(e) => setBulkIsRecurring(e.target.checked)}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                            disabled={bulkCreating}
-                                        />
-                                        <label className="ml-2 block text-sm text-gray-900">
-                                            Recurring annually
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3 pt-6">
-                                    <StandardButton
-                                        onClick={handleBulkCreateDayOffs}
-                                        variant="primary"
-                                        size="md"
-                                        className="flex-1"
-                                        disabled={bulkSelectedDates.size === 0 || bulkCreating}
-                                    >
-                                        {bulkCreating 
-                                            ? 'Creating...' 
-                                            : `Create ${bulkSelectedDates.size} Day Off${bulkSelectedDates.size !== 1 ? 's' : ''}`
-                                        }
-                                    </StandardButton>
-                                    <StandardButton
-                                        onClick={() => setShowBulkModal(false)}
-                                        variant="secondary"
-                                        size="md"
-                                        className="flex-1"
-                                        disabled={bulkCreating}
-                                    >
-                                        Cancel
-                                    </StandardButton>
-                                </div>
-                            </div>
+                        <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
+                            <AvailabilityChangeLog dayOffId={historyFor.id} showLocation={isCompanyAdmin} perPage={50} />
                         </div>
                     </div>
-            )}
-
-            {toast && (
-                <div className="fixed top-4 right-4 z-50">
-                    <Toast 
-                        message={toast.message} 
-                        type={toast.type} 
-                        onClose={() => setToast(null)} 
-                    />
                 </div>
             )}
+
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>
     );
 };

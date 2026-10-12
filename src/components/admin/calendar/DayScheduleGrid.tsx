@@ -24,6 +24,8 @@ import {
   freeUntilMinute,
   nextFreeMinute,
 } from '../../../utils/scheduleGeometry';
+import BlockedPeriodBanner from '../availability/BlockedPeriodBanner';
+import { blockBookingPath } from '../../../utils/blockBookingPath';
 
 const MINUTES_PER_DAY = 24 * 60;
 const WALK_IN_STEP_MINUTES = 5;
@@ -942,6 +944,16 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
           This location is closed for the day. Every space below is marked unavailable.
         </div>
       )}
+
+      <BlockedPeriodBanner
+        periods={windowData.blocked_periods}
+        className="border-b"
+        onBook={isPastDate ? undefined : (kind, locationId) => navigate(blockBookingPath(
+          kind,
+          locationId ?? windowData.location_id ?? null,
+          dateKey(date),
+        ))}
+      />
 
       {overlapSummary.length > 0 && (() => {
         const doubleBooked = overlapSummary.filter(row => row.overlapMinutes > 0);

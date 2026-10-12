@@ -21,7 +21,8 @@ import {
   CheckCircle,
   DollarSign,
   Ticket,
-  Sparkles
+  Sparkles,
+  CalendarOff
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
@@ -47,6 +48,8 @@ import { formatDurationDisplay, parseLocalDate, getMichiganNow } from '../../../
 import { resolvePaymentState, statusAfterPayment } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
+import BlockedPeriodList from '../../../components/admin/availability/BlockedPeriodList';
+import { dayOffService, type AvailabilityBlock } from '../../../services/DayOffService';
 
 const michiganToday = (): Date => {
   const now = getMichiganNow();
@@ -100,6 +103,8 @@ const CalendarView: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(() => michiganToday());
   const [showColorLegend, setShowColorLegend] = useState(false);
+
+  const [blockedPeriods, setBlockedPeriods] = useState<AvailabilityBlock[]>([]);
 
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
@@ -264,6 +269,24 @@ const CalendarView: React.FC = () => {
   useEffect(() => {
     loadExtras();
   }, [loadExtras]);
+
+  useEffect(() => {
+    const range = getVisibleRange();
+    if (!range) return;
+    let cancelled = false;
+    dayOffService
+      .getCalendar({ start_date: range.from, end_date: range.to, location_id: effectiveLocationId })
+      .then(response => {
+        if (!cancelled) setBlockedPeriods(response.data?.occurrences ?? []);
+      })
+      .catch(error => {
+        console.error('Error loading blocked periods:', error);
+        if (!cancelled) setBlockedPeriods([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getVisibleRange, effectiveLocationId]);
 
   useEffect(() => {
     let result = [...bookings];
@@ -446,6 +469,49 @@ const CalendarView: React.FC = () => {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const blocksForDate = (date: Date): AvailabilityBlock[] => {
+    const key = formatDateKey(date);
+    return blockedPeriods.filter(period => period.occurrence_date === key);
+  };
+
+  const renderBlockChip = (date: Date) => {
+    const periods = blocksForDate(date);
+    if (periods.length === 0) return null;
+    const wholeLocationClosed = periods.some(period => period.block_type === 'full_day' && period.scope === 'location');
+    const label = periods.length === 1 ? (periods[0].group_name || 'Blocked') : `${periods.length} blocks`;
+    const details = periods
+      .map(period => `${period.group_name || 'Blocked'}: ${period.scope_label} — ${period.window_label}${period.reason ? ` (${period.reason})` : ''}`)
+      .join('\n');
+
+    return (
+      <div className="mb-1" title={details}>
+        <span
+          className={`flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold leading-tight sm:text-[11px] ${
+            wholeLocationClosed ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'
+          }`}
+        >
+          <CalendarOff className="h-3 w-3 flex-shrink-0" />
+          <span className="hidden truncate sm:inline">{label}</span>
+        </span>
+      </div>
+    );
+  };
+
+  const renderBlockedSection = (date: Date) => {
+    const periods = blocksForDate(date);
+    if (periods.length === 0) return null;
+    return (
+      <div className="mb-6">
+        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <CalendarOff className="h-4 w-4 text-red-600" />
+          Blocked ({periods.length})
+        </div>
+        <p className="mb-2 text-xs text-gray-500">Guests cannot book these times online. Staff are warned before booking inside them.</p>
+        <BlockedPeriodList periods={periods} showLocation={!effectiveLocationId} />
+      </div>
+    );
   };
 
   const filteredAttractionPurchases = useMemo(() => {
@@ -686,6 +752,7 @@ const CalendarView: React.FC = () => {
         <h3 className="text-lg font-semibold mb-4">
           Scheduled for {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </h3>
+        {renderBlockedSection(currentDate)}
         {!hasAny ? (
           <div className="text-center text-gray-500 py-8">
             {pageFilter.isAll ? 'No scheduled activity for this day' : 'No scheduled activity in the selected categories'}
@@ -788,6 +855,7 @@ const CalendarView: React.FC = () => {
                   <span className="md:hidden">{day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
                   <span className="hidden md:inline">{day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 </div>
+                {renderBlockChip(day)}
                 {renderDateBreakdown(day) ?? (
                   <div className="text-xs text-gray-400 mt-1 md:mt-2">
                     {summary.total === 0 || pageFilter.isAll ? 'No activity' : 'Nothing in the selected categories'}
@@ -849,6 +917,7 @@ const CalendarView: React.FC = () => {
                   {day.getDate()}
                 </div>
 
+                {renderBlockChip(day)}
                 {summary.total === 0 ? null : renderDateBreakdown(day)}
               </div>
             );
@@ -1260,7 +1329,7 @@ const CalendarView: React.FC = () => {
         )}
 
         <div className="flex-1 overflow-hidden">
-          {bookings.length === 0 ? (
+          {bookings.length === 0 && blockedPeriods.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-4 text-lg font-medium text-gray-900">No bookings found</h3>
@@ -1312,6 +1381,7 @@ const CalendarView: React.FC = () => {
                     {''}
                   </StandardButton>
                 </div>
+                {renderBlockedSection(parseLocalDate(selectedDate))}
                 {(() => {
                   const modalDate = parseLocalDate(selectedDate);
                   const dayBookings = getBookingsForDate(modalDate);
