@@ -129,6 +129,17 @@ interface CatalogLocation {
 const atLocation = (entry: { locations?: CatalogLocation[] }, locationId: number): CatalogLocation | undefined =>
   (entry.locations ?? []).find((l) => Number(l.location_id) === Number(locationId));
 
+interface PublicPlan {
+  location_id?: number | null;
+  location_access_mode?: string | null;
+  approved_locations?: { id: number }[];
+}
+
+const offeredAt = (plan: PublicPlan, locationId: number): boolean =>
+  plan.location_access_mode === 'all' ||
+  (plan.location_id != null && Number(plan.location_id) === Number(locationId)) ||
+  (plan.approved_locations ?? []).some((l) => Number(l.id) === Number(locationId));
+
 /** Best-effort: the waiver must still confirm if none of this loads. */
 const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   const empty: Takeaway = { bookUrl: null, locationName: null, phone: null, picks: [] };
@@ -155,7 +166,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
     getJson('/packages/grouped-by-name'),
     getJson('/attractions/grouped'),
     getJson(`/events/location/${locationId}`),
-    getJson('/membership-plans/public'),
+    getJson(`/membership-plans/public?location_id=${locationId}`),
   ]);
 
   const venue = list(locationsRes).find((l) => Number(l.id) === Number(locationId));
@@ -197,7 +208,7 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
   });
 
   list(plansRes).forEach((plan) => {
-    if (plan.is_active === false) return;
+    if (plan.is_active === false || !offeredAt(plan, locationId)) return;
     const price = money(plan.price);
     if (!price) return;
     pool.push({ key: `plan-${plan.id}`, label: 'Passes', name: plan.name, price, was: null, when: null, rank: 1 });
