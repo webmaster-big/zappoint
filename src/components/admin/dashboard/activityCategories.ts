@@ -45,8 +45,11 @@ export const bucketForCategory = (
   return source === 'attraction' ? 'attractions' : 'party_packages';
 };
 
-export const bucketForBooking = (booking: Pick<Booking, 'package'>): ActivityBucketKey =>
-  booking.package?.is_escape_room ? 'escape_rooms' : bucketForCategory(booking.package?.category, 'booking');
+export const bucketForBooking = (booking: Pick<Booking, 'package'>): ActivityBucketKey => {
+  const byCategory = bucketForCategory(booking.package?.category, 'booking');
+  if (byCategory !== 'party_packages') return byCategory;
+  return booking.package?.is_escape_room ? 'escape_rooms' : byCategory;
+};
 
 export const bucketForPurchase = (purchase: Pick<AttractionPurchase, 'attraction'>): ActivityBucketKey =>
   bucketForCategory(purchase.attraction?.category, 'attraction');
@@ -115,7 +118,7 @@ export const BUCKET_DEFINITIONS: BucketDefinition[] = [
     primaryUnit: 'bookings',
     secondaryUnit: 'players',
     explanation:
-      'Escape room activity scheduled for this day, whether it was sold as a package booking or as an attraction ticket. Packages switched on as escape rooms always count here, and so do difficulty labels such as Beginner or Advanced. Cancelled rows are left out.',
+      'Escape room activity scheduled for this day, whether it was sold as a package booking or as an attraction ticket. Packages switched on as escape rooms count here, and so do difficulty labels such as Beginner or Advanced. A package in the Rage Room category counts under Rage Rooms instead, even with the escape-room switch on. Cancelled rows are left out.',
   },
   {
     key: 'rage_rooms',
@@ -123,7 +126,7 @@ export const BUCKET_DEFINITIONS: BucketDefinition[] = [
     primaryUnit: 'bookings',
     secondaryUnit: 'guests',
     explanation:
-      'Rage room activity scheduled for this day, whether it was sold as a package booking or as an attraction ticket. Smash room is treated as the same thing. Cancelled rows are left out.',
+      'Rage room activity scheduled for this day, whether it was sold as a package booking or as an attraction ticket. Smash room is treated as the same thing, and a Rage Room package counts here even if its escape-room switch is on. Cancelled rows are left out.',
   },
   {
     key: 'events',
