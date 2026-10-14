@@ -21,6 +21,9 @@ export interface EscapeRoomGuestRoom {
   id: number;
   name: string;
   duration_minutes: number;
+  image?: string | null;
+  image_preview?: string | null;
+  image_pending?: boolean;
   times: EscapeRoomGuestTime[];
 }
 

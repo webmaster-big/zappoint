@@ -13,10 +13,14 @@ import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading } from '../../components/waiver/WaiverStates';
 import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
 import StaffReturnControl from '../../components/waiver/StaffReturnControl';
+import RoomPreviewImage from '../../components/waiver/RoomPreviewImage';
 import { parseLocalDate } from '../../utils/timeFormat';
 
 const SUCCESS_HOLD_SECONDS = 25;
 const RETRY_SECONDS = 30;
+const ROOM_LIST_REFRESH_SECONDS = 300;
+const PREVIEW_CHECK_SECONDS = 4;
+const PREVIEW_CHECKS = 3;
 
 type Phase = 'room' | 'time' | 'form';
 
@@ -106,6 +110,7 @@ const EscapeRoomWaiverKiosk = () => {
   const [completedWaiverRef, setCompletedWaiverRef] = useState<string | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [linkSpent, setLinkSpent] = useState(false);
+  const [previewChecks, setPreviewChecks] = useState(0);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,6 +167,37 @@ const EscapeRoomWaiverKiosk = () => {
     }, RETRY_SECONDS * 1000);
     return () => clearInterval(timer);
   }, [error, linkBroken, loadKiosk]);
+
+  const pendingPreviews = kiosk ? kiosk.rooms.filter((r) => r.image_pending).length : 0;
+  const chosenRoomPending = !!(room && kiosk?.rooms.find((r) => r.id === room.id)?.image_pending);
+  const previewsGaveUp = previewChecks >= PREVIEW_CHECKS;
+
+  useEffect(() => {
+    if (pendingPreviews === 0) {
+      setPreviewChecks(0);
+      return;
+    }
+    if ((phase !== 'room' && !chosenRoomPending) || previewChecks >= PREVIEW_CHECKS) return;
+    const timer = setTimeout(() => {
+      void loadKiosk().finally(() => setPreviewChecks((count) => count + 1));
+    }, PREVIEW_CHECK_SECONDS * (previewChecks + 1) * 1000);
+    return () => clearTimeout(timer);
+  }, [pendingPreviews, chosenRoomPending, previewChecks, phase, loadKiosk]);
+
+  useEffect(() => {
+    if (phase !== 'room' || loading || error || justCompleted) return;
+    const timer = setInterval(() => {
+      loadKiosk();
+    }, ROOM_LIST_REFRESH_SECONDS * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadKiosk();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [phase, loading, error, justCompleted, loadKiosk]);
 
   const resetAll = useCallback(() => {
     if (completeTimer.current) {
@@ -447,6 +483,7 @@ const EscapeRoomWaiverKiosk = () => {
 
   const stepIndex = STEPS.findIndex((s) => s.key === phase);
   const hasRooms = kiosk.rooms.length > 0;
+  const shownRoom = room ? kiosk.rooms.find((r) => r.id === room.id) ?? room : null;
   const noGamesText = kiosk.ahead
     ? 'There are no booked games in this room that day. Please check your booking email, or see the front desk.'
     : 'There are no more games in this room today. Please see the front desk.';
@@ -518,19 +555,27 @@ const EscapeRoomWaiverKiosk = () => {
                     type="button"
                     onClick={() => chooseRoom(r)}
                     disabled={!hasTimes}
-                    className="text-left rounded-xl border-2 border-gray-200 px-5 py-4 hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white"
+                    className="flex sm:flex-col text-left rounded-xl border-2 border-gray-200 overflow-hidden hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white"
                   >
-                    <span className="block text-base font-bold text-gray-900">{r.name}</span>
-                    <span className="block text-xs text-gray-500 mt-1">
-                      {kiosk.ahead
-                        ? hasTimes
-                          ? `${r.duration_minutes} min · ${available.length} booked ${available.length === 1 ? 'game' : 'games'} that day`
-                          : 'No booked games that day'
-                        : upcoming > 0
-                          ? `${r.duration_minutes} min · ${upcoming} ${upcoming === 1 ? 'game' : 'games'} left today`
-                          : hasTimes
-                            ? `${r.duration_minutes} min · Your game`
-                            : 'No more games today'}
+                    <RoomPreviewImage
+                      image={r.image}
+                      preview={r.image_preview}
+                      waiting={!!r.image_pending && !previewsGaveUp}
+                      className="w-28 min-h-[5.25rem] shrink-0 sm:w-full sm:min-h-0 sm:aspect-[16/9]"
+                    />
+                    <span className="block min-w-0 flex-1 px-4 py-3 sm:px-5 sm:py-4">
+                      <span className="block text-base font-bold text-gray-900 break-words">{r.name}</span>
+                      <span className="block text-xs text-gray-500 mt-1">
+                        {kiosk.ahead
+                          ? hasTimes
+                            ? `${r.duration_minutes} min · ${available.length} booked ${available.length === 1 ? 'game' : 'games'} that day`
+                            : 'No booked games that day'
+                          : upcoming > 0
+                            ? `${r.duration_minutes} min · ${upcoming} ${upcoming === 1 ? 'game' : 'games'} left today`
+                            : hasTimes
+                              ? `${r.duration_minutes} min · Your game`
+                              : 'No more games today'}
+                      </span>
                     </span>
                   </button>
                 );
@@ -543,6 +588,13 @@ const EscapeRoomWaiverKiosk = () => {
       {phase === 'time' && room && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sm:p-7 space-y-4">
           <div className="text-center">
+            <RoomPreviewImage
+              image={shownRoom?.image}
+              preview={shownRoom?.image_preview}
+              waiting={!!shownRoom?.image_pending && !previewsGaveUp}
+              className="mx-auto mb-3 w-28 aspect-[4/3] rounded-lg"
+              iconClassName="w-6 h-6"
+            />
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{room.name}</p>
             <h2 className="text-lg font-bold text-gray-900 mt-1">What time is your game?</h2>
             <p className="text-sm text-gray-500 mt-1">Choose the start time on your booking.</p>
@@ -568,12 +620,21 @@ const EscapeRoomWaiverKiosk = () => {
         <>
           <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Your game</p>
-                <p className="text-sm font-bold text-gray-900">
-                  {room.name} · {time ? time.label : 'choose your time'}
-                  {kiosk.ahead && time ? ` · ${kiosk.date_label.replace(/ (\d+)$/, '\u00a0$1')}` : ''}
-                </p>
+              <div className="flex items-center gap-3 min-w-0">
+                <RoomPreviewImage
+                  image={shownRoom?.image}
+                  preview={shownRoom?.image_preview}
+                  waiting={!!shownRoom?.image_pending && !previewsGaveUp}
+                  className="w-16 aspect-[4/3] shrink-0 rounded-md"
+                  iconClassName="w-5 h-5"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Your game</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {room.name} · {time ? time.label : 'choose your time'}
+                    {kiosk.ahead && time ? ` · ${kiosk.date_label.replace(/ (\d+)$/, '\u00a0$1')}` : ''}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {time && (

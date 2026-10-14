@@ -1154,7 +1154,7 @@ const EditPackage: React.FC = () => {
                                         />
                                         <span className="text-base text-neutral-800">This package is an escape room</span>
                                     </label>
-                                    <p className="text-xs text-gray-500 mt-2">Turn this on for each escape room. Guests can check in to it, and online bookings get the escape-room waiver, once an active escape-room waiver covers it (Waivers › Templates › New Template, Waiver type: Escape room). Staff then run each game from Photos › Escape Rooms. The Category field does not do this.</p>
+                                    <p className="text-xs text-gray-500 mt-2">Turn this on for each escape room. Guests can check in to it, and online bookings get the escape-room waiver, once an active escape-room waiver covers it (Waivers › Templates › New Template, Waiver type: Escape room). Staff then run each game from Photos › Escape Rooms. The check-in screen shows this package's photo, so there is no separate picture to upload. The Category field does not do this.</p>
                                 </div>
 
                                 {form.maxParticipants && form.pricingType !== 'per_person' && (
