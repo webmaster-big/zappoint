@@ -20,6 +20,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { usePhotoCamera } from '../../../hooks/usePhotoCamera';
+import CameraViewfinder, { MotionAccessNote } from '../../../components/admin/photos/CameraViewfinder';
 import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -93,8 +94,10 @@ const PhotoCapture = () => {
     };
   }, [effectiveLocationId]);
 
+  const { requestMotionAccess } = camera;
   const startSession = useCallback(async () => {
     if (!effectiveLocationId || !consent) return;
+    requestMotionAccess();
     setBusy(true);
     try {
       const created = await photoService.startSession(effectiveLocationId);
@@ -106,7 +109,7 @@ const PhotoCapture = () => {
     } finally {
       setBusy(false);
     }
-  }, [consent, effectiveLocationId, startCamera]);
+  }, [consent, effectiveLocationId, requestMotionAccess, startCamera]);
 
   const takePhoto = useCallback(async () => {
     if (!session || atCap) return;
@@ -336,14 +339,20 @@ const PhotoCapture = () => {
             <StandardButton onClick={() => void startSession()} disabled={!consent || busy} loading={busy} icon={Camera}>
               Start photo session
             </StandardButton>
+            <MotionAccessNote className="mt-3" />
           </div>
         )}
 
         {step === 'capture' && session && (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <div className="lg:col-span-3">
-              <div className="bg-black rounded-2xl overflow-hidden aspect-[4/3] relative">
-                <video ref={camera.videoRef} playsInline muted className="w-full h-full object-cover" />
+              <CameraViewfinder
+                videoRef={camera.videoRef}
+                frame={camera.frame}
+                savedSize={camera.savedSize}
+                live={camera.isLive}
+                starting={camera.state === 'starting'}
+              >
                 {(camera.state === 'denied' || camera.state === 'unavailable' || camera.state === 'lost') && (
                   <div className="absolute inset-0 bg-gray-900/95 text-white flex items-center justify-center p-6 text-center">
                     <div>
@@ -354,7 +363,7 @@ const PhotoCapture = () => {
                     </div>
                   </div>
                 )}
-              </div>
+              </CameraViewfinder>
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <StandardButton onClick={() => void takePhoto()} disabled={!camera.isLive || atCap || busy} icon={Camera}>
@@ -369,7 +378,7 @@ const PhotoCapture = () => {
                   Upload from device
                 </StandardButton>
                 {camera.state !== 'live' && (
-                  <StandardButton variant="ghost" onClick={() => void startCamera()}>
+                  <StandardButton variant="ghost" onClick={() => void startCamera()} disabled={camera.state === 'starting'}>
                     Retry camera
                   </StandardButton>
                 )}
@@ -415,10 +424,10 @@ const PhotoCapture = () => {
                         <img
                           src={photo.thumbnail_url}
                           alt={`Photo ${i + 1}`}
-                          className="h-16 w-16 rounded-lg object-cover bg-gray-100"
+                          className="h-16 w-24 shrink-0 rounded-lg object-contain bg-gray-100"
                         />
                       ) : (
-                        <div className="h-16 w-16 rounded-lg bg-gray-100 flex items-center justify-center">
+                        <div className="h-16 w-24 shrink-0 rounded-lg bg-gray-100 flex items-center justify-center">
                           <ImageIcon className="w-5 h-5 text-gray-400" />
                         </div>
                       )}

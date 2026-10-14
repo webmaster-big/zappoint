@@ -329,8 +329,9 @@ const PhotoOverlays = () => {
 
             <div className="p-5 space-y-4">
               <p className="text-sm text-gray-600">
-                Use a transparent PNG sized to your photo frame. It is scaled to cover the picture, then the capture date
-                is drawn on top.
+                Use a transparent PNG designed wide at 16:9, for example 1920 × 1080, so its edges line up with landscape
+                group photos. A frame of another shape is scaled to cover the picture and its edges may be cut off. The
+                capture date is drawn on top.
               </p>
 
               <div>

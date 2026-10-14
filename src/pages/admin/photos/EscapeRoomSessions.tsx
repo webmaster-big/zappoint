@@ -36,6 +36,7 @@ import bookingService from '../../../services/bookingService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import CalendarDatePicker from '../../../components/admin/calendar/CalendarDatePicker';
+import CameraViewfinder, { MotionAccessNote } from '../../../components/admin/photos/CameraViewfinder';
 import { dateKey, michiganToday, parseLocalDate } from '../../../utils/timeFormat';
 import { getStoredUser } from '../../../utils/storage';
 import { followUpEmailName, formatFollowUpTime as followUpTime } from '../../../utils/visitFollowUpNotice';
@@ -394,6 +395,7 @@ const EscapeRoomSessions = () => {
 
   const startPhoto = async () => {
     if (!detail || !consent) return;
+    camera.requestMotionAccess();
     setBusy(true);
     try {
       applyDetail(await escapeRoomService.startPhoto(detail.id));
@@ -1684,14 +1686,21 @@ const EscapeRoomSessions = () => {
                       <StandardButton onClick={() => void startPhoto()} disabled={!consent || busy} loading={busy} icon={Camera}>
                         Start group photo
                       </StandardButton>
+                      <MotionAccessNote />
                     </div>
                   )
                 ) : (
                   <div className="space-y-4">
                     {!detail.completed && (
                       <>
-                        <div className="bg-black rounded-xl overflow-hidden aspect-[4/3] relative">
-                          <video ref={camera.videoRef} playsInline muted className="w-full h-full object-cover" />
+                        <CameraViewfinder
+                          videoRef={camera.videoRef}
+                          frame={camera.frame}
+                          savedSize={camera.savedSize}
+                          live={camera.isLive}
+                          starting={camera.state === 'starting'}
+                          roundedClassName="rounded-xl"
+                        >
                           {camera.state !== 'live' && (
                             <div className="absolute inset-0 bg-gray-900/95 text-white flex items-center justify-center p-6 text-center">
                               <div>
@@ -1711,14 +1720,14 @@ const EscapeRoomSessions = () => {
                               </div>
                             </div>
                           )}
-                        </div>
+                        </CameraViewfinder>
                         <div className="flex flex-wrap gap-3">
                           {camera.state === 'live' ? (
                             <StandardButton onClick={() => void takePhoto()} disabled={atCap || busy} icon={Camera}>
                               Take photo
                             </StandardButton>
                           ) : (
-                            <StandardButton onClick={() => void startCamera()} disabled={atCap || busy} icon={Camera}>
+                            <StandardButton onClick={() => void startCamera()} disabled={atCap || busy || camera.state === 'starting'} icon={Camera}>
                               Turn on camera
                             </StandardButton>
                           )}
@@ -1757,10 +1766,10 @@ const EscapeRoomSessions = () => {
                               <img
                                 src={photo.thumbnail_url}
                                 alt={`Group photo ${index + 1}`}
-                                className={`w-full aspect-square rounded-lg object-cover bg-gray-100 ${removingPhotoId === photo.id ? 'ring-2 ring-red-500' : ''}`}
+                                className={`w-full aspect-[4/3] rounded-lg object-contain bg-gray-100 ${removingPhotoId === photo.id ? 'ring-2 ring-red-500' : ''}`}
                               />
                             ) : (
-                              <div className="w-full aspect-square rounded-lg bg-gray-100 flex items-center justify-center">
+                              <div className="w-full aspect-[4/3] rounded-lg bg-gray-100 flex items-center justify-center">
                                 <ImageIcon className="w-5 h-5 text-gray-400" />
                               </div>
                             )}
