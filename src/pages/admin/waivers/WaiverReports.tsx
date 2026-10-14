@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BarChart3, RefreshCcw } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -38,13 +38,15 @@ const WaiverReports = () => {
   const [type, setType] = useState('completed-by-date');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<{ type: string; data: unknown } | null>(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const latestRun = useRef(0);
 
   const current = reportTypes.find((r) => r.value === type) ?? reportTypes[0];
 
   const run = useCallback(async () => {
+    const ticket = ++latestRun.current;
     setLoading(true);
     try {
       const params: Record<string, unknown> = {};
@@ -53,12 +55,14 @@ const WaiverReports = () => {
         params.end_date = endDate;
       }
       const res = await waiverService.report(type, params);
-      setResult(res?.data ?? null);
+      if (ticket !== latestRun.current) return;
+      setResult({ type, data: res?.data ?? null });
     } catch {
+      if (ticket !== latestRun.current) return;
       setToast({ message: 'Failed to run report', type: 'error' });
       setResult(null);
     } finally {
-      setLoading(false);
+      if (ticket === latestRun.current) setLoading(false);
     }
   }, [type, startDate, endDate, current.dated]);
 
@@ -106,7 +110,7 @@ const WaiverReports = () => {
         {loading ? (
           <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor} mx-auto my-8`} />
         ) : (
-          <ReportResult type={type} data={result} fullColor={fullColor} />
+          <ReportResult type={result?.type ?? type} data={result?.data ?? null} fullColor={fullColor} />
         )}
       </div>
 
