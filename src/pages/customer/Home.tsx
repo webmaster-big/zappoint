@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { normalizeCategory } from '../../utils/venueCategories';
-import { EVENTS_CATEGORY_LABEL, categoryKeyOf, categoryLabelOfPackage, isUpcomingEvent } from '../../utils/storefrontCategories';
+import { EVENTS_CATEGORY_LABEL, categoryAccentOf, categoryKeyOf, categoryLabelOfPackage, isUpcomingEvent, type CategoryAccent } from '../../utils/storefrontCategories';
 import { useParams } from 'react-router-dom';
 import {
   MapPin,
@@ -93,7 +93,18 @@ interface FilterChip {
   value: StorefrontFilter;
   icon?: ReactNode;
   isCategory?: boolean;
+  accent?: CategoryAccent | null;
 }
+
+const filterChipColors = (isActive: boolean, accent?: CategoryAccent | null) => {
+  if (accent === 'escape-room') {
+    return isActive ? 'bg-red-700 text-white shadow-md ring-2 ring-inset ring-white/60' : 'bg-red-600 text-white shadow-sm hover:bg-red-700';
+  }
+  if (accent === 'rage-room') {
+    return isActive ? 'bg-green-800 text-white shadow-md ring-2 ring-inset ring-white/60' : 'bg-green-700 text-white shadow-sm hover:bg-green-800';
+  }
+  return isActive ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+};
 
 const CART_ENABLED = true;
 
@@ -656,6 +667,7 @@ const EntertainmentLandingPage = () => {
       label: chip.label,
       value: { kind: 'category', key: chip.key } as StorefrontFilter,
       isCategory: true,
+      accent: categoryAccentOf(chip.key),
     })),
   ];
 
@@ -1347,9 +1359,7 @@ const EntertainmentLandingPage = () => {
                           selectFilter(chip.value); scrollToResults();
                         }}
                         aria-pressed={isActive}
-                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${
-                          isActive ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${filterChipColors(isActive, chip.accent)}`}
                       >
                         {chip.icon}
                         {chip.label}
@@ -1397,9 +1407,7 @@ const EntertainmentLandingPage = () => {
                       key={chip.key}
                       onClick={() => { selectFilter(chip.value); scrollToResults(); }}
                       aria-pressed={chip.key === activeChipKey}
-                      className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${chip.isCategory ? 'capitalize' : ''} ${
-                        chip.key === activeChipKey ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${chip.isCategory ? 'capitalize' : ''} ${filterChipColors(chip.key === activeChipKey, chip.accent)}`}
                     >
                       {chip.label}
                     </button>
@@ -1678,16 +1686,6 @@ const EntertainmentLandingPage = () => {
                         </div>
                         <div className="flex flex-wrap items-stretch gap-2">
                           <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePackageClick(pkg);
-                            }}
-                            className="flex-1 basis-28 whitespace-nowrap border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
-                          >
-                            Learn more
-                          </button>
-                          <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1814,16 +1812,6 @@ const EntertainmentLandingPage = () => {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleAttractionClick(attraction);
-                            }}
-                            className="flex-1 basis-28 whitespace-nowrap border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
-                          >
-                            Learn more
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
                               handleBuyTickets(attraction);
                             }}
                             className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
@@ -1936,16 +1924,6 @@ const EntertainmentLandingPage = () => {
                           </div>
                         </div>
                         <div className="flex flex-wrap items-stretch gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEventClick(evt);
-                            }}
-                            className="flex-1 basis-28 whitespace-nowrap border border-blue-200 text-blue-800 hover:bg-blue-50 px-3 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-1.5 text-sm cursor-pointer"
-                          >
-                            Learn more
-                          </button>
                           <button
                             type="button"
                             onClick={(e) => {

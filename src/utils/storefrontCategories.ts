@@ -15,6 +15,16 @@ export const categoryKeyOf = (value?: string | null) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+// Escape Rooms and Rage Rooms are easy to miss among the plain chips, so they get
+// their own colours: red for escape rooms, green for rage rooms.
+export type CategoryAccent = 'escape-room' | 'rage-room';
+
+export const categoryAccentOf = (key: string): CategoryAccent | null => {
+  if (/^escape-?rooms?$/.test(key)) return 'escape-room';
+  if (/^rage-?rooms?$/.test(key)) return 'rage-room';
+  return null;
+};
+
 export const categoryLabelOfPackage = (pkg: { display_label?: string | null; category?: string | null }) =>
   normalizeCategory(pkg.display_label || pkg.category);
 

@@ -7,7 +7,13 @@ import { customerDataCacheService } from '../../services/CustomerDataCacheServic
 import SiteFooter from '../../components/customer/SiteFooter';
 import LocationsMap from '../../components/customer/LocationsMap';
 import { splitLocationName } from '../../utils/locationName';
-import { buildLocationCategories, storefrontCategoryPath, type StorefrontCategory } from '../../utils/storefrontCategories';
+import { buildLocationCategories, categoryAccentOf, storefrontCategoryPath, type CategoryAccent, type StorefrontCategory } from '../../utils/storefrontCategories';
+
+const categoryChipColors: Record<CategoryAccent | 'default', string> = {
+  'escape-room': 'bg-red-600 text-white shadow-sm hover:bg-red-700 focus-visible:ring-red-600',
+  'rage-room': 'bg-green-700 text-white shadow-sm hover:bg-green-800 focus-visible:ring-green-700',
+  default: 'bg-blue-50 text-blue-800 hover:bg-blue-800 hover:text-white focus-visible:ring-blue-800',
+};
 
 const LocationChooser = () => {
   const { locations: allLocations, loaded, failed } = useStorefrontLocations();
@@ -249,7 +255,7 @@ const LocationChooser = () => {
                               <li key={category.key}>
                                 <Link
                                   to={storefrontCategoryPath(location.slug, category.key)}
-                                  className="pointer-events-auto inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-800 text-xs font-semibold rounded-full capitalize hover:bg-blue-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-1 transition-colors"
+                                  className={`pointer-events-auto inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-full capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 transition-colors ${categoryChipColors[categoryAccentOf(category.key) ?? 'default']}`}
                                 >
                                   {category.label}
                                 </Link>

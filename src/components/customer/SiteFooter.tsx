@@ -69,7 +69,6 @@ const SiteFooter: React.FC<SiteFooterProps> = ({ showLocations = true }) => {
             <a href="https://zap-zone.com/corporate/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Corporate</a>
             <a href="https://zap-zone.com/#" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Careers</a>
             <a href="https://zap-zone.com/#" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Donations</a>
-            <a href="https://zap-zone.com/gift-cards/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Gift Cards</a>
             <a href="https://zap-zone.com/#" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Invitations</a>
           </div>
         </div>
