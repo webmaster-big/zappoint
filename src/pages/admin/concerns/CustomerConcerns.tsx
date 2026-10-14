@@ -66,6 +66,24 @@ const formatWhen = (concern: CheckoutConcern): string => {
   return parts.length ? parts.join(' · ') : 'Nothing chosen yet';
 };
 
+type LeadFilter = 'completed' | 'not_completed' | 'requested_help' | 'needs_follow_up';
+
+const matchesLeadFilter = (concern: CheckoutConcern, value: LeadFilter): boolean => {
+  const booked = concern.completed_booking === true;
+  switch (value) {
+    case 'completed':
+      return booked;
+    case 'not_completed':
+      return concern.kind === 'abandoned_checkout' && !booked;
+    case 'requested_help':
+      return concern.kind === 'schedule_help' || concern.kind === 'call_to_book';
+    case 'needs_follow_up':
+      return concern.status !== 'resolved' && !booked;
+    default:
+      return true;
+  }
+};
+
 const CustomerConcerns = () => {
   const { effectiveLocationId } = useLocationScope();
   const { themeColor } = useThemeColor();
@@ -123,7 +141,9 @@ const CustomerConcerns = () => {
     try {
       setSavingId(concern.id);
       const updated = await checkoutConcernService.updateStatus(concern.id, next);
-      setConcerns(prev => prev.map(row => (row.id === updated.id ? updated : row)));
+      setConcerns(prev => prev.map(row => (
+        row.id === updated.id ? { ...updated, completed_booking: row.completed_booking } : row
+      )));
       setToast({
         message: next === 'resolved' ? 'Marked resolved.' : next === 'contacted' ? 'Marked as contacted.' : 'Reopened.',
         type: 'success',
@@ -215,6 +235,25 @@ const CustomerConcerns = () => {
         },
       },
       {
+        key: 'booked',
+        label: 'Booked?',
+        sortable: true,
+        sortValue: c => (c.completed_booking ? 1 : 0),
+        exportValue: c => (c.completed_booking ? 'Completed booking' : 'Not booked yet'),
+        cellClassName: 'whitespace-nowrap',
+        render: c =>
+          c.completed_booking ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+              <CheckCircle2 size={11} />
+              Completed booking
+            </span>
+          ) : (
+            <span className="inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-gray-50 text-gray-600 border-gray-200">
+              Not booked yet
+            </span>
+          ),
+      },
+      {
         key: 'status',
         label: 'Status',
         sortable: true,
@@ -248,6 +287,19 @@ const CustomerConcerns = () => {
 
   const filterDefs: AdminFilterDef<CheckoutConcern>[] = useMemo(
     () => [
+      {
+        type: 'select',
+        key: 'lead',
+        label: 'Lead',
+        allLabel: 'All leads',
+        options: [
+          { value: 'completed', label: 'Completed booking' },
+          { value: 'not_completed', label: 'Did not complete booking' },
+          { value: 'requested_help', label: 'Requested help' },
+          { value: 'needs_follow_up', label: 'Needs a follow-up call' },
+        ],
+        predicate: (c, value) => matchesLeadFilter(c, value as LeadFilter),
+      },
       {
         type: 'select',
         key: 'status',

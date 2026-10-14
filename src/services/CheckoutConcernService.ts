@@ -72,6 +72,9 @@ export interface CheckoutConcern {
   } | null;
   created_at: string;
   updated_at: string;
+  // Sent by the list endpoint only: the guest paid for a booking or purchase at this
+  // venue (same email) after this concern was recorded.
+  completed_booking?: boolean;
   location?: { id: number; name: string } | null;
   contact?: { id: number; email: string } | null;
   handler?: { id: number; first_name: string; last_name: string } | null;
