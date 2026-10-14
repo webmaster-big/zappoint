@@ -3,7 +3,9 @@ import { API_BASE_URL, getStoredUser } from '../utils/storage';
 import type {
   ApiResponse,
   Paginated,
+  Pagination,
   Waiver,
+  WaiverListCoverage,
   WaiverTemplate,
   WaiverTemplatePayload,
   WaiverTemplateKind,
@@ -133,6 +135,11 @@ const waiverService = {
   // ---- staff: search / view records ----
   list: async (filters: WaiverSearchFilters = {}): Promise<Paginated<Waiver>> =>
     (await api.get('/waivers', { params: filters })).data,
+
+  listWithCoverage: async (
+    filters: WaiverSearchFilters = {},
+  ): Promise<{ success: boolean; data: { waivers: Waiver[]; pagination: Pagination; coverage?: WaiverListCoverage } }> =>
+    (await api.get('/waivers', { params: { ...filters, with_coverage: 1 } })).data,
 
   /** Counted the way the dashboard card counts, so the two screens can be reconciled. */
   periodSummary: async (filters: WaiverSearchFilters = {}): Promise<ApiResponse<WaiverPeriodSummary>> =>

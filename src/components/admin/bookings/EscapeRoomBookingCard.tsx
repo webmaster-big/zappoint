@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Copy, DoorOpen } from 'lucide-react';
 import escapeRoomService from '../../../services/EscapeRoomService';
 import { dateKey, michiganToday } from '../../../utils/timeFormat';
+import { formsSignedLabel } from '../../../utils/waiverCoverage';
 import type { EscapeRoomBookingGame } from '../../../types/escapeRoom.types';
 
 const EscapeRoomBookingCard = ({ bookingId, themeColor, className = '' }: { bookingId: number; themeColor: string; className?: string }) => {
@@ -63,7 +64,7 @@ const EscapeRoomBookingCard = ({ bookingId, themeColor, className = '' }: { book
               Escape-room game: {game.room_name} · {game.time_label}
             </p>
             <p className="text-sm text-gray-600 mt-0.5">
-              Signed waivers cover {covered} of {game.players_booked} {game.players_booked === 1 ? 'player' : 'players'} · {status}
+              Signed waivers cover {covered} of {game.players_booked} {game.players_booked === 1 ? 'participant' : 'participants'} ({formsSignedLabel(game.players_signed)}) · {status}
             </p>
             {game.reviews && game.reviews.scheduled + game.reviews.sent + game.reviews.rated > 0 && (
               <p className="text-xs text-gray-600 mt-1">
@@ -85,7 +86,7 @@ const EscapeRoomBookingCard = ({ bookingId, themeColor, className = '' }: { book
               <p className="text-xs text-gray-500 mt-1">Another booking shares this time. Everyone who signs for it is one group and gets the same photo.</p>
             )}
             <p className="text-xs text-gray-500 mt-1">
-              Each player signs their own waiver{canShareLink ? ' with the group check-in link, any time before the game' : ''}. The group photo goes to everyone who signed.
+              Each adult player signs their own waiver{canShareLink ? ' with the group check-in link, any time before the game' : ''}, and players under 18 need a parent or guardian to sign for them. The group photo goes to everyone who signed.
             </p>
             {showLink && <p className="text-xs text-gray-700 mt-1 break-all select-all">{game.kiosk_url}</p>}
           </div>

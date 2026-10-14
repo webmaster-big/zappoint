@@ -39,6 +39,7 @@ import CalendarDatePicker from '../../../components/admin/calendar/CalendarDateP
 import { dateKey, michiganToday, parseLocalDate } from '../../../utils/timeFormat';
 import { getStoredUser } from '../../../utils/storage';
 import { followUpEmailName, formatFollowUpTime as followUpTime } from '../../../utils/visitFollowUpNotice';
+import { countLabel, formsSignedLabel, participantsCoveredLabel } from '../../../utils/waiverCoverage';
 import visitFollowUpService from '../../../services/VisitFollowUpService';
 import type { PhotoRecord, PhotoSessionRecord } from '../../../types/photo.types';
 import type {
@@ -960,11 +961,15 @@ const EscapeRoomSessions = () => {
           <p className="text-sm font-semibold text-gray-900">
             {player.name || 'Unnamed signer'}
             {player.minors > 0 && (
-              <span className="ml-2 text-xs font-medium text-gray-500">
-                + {player.minors} {player.minors === 1 ? 'minor' : 'minors'}
-              </span>
+              <span className="ml-2 text-xs font-medium text-gray-500">{countLabel(1 + player.minors, 'participant', 'participants')}</span>
             )}
           </p>
+          {player.minors > 0 && (
+            <p className="text-xs text-gray-600">
+              Also covers {countLabel(player.minors, 'minor', 'minors')}
+              {(player.minor_names ?? []).filter(Boolean).length > 0 ? `: ${(player.minor_names ?? []).filter(Boolean).join(', ')}` : ''}
+            </p>
+          )}
           <p className="text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-0.5">
             <span className="inline-flex items-center gap-1">
               <Mail className="w-3 h-3" />
@@ -1339,7 +1344,10 @@ const EscapeRoomSessions = () => {
                   <span>
                     {parseLocalDate(game.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {game.room_name ?? 'Escape room'} · {game.time_label}
                     {' · '}
-                    {game.players} {game.players === 1 ? 'player' : 'players'} signed{game.has_photo ? ', photo started' : ''}
+                    {game.people_covered === undefined
+                      ? formsSignedLabel(game.players)
+                      : `${participantsCoveredLabel(game.people_covered)} · ${formsSignedLabel(game.players)}`}
+                    {game.has_photo ? ', photo started' : ''}
                   </span>
                   <button
                     type="button"
@@ -1471,7 +1479,14 @@ const EscapeRoomSessions = () => {
                             </span>
                             <span className="text-xs text-gray-700 inline-flex items-center gap-1 tabular-nums">
                               <Users className="w-3.5 h-3.5" />
-                              {slot.signed} signed
+                              {slot.people_covered === undefined ? (
+                                `${slot.signed} signed`
+                              ) : (
+                                <>
+                                  {participantsCoveredLabel(slot.people_covered)}
+                                  {slot.signed > 0 && <span className="text-gray-500">· {formsSignedLabel(slot.signed)}</span>}
+                                </>
+                              )}
                               {slot.unsigned > 0 && <span className="text-amber-700">· {slot.unsigned} not signed</span>}
                             </span>
                             {openingKey === slot.key && <span className="text-xs text-gray-400">Opening...</span>}
@@ -1597,7 +1612,7 @@ const EscapeRoomSessions = () => {
 
               <div className="bg-white border border-gray-200 rounded-2xl p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                  <h3 className="font-semibold text-gray-900">Players ({detail.counts.players})</h3>
+                  <h3 className="font-semibold text-gray-900">Players ({detail.counts.people ?? detail.counts.players})</h3>
                   {kioskUrl && (
                     <button
                       type="button"
@@ -1614,8 +1629,11 @@ const EscapeRoomSessions = () => {
                     </button>
                   )}
                 </div>
+                <p className="text-xs text-gray-700 font-medium">
+                  {participantsCoveredLabel(detail.counts.people ?? detail.counts.players)} · {formsSignedLabel(detail.counts.players)}
+                </p>
                 <p className="text-xs text-gray-500 mb-2">
-                  Everyone who signed the waiver for this room and time. Only these players can receive this game's photo.
+                  Everyone who signed the waiver for this room and time. Minors are covered by the waiver their parent or guardian signed. Only these players can receive this game's photo.
                 </p>
                 {detail.players.length === 0 ? (
                   <p className="text-sm text-gray-500 py-3">Nobody has signed for this game yet.</p>

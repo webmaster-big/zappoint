@@ -75,6 +75,7 @@ export interface EscapeRoomSlot {
   bookings: EscapeRoomSlotBooking[];
   players_booked: number;
   signed: number;
+  people_covered?: number;
   unsigned: number;
   photos: number;
   sent: number;
@@ -112,6 +113,7 @@ export interface EscapeRoomUnsentGame {
   time_label: string;
   room_name: string | null;
   players: number;
+  people_covered?: number;
   has_photo: boolean;
 }
 
@@ -122,6 +124,7 @@ export interface EscapeRoomPlayer {
   reference_number: string | null;
   name: string;
   minors: number;
+  minor_names?: string[];
   email_masked: string | null;
   has_email: boolean;
   photo_release: boolean | null;

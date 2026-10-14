@@ -246,6 +246,16 @@ const ReportResult = ({ type, data, fullColor }: { type: string; data: unknown; 
     return <AdPerformanceResult data={data as { ads?: AdPerformanceRow[]; recent_requests?: AdRecentRequest[] }} fullColor={fullColor} />;
   }
 
+  if (type === 'by-escape-room' && Array.isArray(data)) {
+    const rows = (data as Array<{ key: unknown; label: unknown; count?: number; participants_covered?: number }>).map((row) => ({
+      key: row.key,
+      room: row.label,
+      participants_covered: row.participants_covered ?? null,
+      waiver_forms_signed: row.count ?? 0,
+    }));
+    return <SimpleTable rows={rows} fullColor={fullColor} />;
+  }
+
   if (Array.isArray(data)) {
     return <SimpleTable rows={data as Array<Record<string, unknown>>} fullColor={fullColor} />;
   }

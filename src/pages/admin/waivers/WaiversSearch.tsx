@@ -30,6 +30,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser } from '../../../utils/storage';
 import { escapeRoomGameLabel, formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
+import { countLabel, participantsCoveredLabel, peopleOnForm } from '../../../utils/waiverCoverage';
 import waiverService from '../../../services/waiverService';
 import waiverCacheService from '../../../services/WaiverCacheService';
 import bookingService from '../../../services/bookingService';
@@ -603,10 +604,12 @@ const WaiversSearch = () => {
     const statuses = new Set<string>();
     let checkedIn = 0;
     let minors = 0;
+    let participants = 0;
     rows.forEach((w) => {
       statuses.add(w.status);
       if (w.checked_in_at) checkedIn += 1;
       minors += w.minors?.length ?? 0;
+      participants += peopleOnForm(w);
     });
     const onlyStatus = statuses.size === 1 ? [...statuses][0] : null;
     return {
@@ -614,6 +617,7 @@ const WaiversSearch = () => {
       onlyStatus,
       checkedIn,
       minors,
+      participants,
       hidden: waivers.length - rows.length,
     };
   }, [table.filteredRows, waivers.length]);
@@ -748,7 +752,8 @@ const WaiversSearch = () => {
                 <span className="font-semibold text-gray-900">{visibleCounts.total}</span>
                 {visibleCounts.onlyStatus ? ` ${visibleCounts.onlyStatus}` : ''} waiver
                 {visibleCounts.total === 1 ? '' : 's'}
-                {' · '}{visibleCounts.checkedIn} checked in
+                {' · '}{participantsCoveredLabel(visibleCounts.participants)}
+                {' · '}{countLabel(visibleCounts.checkedIn, 'form', 'forms')} checked in
                 {' · '}{visibleCounts.minors} minor{visibleCounts.minors === 1 ? '' : 's'}
                 {visibleCounts.hidden > 0 && <span className="text-gray-500">{` · ${visibleCounts.hidden} hidden`}</span>}
               </>
@@ -761,11 +766,13 @@ const WaiversSearch = () => {
             <span className="font-medium text-gray-700">This period, all statuses:</span>{' '}
             <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.total}</span> total
             {' · '}
-            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.completed}</span> signed
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.completed}</span> waiver {periodSummary.completed === 1 ? 'form' : 'forms'} signed
+            {' · '}
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.people_covered}</span> {periodSummary.people_covered === 1 ? 'participant' : 'participants'} covered
             {' · '}
             <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.pending}</span> pending
             {' · '}
-            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.checked_in}</span> checked in
+            <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.checked_in}</span> {periodSummary.checked_in === 1 ? 'form' : 'forms'} checked in
             {' · '}
             <span className="font-semibold text-gray-900 tabular-nums">{periodSummary.minors_covered}</span> minors
             {(periodSummary.minor_age_brackets?.length ?? 0) > 0 && (

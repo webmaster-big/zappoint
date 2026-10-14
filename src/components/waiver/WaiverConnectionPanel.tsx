@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ShieldCheck, Clock, Link2, FileText, Tablet, UserCheck, Loader2 } from 'lucide-react';
+import { ShieldCheck, Clock, Link2, FileText, Tablet, UserCheck, Loader2, Users } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import waiverService from '../../services/waiverService';
 import type { ConnectedWaiver, EntityWaiverSummary } from '../../types/waiver.types';
+import { countLabel, formsSignedLabel, participantsCoveredLabel, peopleOnForm, waiverCoverage } from '../../utils/waiverCoverage';
 
 interface Props {
   type: 'booking' | 'attraction_purchase' | 'event_purchase' | 'customer';
@@ -11,6 +12,7 @@ interface Props {
   compact?: boolean;
   emptyMessage?: string;
   checkInActions?: boolean;
+  onChanged?: () => void;
 }
 
 const statusStyles: Record<string, string> = {
@@ -44,7 +46,7 @@ const formatDate = (val?: string | null) => {
 
 const waiverName = (w: ConnectedWaiver) => w.adult_name || w.adult_email || w.adult_phone || 'Awaiting signature';
 
-const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, checkInActions = true, emptyMessage }: Props) => {
+const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, checkInActions = true, emptyMessage, onChanged }: Props) => {
   const { themeColor, fullColor } = useThemeColor();
   const [waivers, setWaivers] = useState<ConnectedWaiver[]>([]);
   const [summary, setSummary] = useState<EntityWaiverSummary>({ total: 0, completed: 0, pending: 0, checked_in: 0 });
@@ -116,6 +118,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
     try {
       await waiverService.checkIn(w.id);
       await load(false);
+      onChanged?.();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setActionError(e.response?.data?.message || 'Failed to check in waiver');
@@ -130,6 +133,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
     try {
       await waiverService.checkInAll(type, id);
       await load(false);
+      onChanged?.();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setActionError(e.response?.data?.message || 'Failed to check in waivers');
@@ -139,6 +143,13 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
   };
 
   const checkableCount = waivers.filter((w) => w.status === 'completed' && !w.checked_in_at).length;
+  const counted = waiverCoverage(waivers);
+  const coverage = {
+    participants: summary.people_covered ?? counted.participants,
+    forms: summary.completed ?? counted.forms,
+    notSigned: summary.pending ?? counted.notSigned,
+    participantsCheckedIn: summary.people_checked_in ?? counted.participantsCheckedIn,
+  };
 
   if (loading) {
     return (
@@ -167,17 +178,12 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
         <div className="flex items-center gap-2">
           <ShieldCheck className={`w-4 h-4 text-${fullColor}`} />
           <h3 className="text-sm font-bold text-gray-900">{title}</h3>
         </div>
         <div className="flex items-center gap-2 text-[11px] flex-wrap">
-          <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><ShieldCheck className="w-3 h-3" />{summary.completed} signed</span>
-          {summary.pending > 0 && <span className="inline-flex items-center gap-1 text-amber-600 font-medium"><Clock className="w-3 h-3" />{summary.pending} pending</span>}
-          {checkInActions && (summary.checked_in ?? 0) > 0 && (
-            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium"><UserCheck className="w-3 h-3" />{summary.checked_in} checked in</span>
-          )}
           {canKiosk && (
             <button type="button" onClick={launchKiosk} disabled={launching} className={`inline-flex items-center gap-1 font-semibold text-${fullColor} hover:bg-${themeColor}-50 px-2 py-1 rounded transition disabled:opacity-50`}>
               <Tablet className="w-3 h-3" />{launching ? '…' : 'Kiosk'}
@@ -196,6 +202,16 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
           )}
         </div>
       </div>
+      <div className="flex items-center gap-x-3 gap-y-1 mb-3 text-[11px] flex-wrap">
+        <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold"><Users className="w-3 h-3" />{participantsCoveredLabel(coverage.participants)}</span>
+        <span className="inline-flex items-center gap-1 text-gray-600 font-medium"><ShieldCheck className="w-3 h-3" />{formsSignedLabel(coverage.forms)}</span>
+        {coverage.notSigned > 0 && (
+          <span className="inline-flex items-center gap-1 text-amber-600 font-medium"><Clock className="w-3 h-3" />{countLabel(coverage.notSigned, 'form', 'forms')} not signed yet</span>
+        )}
+        {checkInActions && coverage.participantsCheckedIn > 0 && (
+          <span className="inline-flex items-center gap-1 text-emerald-700 font-medium"><UserCheck className="w-3 h-3" />{coverage.participantsCheckedIn} of {coverage.participants} checked in</span>
+        )}
+      </div>
       {actionError && <div className="mb-2 bg-red-50 border border-red-100 rounded-lg px-3 py-1.5 text-[11px] text-red-700">{actionError}</div>}
       <div className="divide-y divide-gray-50">
         {waivers.map((w) => (
@@ -204,6 +220,11 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium text-gray-900 truncate">{waiverName(w)}</span>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${statusStyles[w.status] || statusStyles.pending}`}>{statusLabel[w.status] || w.status}</span>
+                {peopleOnForm(w) > 1 && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-700 border-gray-200">
+                    <Users className="w-2.5 h-2.5" />{countLabel(peopleOnForm(w), 'participant', 'participants')}
+                  </span>
+                )}
                 {checkInActions && (
                   w.checked_in_at ? (
                     <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-100">
@@ -217,7 +238,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
               {!compact && (
                 <div className="text-[11px] text-gray-400 mt-0.5">
                   {w.template ? `${w.template} · ` : ''}{formatDate(w.selected_date)}
-                  {w.minors.length > 0 && <span> · Minors: {w.minors.join(', ')}</span>}
+                  {w.minors.length > 0 && <span> · {w.status === 'completed' ? 'Minors covered by this waiver' : 'Minors'}: {w.minors.join(', ')}</span>}
                   {w.submitted_at && <span> · Signed {formatDateTime(w.submitted_at)}</span>}
                   {w.checked_in_at && <span> · Checked in {formatDateTime(w.checked_in_at)}</span>}
                 </div>

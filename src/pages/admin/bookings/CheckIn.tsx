@@ -47,6 +47,7 @@ import escapeRoomService from '../../../services/EscapeRoomService';
 import waiverCacheService from '../../../services/WaiverCacheService';
 import type { ScannedWaiver, Waiver, WaiverTemplate } from '../../../types/waiver.types';
 import { resolveScannedCode, KIND_LABELS } from '../../../utils/scanCode';
+import { countLabel, formsSignedLabel, participantsCoveredLabel, waiverCoverage, type WaiverCoverage } from '../../../utils/waiverCoverage';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import ticketOrderService, { type TicketOrder } from '../../../services/TicketOrderService';
 import membershipService from '../../../services/MembershipService';
@@ -223,6 +224,8 @@ const CheckIn: React.FC = () => {
   const [bookingTruncated, setBookingTruncated] = useState(false);
   const [bookingTotal, setBookingTotal] = useState(0);
   const [unsignedComplete, setUnsignedComplete] = useState(true);
+  const [dayCoverage, setDayCoverage] = useState<WaiverCoverage | null>(null);
+  const [signedLoadFailed, setSignedLoadFailed] = useState(false);
   const [listTab, setListTab] = useState<'waivers' | 'bookings'>(readStoredTab);
   const [scannedWaiver, setScannedWaiver] = useState<ScannedWaiver | null>(null);
   const [showWaiverModal, setShowWaiverModal] = useState(false);
@@ -300,6 +303,8 @@ const CheckIn: React.FC = () => {
       setWaiverTotal(0);
       setWaiverTruncated(false);
       setUnsignedComplete(true);
+      setDayCoverage(null);
+      setSignedLoadFailed(false);
     }
     try {
       setWaiversLoading(true);
@@ -311,7 +316,7 @@ const CheckIn: React.FC = () => {
 
       const [unsignedRes, signedRes] = await Promise.allSettled([
         waiverService.list({ ...base, status: 'pending' }),
-        waiverService.list({ ...base, status: 'completed' }),
+        waiverService.listWithCoverage({ ...base, status: 'completed' }),
       ]);
       if (request !== waiverRequest.current || scopeKey !== liveScope.current) return;
 
@@ -335,6 +340,19 @@ const CheckIn: React.FC = () => {
       setWaiverTotal(unsignedTotal + signedTotal);
       setWaiverTruncated(!unsignedOk || signed.length < signedTotal);
       setUnsignedComplete(unsignedOk);
+      setSignedLoadFailed(signedRes.status === 'rejected');
+      const coverage = signedRes.status === 'fulfilled' ? signedRes.value?.data?.coverage : undefined;
+      setDayCoverage(
+        coverage && unsignedRes.status === 'fulfilled'
+          ? {
+              participants: coverage.people_covered,
+              forms: coverage.forms_signed,
+              notSigned: unsignedTotal,
+              minors: coverage.minors_covered,
+              participantsCheckedIn: coverage.people_checked_in,
+            }
+          : null,
+      );
 
       if (unsignedRes.status === 'rejected') {
         setToast({ message: 'Unsigned waivers could not be loaded — this list is incomplete.', type: 'error' });
@@ -425,6 +443,12 @@ const CheckIn: React.FC = () => {
       });
     });
   }, [waivers, searchTerm]);
+
+  const waiverListCoverage = React.useMemo(
+    () => (dayCoverage && !searchTerm.trim() ? dayCoverage : waiverCoverage(filteredWaivers)),
+    [dayCoverage, searchTerm, filteredWaivers],
+  );
+  const waiverCoverageIsPartial = waiverTruncated && !(dayCoverage && !searchTerm.trim());
 
   const selectedDateObj = React.useMemo(() => parseLocalDate(selectedDate), [selectedDate]);
 
@@ -1703,6 +1727,34 @@ const CheckIn: React.FC = () => {
             ))}
           </div>
 
+          {listTab === 'waivers' && !waiversLoading && signedLoadFailed && (
+            <div className="px-6 py-3 border-b border-gray-100 text-sm text-amber-800 bg-amber-50">
+              Signed waivers could not be loaded, so participants covered and forms signed are not shown. Reload the page to try again.
+            </div>
+          )}
+
+          {listTab === 'waivers' && !waiversLoading && !signedLoadFailed && filteredWaivers.length > 0 && (
+            <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-700">
+                <Users className="w-4 h-4" />
+                {participantsCoveredLabel(waiverListCoverage.participants)}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-gray-700">
+                <FileSignature className="w-4 h-4" />
+                {formsSignedLabel(waiverListCoverage.forms)}
+              </span>
+              {waiverListCoverage.notSigned > 0 && (
+                <span className="text-amber-700">{countLabel(waiverListCoverage.notSigned, 'form', 'forms')} not signed yet</span>
+              )}
+              {waiverListCoverage.participantsCheckedIn > 0 && (
+                <span className="text-gray-600">
+                  {waiverListCoverage.participantsCheckedIn} of {waiverListCoverage.participants} checked in
+                </span>
+              )}
+              {waiverCoverageIsPartial && <span className="text-xs text-gray-500">Counted from the waivers listed below.</span>}
+            </div>
+          )}
+
           {listTab === 'waivers' && (waiversLoading ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className={`h-8 w-8 text-${themeColor}-600 animate-spin`} />
@@ -1774,10 +1826,16 @@ const CheckIn: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {1 + minors}
-                            <span className="text-xs text-gray-500 ml-1">
-                              {minors === 0 ? '(adult)' : `(adult + ${minors} minor${minors === 1 ? '' : 's'})`}
-                            </span>
+                            {signed ? (
+                              <>
+                                {1 + minors}
+                                <span className="text-xs text-gray-500 ml-1">
+                                  {minors === 0 ? '(adult)' : `(adult + ${minors} minor${minors === 1 ? '' : 's'})`}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-500">None until signed</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -2046,7 +2104,7 @@ const CheckIn: React.FC = () => {
                 )}
 
                 <div className="mb-3 sm:mb-6">
-                  <WaiverConnectionPanel type="booking" id={verifiedBooking.id} title="Waivers" />
+                  <WaiverConnectionPanel type="booking" id={verifiedBooking.id} title="Waivers" onChanged={() => void loadWaivers()} />
                 </div>
 
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
@@ -2515,6 +2573,10 @@ const CheckIn: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="mb-3 sm:mb-6">
+                  <WaiverConnectionPanel type="booking" id={selectedBooking.id} title="Waivers" onChanged={() => void loadWaivers()} />
+                </div>
 
                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Booking Information</h3>
@@ -3049,7 +3111,7 @@ const CheckIn: React.FC = () => {
                       <Detail icon={Smartphone} label="Phone" value={scannedTicket.guest_phone || '—'} />
                     </div>
                   </div>
-                  <WaiverConnectionPanel type="attraction_purchase" id={scannedTicket.id} title="Waivers" />
+                  <WaiverConnectionPanel type="attraction_purchase" id={scannedTicket.id} title="Waivers" onChanged={() => void loadWaivers()} />
                 </>
               )}
 
@@ -3095,6 +3157,13 @@ const CheckIn: React.FC = () => {
                       {scannedEvent.notes && <Detail icon={AlertCircle} label="Notes" value={scannedEvent.notes} wide />}
                     </div>
                   </div>
+                  <WaiverConnectionPanel
+                    type="event_purchase"
+                    id={scannedEvent.id}
+                    title="Waivers"
+                    onChanged={() => void loadWaivers()}
+                    emptyMessage={scannedEvent.ticket_order_id ? "Covered by this order's waiver — one signature per visit day (see the ticket holding it)." : undefined}
+                  />
                   {scannedEvent.checked_in_at && (
                     <div className="flex items-start gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
                       <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
@@ -3192,7 +3261,7 @@ const CheckIn: React.FC = () => {
 
             <div className="p-5 space-y-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Signed by</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">{scannedWaiver.is_signed ? 'Signed by' : 'Waiver for'}</p>
                 <p className="text-base font-medium text-gray-900">{scannedWaiver.adult_name}</p>
                 {scannedWaiver.template_title && (
                   <p className="text-sm text-gray-500">{scannedWaiver.template_title}</p>
@@ -3210,10 +3279,19 @@ const CheckIn: React.FC = () => {
                 </div>
               </div>
 
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Participants covered</p>
+                <p className="text-sm text-gray-900">
+                  {scannedWaiver.is_signed
+                    ? `${1 + scannedWaiver.minors_count} — ${scannedWaiver.minors_count === 0 ? 'the signer' : `the signer and ${countLabel(scannedWaiver.minors_count, 'minor', 'minors')}`}`
+                    : 'None until this waiver is signed'}
+                </p>
+              </div>
+
               {scannedWaiver.minors_count > 0 && (
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                    Minors covered ({scannedWaiver.minors_count})
+                    Minors covered by this waiver ({scannedWaiver.minors_count})
                   </p>
                   <ul className="text-sm text-gray-900 space-y-0.5">
                     {scannedWaiver.minors.map(minor => (

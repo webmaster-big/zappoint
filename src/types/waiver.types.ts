@@ -423,7 +423,15 @@ export interface ConnectedWaiver {
   submitted_at?: string | null;
   checked_in_at?: string | null;
   minors: string[];
+  people_covered?: number;
   signing_url?: string | null;
+}
+
+export interface WaiverListCoverage {
+  forms_signed: number;
+  people_covered: number;
+  minors_covered: number;
+  people_checked_in: number;
 }
 
 export interface EntityWaiverSummary {
@@ -431,6 +439,9 @@ export interface EntityWaiverSummary {
   completed: number;
   pending: number;
   checked_in?: number;
+  people_covered?: number;
+  minors_covered?: number;
+  people_checked_in?: number;
 }
 
 /** Mirrors the company admin dashboard's period options so both screens can be compared. */

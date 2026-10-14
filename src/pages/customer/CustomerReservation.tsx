@@ -490,7 +490,7 @@ const CustomerReservations = () => {
                                     ) : (
                                       <>
                                         <p className="mt-1">
-                                          Everyone playing signs their own waiver, and the group photo is emailed to everyone who signed.
+                                          Every adult playing signs their own waiver, players under 18 need a parent or guardian to sign for them, and the group photo is emailed to everyone who signed.
                                           {game.players_signed !== null
                                             ? ` Signed waivers cover ${game.people_covered ?? game.players_signed} of ${game.players_booked} so far.`
                                             : ''}
