@@ -150,6 +150,7 @@ export interface Waiver {
 export interface WaiverFormTemplate {
   id: number;
   title: string;
+  kind?: WaiverTemplateKind;
   version: number | null;
   highlight_points?: string | null;
   max_minors: number;

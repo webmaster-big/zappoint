@@ -107,7 +107,6 @@ const EscapeRoomWaiverKiosk = () => {
   const [completedName, setCompletedName] = useState<string | undefined>(undefined);
   const [completedAd, setCompletedAd] = useState<KioskAd | null>(null);
   const [completedWaiverId, setCompletedWaiverId] = useState<number | null>(null);
-  const [completedWaiverRef, setCompletedWaiverRef] = useState<string | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [linkSpent, setLinkSpent] = useState(false);
   const [previewChecks, setPreviewChecks] = useState(0);
@@ -218,7 +217,6 @@ const EscapeRoomWaiverKiosk = () => {
     setCompletedName(undefined);
     setCompletedAd(null);
     setCompletedWaiverId(null);
-    setCompletedWaiverRef(null);
     window.scrollTo({ top: 0 });
     loadKiosk();
   }, [loadKiosk]);
@@ -262,7 +260,6 @@ const EscapeRoomWaiverKiosk = () => {
     setCompletedName(undefined);
     setCompletedAd(null);
     setCompletedWaiverId(null);
-    setCompletedWaiverRef(null);
     window.scrollTo({ top: 0 });
   };
 
@@ -417,7 +414,6 @@ const EscapeRoomWaiverKiosk = () => {
       setCompletedName(data.adult_first_name);
       setCompletedAd(result.ad ?? null);
       setCompletedWaiverId(result.id ?? null);
-      setCompletedWaiverRef(result.reference_number ?? null);
       setJustCompleted(true);
       const holdSeconds = holdFor(result.ad);
       completeTimer.current = setTimeout(resetAll, (holdSeconds + 90) * 1000);
@@ -693,7 +689,6 @@ const EscapeRoomWaiverKiosk = () => {
           onAutoClose={resetAll}
           ad={completedAd}
           waiverId={completedWaiverId}
-          waiverReference={completedWaiverRef}
           nextLabel={room && time ? `Sign for another player on ${room.name} ·\u00a0${time.label.replace(/ /g, '\u00a0')}` : 'Sign for another player'}
           secondaryLabel={pinnedGame ? undefined : 'Sign for a different room or time'}
           onSecondary={resetAll}

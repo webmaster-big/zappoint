@@ -26,6 +26,7 @@ const WaiverKioskSession = () => {
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutSeconds = context?.settings?.inactivity_timeout_seconds ?? 120;
+  const escapeRoomWaiver = context?.template?.kind === 'escape_room' || !!context?.escape_room;
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -96,7 +97,7 @@ const WaiverKioskSession = () => {
     return (
       <>
         <WaiverSuccess />
-        {(completedAd || completedWaiverRef) && !adDismissed && (
+        {(completedAd || completedWaiverRef || escapeRoomWaiver) && !adDismissed && (
           <WaiverSuccessModal
             signerFirstName={signerFirstName}
             locationId={null}
@@ -104,7 +105,7 @@ const WaiverKioskSession = () => {
             onStartNext={() => setAdDismissed(true)}
             ad={completedAd}
             waiverId={completedWaiverId}
-            waiverReference={completedWaiverRef}
+            waiverReference={escapeRoomWaiver ? null : completedWaiverRef}
             nextLabel="Done"
             closingText="Closing"
             note={context?.escape_room ? 'Your group photo will be emailed to you after the game.' : undefined}
