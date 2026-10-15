@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Clock, Link2, FileText, Tablet, UserCheck, Loader2, Users } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import waiverService from '../../services/waiverService';
@@ -55,6 +55,7 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
   const [launching, setLaunching] = useState(false);
   const [busyId, setBusyId] = useState<number | 'all' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const latestLoad = useRef(0);
 
   const canKiosk = type !== 'customer';
 
@@ -86,17 +87,20 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
   };
 
   const load = useCallback(async (withSpinner = true) => {
+    const ticket = ++latestLoad.current;
     if (withSpinner) setLoading(true);
     try {
       const r = await waiverService.entityWaivers(type, id);
+      if (ticket !== latestLoad.current) return;
       if (r.success) {
         setWaivers(r.data.waivers || []);
         setSummary(r.data.summary || { total: 0, completed: 0, pending: 0, checked_in: 0 });
       }
     } catch {
+      if (ticket !== latestLoad.current) return;
       setWaivers([]);
     } finally {
-      if (withSpinner) setLoading(false);
+      if (ticket === latestLoad.current) setLoading(false);
     }
   }, [type, id]);
 
