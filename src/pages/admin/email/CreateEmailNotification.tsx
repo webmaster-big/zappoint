@@ -588,7 +588,9 @@ const CreateEmailNotification: React.FC = () => {
       console.error('Error creating notification:', error);
       const data = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response?.data;
       const firstError = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
-      setToast({ message: firstError ?? data?.message ?? 'Failed to create notification', type: 'error' });
+      const refusedIndex = Object.keys(data?.errors ?? {}).map((key) => /^excluded_emails\.(\d+)$/.exec(key)?.[1]).find(Boolean);
+      const refused = refusedIndex !== undefined ? excludedEmails[Number(refusedIndex)] : undefined;
+      setToast({ message: refused ? `Don't Send To can't use "${refused}". Remove it, type it again and save.` : firstError ?? data?.message ?? 'Failed to create notification', type: 'error' });
     } finally {
       setLoading(false);
     }

@@ -187,12 +187,36 @@ export const suggestEmails = (value: string, options: SuggestOptions = {}): Emai
   }));
 };
 
-const ADDRESS_PART = /^[^\s@.,;:<>()[\]\\"]+(\.[^\s@.,;:<>()[\]\\"]+)*$/;
-const DOMAIN = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+$/u;
+const INVISIBLE = /[\p{Cc}\p{Cf}]/gu;
+const LOCAL_PART = /^[A-Za-z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u1E00-\u1EFF!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u1E00-\u1EFF!#$%&'*+/=?^_`{|}~-]+)*$/;
+const DOMAIN_LABEL = /^[A-Za-z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u1E00-\u1EFF](?:[A-Za-z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u1E00-\u1EFF-]*[A-Za-z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u1E00-\u1EFF])?$/;
+const ASCII_LABEL = /^[A-Za-z0-9-]+$/;
+const MAX_DOMAIN_BYTES = 253;
 
-export const cleanEmailAddress = (value: string): string => value.trim().toLowerCase().replace(/[.,;]+$/, '');
+const byteLength = (value: string): number => new TextEncoder().encode(value).length;
+
+const encodedLength = (label: string): number => {
+  try {
+    return new URL(`http://${label}`).hostname.length;
+  } catch {
+    return Infinity;
+  }
+};
+
+const labelFits = (label: string, index: number): boolean => ASCII_LABEL.test(label)
+  ? label.length <= (index === 0 ? 63 : 62)
+  : byteLength(label) <= 63 && encodedLength(label) <= 63;
+
+export const cleanEmailAddress = (value: string): string =>
+  value.replace(INVISIBLE, '').toLowerCase().normalize('NFC').trim().replace(/[\s.,;]+$/u, '');
 
 export const isValidEmailAddress = (value: string): boolean => {
   const at = value.lastIndexOf('@');
-  return at > 0 && ADDRESS_PART.test(value.slice(0, at)) && DOMAIN.test(value.slice(at + 1));
+  if (at <= 0) return false;
+  const domain = value.slice(at + 1);
+  const labels = domain.split('.');
+  return LOCAL_PART.test(value.slice(0, at))
+    && labels.length >= 2
+    && byteLength(domain) <= MAX_DOMAIN_BYTES
+    && labels.every((label, index) => DOMAIN_LABEL.test(label) && labelFits(label, index));
 };
