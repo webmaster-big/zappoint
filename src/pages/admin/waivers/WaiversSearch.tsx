@@ -32,6 +32,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { escapeRoomGameLabel, formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import { countLabel, participantsCoveredLabel, peopleOnForm } from '../../../utils/waiverCoverage';
 import waiverService from '../../../services/waiverService';
+import { digitsOnly } from '../../../utils/bookingSearch';
 import waiverCacheService from '../../../services/WaiverCacheService';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
@@ -500,6 +501,7 @@ const WaiversSearch = () => {
       adultName(w),
       w.adult_email,
       w.adult_phone,
+      digitsOnly(w.adult_phone ?? ''),
       minorNames(w),
       w.template?.title,
       w.location?.name,

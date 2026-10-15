@@ -24,8 +24,10 @@ import CameraViewfinder, { MotionAccessNote } from '../../../components/admin/ph
 import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import DeliveryOutcomePanel from '../../../components/admin/photos/DeliveryOutcomePanel';
 import type {
   PhotoCaptureContext,
+  PhotoSendOutcome,
   PhotoSessionRecord,
   PhotoWaiverMatch,
 } from '../../../types/photo.types';
@@ -34,6 +36,8 @@ type Step = 'consent' | 'capture' | 'delivery' | 'done';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
+
+const needsQrFallback = (result?: PhotoSendOutcome['result'] | null): boolean => result === 'failed' || result === 'partial';
 
 const PhotoCapture = () => {
   const { themeColor } = useThemeColor();
@@ -54,7 +58,15 @@ const PhotoCapture = () => {
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState<PhotoWaiverMatch[]>([]);
   const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
+  const [deliveryOutcome, setDeliveryOutcome] = useState<PhotoSendOutcome | null>(null);
+  const [offerQr, setOfferQr] = useState(false);
+  const [latestResult, setLatestResult] = useState<PhotoSendOutcome['result'] | null>(null);
   const [slideshowOptIn, setSlideshowOptIn] = useState(false);
+
+  const handleResultChange = useCallback((result: PhotoSendOutcome['result']) => {
+    setLatestResult(result);
+    if (needsQrFallback(result)) setOfferQr(true);
+  }, []);
 
   const camera = usePhotoCamera({ facingMode: 'environment' });
   const { start: startCamera, stop: stopCamera, capture: capturePhoto } = camera;
@@ -212,6 +224,8 @@ const PhotoCapture = () => {
       });
       setSession(result.data);
       setDeliveryNote(result.message ?? null);
+      setDeliveryOutcome(result.outcome ?? null);
+      setOfferQr(needsQrFallback(result.outcome?.result));
       stopCamera();
       setStep('done');
     } catch (e) {
@@ -233,6 +247,9 @@ const PhotoCapture = () => {
     setSearched(false);
     setSelected([]);
     setDeliveryNote(null);
+    setDeliveryOutcome(null);
+    setOfferQr(false);
+    setLatestResult(null);
     setSlideshowOptIn(slideshowDefaultRef.current);
   }, [stopCamera]);
 
@@ -300,7 +317,7 @@ const PhotoCapture = () => {
               consent: 'Consent',
               capture: 'Capture',
               delivery: 'Delivery',
-              done: 'Sent',
+              done: 'Result',
             };
             return (
               <li key={s} className="flex items-center gap-2">
@@ -536,17 +553,22 @@ const PhotoCapture = () => {
 
             {method === 'waiver_message' && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5">
-                {(context?.channels.sms_note || context?.channels.email_note) && (
+                {(context?.channels.sms_note || context?.channels.email_note || context?.channels.photo_link_note) && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                     <p className="flex items-center gap-2 text-sm font-medium text-amber-900">
                       <AlertTriangle className="w-4 h-4" />
-                      Not every channel is sending
+                      {context?.channels.email_note || context?.channels.photo_link_note
+                        ? 'Not every channel is sending'
+                        : context?.channels.sms_status?.headline ?? 'Not every channel is sending'}
                     </p>
                     {context?.channels.email_note && (
                       <p className="mt-1 text-sm text-amber-900">{context.channels.email_note}</p>
                     )}
                     {context?.channels.sms_note && (
                       <p className="mt-1 text-sm text-amber-900">{context.channels.sms_note}</p>
+                    )}
+                    {context?.channels.photo_link_note && (
+                      <p className="mt-1 text-sm text-amber-900">{context.channels.photo_link_note}</p>
                     )}
                   </div>
                 )}
@@ -726,11 +748,24 @@ const PhotoCapture = () => {
         {step === 'done' && session && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-2xl p-6">
-              <CheckCircle2 className="w-8 h-8 text-green-600 mb-3" />
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                {session.delivery_method === 'staff_qr' ? 'Ready to scan' : 'Delivery recorded'}
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">{deliveryNote ?? 'The session is complete.'}</p>
+              {deliveryOutcome && session.delivery_method !== 'staff_qr' ? (
+                <div className="mb-5">
+                  <DeliveryOutcomePanel
+                    key={deliveryOutcome.delivery_ids.join('-')}
+                    outcome={deliveryOutcome}
+                    deliveries={session.deliveries}
+                    onResultChange={handleResultChange}
+                  />
+                </div>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-8 h-8 text-green-600 mb-3" />
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                    {session.delivery_method === 'staff_qr' ? 'Ready to scan' : 'Delivery recorded'}
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-4">{deliveryNote ?? 'The session is complete.'}</p>
+                </>
+              )}
 
               <dl className="text-sm space-y-2">
                 <div className="flex justify-between gap-4">
@@ -753,7 +788,7 @@ const PhotoCapture = () => {
                 )}
               </dl>
 
-              {session.deliveries.length > 0 && (
+              {!deliveryOutcome && session.deliveries.length > 0 && (
                 <div className="mt-5 border-t border-gray-100 pt-4">
                   <p className="text-sm font-medium text-gray-900 mb-2">Channels</p>
                   <ul className="space-y-1 text-sm">
@@ -789,8 +824,16 @@ const PhotoCapture = () => {
               </StandardButton>
             </div>
 
-            {session.delivery_method === 'staff_qr' && (
+            {(session.delivery_method === 'staff_qr' ||
+              (deliveryOutcome && offerQr && session.qr_status === 'active')) && (
               <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
+                {session.delivery_method !== 'staff_qr' && (
+                  <p className="mb-4 text-sm font-medium text-gray-900">
+                    {latestResult === 'sent'
+                      ? 'Everything has gone out now. They can still scan this code to open their photos.'
+                      : 'Not every message reached the guest. They can scan this code instead.'}
+                  </p>
+                )}
                 <div className="inline-block rounded-2xl bg-white p-4 border border-gray-100">
                   <QRCodeCanvas value={session.qr_target_url} size={230} includeMargin={false} level="M" />
                 </div>

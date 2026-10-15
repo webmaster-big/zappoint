@@ -13,7 +13,14 @@ import DateOfBirthSelect from './DateOfBirthSelect';
 import RelationshipSelect from './RelationshipSelect';
 import EmailInput from '../ui/EmailInput';
 import { getDeviceId } from '../../utils/deviceId';
-import { formatPhoneForDisplay, isCompletePhone, localPhoneDigits } from '../../utils/bookingSearch';
+import {
+  COUNTRY_CODE_NEEDED,
+  PHONE_NOT_RECOGNISED,
+  formatPhoneForDisplay,
+  isCompletePhone,
+  needsCountryCode,
+  phoneForSubmit,
+} from '../../utils/bookingSearch';
 import { ADULT_AGE, calculateAge, isFutureDate } from '../../utils/age';
 import { formatDateLong } from '../../utils/timeFormat';
 
@@ -155,8 +162,10 @@ const WaiverFormBody = ({
     if (!adultEmail.trim()) errs.adultEmail = 'Required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adultEmail)) errs.adultEmail = 'Invalid email';
     if (!adultPhone.trim()) errs.adultPhone = 'Required';
+    else if (!locked.phone && needsCountryCode(adultPhone))
+      errs.adultPhone = COUNTRY_CODE_NEEDED;
     else if (!locked.phone && !isCompletePhone(adultPhone))
-      errs.adultPhone = 'Enter a 10-digit phone number';
+      errs.adultPhone = PHONE_NOT_RECOGNISED;
     if (!adultDob) errs.adultDob = 'Required';
     else if (isFutureDate(adultDob)) errs.adultDob = 'Please check this date — it cannot be in the future';
     else if (signerIsMinor) errs.adultDob = `The person signing must be ${ADULT_AGE} or older`;
@@ -189,7 +198,7 @@ const WaiverFormBody = ({
       adult_first_name: adultFirstName.trim(),
       adult_last_name: adultLastName.trim(),
       adult_email: adultEmail.trim(),
-      adult_phone: locked.phone ? adultPhone.trim() : (localPhoneDigits(adultPhone) || adultPhone.trim()),
+      adult_phone: locked.phone ? adultPhone.trim() : phoneForSubmit(adultPhone),
       adult_dob: adultDob,
       typed_legal_name: typedLegalName.trim(),
       signature_image: signatureImage || undefined,

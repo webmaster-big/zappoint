@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { followUpEmailName } from '../../../utils/visitFollowUpNotice';
 import {
@@ -17,10 +17,15 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
+import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import EmailInput from '../../../components/ui/EmailInput';
 import type { PhotoChannel, PhotoMessageTemplateRecord, PhotoSettingsResponse } from '../../../types/photo.types';
+import { TEXTING_STATE_BADGE, TEXTING_STATE_CARD } from '../../../utils/photoDeliveryOutcome';
+
+const TEST_POLL_INTERVAL_MS = 4000;
+const TEST_POLL_LIMIT = 15;
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -60,14 +65,69 @@ const ChannelTest = ({
 }) => {
   const [destination, setDestination] = useState('');
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ tone: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [size, setSize] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<{ reference: string; token: string; checks: number } | null>(null);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!tracking || !locationId) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const status = await photoService.getTestMessageStatus(locationId, tracking.reference, tracking.token);
+        if (cancelled || !mounted.current) return;
+        if (status.final) {
+          setResult({ tone: status.delivered ? 'success' : 'error', message: status.message });
+          setTracking(null);
+          return;
+        }
+      } catch {
+        if (cancelled || !mounted.current) return;
+      }
+      if (cancelled) return;
+      if (tracking.checks + 1 >= TEST_POLL_LIMIT) {
+        setResult({
+          tone: 'info',
+          message:
+            'The phone carrier has not confirmed the test yet. Check the phone. If nothing arrives, an administrator can run: php artisan sms:diagnose --sid=' +
+            tracking.reference,
+        });
+        setTracking(null);
+        return;
+      }
+      setTracking((prev) => (prev && prev.reference === tracking.reference ? { ...prev, checks: prev.checks + 1 } : prev));
+    }, TEST_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [locationId, tracking]);
 
   const send = async () => {
     if (sending || !locationId || destination.trim() === '') return;
     setSending(true);
     setResult(null);
+    setSize(null);
+    setTracking(null);
     try {
-      setResult(await photoService.sendTestMessage(locationId, channel, destination.trim()));
+      const sent = await photoService.sendTestMessage(locationId, channel, destination.trim());
+      setResult({ tone: sent.success ? (channel === 'sms' ? 'info' : 'success') : 'error', message: sent.message });
+      setSize(
+        sent.success && channel === 'sms' && sent.characters
+          ? `A real photo text is about ${sent.characters} characters (${sent.encoding ?? 'GSM-7'}), billed as ${sent.segments ?? 1} message${(sent.segments ?? 1) === 1 ? '' : 's'}.`
+          : null,
+      );
+      if (sent.success && channel === 'sms' && sent.providerReference && sent.checkToken) {
+        setTracking({ reference: sent.providerReference, token: sent.checkToken, checks: 0 });
+      }
     } finally {
       setSending(false);
     }
@@ -123,10 +183,17 @@ const ChannelTest = ({
         </button>
       </div>
       {result && (
-        <p className={`mt-2 text-sm ${result.success ? 'text-green-800' : 'text-red-700'}`} aria-live="polite">
+        <p
+          className={`mt-2 text-sm ${
+            result.tone === 'success' ? 'text-green-800' : result.tone === 'error' ? 'text-red-700' : 'text-gray-700'
+          }`}
+          aria-live="polite"
+        >
+          {tracking && <RefreshCcw className="inline w-3.5 h-3.5 mr-1 animate-spin" />}
           {result.message}
         </p>
       )}
+      {size && <p className="mt-1 text-xs text-gray-600">{size}</p>}
     </div>
   );
 };
@@ -150,6 +217,49 @@ const PhotoSettings = () => {
   const [templateDraft, setTemplateDraft] = useState<Record<number, PhotoMessageTemplateRecord>>({});
   const [templateTestTo, setTemplateTestTo] = useState<Record<number, string>>({});
   const [templateTesting, setTemplateTesting] = useState<number | null>(null);
+
+  const [resettingTexting, setResettingTexting] = useState(false);
+  const canResetTexting = ['company_admin', 'admin'].includes(String(getStoredUser()?.role ?? ''));
+  const texting = data
+    ? data.channels.sms_status ?? {
+        state: data.channels.sms_available ? ('unverified' as const) : ('not_configured' as const),
+        headline: data.channels.sms_available ? 'Texting not confirmed yet' : 'Texting is switched off',
+        note: data.channels.sms_note,
+        sender: null,
+        sender_kind: 'none' as const,
+        verified: null,
+        problem: null,
+        recent: {
+          days: 14,
+          attempted: 0,
+          received: 0,
+          delivered: 0,
+          awaiting_carrier: 0,
+          unconfirmed: 0,
+          not_delivered: 0,
+          failed: 0,
+          skipped: 0,
+          top_problem: null,
+        },
+      }
+    : null;
+
+  const resetTexting = async () => {
+    if (!effectiveLocationId || resettingTexting) return;
+    if (!window.confirm('Mark texting as not confirmed? It shows as confirmed again once a guest receives a photo text on their phone.')) return;
+    setResettingTexting(true);
+    try {
+      const result = await photoService.resetTextingConfirmation(effectiveLocationId);
+      setData((prev) =>
+        prev ? { ...prev, channels: { ...prev.channels, sms_status: result.texting, sms_note: result.texting.note } } : prev,
+      );
+      setToast({ message: result.message, type: 'success' });
+    } catch (e) {
+      setToast({ message: errorMessage(e, 'That could not be reset.'), type: 'error' });
+    } finally {
+      setResettingTexting(false);
+    }
+  };
 
   const sendTemplateTest = async (template: PhotoMessageTemplateRecord) => {
     if (!effectiveLocationId) return;
@@ -351,7 +461,7 @@ const PhotoSettings = () => {
           </div>
         )}
 
-        {data && (
+        {data && texting && (
           <div className="space-y-6">
             <section className="bg-white border border-gray-200 rounded-2xl p-5">
               <h2 className="font-semibold text-gray-900 mb-1">Delivery channels</h2>
@@ -390,24 +500,86 @@ const PhotoSettings = () => {
                   />
                 </div>
 
-                <div
-                  className={`rounded-xl border p-4 ${
-                    data.channels.sms_available ? 'border-green-200 bg-green-50/60' : 'border-amber-200 bg-amber-50'
-                  }`}
-                >
+                <div className={`rounded-xl border p-4 ${TEXTING_STATE_CARD[texting.state]}`}>
                   <p className="flex items-center gap-2 font-medium text-gray-900">
                     <MessageSquare className="w-4 h-4" />
                     SMS
                     <span
-                      className={`ml-auto text-xs rounded-full px-2 py-0.5 ${
-                        data.channels.sms_available ? 'bg-green-600 text-white' : 'bg-amber-500 text-white'
-                      }`}
+                      className={`ml-auto text-xs rounded-full px-2 py-0.5 ${TEXTING_STATE_BADGE[texting.state].className}`}
                     >
-                      {data.channels.sms_available ? 'sending' : 'not sending'}
+                      {TEXTING_STATE_BADGE[texting.state].label}
                     </span>
                   </p>
-                  <p className="mt-2 text-sm text-gray-700">Provider: Twilio</p>
-                  {data.channels.sms_note && <p className="mt-2 text-sm text-amber-900">{data.channels.sms_note}</p>}
+                  <p className="mt-2 text-sm text-gray-700">
+                    Provider: Twilio
+                    {texting.sender && (
+                      <>
+                        {' '}
+                        · sending from{' '}
+                        <code className="text-xs bg-white/70 rounded px-1.5 py-0.5">{texting.sender}</code>
+                        {texting.sender_kind === 'toll_free' && ' (toll-free)'}
+                      </>
+                    )}
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-gray-900">{texting.headline}</p>
+                  {data.channels.sms_note && <p className="mt-1 text-sm text-gray-800">{data.channels.sms_note}</p>}
+                  {texting.verified && (
+                    <p className="mt-2 text-xs text-gray-600">
+                      {texting.state === 'verified' ? 'Confirmed' : 'Last confirmed'}
+                      {texting.verified.at &&
+                        ` on ${new Date(texting.verified.at).toLocaleDateString()}`}
+                      {texting.verified.method === 'guest_opened_link'
+                        ? ' when a guest opened the link from their text'
+                        : texting.verified.by_name
+                          ? ` by ${texting.verified.by_name}`
+                          : ''}
+                      {texting.verified.location_name && ` at ${texting.verified.location_name}`}.
+                      {texting.state === 'failing' && ' Newer texts are not arriving.'}
+                    </p>
+                  )}
+                  {texting.recent.attempted > 0 && (
+                    <p className="mt-2 text-xs text-gray-600">
+                      Last {texting.recent.days} days: {texting.recent.attempted} photo texts ·{' '}
+                      {texting.recent.received + texting.recent.delivered} reached the phone ·{' '}
+                      {texting.recent.awaiting_carrier + texting.recent.unconfirmed} not confirmed ·{' '}
+                      {texting.recent.not_delivered + texting.recent.failed} did not arrive
+                    </p>
+                  )}
+                  {texting.recent.top_problem && texting.recent.top_problem.code !== texting.problem?.code && (
+                    <p className="mt-1 text-xs text-red-700">
+                      Most common problem (code {texting.recent.top_problem.code},{' '}
+                      {texting.recent.top_problem.count}×):{' '}
+                      {texting.recent.top_problem.meaning ?? 'see the provider console'}
+                    </p>
+                  )}
+                  {(texting.state === 'unverified' || texting.state === 'failing') && (
+                    <details className="mt-3 text-sm text-gray-800">
+                      <summary className="cursor-pointer font-medium">How to confirm texting works</summary>
+                      <ol className="mt-2 list-decimal pl-5 space-y-1">
+                        <li>On Photo Capture, send a photo to a real guest&apos;s waiver that has their mobile number.</li>
+                        <li>Stay on the result screen until the text shows &ldquo;Delivered to the phone&rdquo; or &ldquo;Not delivered&rdquo;.</li>
+                        <li>
+                          Ask the guest to show you the text. If it is there, tap &ldquo;Guest received it&rdquo;. The guest opening
+                          the link from the text confirms it straight away.
+                        </li>
+                      </ol>
+                      <p className="mt-2 text-xs text-gray-600">
+                        A staff tap counts once the phone carrier reports that text delivered, or after three days if the carrier
+                        reports no problem. The test below only checks the provider and the carrier; it does not confirm texting
+                        for guests on its own.
+                      </p>
+                    </details>
+                  )}
+                  {canResetTexting && texting.verified && (
+                    <button
+                      type="button"
+                      onClick={() => void resetTexting()}
+                      disabled={resettingTexting}
+                      className="mt-3 text-xs text-gray-700 underline underline-offset-2 disabled:opacity-50"
+                    >
+                      Mark texting as not confirmed
+                    </button>
+                  )}
                   <ChannelTest
                     channel="sms"
                     locationId={effectiveLocationId}

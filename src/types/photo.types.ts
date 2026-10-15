@@ -18,6 +18,65 @@ export type PhotoDeliveryKind = 'immediate' | 'next_day' | 'kiosk' | 'backend' |
 
 export type PhotoDeliveryStatus = 'queued' | 'scheduled' | 'sent' | 'failed' | 'canceled' | 'skipped';
 
+export type PhotoDeliveryOutcome =
+  | 'received'
+  | 'delivered'
+  | 'awaiting_carrier'
+  | 'unconfirmed'
+  | 'not_delivered'
+  | 'sent'
+  | 'failed'
+  | 'skipped'
+  | 'duplicate'
+  | 'scheduled'
+  | 'queued'
+  | 'canceled';
+
+export type PhotoOutcomeTone = 'success' | 'info' | 'warning' | 'danger' | 'muted';
+
+export type PhotoTextingState = 'not_configured' | 'unverified' | 'verified' | 'failing';
+
+export interface PhotoSendOutcome {
+  result: 'sent' | 'partial' | 'failed' | 'scheduled';
+  headline: string;
+  message: string;
+  carrier_pending: number;
+  delivery_ids: number[];
+  confirmable_ids: number[];
+  texting_state: PhotoTextingState;
+  ask_for_receipt: boolean;
+  texts_blocked?: boolean;
+}
+
+export interface PhotoTextingStatus {
+  state: PhotoTextingState;
+  headline: string;
+  note: string | null;
+  sender: string | null;
+  sender_kind: 'toll_free' | 'standard' | 'short_code' | 'none';
+  verified: {
+    at: string | null;
+    method: 'staff_confirmed' | 'guest_opened_link';
+    by_name: string | null;
+    location_name: string | null;
+    photo_delivery_id: number | null;
+  } | null;
+  problem: { code: string | null; meaning: string; seen_at: string | null } | null;
+  pending_receipt?: { photo_delivery_id: number; at: string | null; at_label: string; settles_after: string | null } | null;
+  recent: {
+    days: number;
+    attempted: number;
+    received: number;
+    delivered: number;
+    awaiting_carrier: number;
+    unconfirmed: number;
+    not_delivered: number;
+    failed: number;
+    skipped: number;
+    top_problem: { code: string; meaning: string | null; count: number } | null;
+  };
+}
+
 export type SessionDeliveryStatus =
   | 'none'
   | 'pending'
@@ -81,6 +140,21 @@ export interface PhotoDeliveryRecord {
   opened_at: string | null;
   attempts: number;
   error: string | null;
+  outcome: PhotoDeliveryOutcome;
+  outcome_tone: PhotoOutcomeTone;
+  outcome_label: string;
+  outcome_detail: string | null;
+  provider_reference: string | null;
+  provider_status: string | null;
+  provider_error_code: string | null;
+  delivered_at: string | null;
+  receipt_confirmed_at: string | null;
+  receipt_confirmed_via: 'staff' | 'link' | null;
+  receipt_confirmed_by_name: string | null;
+  awaiting_carrier: boolean;
+  carrier_pending?: boolean;
+  can_confirm_receipt: boolean;
+  retry_useful?: boolean;
   can_retry: boolean;
   can_cancel: boolean;
   created_at: string | null;
@@ -151,6 +225,7 @@ export interface PhotoChannelDiagnostics {
   sms_available: boolean;
   email_available: boolean;
   email_transport: string;
+  sms_status?: PhotoTextingStatus;
   sms_note: string | null;
   email_note: string | null;
   photo_link_base: string;
@@ -413,6 +488,7 @@ export interface CustomerPhotoPage {
   source?: PhotoSessionSource;
   greeting_name?: string | null;
   asked_for_details?: boolean;
+  link_sent_by?: { email: boolean; sms: boolean; sms_reliable?: boolean } | null;
   photo_date?: string;
   photo_count?: number;
   expires_at: string | null;

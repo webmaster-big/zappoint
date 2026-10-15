@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Clock, Download, ImageOff, Lock } from 'lucide-react';
 import EmailInput from '../../components/ui/EmailInput';
 import photoService from '../../services/PhotoService';
@@ -7,11 +7,33 @@ import type { CustomerPhotoPage } from '../../types/photo.types';
 import { useLocationBrand } from '../../hooks/useLocationBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
+import { COUNTRY_CODE_NEEDED, isCompletePhone, needsCountryCode } from '../../utils/bookingSearch';
 
 type FieldErrors = Partial<Record<'name' | 'email' | 'phone', string>>;
 
+const savedToLine = (page: CustomerPhotoPage): string => {
+  const sentBy = page.link_sent_by;
+  const until = `This page stays open until ${page.expires_on_label}.`;
+  if (!sentBy) return `Saved to your email and phone. ${until}`;
+  const textReliable = sentBy.sms_reliable ?? true;
+  if (sentBy.email && sentBy.sms) {
+    return textReliable
+      ? `We sent the link to your email and phone. ${until}`
+      : `We emailed you the link and also tried to text it to you. ${until}`;
+  }
+  if (sentBy.email) return `We emailed you the link. We could not text it to you. ${until}`;
+  if (sentBy.sms) {
+    return textReliable
+      ? `We texted you the link. We could not email it to you. ${until}`
+      : `We tried to text you the link. If it does not arrive, save or download your photos now. ${until}`;
+  }
+  return `We could not send you the link, so save or download your photos now. ${until}`;
+};
+
 const CustomerPhotos = () => {
   const { accessToken } = useParams<{ accessToken: string }>();
+  const [searchParams] = useSearchParams();
+  const linkRef = searchParams.get('r');
   const [page, setPage] = useState<CustomerPhotoPage | null>(null);
   const photoBrand = useLocationBrand(page?.location_logo_path, page?.location_name);
   const brandLogoSrc = getImageUrl(photoBrand.logoPath) || DEFAULT_LOGO_SRC;
@@ -36,7 +58,7 @@ const CustomerPhotos = () => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await photoService.getCustomerPage(accessToken);
+        const data = await photoService.getCustomerPage(accessToken, linkRef);
         if (cancelled) return;
         setPage(data);
         setState('ready');
@@ -57,14 +79,16 @@ const CustomerPhotos = () => {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, linkRef]);
 
   const validate = useCallback((): boolean => {
     const next: FieldErrors = {};
     if (name.trim().length < 2) next.name = 'Please enter your name.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) next.email = 'Please enter a valid email address.';
     if (email.trim().length === 0) next.email = 'Please enter your email address.';
-    if (phone.replace(/\D/g, '').length < 10) next.phone = 'Please enter a valid mobile number.';
+    if (needsCountryCode(phone)) next.phone = COUNTRY_CODE_NEEDED;
+    else if (!isCompletePhone(phone))
+      next.phone = 'Please enter a valid mobile number. Start a number from outside the US or Canada with + and its country code.';
     if (phone.trim().length === 0) next.phone = 'Please enter your mobile number.';
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -305,7 +329,7 @@ const CustomerPhotos = () => {
                 </p>
                 <p className="text-sm text-zinc-500 mb-8">
                   {page.asked_for_details
-                    ? `Saved to your email and phone. This page stays open until ${page.expires_on_label}.`
+                    ? savedToLine(page)
                     : `Nothing was asked of you — this link came straight from the counter. It stays open until ${page.expires_on_label}.`}
                 </p>
               </>

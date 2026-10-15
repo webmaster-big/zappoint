@@ -22,7 +22,14 @@ import { confirmPhotoRelease, releaseConfirmMessage } from '../../../utils/photo
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
-import type { PhotoLibraryResponse, PhotoRecord, PhotoSessionRecord, PhotoWaiverMatch } from '../../../types/photo.types';
+import DeliveryOutcomePanel from '../../../components/admin/photos/DeliveryOutcomePanel';
+import type {
+  PhotoLibraryResponse,
+  PhotoRecord,
+  PhotoSendOutcome,
+  PhotoSessionRecord,
+  PhotoWaiverMatch,
+} from '../../../types/photo.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -68,6 +75,7 @@ const PhotoLibrary = () => {
   const [slideshowBusyId, setSlideshowBusyId] = useState<number | null>(null);
 
   const [sendFor, setSendFor] = useState<PhotoRecord | null>(null);
+  const [sendResult, setSendResult] = useState<{ outcome: PhotoSendOutcome; session: PhotoSessionRecord } | null>(null);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<PhotoWaiverMatch[]>([]);
   const [searching, setSearching] = useState(false);
@@ -202,9 +210,13 @@ const PhotoLibrary = () => {
     if (!sendFor || chosen.length === 0) return;
     setSending(true);
     try {
-      await photoService.sendPhoto(sendFor.id, { waiver_ids: chosen, schedule });
-      setToast({ message: 'Sent using the normal waiver message delivery flow.', type: 'success' });
-      setSendFor(null);
+      const result = await photoService.sendPhoto(sendFor.id, { waiver_ids: chosen, schedule });
+      if (result.outcome) {
+        setSendResult({ outcome: result.outcome, session: result.data });
+      } else {
+        setToast({ message: result.message ?? 'Sent.', type: 'success' });
+        setSendFor(null);
+      }
       setChosen([]);
       setMatches([]);
       setQuery('');
@@ -599,95 +611,122 @@ const PhotoLibrary = () => {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Send this photo again</h2>
-              <button type="button" onClick={() => setSendFor(null)} aria-label="Close">
+              <h2 className="font-semibold text-gray-900">{sendResult ? 'How it went' : 'Send this photo again'}</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setSendFor(null);
+                  setSendResult(null);
+                }}
+                aria-label="Close"
+              >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
-            <div className="p-5">
-              <p className="text-sm text-gray-600 mb-4">
-                This uses the normal waiver message delivery flow, and the action is recorded in the activity log.
-              </p>
-
-              <div className="flex gap-2 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void runSearch();
-                    }}
-                    placeholder="Name, phone or email"
-                    className={`w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
-                  />
-                </div>
-                <StandardButton size="sm" onClick={() => void runSearch()} loading={searching}>
-                  Search
+            {sendResult ? (
+              <div className="p-5">
+                <DeliveryOutcomePanel
+                  key={sendResult.outcome.delivery_ids.join('-')}
+                  outcome={sendResult.outcome}
+                  deliveries={sendResult.session.deliveries}
+                />
+                <StandardButton
+                  className="mt-5"
+                  fullWidth
+                  onClick={() => {
+                    setSendFor(null);
+                    setSendResult(null);
+                  }}
+                >
+                  Done
                 </StandardButton>
               </div>
+            ) : (
+              <div className="p-5">
+                <p className="text-sm text-gray-600 mb-4">
+                  This uses the normal waiver message delivery flow, and the action is recorded in the activity log.
+                </p>
 
-              <ul className="space-y-2 max-h-56 overflow-y-auto mb-4">
-                {matches.map((waiver) => (
-                  <li key={waiver.id}>
-                    <label
-                      className={`flex items-start gap-3 rounded-xl border p-3 ${
-                        waiver.contactable ? 'cursor-pointer border-gray-200' : 'border-gray-200 bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={chosen.includes(waiver.id)}
-                        disabled={!waiver.contactable}
-                        onChange={() =>
-                          setChosen((prev) =>
-                            prev.includes(waiver.id) ? prev.filter((id) => id !== waiver.id) : [...prev, waiver.id],
-                          )
-                        }
-                        className={`mt-1 h-4 w-4 accent-${themeColor}-700`}
-                      />
-                      <span className="flex-1">
-                        <span className="block text-sm font-medium text-gray-900">{waiver.name}</span>
-                        <span className="block text-xs text-gray-500">
-                          {waiver.email_masked || 'no email'} · {waiver.phone_masked || 'no phone'}
+                <div className="flex gap-2 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void runSearch();
+                      }}
+                      placeholder="Name, phone or email"
+                      className={`w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
+                    />
+                  </div>
+                  <StandardButton size="sm" onClick={() => void runSearch()} loading={searching}>
+                    Search
+                  </StandardButton>
+                </div>
+
+                <ul className="space-y-2 max-h-56 overflow-y-auto mb-4">
+                  {matches.map((waiver) => (
+                    <li key={waiver.id}>
+                      <label
+                        className={`flex items-start gap-3 rounded-xl border p-3 ${
+                          waiver.contactable ? 'cursor-pointer border-gray-200' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={chosen.includes(waiver.id)}
+                          disabled={!waiver.contactable}
+                          onChange={() =>
+                            setChosen((prev) =>
+                              prev.includes(waiver.id) ? prev.filter((id) => id !== waiver.id) : [...prev, waiver.id],
+                            )
+                          }
+                          className={`mt-1 h-4 w-4 accent-${themeColor}-700`}
+                        />
+                        <span className="flex-1">
+                          <span className="block text-sm font-medium text-gray-900">{waiver.name}</span>
+                          <span className="block text-xs text-gray-500">
+                            {waiver.email_masked || 'no email'} · {waiver.phone_masked || 'no phone'}
+                          </span>
+                          {!waiver.contactable && (
+                            <span className="text-[11px] text-amber-800">no contact method on this waiver</span>
+                          )}
                         </span>
-                        {!waiver.contactable && (
-                          <span className="text-[11px] text-amber-800">no contact method on this waiver</span>
-                        )}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
 
-              <div className="space-y-2 mb-5">
-                <label className="flex items-center gap-3 cursor-pointer text-sm">
-                  <input
-                    type="radio"
-                    name="lib-schedule"
-                    checked={schedule === 'immediate'}
-                    onChange={() => setSchedule('immediate')}
-                    className={`accent-${themeColor}-700`}
-                  />
-                  <span>Send immediately</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer text-sm">
-                  <input
-                    type="radio"
-                    name="lib-schedule"
-                    checked={schedule === 'next_day_9am'}
-                    onChange={() => setSchedule('next_day_9am')}
-                    className={`accent-${themeColor}-700`}
-                  />
-                  <span>9:00 AM tomorrow, location time</span>
-                </label>
+                <div className="space-y-2 mb-5">
+                  <label className="flex items-center gap-3 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="lib-schedule"
+                      checked={schedule === 'immediate'}
+                      onChange={() => setSchedule('immediate')}
+                      className={`accent-${themeColor}-700`}
+                    />
+                    <span>Send immediately</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="lib-schedule"
+                      checked={schedule === 'next_day_9am'}
+                      onChange={() => setSchedule('next_day_9am')}
+                      className={`accent-${themeColor}-700`}
+                    />
+                    <span>9:00 AM tomorrow, location time</span>
+                  </label>
+                </div>
+
+                <StandardButton fullWidth onClick={() => void send()} loading={sending} disabled={chosen.length === 0}>
+                  Send to {chosen.length} waiver{chosen.length === 1 ? '' : 's'}
+                </StandardButton>
               </div>
-
-              <StandardButton fullWidth onClick={() => void send()} loading={sending} disabled={chosen.length === 0}>
-                Send to {chosen.length} waiver{chosen.length === 1 ? '' : 's'}
-              </StandardButton>
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -9,7 +9,7 @@ import waiverService from '../../services/waiverService';
 import DateOfBirthSelect from './DateOfBirthSelect';
 import RelationshipSelect from './RelationshipSelect';
 import { calculateAge, isFutureDate } from '../../utils/age';
-import { formatPhoneForDisplay, isCompletePhone } from '../../utils/bookingSearch';
+import { formatPhoneForDisplay, isCompletePhone, localPhoneDigits, phoneForSubmit } from '../../utils/bookingSearch';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -146,7 +146,7 @@ const WaiverReturningPanel = ({
       setLookupError('Please enter your phone number.');
       return;
     }
-    if (!isCompletePhone(value)) {
+    if (localPhoneDigits(value).length !== 10 && !isCompletePhone(value)) {
       setLookupError('Please enter your full 10-digit phone number.');
       return;
     }
@@ -158,7 +158,7 @@ const WaiverReturningPanel = ({
     setLookupError(null);
     setOutcome('idle');
     try {
-      const result = await waiverService.kioskLookup(templateId, value, surname);
+      const result = await waiverService.kioskLookup(templateId, phoneForSubmit(value), surname);
       if (result.status === 'found' && result.profile) {
         onFound(result.profile, result.lookup_token ?? null);
         return;

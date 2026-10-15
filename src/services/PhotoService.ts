@@ -14,9 +14,11 @@ import type {
   PhotoMessageTemplateRecord,
   PhotoOverlayResponse,
   PhotoRecord,
+  PhotoSendOutcome,
   PhotoSessionRecord,
   PhotoSettingsResponse,
   PhotoTemplatesResponse,
+  PhotoTextingStatus,
   PhotoWaiverMatch,
   QrResolution,
   SlideshowApprovalStatus,
@@ -123,9 +125,9 @@ const photoService = {
       waiver_ids?: number[];
       slideshow_opt_in?: boolean;
     },
-  ): Promise<{ data: PhotoSessionRecord; message?: string }> => {
+  ): Promise<{ data: PhotoSessionRecord; message?: string; outcome?: PhotoSendOutcome }> => {
     const res = await api.post(`/photo-sessions/${sessionId}/deliver`, payload);
-    return { data: res.data.data, message: res.data.message };
+    return { data: res.data.data, message: res.data.message, outcome: res.data.outcome };
   },
 
   discardSession: async (sessionId: number): Promise<void> => {
@@ -150,7 +152,10 @@ const photoService = {
   sendPhoto: async (
     photoId: number,
     payload: { waiver_ids: number[]; schedule?: string },
-  ): Promise<PhotoSessionRecord> => (await api.post(`/photo-library/${photoId}/send`, payload)).data.data,
+  ): Promise<{ data: PhotoSessionRecord; message?: string; outcome?: PhotoSendOutcome }> => {
+    const res = await api.post(`/photo-library/${photoId}/send`, payload);
+    return { data: res.data.data, message: res.data.message, outcome: res.data.outcome };
+  },
 
   setPhotoOnSlideshow: async (photoId: number, include: boolean, confirmRelease = false): Promise<string> =>
     (await api.post(`/slideshow-photos/${photoId}/inclusion`, { include, ...(confirmRelease ? { confirm_release: true } : {}) })).data.message,
@@ -214,8 +219,22 @@ const photoService = {
   getDeliveries: async (params: Record<string, unknown>) =>
     (await api.get('/photo-deliveries', { params })).data.data,
 
-  retryDelivery: async (deliveryId: number): Promise<PhotoDeliveryRecord> =>
-    (await api.post(`/photo-deliveries/${deliveryId}/retry`)).data.data,
+  retryDelivery: async (deliveryId: number): Promise<{ data: PhotoDeliveryRecord; message: string }> => {
+    const res = await api.post(`/photo-deliveries/${deliveryId}/retry`);
+    return { data: res.data.data, message: res.data.message };
+  },
+
+  refreshDeliveryStatus: async (
+    deliveryIds: number[],
+  ): Promise<{ deliveries: PhotoDeliveryRecord[]; outcome: PhotoSendOutcome | null }> =>
+    (await api.post('/photo-deliveries/status', { delivery_ids: deliveryIds })).data.data,
+
+  confirmTextReceived: async (
+    deliveryId: number,
+  ): Promise<{ data: PhotoDeliveryRecord; message: string; texting?: PhotoTextingStatus }> => {
+    const res = await api.post(`/photo-deliveries/${deliveryId}/confirm-receipt`);
+    return { data: res.data.data, message: res.data.message, texting: res.data.texting };
+  },
 
   cancelDelivery: async (deliveryId: number): Promise<PhotoDeliveryRecord> =>
     (await api.post(`/photo-deliveries/${deliveryId}/cancel`)).data.data,
@@ -235,7 +254,15 @@ const photoService = {
     channel: PhotoChannel,
     destination: string,
     kind?: string,
-  ): Promise<{ success: boolean; message: string }> => {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    providerReference?: string | null;
+    checkToken?: string | null;
+    characters?: number | null;
+    segments?: number | null;
+    encoding?: string | null;
+  }> => {
     try {
       const res = await api.post('/photo-settings/test-message', {
         location_id: locationId,
@@ -243,7 +270,15 @@ const photoService = {
         destination,
         ...(kind ? { kind } : {}),
       });
-      return { success: true, message: res.data.message as string };
+      return {
+        success: true,
+        message: res.data.message as string,
+        providerReference: (res.data.data?.provider_reference as string | undefined) ?? null,
+        checkToken: (res.data.data?.check_token as string | undefined) ?? null,
+        characters: (res.data.data?.characters as number | undefined) ?? null,
+        segments: (res.data.data?.segments as number | undefined) ?? null,
+        encoding: (res.data.data?.encoding as string | undefined) ?? null,
+      };
     } catch (error) {
       const response = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response;
       const firstFieldError = Object.values(response?.data?.errors ?? {})[0]?.[0];
@@ -252,6 +287,30 @@ const photoService = {
         message: firstFieldError || response?.data?.message || 'The test message could not be sent.',
       };
     }
+  },
+
+  getTestMessageStatus: async (
+    locationId: number,
+    providerReference: string,
+    checkToken: string,
+  ): Promise<{ provider_status: string; provider_error_code: string | null; final: boolean; delivered: boolean; message: string }> =>
+    (
+      await api.post('/photo-settings/test-message/status', {
+        location_id: locationId,
+        provider_reference: providerReference,
+        check_token: checkToken,
+      })
+    ).data.data,
+
+  resetTextingConfirmation: async (
+    locationId: number,
+    reason?: string,
+  ): Promise<{ message: string; texting: PhotoTextingStatus }> => {
+    const res = await api.post('/photo-settings/texting/reset', {
+      location_id: locationId,
+      ...(reason ? { reason } : {}),
+    });
+    return { message: res.data.message, texting: res.data.data };
   },
 
   getTemplates: async (): Promise<PhotoTemplatesResponse> => (await api.get('/photo-templates')).data.data,
@@ -356,8 +415,8 @@ const photoService = {
   resolveQr: async (qrToken: string): Promise<QrResolution> =>
     (await publicApi.get(`/photos/qr/${qrToken}`)).data.data,
 
-  getCustomerPage: async (accessToken: string): Promise<CustomerPhotoPage> =>
-    (await publicApi.get(`/photos/access/${accessToken}`)).data.data,
+  getCustomerPage: async (accessToken: string, linkRef?: string | null): Promise<CustomerPhotoPage> =>
+    (await publicApi.get(`/photos/access/${accessToken}`, linkRef ? { params: { r: linkRef } } : undefined)).data.data,
 
   submitCustomerContact: async (
     accessToken: string,

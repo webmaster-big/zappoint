@@ -83,19 +83,72 @@ export const matchesBookingSearch = (booking: SearchableBooking, rawTerm: string
   return terms.every(term => matchesTerm(text, phones, term));
 };
 
+const cleanPhoneInput = (value?: string | null): string =>
+  String(value ?? '')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/[\uFF10-\uFF19]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xff10 + 48))
+    .replace(/\uFF0B/g, '+')
+    .replace(/\u00A0/g, ' ')
+    .trim()
+    .replace(/^[^\d+]*(?=\+)/, '');
+
+const withoutExtension = (value?: string | null): string =>
+  cleanPhoneInput(value).replace(/(\d)\s*(?:extension|ext\.?|x|#|,|;)\s*\d+\s*$/i, '$1');
+
 export const localPhoneDigits = (value?: string | null): string => {
-  const digits = digitsOnly(String(value ?? ''));
+  const raw = withoutExtension(value);
+  let digits = digitsOnly(raw);
+  const dialOut = raw.match(/^(011|00)/);
+  const afterDialOut = dialOut ? digits.slice(dialOut[0].length) : '';
+  if (afterDialOut.length === 11 && afterDialOut.startsWith('1')) digits = afterDialOut;
   return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
 };
 
+const isDialledAbroad = (value?: string | null): boolean => {
+  const raw = withoutExtension(value);
+  const match = raw.match(/^(\+|011|00)/);
+  if (!match) return false;
+  return !digitsOnly(raw.slice(match[0].length)).startsWith('1');
+};
+
+export const needsCountryCode = (value?: string | null): boolean => {
+  const raw = withoutExtension(value);
+  if (!isDialledAbroad(raw)) return false;
+  const afterPrefix = raw
+    .replace(/^\s*(\+|011|00)\s*/, '')
+    .replace(/^\(\s*0\s*\)/, '')
+    .replace(/^[0\s]+/, '');
+  const digits = digitsOnly(afterPrefix);
+  if (!/^[2-9]\d{2}[2-9]\d{6}$/.test(digits)) return false;
+  const group = afterPrefix.match(/^(\d{1,2})(?=\D)\D*\d/);
+  return !(group && digits.startsWith(group[1]));
+};
+
+export const PHONE_NOT_RECOGNISED =
+  'Please enter a 10-digit US or Canadian number, or start a number from another country with + and its country code.';
+
+export const COUNTRY_CODE_NEEDED =
+  'Please check the country code. Start a US or Canadian number with +1, or put a space after your country code, for example +47 912 34 567.';
+
+export const phoneForSubmit = (value?: string | null): string => {
+  const raw = cleanPhoneInput(value);
+  if (isDialledAbroad(raw)) return raw;
+  return localPhoneDigits(raw) || raw;
+};
+
 export const isCompletePhone = (value?: string | null): boolean => {
-  const raw = String(value ?? '').trim();
-  if (localPhoneDigits(raw).length === 10) return true;
-  return raw.startsWith('+') && digitsOnly(raw).length >= 8;
+  const raw = withoutExtension(value);
+  if (/^[2-9]\d{9}$/.test(localPhoneDigits(raw))) return true;
+  const dialOut = raw.match(/^(\+|011|00)/);
+  if (!dialOut) return false;
+  const rest = digitsOnly(raw.slice(dialOut[0].length));
+  return !rest.startsWith('1') && rest.length >= (dialOut[0] === '+' ? 8 : 9);
 };
 
 export const formatPhoneForDisplay = (value?: string | null): string => {
   if (!value) return '';
+  const cleaned = cleanPhoneInput(value);
+  if (isDialledAbroad(value) || withoutExtension(value) !== cleaned || digitsOnly(cleaned).length > 11) return value;
   const local = localPhoneDigits(value);
   if (local.length !== 10) return value;
   return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;

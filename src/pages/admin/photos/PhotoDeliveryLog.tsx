@@ -1,25 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
-import { Mail, MessageSquare, RefreshCcw, Send, XCircle } from 'lucide-react';
+import { Loader2, Mail, MessageSquare, RefreshCcw, Send, Smartphone, XCircle } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PhotoDeliveryRecord } from '../../../types/photo.types';
+import { OUTCOME_TONE_BADGE, mergeDeliveries } from '../../../utils/photoDeliveryOutcome';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
-
-const STATUS_STYLES: Record<string, string> = {
-  sent: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  scheduled: 'bg-blue-100 text-blue-800',
-  queued: 'bg-gray-100 text-gray-700',
-  canceled: 'bg-gray-200 text-gray-600',
-  skipped: 'bg-amber-100 text-amber-800',
-};
 
 interface Paginated {
   data: PhotoDeliveryRecord[];
@@ -27,6 +19,13 @@ interface Paginated {
   last_page: number;
   total: number;
 }
+
+const CARRIER_RECHECK_MS = 10000;
+const CARRIER_RECHECK_LIMIT = 18;
+const CHECKS_PAUSED =
+  'Checking the newest texts is paused because this sign-in checked very often. Press Refresh in a minute.';
+
+const isRateLimited = (e: unknown): boolean => (e as { response?: { status?: number } })?.response?.status === 429;
 
 const PhotoDeliveryLog = () => {
   const { themeColor } = useThemeColor();
@@ -40,12 +39,19 @@ const PhotoDeliveryLog = () => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [includeDuplicates, setIncludeDuplicates] = useState(false);
+  const [outcome, setOutcome] = useState('');
   const [loading, setLoading] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [busyIds, setBusyIds] = useState<number[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const loadSeq = useRef(0);
+  const rowEdits = useRef(0);
+  const [recheckRounds, setRecheckRounds] = useState(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
+    setRecheckRounds(0);
     try {
       const params: Record<string, unknown> = { page: pageNumber, per_page: 25 };
       if (effectiveLocationId) params.location_id = effectiveLocationId;
@@ -55,49 +61,130 @@ const PhotoDeliveryLog = () => {
       if (from) params.from = from;
       if (to) params.to = to;
       if (includeDuplicates) params.include_duplicates = 1;
-      setPage(await photoService.getDeliveries(params));
+      if (outcome) params.outcome = outcome;
+      const loaded: Paginated = await photoService.getDeliveries(params);
+      if (seq !== loadSeq.current) return;
+      setPage(loaded);
+      const waitingIds = loaded.data
+        .filter((delivery) => delivery.carrier_pending ?? delivery.awaiting_carrier)
+        .map((delivery) => delivery.id)
+        .slice(0, 50);
+      if (waitingIds.length > 0) {
+        const edits = rowEdits.current;
+        try {
+          const checked = await photoService.refreshDeliveryStatus(waitingIds);
+          if (seq !== loadSeq.current) return;
+          if (edits === rowEdits.current) {
+            setPage((prev) => (prev ? { ...prev, data: mergeDeliveries(prev.data, checked.deliveries) } : prev));
+          }
+        } catch (checkError) {
+          if (seq !== loadSeq.current) return;
+          if (isRateLimited(checkError)) setRecheckRounds(CARRIER_RECHECK_LIMIT);
+          setToast({
+            message: isRateLimited(checkError)
+              ? CHECKS_PAUSED
+              : 'The text provider could not be asked about the newest texts just now.',
+            type: 'info',
+          });
+        }
+      }
     } catch (e) {
-      setToast({ message: errorMessage(e, 'Could not load the delivery log.'), type: 'error' });
+      if (seq === loadSeq.current) setToast({ message: errorMessage(e, 'Could not load the delivery log.'), type: 'error' });
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
-  }, [channel, effectiveLocationId, from, includeDuplicates, kind, pageNumber, status, to]);
+  }, [channel, effectiveLocationId, from, includeDuplicates, kind, outcome, pageNumber, status, to]);
+
+  const pendingIds = useMemo(
+    () =>
+      (page?.data ?? [])
+        .filter((delivery) => delivery.carrier_pending ?? delivery.awaiting_carrier)
+        .map((delivery) => delivery.id)
+        .slice(0, 50),
+    [page],
+  );
 
   useEffect(() => {
+    if (loading || pendingIds.length === 0 || recheckRounds >= CARRIER_RECHECK_LIMIT) return undefined;
+    const timer = window.setTimeout(() => {
+      const seq = loadSeq.current;
+      const edits = rowEdits.current;
+      photoService
+        .refreshDeliveryStatus(pendingIds)
+        .then((checked) => {
+          if (seq !== loadSeq.current) return;
+          if (edits === rowEdits.current) {
+            setPage((prev) => (prev ? { ...prev, data: mergeDeliveries(prev.data, checked.deliveries) } : prev));
+          }
+          setRecheckRounds((n) => n + 1);
+        })
+        .catch((checkError) => {
+          if (seq !== loadSeq.current) return;
+          setRecheckRounds(CARRIER_RECHECK_LIMIT);
+          if (isRateLimited(checkError)) setToast({ message: CHECKS_PAUSED, type: 'info' });
+        });
+    }, CARRIER_RECHECK_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading, pendingIds, recheckRounds]);
+
+  const loadRef = useRef(load);
+
+  useEffect(() => {
+    loadRef.current = load;
     void load();
   }, [load]);
 
   const retry = useCallback(
     async (delivery: PhotoDeliveryRecord) => {
-      setBusyId(delivery.id);
+      setBusyIds((prev) => [...prev, delivery.id]);
       try {
-        await photoService.retryDelivery(delivery.id);
-        setToast({ message: 'Delivery sent.', type: 'success' });
-        await load();
+        const result = await photoService.retryDelivery(delivery.id);
+        setToast({ message: result.message, type: 'success' });
+        await loadRef.current();
       } catch (e) {
         setToast({ message: errorMessage(e, 'The retry failed.'), type: 'error' });
-        await load();
+        await loadRef.current();
       } finally {
-        setBusyId(null);
+        setBusyIds((prev) => prev.filter((id) => id !== delivery.id));
       }
     },
-    [load],
+    [],
+  );
+
+  const confirmReceived = useCallback(
+    async (delivery: PhotoDeliveryRecord) => {
+      rowEdits.current += 1;
+      setBusyIds((prev) => [...prev, delivery.id]);
+      try {
+        const result = await photoService.confirmTextReceived(delivery.id);
+        setPage((prev) => (prev ? { ...prev, data: mergeDeliveries(prev.data, [result.data]) } : prev));
+        setToast({ message: result.message, type: 'success' });
+      } catch (e) {
+        const current = (e as { response?: { data?: { data?: PhotoDeliveryRecord } } })?.response?.data?.data;
+        if (current) setPage((prev) => (prev ? { ...prev, data: mergeDeliveries(prev.data, [current]) } : prev));
+        setToast({ message: errorMessage(e, 'That could not be saved.'), type: 'error' });
+      } finally {
+        rowEdits.current += 1;
+        setBusyIds((prev) => prev.filter((id) => id !== delivery.id));
+      }
+    },
+    [],
   );
 
   const cancel = useCallback(
     async (delivery: PhotoDeliveryRecord) => {
-      setBusyId(delivery.id);
+      setBusyIds((prev) => [...prev, delivery.id]);
       try {
         await photoService.cancelDelivery(delivery.id);
         setToast({ message: 'Scheduled delivery canceled.', type: 'info' });
-        await load();
+        await loadRef.current();
       } catch (e) {
         setToast({ message: errorMessage(e, 'That delivery could not be canceled.'), type: 'error' });
       } finally {
-        setBusyId(null);
+        setBusyIds((prev) => prev.filter((id) => id !== delivery.id));
       }
     },
-    [load],
+    [],
   );
 
   const fieldCls = `border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`;
@@ -114,8 +201,8 @@ const PhotoDeliveryLog = () => {
               Photo delivery log
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              Email and SMS are tracked separately, so a session shows as partly delivered when one channel succeeds and
-              another fails.
+              Email and SMS are tracked separately. A text only shows as delivered once the phone carrier confirms it, and
+              as received once the guest opens its link or a staff member sees it on their phone.
             </p>
           </div>
           <StandardButton variant="secondary" size="sm" icon={RefreshCcw} onClick={() => void load()} loading={loading}>
@@ -130,7 +217,13 @@ const PhotoDeliveryLog = () => {
             <option value="failed">Failed</option>
             <option value="scheduled">Scheduled</option>
             <option value="canceled">Canceled</option>
-            <option value="skipped">Skipped (duplicate destination)</option>
+            <option value="skipped">Not sent (channel off)</option>
+          </select>
+          <select value={outcome} onChange={(e) => { setOutcome(e.target.value); setPageNumber(1); }} className={fieldCls} aria-label="Text outcome">
+            <option value="">Any text outcome</option>
+            <option value="not_delivered">Text not delivered</option>
+            <option value="awaiting_carrier">Text waiting for the carrier</option>
+            <option value="reached_phone">Text reached the phone</option>
           </select>
           <select value={channel} onChange={(e) => { setChannel(e.target.value); setPageNumber(1); }} className={fieldCls}>
             <option value="">Both channels</option>
@@ -219,11 +312,23 @@ const PhotoDeliveryLog = () => {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`text-xs rounded-full px-2 py-0.5 ${STATUS_STYLES[delivery.status] ?? 'bg-gray-100 text-gray-700'}`}
+                        className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 ${OUTCOME_TONE_BADGE[delivery.outcome_tone] ?? 'bg-gray-100 text-gray-700'}`}
                       >
-                        {delivery.status}
+                        {delivery.awaiting_carrier && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {delivery.outcome_label ?? delivery.status}
                       </span>
-                      {delivery.error && <p className="text-xs text-red-600 mt-1 max-w-xs">{delivery.error}</p>}
+                      {(delivery.outcome_detail ?? delivery.error) && (
+                        <p
+                          className={`text-xs mt-1 max-w-xs ${
+                            delivery.outcome_tone === 'danger' ? 'text-red-600' : 'text-gray-600'
+                          }`}
+                        >
+                          {delivery.outcome_detail ?? delivery.error}
+                        </p>
+                      )}
+                      {delivery.receipt_confirmed_by_name && (
+                        <p className="text-xs text-gray-500 mt-1">confirmed by {delivery.receipt_confirmed_by_name}</p>
+                      )}
                       {delivery.attempts > 1 && (
                         <p className="text-xs text-gray-500 mt-1">{delivery.attempts} attempts</p>
                       )}
@@ -236,15 +341,26 @@ const PhotoDeliveryLog = () => {
                           : delivery.created_at
                             ? new Date(delivery.created_at).toLocaleString()
                             : '—'}
-                      {delivery.opened_at && <p className="text-xs text-green-700">link opened</p>}
+                      {delivery.opened_at && <p className="text-xs text-green-700">link opened from this message</p>}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {delivery.can_retry && !delivery.is_duplicate && (
+                      <div className="flex flex-wrap gap-1">
+                        {delivery.can_confirm_receipt && (
+                          <button
+                            type="button"
+                            onClick={() => void confirmReceived(delivery)}
+                            disabled={busyIds.includes(delivery.id)}
+                            className="inline-flex items-center gap-1 text-xs border border-green-300 text-green-800 rounded-lg px-2.5 py-1.5 hover:bg-green-50 disabled:opacity-40"
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            Guest received it
+                          </button>
+                        )}
+                        {delivery.can_retry && !delivery.is_duplicate && delivery.retry_useful !== false && (
                           <button
                             type="button"
                             onClick={() => void retry(delivery)}
-                            disabled={busyId === delivery.id}
+                            disabled={busyIds.includes(delivery.id)}
                             className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-40"
                           >
                             <RefreshCcw className="w-3.5 h-3.5" />
@@ -255,7 +371,7 @@ const PhotoDeliveryLog = () => {
                           <button
                             type="button"
                             onClick={() => void cancel(delivery)}
-                            disabled={busyId === delivery.id}
+                            disabled={busyIds.includes(delivery.id)}
                             className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-red-50 text-red-700 disabled:opacity-40"
                           >
                             <XCircle className="w-3.5 h-3.5" />
