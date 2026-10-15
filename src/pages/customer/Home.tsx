@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { normalizeCategory } from '../../utils/venueCategories';
 import { EVENTS_CATEGORY_LABEL, categoryAccentOf, categoryKeyOf, categoryLabelOfPackage, isUpcomingEvent, type CategoryAccent } from '../../utils/storefrontCategories';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   MapPin,
   Calendar,
@@ -647,7 +647,7 @@ const EntertainmentLandingPage = () => {
   })();
   const shownAttractions = activeCategoryKey === null
     ? filteredAttractions
-    : (isEventsCategory ? [] : filteredAttractions.filter(a => categoryKeyOf(a.category) === activeCategoryKey));
+    : filteredAttractions.filter(a => categoryKeyOf(a.category) === activeCategoryKey);
   const shownSpecialPackages = activeCategoryKey === null
     ? filteredSpecialPackages
     : filteredSpecialPackages.filter(pkg => categoryKeyOf(categoryLabelOfPackage(pkg)) === activeCategoryKey);
@@ -657,6 +657,38 @@ const EntertainmentLandingPage = () => {
   const showPackagesSection = shownPackages.length > 0;
   const showAttractionsSection = shownAttractions.length > 0;
   const showEventsSection = shownEvents.length > 0;
+
+  const categorySections = isSingleLocationPage
+    ? [
+        ...categoryChips
+          .filter(chip => activeCategoryKey === null || chip.key === activeCategoryKey)
+          .map(chip => ({
+            key: chip.key,
+            label: chip.label,
+            packages: shownPackages.filter(pkg => categoryKeyOf(categoryLabelOfPackage(pkg)) === chip.key),
+            attractions: shownAttractions.filter(attraction => categoryKeyOf(attraction.category) === chip.key),
+          })),
+        ...(activeCategoryKey === null
+          ? [{
+              key: '',
+              label: '',
+              packages: shownPackages.filter(pkg => !categoryKeyOf(categoryLabelOfPackage(pkg))),
+              attractions: shownAttractions.filter(attraction => !categoryKeyOf(attraction.category)),
+            }]
+          : []),
+      ]
+        .filter(section => section.packages.length + section.attractions.length > 0)
+        .map((section, order) => ({ section, order }))
+        .sort((a, b) => {
+          if (!a.section.key !== !b.section.key) return a.section.key ? -1 : 1;
+          const aHasPackages = a.section.packages.length > 0;
+          const bHasPackages = b.section.packages.length > 0;
+          if (aHasPackages !== bHasPackages) return aHasPackages ? -1 : 1;
+          return a.order - b.order;
+        })
+        .map(({ section }) => section)
+    : [];
+  const hasLocationResults = categorySections.length > 0 || showSpecialsSection || showEventsSection;
 
   const activeChipKey = effectiveFilter.kind === 'category' ? `cat:${effectiveFilter.key}` : 'all';
 
@@ -1031,6 +1063,214 @@ const EntertainmentLandingPage = () => {
   const locationAddress = activeLocation
     ? [activeLocation.address, activeLocation.city, activeLocation.state].filter(Boolean).join(', ')
     : '';
+
+  const renderPackageCard = (pkg: PackageType) => (
+    <div 
+      key={pkg.id} 
+      onClick={() => handlePackageClick(pkg)}
+      className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
+    >
+      <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
+        {imageFor(pkg) ? (
+          <img 
+            src={getImageUrl(imageFor(pkg))} 
+            alt={pkg.name}
+            className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-blue-700 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
+            {pkg.name}
+          </div>
+        )}
+        {pkg.special_pricing?.has_special_pricing && pkg.special_pricing.discounts_applied.length > 0 && (
+          <div className="discount-overlay">
+            {pkg.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
+              <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                <Sparkles size={i === 0 ? 12 : 10} />
+                <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+              </span>
+            ))}
+            {pkg.special_pricing.discounts_applied.length > 2 && (
+              <span className="discount-pill-more">+{pkg.special_pricing.discounts_applied.length - 2} more</span>
+            )}
+          </div>
+        )}
+        <div className="absolute top-3 left-3">
+          <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
+            {normalizeCategory(pkg.display_label || pkg.category) || 'Package'}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-5 md:p-6 flex flex-col flex-1">
+        <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
+          {pkg.name}
+        </h3>
+        <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">
+          {pkg.description}
+        </p>
+
+        <div className="space-y-2 mb-4">
+          {pkg.includes.slice(0, 3).map((item: string, index: number) => (
+            <div key={index} className="flex items-center text-xs md:text-sm text-gray-600">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mr-2 flex-shrink-0" />
+              <span className="line-clamp-1">{item}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-gray-400 mb-5 pt-3 border-t border-gray-50">
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg">
+            <Clock size={13} className="text-blue-600" />
+            <span className="font-medium text-gray-600 truncate">{pkg.duration}</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg">
+            <Users size={13} className="text-blue-600" />
+            <span className="font-medium text-gray-600 truncate">{pkg.participants}</span>
+          </div>
+        </div>
+
+        <div className="mt-auto">
+          <div className="flex items-end justify-between gap-3 mb-3">
+            <div>
+              {pkg.special_pricing?.has_special_pricing ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
+                  <span className="text-emerald-500 font-bold">→</span>
+                  <span className="text-2xl font-extrabold text-emerald-600">
+                    ${pkg.special_pricing.discounted_price}
+                  </span>
+                  <span className="text-gray-400 text-xs">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
+                </div>
+              ) : (
+                <>
+                  <span className="text-2xl font-extrabold text-gray-900">
+                    ${pkg.price}
+                  </span>
+                  <span className="text-gray-400 text-xs ml-1">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-stretch gap-2">
+            <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBookPackage(pkg);
+            }}
+            className="flex-1 basis-28 whitespace-nowrap bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
+          >
+            {packageCTB(pkg) ? <Phone size={15} /> : <Calendar size={15} />}
+            {packageCTB(pkg) ? 'Call to Book' : 'Book Now'}
+          </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAttractionCard = (attraction: Attraction) => (
+    <div 
+      key={attraction.id} 
+      onClick={() => handleAttractionClick(attraction)}
+      className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
+    >
+      <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
+        {imageFor(attraction) ? (
+          <img 
+            src={getImageUrl(imageFor(attraction))} 
+            alt={attraction.name}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
+            {attraction.name}
+          </div>
+        )}
+        {attraction.special_pricing?.has_special_pricing && attraction.special_pricing.discounts_applied.length > 0 && (
+          <div className="discount-overlay">
+            {attraction.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
+              <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                <Sparkles size={i === 0 ? 12 : 10} />
+                <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+              </span>
+            ))}
+            {attraction.special_pricing.discounts_applied.length > 2 && (
+              <span className="discount-pill-more">+{attraction.special_pricing.discounts_applied.length - 2} more</span>
+            )}
+          </div>
+        )}
+        <div className="absolute top-3 left-3">
+          <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
+            {normalizeCategory(attraction.category) || 'Attraction'}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-5 md:p-6 flex flex-col flex-1">
+        <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
+          {attraction.name}
+        </h3>
+        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
+          {attraction.description}
+        </p>
+
+        <div className="mt-auto">
+          <div className="flex items-end justify-between gap-3 mb-3">
+            <div>
+              {attraction.special_pricing?.has_special_pricing ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400 line-through font-semibold">${attraction.special_pricing.original_price}</span>
+                  <span className="text-emerald-500 font-bold">→</span>
+                  <span className="text-2xl font-extrabold text-emerald-600">
+                    ${attraction.special_pricing.discounted_price}
+                  </span>
+                  <span className="text-gray-400 text-xs">/ person</span>
+                </div>
+              ) : (
+                <>
+                  <span className="text-2xl font-extrabold text-gray-900">
+                    ${attraction.price}
+                  </span>
+                  <span className="text-gray-400 text-xs ml-1">/ person</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-stretch gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBuyTickets(attraction);
+              }}
+              className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+            >
+              {attractionCTB(attraction) ? <Phone size={15} /> : <Ticket size={15} />}
+              {attractionCTB(attraction) ? 'Call to Book' : 'Buy now'}
+            </button>
+            {CART_ENABLED && !attractionCTB(attraction) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddAttractionToCart(attraction);
+                }}
+                className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
+              >
+                <ShoppingCart size={15} />
+                Add to cart
+              </button>
+            )}
+          </div>
+          {cartNotice?.key === `attraction-${attraction.id}` && (
+            <p className="mt-2 text-xs font-semibold text-blue-800">{cartNotice.message}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -1422,11 +1662,7 @@ const EntertainmentLandingPage = () => {
       {isSingleLocationPage && activeLocation && !dataLoading && (
         <LocationConfirmModal
           location={activeLocation}
-          counts={{
-            packages: filteredPackages.length,
-            attractions: filteredAttractions.length,
-            events: filteredEvents.length,
-          }}
+          categories={categoryChips.map(chip => chip.label)}
         />
       )}
 
@@ -1565,285 +1801,155 @@ const EntertainmentLandingPage = () => {
           </section>
         )}
 
-        {showPackagesSection && packageSections.map((sec, secIndex) => (
-          <section className="mb-12 md:mb-20" key={sec.label || 'packages'}>
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2" id={secIndex === 0 ? 'packages' : undefined}>
-              <div>
-                <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3">
-                  <div className="p-2 bg-blue-50 rounded-xl">
-                    <Package className="w-5 h-5 md:w-6 md:h-6 text-blue-800" />
-                  </div>
-                  {sec.label || 'Experience Packages'}
-                </h2>
-                <p className="text-gray-400 text-xs md:text-sm mt-1 ml-12">
-                  {sec.label ? `Book your ${sec.label.toLowerCase()} experience` : 'Choose your perfect entertainment experience'}
-                </p>
+        {isSingleLocationPage ? (
+          dataLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+              <p className="text-gray-400 text-xs mt-3">Loading...</p>
+            </div>
+          ) : !hasLocationResults ? (
+            <div className="flex flex-col items-center justify-center text-center py-16 px-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-4">
+                {searchQuery.trim()
+                  ? <Search className="w-6 h-6 text-blue-800" aria-hidden="true" />
+                  : <MapPin className="w-6 h-6 text-blue-800" aria-hidden="true" />}
               </div>
-              {!dataLoading && (
-                <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
-                  {sec.items.length} {sec.label ? `available` : `package${sec.items.length !== 1 ? 's' : ''} available`}
-                </p>
+              {searchQuery.trim() ? (
+                <>
+                  <h2 className="text-xl font-bold text-gray-900 mb-2 break-words max-w-full">No results for “{searchQuery.trim()}”</h2>
+                  <p className="text-gray-600 mb-6">Try another word, or clear the search to see everything here.</p>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="px-6 py-2.5 bg-blue-800 text-white font-semibold rounded-xl hover:bg-blue-900 transition-colors"
+                  >
+                    Clear search
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Nothing can be booked online here yet</h2>
+                  <p className="text-gray-600 mb-6 max-w-md">
+                    Please check back soon.
+                    {activeLocation?.phone && (
+                      <>
+                        {' '}To book now, call{' '}
+                        <a href={`tel:${activeLocation.phone}`} className="font-semibold text-blue-800 hover:text-blue-900">
+                          {activeLocation.phone}
+                        </a>
+                        .
+                      </>
+                    )}
+                  </p>
+                  <Link
+                    to="/"
+                    className="px-6 py-2.5 bg-blue-800 text-white font-semibold rounded-xl hover:bg-blue-900 transition-colors"
+                  >
+                    See all locations
+                  </Link>
+                </>
               )}
             </div>
-            {dataLoading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
-                <p className="text-gray-400 text-xs mt-3">Loading packages...</p>
-              </div>
-            ) : sec.items.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-sm md:text-lg">No packages found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
-                {sec.items.map(pkg => (
-                  <div 
-                    key={pkg.id} 
-                    onClick={() => handlePackageClick(pkg)}
-                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
-                  >
-                    <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
-                      {imageFor(pkg) ? (
-                        <img 
-                          src={getImageUrl(imageFor(pkg))} 
-                          alt={pkg.name}
-                          className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-700 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
-                          {pkg.name}
-                        </div>
-                      )}
-                      {pkg.special_pricing?.has_special_pricing && pkg.special_pricing.discounts_applied.length > 0 && (
-                        <div className="discount-overlay">
-                          {pkg.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
-                            <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
-                              <Sparkles size={i === 0 ? 12 : 10} />
-                              <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
-                            </span>
-                          ))}
-                          {pkg.special_pricing.discounts_applied.length > 2 && (
-                            <span className="discount-pill-more">+{pkg.special_pricing.discounts_applied.length - 2} more</span>
-                          )}
-                        </div>
-                      )}
-                      <div className="absolute top-3 left-3">
-                        <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
-                          {normalizeCategory(pkg.display_label || pkg.category) || 'Package'}
-                        </span>
-                      </div>
+          ) : (
+            categorySections.map(section => (
+              <section className="mb-12 md:mb-20" key={section.key ? `cat:${section.key}` : 'uncategorized'} id={section.key ? `category-${section.key}` : 'more-to-book'}>
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
+                  <h2 className={`text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3 ${section.key ? 'capitalize' : ''}`}>
+                    <div className="p-2 bg-blue-50 rounded-xl">
+                      {section.packages.length > 0
+                        ? <Package className="w-5 h-5 md:w-6 md:h-6 text-blue-800" />
+                        : <Ticket className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />}
                     </div>
-                    
-                    <div className="p-5 md:p-6 flex flex-col flex-1">
-                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
-                        {pkg.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">
-                        {pkg.description}
-                      </p>
-                      
-                      <div className="space-y-2 mb-4">
-                        {pkg.includes.slice(0, 3).map((item: string, index: number) => (
-                          <div key={index} className="flex items-center text-xs md:text-sm text-gray-600">
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mr-2 flex-shrink-0" />
-                            <span className="line-clamp-1">{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="flex items-center gap-3 text-xs text-gray-400 mb-5 pt-3 border-t border-gray-50">
-                        <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg">
-                          <Clock size={13} className="text-blue-600" />
-                          <span className="font-medium text-gray-600 truncate">{pkg.duration}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg">
-                          <Users size={13} className="text-blue-600" />
-                          <span className="font-medium text-gray-600 truncate">{pkg.participants}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-auto">
-                        <div className="flex items-end justify-between gap-3 mb-3">
-                          <div>
-                            {pkg.special_pricing?.has_special_pricing ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
-                                <span className="text-emerald-500 font-bold">→</span>
-                                <span className="text-2xl font-extrabold text-emerald-600">
-                                  ${pkg.special_pricing.discounted_price}
-                                </span>
-                                <span className="text-gray-400 text-xs">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
-                              </div>
-                            ) : (
-                              <>
-                                <span className="text-2xl font-extrabold text-gray-900">
-                                  ${pkg.price}
-                                </span>
-                                <span className="text-gray-400 text-xs ml-1">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-stretch gap-2">
-                          <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBookPackage(pkg);
-                          }}
-                          className="flex-1 basis-28 whitespace-nowrap bg-blue-800 hover:bg-blue-900 text-white px-5 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg cursor-pointer"
-                        >
-                          {packageCTB(pkg) ? <Phone size={15} /> : <Calendar size={15} />}
-                          {packageCTB(pkg) ? 'Call to Book' : 'Book Now'}
-                        </button>
-                        </div>
-                      </div>
+                    {section.label || 'More to book'}
+                  </h2>
+                  <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
+                    {section.packages.length + section.attractions.length} available
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
+                  {section.packages.map(pkg => renderPackageCard(pkg))}
+                  {section.attractions.map(attraction => renderAttractionCard(attraction))}
+                </div>
+              </section>
+            ))
+          )
+        ) : (
+          <>
+          {showPackagesSection && packageSections.map((sec, secIndex) => (
+            <section className="mb-12 md:mb-20" key={sec.label || 'packages'}>
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2" id={secIndex === 0 ? 'packages' : undefined}>
+                <div>
+                  <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3">
+                    <div className="p-2 bg-blue-50 rounded-xl">
+                      <Package className="w-5 h-5 md:w-6 md:h-6 text-blue-800" />
                     </div>
-                  </div>
-                ))}
+                    {sec.label || 'Experience Packages'}
+                  </h2>
+                  <p className="text-gray-400 text-xs md:text-sm mt-1 ml-12">
+                    {sec.label ? `Book your ${sec.label.toLowerCase()} experience` : 'Choose your perfect entertainment experience'}
+                  </p>
+                </div>
+                {!dataLoading && (
+                  <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
+                    {sec.items.length} {sec.label ? `available` : `package${sec.items.length !== 1 ? 's' : ''} available`}
+                  </p>
+                )}
               </div>
-            )}
-          </section>
-        ))}
-
-        {showAttractionsSection && (
-          <section className="mb-12 md:mb-20">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
-              <div>
-                <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="attractions">
-                  <div className="p-2 bg-blue-50 rounded-xl">
-                    <Ticket className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
-                  </div>
-                  Individual Attractions
-                </h2>
-                <p className="text-gray-400 text-xs md:text-sm mt-1 ml-12">
-                  Pick your thrill, one at a time
-                </p>
-              </div>
-              {!dataLoading && (
-                <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
-                  {shownAttractions.length} attraction{shownAttractions.length !== 1 ? 's' : ''} available
-                </p>
+              {dataLoading ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+                  <p className="text-gray-400 text-xs mt-3">Loading packages...</p>
+                </div>
+              ) : sec.items.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-sm md:text-lg">No packages found matching your criteria.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
+                  {sec.items.map(pkg => renderPackageCard(pkg))}
+                </div>
               )}
-            </div>
+            </section>
+          ))}
 
-            {dataLoading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
-                <p className="text-gray-400 text-xs mt-3">Loading attractions...</p>
-              </div>
-            ) : shownAttractions.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-sm md:text-lg">No attractions found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
-                {shownAttractions.map(attraction => {
-                  return (
-                  <div 
-                    key={attraction.id} 
-                    onClick={() => handleAttractionClick(attraction)}
-                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
-                  >
-                    <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
-                      {imageFor(attraction) ? (
-                        <img 
-                          src={getImageUrl(imageFor(attraction))} 
-                          alt={attraction.name}
-                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
-                          {attraction.name}
-                        </div>
-                      )}
-                      {attraction.special_pricing?.has_special_pricing && attraction.special_pricing.discounts_applied.length > 0 && (
-                        <div className="discount-overlay">
-                          {attraction.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
-                            <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
-                              <Sparkles size={i === 0 ? 12 : 10} />
-                              <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
-                            </span>
-                          ))}
-                          {attraction.special_pricing.discounts_applied.length > 2 && (
-                            <span className="discount-pill-more">+{attraction.special_pricing.discounts_applied.length - 2} more</span>
-                          )}
-                        </div>
-                      )}
-                      <div className="absolute top-3 left-3">
-                        <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
-                          {normalizeCategory(attraction.category) || 'Attraction'}
-                        </span>
-                      </div>
+          {showAttractionsSection && (
+            <section className="mb-12 md:mb-20">
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
+                <div>
+                  <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="attractions">
+                    <div className="p-2 bg-blue-50 rounded-xl">
+                      <Ticket className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
                     </div>
-                    
-                    <div className="p-5 md:p-6 flex flex-col flex-1">
-                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
-                        {attraction.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
-                        {attraction.description}
-                      </p>
+                    Individual Attractions
+                  </h2>
+                  <p className="text-gray-400 text-xs md:text-sm mt-1 ml-12">
+                    Pick your thrill, one at a time
+                  </p>
+                </div>
+                {!dataLoading && (
+                  <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
+                    {shownAttractions.length} attraction{shownAttractions.length !== 1 ? 's' : ''} available
+                  </p>
+                )}
+              </div>
 
-                      <div className="mt-auto">
-                        <div className="flex items-end justify-between gap-3 mb-3">
-                          <div>
-                            {attraction.special_pricing?.has_special_pricing ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-400 line-through font-semibold">${attraction.special_pricing.original_price}</span>
-                                <span className="text-emerald-500 font-bold">→</span>
-                                <span className="text-2xl font-extrabold text-emerald-600">
-                                  ${attraction.special_pricing.discounted_price}
-                                </span>
-                                <span className="text-gray-400 text-xs">/ person</span>
-                              </div>
-                            ) : (
-                              <>
-                                <span className="text-2xl font-extrabold text-gray-900">
-                                  ${attraction.price}
-                                </span>
-                                <span className="text-gray-400 text-xs ml-1">/ person</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-stretch gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleBuyTickets(attraction);
-                            }}
-                            className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-all inline-flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
-                          >
-                            {attractionCTB(attraction) ? <Phone size={15} /> : <Ticket size={15} />}
-                            {attractionCTB(attraction) ? 'Call to Book' : 'Buy now'}
-                          </button>
-                          {CART_ENABLED && !attractionCTB(attraction) && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddAttractionToCart(attraction);
-                              }}
-                              className="flex-1 basis-28 whitespace-nowrap px-4 py-2.5 font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-2 text-sm border border-blue-800 text-blue-800 hover:bg-blue-50 cursor-pointer"
-                            >
-                              <ShoppingCart size={15} />
-                              Add to cart
-                            </button>
-                          )}
-                        </div>
-                        {cartNotice?.key === `attraction-${attraction.id}` && (
-                          <p className="mt-2 text-xs font-semibold text-blue-800">{cartNotice.message}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+              {dataLoading ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <img src={brandLogoSrc} alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+                  <p className="text-gray-400 text-xs mt-3">Loading attractions...</p>
+                </div>
+              ) : shownAttractions.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-sm md:text-lg">No attractions found matching your criteria.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
+                  {shownAttractions.map(attraction => renderAttractionCard(attraction))}
+                </div>
+              )}
+            </section>
+          )}
+          </>
         )}
 
         {/* <MembershipCarousel /> */}

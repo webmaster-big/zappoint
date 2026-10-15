@@ -19,11 +19,11 @@ const splitName = (name: string) => {
 
 const LocationConfirmModal = ({
   location,
-  counts,
+  categories,
   onConfirm,
 }: {
   location: StorefrontLocation;
-  counts?: { packages: number; attractions: number; events: number };
+  categories?: string[];
   onConfirm?: () => void;
 }) => {
   const [open, setOpen] = useState(false);
@@ -100,9 +100,31 @@ const LocationConfirmModal = ({
             </a>
           </div>
 
-          {counts && (
-            <p className="text-xs text-gray-500">
-              {counts.packages} packages · {counts.attractions} attractions · {counts.events} events here
+          {categories && categories.length > 0 && (
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="shrink-0 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">Book here</p>
+              <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {categories.map(label => (
+                  <span key={label} className="shrink-0 whitespace-nowrap px-2.5 py-1 bg-blue-50 text-blue-800 text-xs font-semibold rounded-full capitalize">
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {categories && categories.length === 0 && (
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Nothing can be booked online here yet.
+              {location.phone && (
+                <>
+                  {' '}Call{' '}
+                  <a href={`tel:${location.phone}`} className="font-semibold text-blue-800 hover:text-blue-900">
+                    {location.phone}
+                  </a>{' '}
+                  to book.
+                </>
+              )}
             </p>
           )}
 
@@ -158,7 +180,7 @@ const LocationConfirmModal = ({
           </div>
         </div>
 
-        <div className="p-5 pt-4">
+        <div className="sticky bottom-0 z-10 bg-white px-5 pt-4 pb-3">
           <button
             type="button"
             onClick={confirm}
@@ -168,7 +190,9 @@ const LocationConfirmModal = ({
             Continue at {venue}
             <ArrowRight size={16} />
           </button>
-          <p className="mt-2.5 text-[11px] text-gray-400 text-center leading-relaxed">
+        </div>
+        <div className="px-5 pb-5">
+          <p className="text-[11px] text-gray-400 text-center leading-relaxed">
             Saved on this device so you only enter it once. We only use it to help with your visit and
             bookings — nothing is booked or charged.
           </p>

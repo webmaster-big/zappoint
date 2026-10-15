@@ -34,6 +34,7 @@ const readStoredCustomer = (): { id?: number; first_name?: string; last_name?: s
 const CustomerGiftCards = () => {
   const [tab, setTab] = useState<'buy' | 'owned'>('buy');
   const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [locationsLoaded, setLocationsLoaded] = useState(false);
 
   const me = readStoredCustomer();
   const [amount, setAmount] = useState<number>(50);
@@ -91,9 +92,11 @@ const CustomerGiftCards = () => {
         if (res.data?.success && Array.isArray(res.data.data)) {
           setLocations(
             res.data.data
-              .filter((loc: LocationOption & { is_active?: boolean }) => loc.is_active !== false)
+              .filter((loc: LocationOption & { is_active?: boolean; show_on_main_page?: boolean }) =>
+                loc.is_active !== false && loc.show_on_main_page !== false)
               .map((loc: LocationOption) => ({ id: loc.id, name: loc.name }))
           );
+          setLocationsLoaded(true);
         }
       } catch {
       }
@@ -187,14 +190,18 @@ const CustomerGiftCards = () => {
   })();
 
   const cardDigits = cardNumber.replace(/\D/g, '');
+  const noLocations = locationsLoaded && locations.length === 0;
+  const purchaseBlockedMessage = noLocations
+    ? "Gift cards aren't sold online right now. Please call the venue to buy one."
+    : gatewayError;
   const canBuy =
-    gatewayReady && amountValid && !buying &&
+    gatewayReady && buyLocationId !== '' && !noLocations && amountValid && !buying &&
     purchaserName.trim().length > 1 &&
     /.+@.+\..+/.test(purchaserEmail) &&
     cardDigits.length >= 13 && expMonth.length > 0 && expYear.length === 4 && cvc.length >= 3;
 
   const handleBuy = async () => {
-    if (!canBuy || buyLocationId === '') return;
+    if (!canBuy) return;
     setBuying(true);
     setBuyError(null);
     try {
@@ -224,7 +231,12 @@ const CustomerGiftCards = () => {
       showToast(res.duplicate ? (res.data.code ? 'This card was already purchased.' : res.message) : 'Gift card purchased!', 'success');
       fetchOwnedCards();
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      const err = e as { response?: { data?: { message?: string; code?: string } }; message?: string };
+      if (err.response?.data?.code === 'LOCATION_NOT_BOOKABLE_ONLINE') {
+        const remaining = locations.filter(loc => loc.id !== Number(buyLocationId));
+        setLocations(remaining);
+        setBuyLocationId(remaining[0]?.id ?? '');
+      }
       setBuyError(err.response?.data?.message || err.message || 'That purchase did not go through.');
     } finally {
       setBuying(false);
@@ -411,10 +423,10 @@ const CustomerGiftCards = () => {
                     <h2 className="text-base font-semibold text-gray-900">Payment</h2>
                   </div>
 
-                  {gatewayError ? (
+                  {purchaseBlockedMessage ? (
                     <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3.5 flex gap-2.5">
                       <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-amber-800">{gatewayError}</p>
+                      <p className="text-sm text-amber-800">{purchaseBlockedMessage}</p>
                     </div>
                   ) : (
                     <>

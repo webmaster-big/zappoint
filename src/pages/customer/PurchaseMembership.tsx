@@ -92,6 +92,7 @@ const PurchaseMembership = () => {
     () => (membershipCache.getPublicPlansSync() ?? []).filter((p) => p.is_active)
   );
   const [locations, setLocations] = useState<{ id: number; name: string }[]>([]);
+  const [locationsLoaded, setLocationsLoaded] = useState(false);
   const [loading, setLoading] = useState(
     () => (membershipCache.getPublicPlansSync() === null)
   );
@@ -144,8 +145,11 @@ const PurchaseMembership = () => {
         setExistingMembership(activeMembership);
         const activePlans = plansResult.filter((pl) => pl.is_active);
         setPlans(activePlans);
-        const locs = (locsResult.data ?? []).map((l) => ({ id: l.id, name: l.name }));
+        const locs = (locsResult.data ?? [])
+          .filter((l) => l.show_on_main_page !== false)
+          .map((l) => ({ id: l.id, name: l.name }));
         setLocations(locs);
+        setLocationsLoaded(true);
         if (locs.length > 0) setHomeLocationName(locs[0].name);
         const planParam = searchParams.get('plan');
         if (planParam) {
@@ -288,7 +292,7 @@ const PurchaseMembership = () => {
   const canSubmit =
     !!selectedPlanId &&
     !isCurrentPlan &&
-    !!homeLocationId &&
+    (isUpgrade || !!homeLocationId) &&
     (isUpgrade || termsAccepted) &&
     (isUpgrade || recurringAuthorized) &&
     (!paymentRequired || (
@@ -339,7 +343,14 @@ const PurchaseMembership = () => {
       await membershipCache.invalidate();
       setTimeout(() => navigate('/customer/membership'), 800);
     } catch (e: unknown) {
-      showError(e, isUpgrade ? 'Plan change failed' : 'Purchase failed');
+      const refusal = (e as { response?: { data?: { code?: string; message?: string } } }).response?.data;
+      if (!isUpgrade && refusal?.code === 'LOCATION_NOT_BOOKABLE_ONLINE') {
+        const remaining = locations.filter((l) => l.id !== homeLocationId);
+        setLocations(remaining);
+        setHomeLocationName(remaining[0]?.name ?? '');
+      }
+      if (refusal?.message) show(refusal.message, 'error');
+      else showError(e, isUpgrade ? 'Plan change failed' : 'Purchase failed');
     } finally {
       setSubmitting(false);
     }
@@ -481,6 +492,9 @@ const PurchaseMembership = () => {
                     <option key={loc.id} value={loc.name}>{loc.name}</option>
                   ))}
                 </select>
+                {locationsLoaded && locations.length === 0 && (
+                  <p className="mt-2 text-xs text-red-600">Memberships aren't sold online right now. Please call the venue to join.</p>
+                )}
                 {selectedPlan.valid_locations && selectedPlan.valid_locations.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {selectedPlan.valid_locations.slice(0, 8).map((loc) => (
