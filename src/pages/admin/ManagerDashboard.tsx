@@ -75,6 +75,7 @@ import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashb
 import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
 import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
 import LocationConcernsPanel from '../../components/admin/dashboard/LocationConcernsPanel';
+import { countLabel, participantsCoveredLabel } from '../../utils/waiverCoverage';
 
 const LocationManagerDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -790,10 +791,10 @@ const LocationManagerDashboard: React.FC = () => {
       value: metrics.waiverMetricsAvailable === false ? '—' : (metrics.totalWaivers ?? 0).toString(),
       change: metrics.waiverMetricsAvailable === false
         ? 'Could not be counted — see the server log'
-        : `${metrics.completedWaivers ?? 0} signed • ${metrics.pendingWaivers ?? 0} pending`,
+        : `${participantsCoveredLabel((metrics.adultWaivers ?? metrics.completedWaivers ?? 0) + (metrics.minorWaivers ?? 0))} • ${countLabel(metrics.completedWaivers ?? 0, 'form', 'forms')} signed • ${metrics.pendingWaivers ?? 0} pending`,
       icon: FileSignature,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
-      explanation: 'Waivers covering visit days in this period, counted on the day they cover — the same rule the Waiver Records page uses, so the numbers agree. Open the card for the split by status, by source, the adult age brackets, and the minors\u2019 ages as of the waiver date.',
+      explanation: 'Waivers covering visit days in this period, counted on the day they cover — the same rule the Waiver Records page uses, so the numbers agree. Participants covered counts each signer plus the minors on their signed forms. Open the card for the split by status, by source, the adult age brackets, and the minors\u2019 ages as of the waiver date.',
       sections: metrics.waiverMetricsAvailable === false ? [] : [
         { title: 'By status', items: dashboardBreakdowns?.waiverStatusBreakdown ?? [], showTotal: false },
         { title: 'By source', items: dashboardBreakdowns?.waiverBreakdown ?? [] },

@@ -81,6 +81,7 @@ import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
 import { resolvePaymentState, statusAfterPayment } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
+import { countLabel, participantsCoveredLabel } from '../../utils/waiverCoverage';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -771,12 +772,12 @@ const CompanyDashboard: React.FC = () => {
       value: metrics.waiverMetricsAvailable === false ? '—' : (metrics.totalWaivers ?? 0),
       description: metrics.waiverMetricsAvailable === false
         ? 'Could not be counted — see the server log'
-        : `${metrics.completedWaivers ?? 0} signed · ${metrics.pendingWaivers ?? 0} pending`,
+        : `${participantsCoveredLabel((metrics.adultWaivers ?? metrics.completedWaivers ?? 0) + (metrics.minorWaivers ?? 0))} · ${countLabel(metrics.completedWaivers ?? 0, 'form', 'forms')} signed · ${metrics.pendingWaivers ?? 0} pending`,
       icon: FileSignature,
       accent: 'bg-indigo-100 text-indigo-700',
       timeframe: timeframeDescription,
       breakdown: dashboardBreakdowns.waiverBreakdown ?? [],
-      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers. "Signed" are completed waivers and matches the Waiver Records page for the same day; the total also counts pending ones, which Records only shows if you set its status to All. Open the card for the split by status, by source, adults vs minors covered, the adult age brackets, and the minors\' ages as of the waiver date.',
+      explanation: 'Waivers for visits in the selected period, scoped to the selected location, counted on the day each waiver covers. "Participants covered" counts each signer plus the minors on their signed forms. "Forms signed" are completed waivers and match the Waiver Records page for the same day; the total also counts pending ones, which Records only shows if you set its status to All. Open the card for the split by status, by source, adults vs minors covered, the adult age brackets, and the minors\' ages as of the waiver date.',
     },
   ];
 
@@ -1119,7 +1120,7 @@ const CompanyDashboard: React.FC = () => {
             return (
               <div key={card.key} className="relative">
                 <div
-                  className={`bg-white rounded-xl border shadow-sm p-4 flex flex-col gap-1.5 transition-all cursor-pointer select-none ${
+                  className={`bg-white rounded-xl border shadow-sm p-4 h-full flex flex-col gap-1.5 transition-all cursor-pointer select-none ${
                     isExpanded ? 'border-gray-300 shadow-md' : 'border-gray-100 hover:shadow-md'
                   }`}
                   onClick={() => setExpandedCard(isExpanded ? null : card.key)}
@@ -1140,8 +1141,8 @@ const CompanyDashboard: React.FC = () => {
                     )}
                     <p className="text-xs font-medium text-gray-700 mt-0.5 leading-tight">{card.title}</p>
                   </div>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-[10px] text-gray-400 truncate">{loading ? '' : card.description}</span>
+                  <div className="flex items-start justify-between mt-auto pt-0.5">
+                    <span className="text-[10px] text-gray-400 leading-snug min-w-0">{loading ? '' : card.description}</span>
                     <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full ml-1 shrink-0">{card.timeframe}</span>
                   </div>
                 </div>
