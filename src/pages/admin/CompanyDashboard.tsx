@@ -1141,9 +1141,9 @@ const CompanyDashboard: React.FC = () => {
                     )}
                     <p className="text-xs font-medium text-gray-700 mt-0.5 leading-tight">{card.title}</p>
                   </div>
-                  <div className="flex items-start justify-between mt-auto pt-0.5">
+                  <div className="flex flex-wrap items-start justify-between gap-x-1 gap-y-0.5 mt-auto pt-0.5">
                     <span className="text-[10px] text-gray-400 leading-snug min-w-0">{loading ? '' : card.description}</span>
-                    <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full ml-1 shrink-0">{card.timeframe}</span>
+                    <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full ml-auto shrink-0">{card.timeframe}</span>
                   </div>
                 </div>
 
