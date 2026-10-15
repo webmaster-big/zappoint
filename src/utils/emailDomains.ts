@@ -186,3 +186,13 @@ export const suggestEmails = (value: string, options: SuggestOptions = {}): Emai
     kind: 'correction' as const,
   }));
 };
+
+const ADDRESS_PART = /^[^\s@.,;:<>()[\]\\"]+(\.[^\s@.,;:<>()[\]\\"]+)*$/;
+const DOMAIN = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+$/u;
+
+export const cleanEmailAddress = (value: string): string => value.trim().toLowerCase().replace(/[.,;]+$/, '');
+
+export const isValidEmailAddress = (value: string): boolean => {
+  const at = value.lastIndexOf('@');
+  return at > 0 && ADDRESS_PART.test(value.slice(0, at)) && DOMAIN.test(value.slice(at + 1));
+};

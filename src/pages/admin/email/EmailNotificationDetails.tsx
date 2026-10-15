@@ -504,6 +504,23 @@ const EmailNotificationDetails: React.FC = () => {
                 </div>
               )}
 
+              {Array.isArray(notification.excluded_emails) && notification.excluded_emails.length > 0 && (
+                <div className="pt-3 border-t border-gray-200">
+                  <label className="text-sm font-medium text-gray-500">Don't Send To</label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {notification.excluded_emails.map((email) => (
+                      <span
+                        key={email}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded text-sm text-red-700"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        {email}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {notification.trigger_type === 'visit_completed' && (
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-gray-500">Return-visit promo code</label>

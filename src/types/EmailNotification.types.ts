@@ -102,6 +102,7 @@ export interface EmailNotification {
   is_body_customized?: boolean;
   recipient_types: RecipientType[];
   custom_emails: string[];
+  excluded_emails?: string[] | null;
   include_qr_code: boolean;
   is_active: boolean;
   send_before_hours: number | null;
@@ -156,6 +157,7 @@ export interface CreateEmailNotificationData {
   body?: string | null;
   recipient_types: RecipientType[];
   custom_emails?: string[];
+  excluded_emails?: string[];
   include_qr_code?: boolean;
   is_active?: boolean;
   send_before_hours?: number | null;

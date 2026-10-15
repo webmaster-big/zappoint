@@ -50,6 +50,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import HtmlCodeEditor from '../../../components/admin/email/HtmlCodeEditor';
 import EmailInput from '../../../components/ui/EmailInput';
+import { cleanEmailAddress, isValidEmailAddress } from '../../../utils/emailDomains';
 import VisitEmailSettings from '../../../components/admin/email/VisitEmailSettings';
 import { getStoredUser } from '../../../utils/storage';
 import { isVisitTrigger } from '../../../types/EmailNotification.types';
@@ -90,6 +91,7 @@ const CreateEmailNotification: React.FC = () => {
     body: '',
     recipient_types: ['customer'],
     custom_emails: [],
+    excluded_emails: [],
     include_qr_code: false,
     is_active: true,
     send_before_hours: undefined,
@@ -105,6 +107,7 @@ const CreateEmailNotification: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [useTemplate, setUseTemplate] = useState(false);
   const [customEmail, setCustomEmail] = useState('');
+  const [excludedEmail, setExcludedEmail] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showImageSizeModal, setShowImageSizeModal] = useState(false);
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
@@ -337,6 +340,25 @@ const CreateEmailNotification: React.FC = () => {
     setFormData(prev => ({ ...prev, custom_emails: prev.custom_emails?.filter(e => e !== email) || [] }));
   };
 
+  const addExcludedEmail = () => {
+    const email = cleanEmailAddress(excludedEmail);
+    if (!email) return;
+    if (!isValidEmailAddress(email)) {
+      setToast({ message: 'Please enter a valid email address', type: 'error' });
+      return;
+    }
+    if (formData.excluded_emails?.includes(email)) {
+      setToast({ message: 'Email already excluded', type: 'error' });
+      return;
+    }
+    setFormData(prev => ({ ...prev, excluded_emails: [...(prev.excluded_emails || []), email] }));
+    setExcludedEmail('');
+  };
+
+  const removeExcludedEmail = (email: string) => {
+    setFormData(prev => ({ ...prev, excluded_emails: prev.excluded_emails?.filter(e => e !== email) || [] }));
+  };
+
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || '' }));
@@ -527,6 +549,14 @@ const CreateEmailNotification: React.FC = () => {
       setToast({ message: 'Please specify hours after event for follow-up', type: 'error' });
       return;
     }
+    const pendingExcluded = cleanEmailAddress(excludedEmail);
+    if (!isVisitEmail && pendingExcluded && !isValidEmailAddress(pendingExcluded)) {
+      setToast({ message: "Enter a valid email in Don't Send To, or clear the box", type: 'error' });
+      return;
+    }
+    const excludedEmails = isVisitEmail
+      ? []
+      : Array.from(new Set([...(formData.excluded_emails || []), ...(pendingExcluded ? [pendingExcluded] : [])]));
 
     try {
       setLoading(true);
@@ -543,6 +573,7 @@ const CreateEmailNotification: React.FC = () => {
               activity_filter: formData.entity_type === 'event' ? null : formData.activity_filter ?? null,
             }
           : { from_name: null, review_url: null, activity_filter: null }),
+        excluded_emails: excludedEmails,
         promo_id: formData.trigger_type === 'visit_completed' ? formData.promo_id ?? null : null,
         email_template_id: useTemplate ? formData.email_template_id : undefined,
         subject: useTemplate ? undefined : formData.subject,
@@ -838,6 +869,36 @@ const CreateEmailNotification: React.FC = () => {
                   )}
                 </div>
               )}
+
+              <div className="pt-4 border-t border-gray-200 mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Don't Send To</label>
+                <p className="text-xs text-gray-500 mb-2">These addresses never get this email, even when they belong to a company admin, manager, or staff account picked above.</p>
+                <div className="flex gap-2 mb-2">
+                  <EmailInput
+                    value={excludedEmail}
+                    onChange={(e) => setExcludedEmail(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addExcludedEmail())}
+                    placeholder="Enter email address to exclude..."
+                    wrapperClassName="flex-1 min-w-0"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                  <StandardButton type="button" variant="secondary" icon={Plus} onClick={addExcludedEmail}>
+                    Add
+                  </StandardButton>
+                </div>
+                {formData.excluded_emails && formData.excluded_emails.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.excluded_emails.map(email => (
+                      <span key={email} className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 rounded-full text-sm text-red-700">
+                        {email}
+                        <button type="button" onClick={() => removeExcludedEmail(email)} className="hover:text-red-900">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="pt-4 border-t border-gray-200 mt-4">
                 <label className="flex items-center gap-2 cursor-pointer">
