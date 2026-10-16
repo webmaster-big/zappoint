@@ -28,7 +28,7 @@ import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { feeSupportService } from '../../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -543,9 +543,11 @@ const OnsitePurchaseEvent = () => {
         };
       });
 
-      const freshFeeTotal = event
-        ? await resolveFeeTotal('event', event.id, calculateBaseTotal(), event.location_id || undefined)
+      const freshBreakdown = event
+        ? await resolveFeeBreakdown('event', event.id, calculateBaseTotal(), event.location_id || undefined)
         : null;
+      const freshFeeTotal = freshBreakdown ? freshBreakdown.total : null;
+      const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const total = freshFeeTotal !== null
         ? Math.max(0, freshFeeTotal - specialPricingDiscount)
         : calculateTotal();
@@ -578,7 +580,7 @@ const OnsitePurchaseEvent = () => {
         send_email: paymentMethod === 'in-store' ? sendEmail : false,
         notes: notes || undefined,
         add_ons: addOnsPayload.length > 0 ? addOnsPayload : undefined,
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : undefined,
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : undefined,
         custom_fields: toCustomFieldPayload(customFieldAnswers),

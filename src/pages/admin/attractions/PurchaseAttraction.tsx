@@ -56,7 +56,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
 import { feeSupportService } from '../../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -1038,9 +1038,11 @@ const PurchaseAttraction = () => {
       setIsProcessingPayment(true);
       setPaymentError('');
 
-      const freshFeeTotal = attraction
-        ? await resolveFeeTotal('attraction', Number(attraction.id), calculateTotal(), attraction.locationId ? Number(attraction.locationId) : undefined)
+      const freshBreakdown = attraction
+        ? await resolveFeeBreakdown('attraction', Number(attraction.id), calculateTotal(), attraction.locationId ? Number(attraction.locationId) : undefined)
         : null;
+      const freshFeeTotal = freshBreakdown ? freshBreakdown.total : null;
+      const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const submitTotalBeforeMembership = freshFeeTotal !== null
         ? freshFeeTotal - specialPricingDiscount
         : totalBeforeMembership;
@@ -1101,7 +1103,7 @@ const PurchaseAttraction = () => {
         scheduled_time: scheduledTime || undefined,
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : null,
         discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
         applied_discounts: (() => {
           const items = [

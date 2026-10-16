@@ -47,7 +47,7 @@ import { globalNoteService, type GlobalNote } from '../../../services/GlobalNote
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
 import { feeSupportService } from '../../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -1291,7 +1291,9 @@ const BookPackage: React.FC = () => {
     setPaymentError('');
     
     try {
-      const freshFeeTotal = pkg ? await resolveFeeTotal('package', pkg.id, subtotal, pkg.location_id || undefined) : null;
+      const freshBreakdown = pkg ? await resolveFeeBreakdown('package', pkg.id, subtotal, pkg.location_id || undefined) : null;
+      const freshFeeTotal = freshBreakdown ? freshBreakdown.total : null;
+      const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const submitFinalTotal = freshFeeTotal !== null
         ? Math.max(0, freshFeeTotal - specialPricingDiscount - promoDiscount - giftCardDiscount - membershipDiscount)
         : finalTotal;
@@ -1385,7 +1387,7 @@ const BookPackage: React.FC = () => {
         sms_consent: smsConsent,
         checkout_key: checkoutKeyRef.current,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : null,
         discount_amount: (specialPricingDiscount + membershipDiscount) > 0 ? (specialPricingDiscount + membershipDiscount) : undefined,
         applied_discounts: (() => {
           const items = [

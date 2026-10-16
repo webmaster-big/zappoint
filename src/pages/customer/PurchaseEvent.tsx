@@ -48,7 +48,7 @@ import type { FeeBreakdown } from '../../types/FeeSupport.types';
 import { buildAppliedFees } from '../../utils/fees';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../utils/discounts';
 import { feeSupportService } from '../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../utils/feeTotal';
 import { specialPricingService } from '../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../types/SpecialPricing.types';
 import type { Event, EventAddOn } from '../../types/event.types';
@@ -1015,6 +1015,7 @@ const PurchaseEvent = () => {
       }
 
       let response;
+      let submitBreakdown: FeeBreakdown | null = feeBreakdown;
       try {
         setNextTrackingId();
         const submitBasePrice = event
@@ -1024,9 +1025,11 @@ const PurchaseEvent = () => {
               return sum + (addon ? parseFloat(addon.price) * qty : 0);
             }, 0)
           : 0;
-        const freshFeeTotal = event
-          ? await resolveFeeTotal('event', event.id, submitBasePrice, event.location_id)
+        const freshBreakdown = event
+          ? await resolveFeeBreakdown('event', event.id, submitBasePrice, event.location_id)
           : null;
+        const freshFeeTotal = freshBreakdown ? freshBreakdown.total : null;
+        submitBreakdown = freshBreakdown ?? feeBreakdown;
         const submitTotalBeforeMembership = freshFeeTotal !== null
           ? freshFeeTotal - specialPricingDiscount
           : totalBeforeMembership;
@@ -1054,7 +1057,7 @@ const PurchaseEvent = () => {
           payment_status: 'pending',
           special_requests: specialRequests || undefined,
           send_email: !!giftCard,
-          applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
+          applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : undefined,
           applied_discounts: (() => {
             const items = [
               ...buildAppliedDiscounts(specialPricingBreakdown),
@@ -1127,7 +1130,7 @@ const PurchaseEvent = () => {
         payable_id: createdPurchase.id,
         payable_type: PAYMENT_TYPE.EVENT_PURCHASE,
         send_email: true,
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : null,
       };
 
       let paymentResponse;

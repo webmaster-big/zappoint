@@ -34,7 +34,7 @@ import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
 import StandardButton from '../../../components/ui/StandardButton';
 import { feeSupportService } from '../../../services/FeeSupportService';
-import { resolveFeeTotal } from '../../../utils/feeTotal';
+import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
@@ -1004,9 +1004,11 @@ const CreatePurchase = () => {
         return;
       }
 
-      const freshFeeTotal = selectedAttraction
-        ? await resolveFeeTotal('attraction', Number(selectedAttraction.id), calculateTotal(), (selectedAttraction.locationId ? Number(selectedAttraction.locationId) : (selectedLocation ?? undefined)))
+      const freshBreakdown = selectedAttraction
+        ? await resolveFeeBreakdown('attraction', Number(selectedAttraction.id), calculateTotal(), (selectedAttraction.locationId ? Number(selectedAttraction.locationId) : (selectedLocation ?? undefined)))
         : null;
+      const freshFeeTotal = freshBreakdown ? freshBreakdown.total : null;
+      const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const totalAmount = freshFeeTotal !== null ? Math.max(0, freshFeeTotal - specialPricingDiscount) : finalTotal;
       let transactionId: string | undefined;
       
@@ -1050,7 +1052,7 @@ const CreatePurchase = () => {
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
         send_email: paymentMethod === 'in-store' ? sendEmail : false,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
-        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        applied_fees: buildAppliedFees(submitBreakdown).length > 0 ? buildAppliedFees(submitBreakdown) : null,
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
