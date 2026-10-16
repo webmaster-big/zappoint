@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OverlapOverrideDialog from '../../../components/admin/bookings/OverlapOverrideDialog';
-import { ArrowLeft, Save, Plus, Minus, Calendar, Clock, CreditCard, DollarSign } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Minus, Calendar, Clock, CreditCard, DollarSign, EyeOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -1229,6 +1229,12 @@ const ManualBooking: React.FC = () => {
         return;
       }
 
+      if (refused?.status === 422 && refused.data?.code === 'PACKAGE_NOT_BOOKABLE_ONLINE') {
+        setToast({ message: 'Your staff login was not accepted, so this was handled as an online booking and refused. Nothing new was booked or charged. Please sign in again and try once more.', type: 'error' });
+        setLoading(false);
+        return;
+      }
+
       const err = error as { 
         response?: { 
           data?: { 
@@ -1422,6 +1428,15 @@ const ManualBooking: React.FC = () => {
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
                             Max {p.max_participants}
                           </span>
+                          {p.available_online === false && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium amber-tone bg-amber-100 text-amber-800"
+                              title="Customers cannot see or book this package online. Staff can still book it."
+                            >
+                              <EyeOff className="w-2.5 h-2.5" aria-hidden="true" />
+                              Backend only
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -2007,6 +2022,12 @@ const ManualBooking: React.FC = () => {
                     )}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm text-gray-900 truncate">{pkg.name}</h3>
+                      {pkg.available_online === false && (
+                        <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium amber-tone bg-amber-100 text-amber-800">
+                          <EyeOff className="w-2.5 h-2.5" aria-hidden="true" />
+                          Backend only
+                        </span>
+                      )}
                       <div className="flex flex-col gap-1 mt-2">
                         <span className="text-sm text-gray-500">{formatDurationDisplay(pkg.duration, pkg.duration_unit)}</span>
                         <span className="text-sm text-gray-500">Up to {pkg.max_participants} guests</span>

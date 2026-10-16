@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { readBookingPrefill } from '../../../utils/bookingPrefill';
-import { AlertTriangle, Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin } from 'lucide-react';
+import { AlertTriangle, Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X, MapPin, EyeOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -691,6 +691,7 @@ const OnsiteBooking: React.FC = () => {
             has_guest_of_honor: pkg.has_guest_of_honor || false,
             customerNotes: pkg.customer_notes || '',
             location_id: pkg.location_id ?? pkg.location?.id,
+            availableOnline: pkg.available_online !== false,
             location: pkg.location || undefined
           }));
           
@@ -782,6 +783,7 @@ const OnsiteBooking: React.FC = () => {
           has_guest_of_honor: pkg.has_guest_of_honor || false,
           customerNotes: pkg.customer_notes || '',
           location_id: pkg.location_id ?? pkg.location?.id,
+          availableOnline: pkg.available_online !== false,
           location: pkg.location || undefined
           };
         });
@@ -2058,6 +2060,12 @@ const OnsiteBooking: React.FC = () => {
             return;
           }
 
+          if (paymentErr?.response?.status === 422 && paymentErr?.response?.data?.code === 'PACKAGE_NOT_BOOKABLE_ONLINE') {
+            setPaymentError('Your staff login was not accepted, so this was handled as an online booking and refused. Nothing new was booked or charged. Please sign in again and try once more.');
+            setIsProcessingPayment(false);
+            return;
+          }
+
           if (createdBookingIdForCleanup && !(paymentErr instanceof PaymentOutcomeUnknownError)) {
             try {
               const rollbackOutcome = await bookingService.rollbackBooking(createdBookingIdForCleanup);
@@ -2160,6 +2168,11 @@ const OnsiteBooking: React.FC = () => {
         return;
       }
 
+      if (failure?.status === 422 && failure.data?.code === 'PACKAGE_NOT_BOOKABLE_ONLINE') {
+        setToast({ message: 'Your staff login was not accepted, so this was handled as an online booking and refused. Nothing new was booked or charged. Please sign in again and try once more.', type: 'error' });
+        return;
+      }
+
       // Say why: a rejected booking (capacity, a required confirmation) has a reason and
       // staff cannot act on "Please try again".
       setToast({ message: failure?.data?.message || 'Failed to create booking. Please try again.', type: 'error' });
@@ -2198,6 +2211,15 @@ const OnsiteBooking: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <h4 className={`font-semibold text-sm text-${fullColor} truncate`}>{selectedPackage.name}</h4>
                   <p className="text-xs text-gray-500 mt-0.5">{normalizeCategory(selectedPackage.category)}</p>
+                  {selectedPackage.availableOnline === false && (
+                    <span
+                      className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium amber-tone bg-amber-50 text-amber-800 border border-amber-200"
+                      title="Customers cannot see or book this package online. Staff can still book it."
+                    >
+                      <EyeOff className="w-3 h-3" aria-hidden="true" />
+                      Backend only
+                    </span>
+                  )}
                   <p className={`text-lg font-bold text-gray-900 mt-1`}>${selectedPackage.price}</p>
                 </div>
               </div>
@@ -2573,6 +2595,15 @@ const OnsiteBooking: React.FC = () => {
                         <Users className="w-3.5 h-3.5 mr-1" />
                         Up to {pkg.maxParticipants}
                       </span>
+                      {pkg.availableOnline === false && (
+                        <span
+                          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium amber-tone bg-amber-50 text-amber-800 border border-amber-200"
+                          title="Customers cannot see or book this package online. Staff can still book it."
+                        >
+                          <EyeOff className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
+                          Backend only
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -3405,6 +3436,12 @@ const OnsiteBooking: React.FC = () => {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${the}-100 text-${the}-800">
                       {normalizeCategory(selectedPackage.category)}
                     </span>
+                    {selectedPackage.availableOnline === false && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium amber-tone bg-amber-100 text-amber-800">
+                        <EyeOff className="w-3 h-3 mr-1" aria-hidden="true" />
+                        Backend only
+                      </span>
+                    )}
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                       <Clock className="w-3 h-3 mr-1" />
                       {formatDuration(selectedPackage)}

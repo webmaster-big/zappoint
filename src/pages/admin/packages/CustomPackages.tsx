@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, Power, Sparkles, CalendarHeart, Calendar, Clock, Copy, CalendarDays } from "lucide-react";
+import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, EyeOff, Globe, Power, Sparkles, CalendarHeart, Calendar, Clock, Copy, CalendarDays } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, packageCacheService, type Package } from '../../../services';
@@ -30,6 +30,8 @@ const CustomPackages: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [onlineTogglingId, setOnlineTogglingId] = useState<number | null>(null);
+  const canChangeOnlineAvailability = ['company_admin', 'admin', 'location_manager'].includes(getStoredUser()?.role);
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -84,6 +86,11 @@ const CustomPackages: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = packageCacheService.onCacheUpdate(async (event: CustomEvent) => {
+      if (event.detail?.source === 'update' && event.detail?.changes) {
+        const { packageId, changes } = event.detail as { packageId: number; changes: Partial<Package> };
+        setPackages(prev => prev.map(pkg => (pkg.id === packageId ? { ...pkg, ...changes } : pkg)));
+        return;
+      }
       if (event.detail?.source === 'api') {
         const cached = await packageCacheService.getCachedPackages();
         if (cached) {
@@ -179,19 +186,57 @@ const CustomPackages: React.FC = () => {
     try {
       const response = await packageService.toggleStatus(id);
       
-      const updatedPackage = { ...packages.find(pkg => pkg.id === id)!, is_active: response.data.is_active };
-      
       setPackages(prev => prev.map(pkg => 
-        pkg.id === id ? updatedPackage : pkg
+        pkg.id === id ? { ...pkg, is_active: response.data.is_active } : pkg
       ));
       
-      await packageCacheService.updatePackageInCache(updatedPackage);
+      await packageCacheService.patchPackageInCache(id, { is_active: response.data.is_active });
       
       const statusText = response.data.is_active ? 'activated' : 'deactivated';
       setToast({ message: `Package ${statusText} successfully!`, type: 'success' });
     } catch (err) {
       console.error('Error toggling package status:', err);
       setToast({ message: 'Failed to update package status. Please try again.', type: 'error' });
+    }
+  };
+
+  const handleToggleOnline = async (pkg: Package) => {
+    const makeBackendOnly = pkg.available_online !== false;
+    const question = makeBackendOnly
+      ? pkg.is_active === false
+        ? `Make "${pkg.name}" backend only?\n\nIt is switched off right now, so nobody can book it yet. Once it is switched on, customers will not see it or book it online, and staff can book it here.`
+        : `Make "${pkg.name}" backend only?\n\nCustomers will no longer see it or book it online. Staff can still book it here, and existing bookings are not affected.`
+      : pkg.is_active === false
+        ? `Let customers book "${pkg.name}" online?\n\nIt is switched off right now, so it will appear on the booking site once it is switched on.`
+        : `Show "${pkg.name}" on the booking site again?\n\nCustomers will be able to see it and book it online.`;
+
+    if (!window.confirm(question)) return;
+
+    try {
+      setOnlineTogglingId(pkg.id);
+      const response = await packageService.setOnlineAvailability(pkg.id, !makeBackendOnly);
+      const saved = response.data?.available_online;
+
+      if (saved !== !makeBackendOnly) {
+        setToast({ message: 'Front-End Availability could not be changed yet because the server has not been updated for it. Please try again later.', type: 'error' });
+        return;
+      }
+
+      setPackages(prev => prev.map(item => (item.id === pkg.id ? { ...item, available_online: saved } : item)));
+      await packageCacheService.patchPackageInCache(pkg.id, { available_online: saved });
+      setToast({
+        message: !saved
+          ? `"${pkg.name}" is now backend only.`
+          : pkg.is_active === false
+            ? `"${pkg.name}" can be booked online once it is switched on.`
+            : `"${pkg.name}" is on the booking site again.`,
+        type: 'success',
+      });
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToast({ message: message || 'Failed to update Front-End Availability. Please try again.', type: 'error' });
+    } finally {
+      setOnlineTogglingId(null);
     }
   };
 
@@ -406,6 +451,15 @@ const CustomPackages: React.FC = () => {
                             {normalizeCategory(pkg.category)}
                           </span>
                         )}
+                        {pkg.available_online === false && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium amber-tone bg-amber-100 text-amber-800"
+                            title={pkg.is_active === false ? 'Customers cannot see or book this package online. Staff can book it once it is switched on.' : 'Customers cannot see or book this package online. Staff can still book it.'}
+                          >
+                            <EyeOff className="w-3 h-3" />
+                            Backend only
+                          </span>
+                        )}
                         {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                             <Clock className="w-3 h-3" />
@@ -443,6 +497,25 @@ const CustomPackages: React.FC = () => {
                         >
                           <Pencil className="w-4 h-4" />
                         </Link>
+                        {canChangeOnlineAvailability && typeof pkg.available_online === 'boolean' && (
+                          <button
+                            onClick={() => handleToggleOnline(pkg)}
+                            className={`flex-1 p-1.5 rounded transition-colors flex items-center justify-center disabled:opacity-50 ${
+                              pkg.available_online === false
+                                ? 'text-amber-700 hover:bg-amber-100 amber-tone-hover'
+                                : `text-${fullColor} hover:bg-${themeColor}-100`
+                            }`}
+                            title={pkg.available_online === false
+                              ? 'Backend only - click to let customers book it online'
+                              : pkg.is_active === false
+                                ? 'Online booking is on for when this package is switched on - click to make it backend only'
+                                : 'On the booking site - click to make it backend only'}
+                            aria-label={pkg.available_online === false ? `Show ${pkg.name} on the booking site` : `Make ${pkg.name} backend only`}
+                            disabled={onlineTogglingId === pkg.id}
+                          >
+                            {pkg.available_online === false ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                          </button>
+                        )}
                         <StandardButton
                           onClick={() => handleDelete(pkg.id)}
                           variant="danger"

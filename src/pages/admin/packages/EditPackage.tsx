@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
-import { Info, Plus, Calendar, Clock, Gift, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText, MapPin } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText, MapPin, EyeOff } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import {
     attractionService,
@@ -28,6 +28,7 @@ import type {
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import CallToBookNotice from '../../../components/admin/CallToBookNotice';
+import OnlineAvailabilityField from '../../../components/admin/OnlineAvailabilityField';
 import { packageIsCallToBook } from '../../../utils/callToBook';
 
 const getOrdinal = (n: number): string => {
@@ -72,6 +73,8 @@ const EditPackage: React.FC = () => {
     const [slotCleanupMinutes, setSlotCleanupMinutes] = useState<number>(DEFAULT_SLOT_CLEANUP_MINUTES);
 
     const [savedEscapeRoom, setSavedEscapeRoom] = useState(false);
+    const [savedAvailableOnline, setSavedAvailableOnline] = useState(true);
+    const canChangeOnlineAvailability = ['company_admin', 'admin', 'location_manager'].includes(getStoredUser()?.role);
     const [form, setForm] = useState({
         name: "",
         description: "",
@@ -114,6 +117,7 @@ const EditPackage: React.FC = () => {
         minBookingNoticeHours: "", // Min hours in advance for booking (0-8760)
         isActive: false, // Preserve active/inactive status on edit
         displayOrder: "0",
+        availableOnline: true,
     });
 
     const [imagePreview, setImagePreview] = useState<string>("");
@@ -273,6 +277,7 @@ const EditPackage: React.FC = () => {
                 }
 
                 setSavedEscapeRoom(Boolean(pkg.is_escape_room));
+                setSavedAvailableOnline(pkg.available_online !== false);
                 setForm({
                     name: pkg.name || "",
                     description: pkg.description || "",
@@ -320,6 +325,7 @@ const EditPackage: React.FC = () => {
                     minBookingNoticeHours: String(pkg.min_booking_notice_hours || ""),
                     isActive: pkg.is_active ?? false,
                     displayOrder: String(pkg.display_order || "0"),
+                    availableOnline: pkg.available_online !== false,
                 });
 
                 const storedImage = Array.isArray(pkg.image) ? pkg.image[0] : pkg.image;
@@ -751,6 +757,8 @@ const EditPackage: React.FC = () => {
                 .map(name => rooms.find(r => r.name === name)?.id ?? attached.rooms.find(r => r.name === name)?.id)
                 .filter(Boolean) as number[];
 
+            const changingOnlineAvailability = canChangeOnlineAvailability && form.availableOnline !== savedAvailableOnline;
+
             const updateData = {
                 name: form.name,
                 description: form.description,
@@ -784,13 +792,19 @@ const EditPackage: React.FC = () => {
                 add_ons_order: form.addOns,
                 is_active: form.isActive,
                 display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
+                ...(changingOnlineAvailability ? { available_online: form.availableOnline } : {}),
             };
 
             console.log("Updating package with data:", updateData);
 
             const response = await packageService.updatePackage(parseInt(id), updateData);
             console.log("Update response:", response);
-            
+            if (changingOnlineAvailability && typeof response?.data?.available_online === 'boolean') {
+                const serverOnline = response.data.available_online;
+                setSavedAvailableOnline(serverOnline);
+                setForm(prev => ({ ...prev, availableOnline: serverOnline }));
+            }
+
             if (schedulesLoaded) {
                 try {
                     await packageService.updateAvailabilitySchedules(parseInt(id), {
@@ -810,6 +824,15 @@ const EditPackage: React.FC = () => {
                 }
             } catch (cacheError) {
                 console.error('Error updating cache:', cacheError);
+            }
+
+            if (changingOnlineAvailability && response?.data?.available_online !== form.availableOnline) {
+                const serverValue = response?.data?.available_online !== false;
+                setSavedAvailableOnline(serverValue);
+                setForm(prev => ({ ...prev, availableOnline: serverValue }));
+                showToast("The package was saved, but Front-End Availability could not be changed yet because the server has not been updated for it.", "error");
+                setSubmitting(false);
+                return;
             }
             
             showToast("Package updated successfully!", "success");
@@ -902,6 +925,15 @@ const EditPackage: React.FC = () => {
                         <div>
                             <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Edit Package</h2>
                             <p className="text-sm text-gray-500 mt-1">Update the details of your package deal.</p>
+                            {!savedAvailableOnline && (
+                                <span
+                                    className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-amber-800 amber-tone bg-amber-50 border border-amber-200 rounded-full"
+                                    title={form.isActive ? 'Customers cannot see or book this package online. Staff can still book it.' : 'Customers cannot see or book this package online. Staff can book it once it is switched on.'}
+                                >
+                                    <EyeOff className="h-3 w-3" aria-hidden="true" />
+                                    Backend only
+                                </span>
+                            )}
                         </div>
                     </div>
 
@@ -1292,7 +1324,7 @@ const EditPackage: React.FC = () => {
                                     </p>
                                 </div>
 
-                                <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" />
+                                <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" backendOnly={!form.availableOnline} switchedOff={!form.isActive} />
                                 
                                 {form.availability_schedules.length > 1 && (
                                     <p className="text-xs text-gray-500 mb-3">When two schedules cover the same day, the one lower in this list wins.</p>
@@ -2086,6 +2118,14 @@ const EditPackage: React.FC = () => {
                             />
                             <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the store page.</p>
                         </div>
+
+                        <OnlineAvailabilityField
+                            checked={form.availableOnline}
+                            canChange={canChangeOnlineAvailability}
+                            themeColor={themeColor}
+                            isActive={form.isActive}
+                            onChange={(next) => setForm(prev => ({ ...prev, availableOnline: next }))}
+                        />
                         
                         <div className="flex gap-2 mt-6">
                             <StandardButton

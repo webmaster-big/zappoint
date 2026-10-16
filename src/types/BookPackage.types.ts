@@ -95,6 +95,7 @@ export interface BookPackagePackage {
   availability_schedules?: BookPackageAvailabilitySchedule[];
   image?: string;
   is_active: boolean;
+  available_online?: boolean;
   created_at: string;
   updated_at: string;
   partial_payment_percentage?: number | null;
@@ -109,6 +110,7 @@ export interface BookPackagePackage {
     id: number;
     company_id: number;
     name: string;
+    slug?: string | null;
     address: string;
     city: string;
     state: string;

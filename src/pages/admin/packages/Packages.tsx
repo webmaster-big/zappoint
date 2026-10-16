@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical, CalendarDays, DoorOpen } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, EyeOff, Globe, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical, CalendarDays, DoorOpen } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -27,6 +27,8 @@ const Packages: React.FC = () => {
   const [filteredPackages, setFilteredPackages] = useState<Package[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [escapeOnly, setEscapeOnly] = useState(false);
+  const [backendOnlyFilter, setBackendOnlyFilter] = useState(false);
+  const [onlineTogglingId, setOnlineTogglingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -158,6 +160,11 @@ const Packages: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = packageCacheService.onCacheUpdate((event: CustomEvent) => {
+      if (event.detail?.source === 'update' && event.detail?.changes) {
+        const { packageId, changes } = event.detail as { packageId: number; changes: Partial<Package> };
+        setPackages(prev => prev.map(pkg => (pkg.id === packageId ? { ...pkg, ...changes } : pkg)));
+        return;
+      }
       if (event.detail?.source === 'api') {
         const refreshFromCache = async () => {
           const cachedPackages = await packageCacheService.getCachedPackages();
@@ -176,6 +183,8 @@ const Packages: React.FC = () => {
 
   const escapeRoomCount = packages.filter(pkg => pkg.is_escape_room === true && (!effectiveLocationId || pkg.location_id === effectiveLocationId)).length;
   const escapeFilterOn = escapeOnly && escapeRoomCount > 0;
+  const backendOnlyCount = packages.filter(pkg => pkg.available_online === false && (!effectiveLocationId || pkg.location_id === effectiveLocationId)).length;
+  const backendOnlyFilterOn = backendOnlyFilter && backendOnlyCount > 0;
 
   useEffect(() => {
     let result = [...packages];
@@ -186,6 +195,10 @@ const Packages: React.FC = () => {
 
     if (escapeFilterOn) {
       result = result.filter(pkg => pkg.is_escape_room === true);
+    }
+
+    if (backendOnlyFilterOn) {
+      result = result.filter(pkg => pkg.available_online === false);
     }
 
     if (filterCategory !== "all") {
@@ -232,11 +245,18 @@ const Packages: React.FC = () => {
     });
 
     setFilteredPackages(result);
-  }, [packages, filterCategory, escapeFilterOn, effectiveLocationId, searchTerm, sortBy, sortOrder]);
+  }, [packages, filterCategory, escapeFilterOn, backendOnlyFilterOn, effectiveLocationId, searchTerm, sortBy, sortOrder]);
+
+  useEffect(() => {
+    if (backendOnlyCount === 0) {
+      setBackendOnlyFilter(false);
+    }
+  }, [backendOnlyCount]);
 
   const categories = ["all", ...new Set(packages.map(pkg => normalizeCategory(pkg.category)).filter(Boolean))];
 
   const isCompanyAdmin = userData?.role === 'company_admin';
+  const canChangeOnlineAvailability = ['company_admin', 'admin', 'location_manager'].includes(getStoredUser()?.role);
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
@@ -364,6 +384,7 @@ const Packages: React.FC = () => {
           available_month_days: cleanPkg.available_month_days,
           image: cleanPkg.image,
           is_active: cleanPkg.is_active !== false,
+          available_online: cleanPkg.available_online !== false,
           is_escape_room: cleanPkg.is_escape_room === true,
           attraction_ids: cleanPkg.attraction_ids || [],
           addon_ids: cleanPkg.addon_ids || [],
@@ -382,10 +403,17 @@ const Packages: React.FC = () => {
       
       const successCount = response.data.imported_count || 0;
       const failedCount = response.data.failed_count || 0;
+      const failedRows = new Set((response.errors ?? []).map(item => item.index));
+      const importedRows = packagesForImport.filter((_, index) => !failedRows.has(index));
+      const stayedOnline = (response.data.imported || []).filter((pkg, index) => importedRows[index]?.available_online === false && pkg.available_online !== false).length;
+      if (stayedOnline > 0) {
+        alert(`${stayedOnline} imported package(s) meant to be backend only are on the booking site, because the server has not been updated for Front-End Availability yet.`);
+      }
       
       if (failedCount > 0) {
         console.error('Import errors:', response.errors);
-        alert(`Imported ${successCount} package(s). ${failedCount} failed. Check console for details.`);
+        const reasons = (response.errors ?? []).slice(0, 3).map(item => `- ${item.name}: ${item.error}`).join('\n');
+        alert(`Imported ${successCount} package(s). ${failedCount} failed.${reasons ? `\n\n${reasons}` : ' Check console for details.'}`);
       } else {
         alert(`Successfully imported ${successCount} package(s)!`);
       }
@@ -424,18 +452,49 @@ const Packages: React.FC = () => {
   const handleToggleStatus = async (id: number) => {
     try {
       const response = await packageService.toggleStatus(id);
-      
       setPackages(prev => prev.map(pkg => 
         pkg.id === id ? { ...pkg, is_active: response.data.is_active } : pkg
       ));
       
-      await packageCacheService.updatePackageInCache(response.data);
+      await packageCacheService.patchPackageInCache(id, { is_active: response.data.is_active });
       
       const statusText = response.data.is_active ? 'activated' : 'deactivated';
       alert(`Package ${statusText} successfully!`);
     } catch (err) {
       console.error('Error toggling package status:', err);
       alert('Failed to update package status. Please try again.');
+    }
+  };
+
+  const handleToggleOnline = async (pkg: Package) => {
+    const makeBackendOnly = pkg.available_online !== false;
+    const question = makeBackendOnly
+      ? pkg.is_active === false
+        ? `Make "${pkg.name}" backend only?\n\nIt is switched off right now, so nobody can book it yet. Once it is switched on, customers will not see it or book it online, and staff can book it here.`
+        : `Make "${pkg.name}" backend only?\n\nCustomers will no longer see it or book it online. Staff can still book it here, and existing bookings are not affected.`
+      : pkg.is_active === false
+        ? `Let customers book "${pkg.name}" online?\n\nIt is switched off right now, so it will appear on the booking site once it is switched on.`
+        : `Show "${pkg.name}" on the booking site again?\n\nCustomers will be able to see it and book it online.`;
+
+    if (!window.confirm(question)) return;
+
+    try {
+      setOnlineTogglingId(pkg.id);
+      const response = await packageService.setOnlineAvailability(pkg.id, !makeBackendOnly);
+      const saved = response.data?.available_online;
+
+      if (saved !== !makeBackendOnly) {
+        alert('Front-End Availability could not be changed yet because the server has not been updated for it. Please try again later.');
+        return;
+      }
+
+      setPackages(prev => prev.map(item => (item.id === pkg.id ? { ...item, available_online: saved } : item)));
+      await packageCacheService.patchPackageInCache(pkg.id, { available_online: saved });
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(message || 'Failed to update Front-End Availability. Please try again.');
+    } finally {
+      setOnlineTogglingId(null);
     }
   };
 
@@ -483,6 +542,7 @@ const Packages: React.FC = () => {
         availability_schedules: original.availability_schedules,
         image: original.image,
         is_active: false,
+        ...(canChangeOnlineAvailability && original.available_online === false ? { available_online: false } : {}),
         partial_payment_percentage: original.partial_payment_percentage,
         partial_payment_fixed: original.partial_payment_fixed,
         has_guest_of_honor: original.has_guest_of_honor,
@@ -501,14 +561,17 @@ const Packages: React.FC = () => {
         await packageCacheService.addPackageToCache(createResponse.data);
         setPackages(prev => [createResponse.data, ...prev]);
         const targetName = allLocations.find(l => l.id === duplicateTargetLocationId)?.name || '';
+        const copyStayedOnline = duplicateData.available_online === false && createResponse.data.available_online !== false;
         alert(
           `"${original.name}" duplicated successfully${targetName ? ` to ${targetName}` : ''}!` +
-          (sameLocation ? '' : '\n\nSpaces, add-ons and attractions were not copied - they belong to the original location. Pick that location\u2019s own ones on the copy.')
+          (sameLocation ? '' : '\n\nSpaces, add-ons and attractions were not copied - they belong to the original location. Pick that location\u2019s own ones on the copy.') +
+          (copyStayedOnline ? '\n\nThe copy could not be made backend only because the server has not been updated for Front-End Availability yet.' : '')
         );
       }
     } catch (error) {
       console.error('Error duplicating package:', error);
-      alert('Failed to duplicate package. Please try again.');
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(message || 'Failed to duplicate package. Please try again.');
     } finally {
       setDuplicatingId(null);
       setPackageToDuplicate(null);
@@ -713,7 +776,7 @@ const Packages: React.FC = () => {
             </div>
           </div>
 
-          {(categories.length > 1 || escapeRoomCount > 0) && (
+          {(categories.length > 1 || escapeRoomCount > 0 || backendOnlyCount > 0) && (
             <div className="flex items-center gap-2 flex-wrap mt-3">
               {categories.length > 1 && categories.map((category) => (
                 <StandardButton 
@@ -736,6 +799,18 @@ const Packages: React.FC = () => {
                   title="Packages with 'This package is an escape room' switched on: players sign in by room and time and get the group photo by email. The Category does not do this."
                 >
                   Escape-room check-in ({escapeRoomCount})
+                </StandardButton>
+              )}
+              {backendOnlyCount > 0 && (
+                <StandardButton
+                  variant={backendOnlyFilterOn ? "primary" : "secondary"}
+                  size="sm"
+                  icon={EyeOff}
+                  onClick={() => setBackendOnlyFilter(!backendOnlyFilterOn)}
+                  className="rounded-full"
+                  title="Packages customers cannot see or book online. Staff can still book them."
+                >
+                  Backend only ({backendOnlyCount})
                 </StandardButton>
               )}
             </div>
@@ -843,6 +918,15 @@ const Packages: React.FC = () => {
                           Escape room
                         </span>
                       )}
+                      {pkg.available_online === false && (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium amber-tone bg-amber-100 text-amber-800"
+                          title={pkg.is_active === false ? 'Customers cannot see or book this package online. Staff can book it once it is switched on.' : 'Customers cannot see or book this package online. Staff can still book it.'}
+                        >
+                          <EyeOff className="w-3 h-3" />
+                          Backend only
+                        </span>
+                      )}
                       {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <Clock className="w-3 h-3" />
@@ -877,6 +961,25 @@ const Packages: React.FC = () => {
                       >
                         <Pencil className="w-4 h-4" />
                       </Link>
+                      {canChangeOnlineAvailability && typeof pkg.available_online === 'boolean' && (
+                        <button
+                          onClick={() => handleToggleOnline(pkg)}
+                          className={`flex-1 p-1.5 rounded transition-colors flex items-center justify-center disabled:opacity-50 ${
+                            pkg.available_online === false
+                              ? 'text-amber-700 hover:bg-amber-100 amber-tone-hover'
+                              : `text-${fullColor} hover:bg-${themeColor}-100`
+                          }`}
+                          title={pkg.available_online === false
+                            ? 'Backend only - click to let customers book it online'
+                            : pkg.is_active === false
+                              ? 'Online booking is on for when this package is switched on - click to make it backend only'
+                              : 'On the booking site - click to make it backend only'}
+                          aria-label={pkg.available_online === false ? `Show ${pkg.name} on the booking site` : `Make ${pkg.name} backend only`}
+                          disabled={onlineTogglingId === pkg.id}
+                        >
+                          {pkg.available_online === false ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDuplicatePackage(pkg)}
                         className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center disabled:opacity-50`}
@@ -915,11 +1018,13 @@ const Packages: React.FC = () => {
               {searchTerm
                 ? `No packages match "${searchTerm}"`
                 : filterCategory !== "all"
-                  ? `No ${escapeFilterOn ? "escape rooms" : "packages"} in the "${filterCategory}" category`
-                  : "Create your first package to get started"
+                  ? `No ${escapeFilterOn ? "escape rooms" : backendOnlyFilterOn ? "backend-only packages" : "packages"} in the "${filterCategory}" category`
+                  : escapeFilterOn || backendOnlyFilterOn
+                    ? "No packages match these filters"
+                    : "Create your first package to get started"
               }
             </p>
-            {(searchTerm || filterCategory !== "all" || escapeFilterOn) && (
+            {(searchTerm || filterCategory !== "all" || escapeFilterOn || backendOnlyFilterOn) && (
               <StandardButton
                 variant="secondary"
                 size="md"
@@ -928,6 +1033,7 @@ const Packages: React.FC = () => {
                   setSearchTerm("");
                   setFilterCategory("all");
                   setEscapeOnly(false);
+                  setBackendOnlyFilter(false);
                 }}
               >
                 Clear Filters
@@ -1307,9 +1413,16 @@ const Packages: React.FC = () => {
                   {allLocations[0]?.name || 'Current location'}
                 </p>
               )}
+              {packageToDuplicate.available_online === false && (
+                <p className="mt-3 rounded-md border border-amber-200 amber-tone bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {canChangeOnlineAvailability
+                    ? 'This package is backend only, so the copy will be backend only too.'
+                    : 'This package is backend only. The copy will be on the booking site once it is switched on. Only a location manager or an admin can make it backend only.'}
+                </p>
+              )}
               {duplicateTargetLocationId !== null
                 && Number(duplicateTargetLocationId) !== Number(packageToDuplicate.location_id) && (
-                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <p className="mt-3 rounded-md border border-amber-200 amber-tone bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   Spaces, add-ons and attractions belong to a location, so the copy starts with none of them.
                   Everything else - pricing, schedules, images - is copied. Pick that location&rsquo;s own spaces on the copy.
                 </p>

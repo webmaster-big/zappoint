@@ -31,6 +31,7 @@ import type {
 import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CallToBookNotice from '../../../components/admin/CallToBookNotice';
+import OnlineAvailabilityField from '../../../components/admin/OnlineAvailabilityField';
 import { packageIsCallToBook } from '../../../utils/callToBook';
 
 const getOrdinal = (n: number): string => {
@@ -76,6 +77,7 @@ const CreatePackage: React.FC = () => {
     
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
+    const canChangeOnlineAvailability = ['company_admin', 'admin', 'location_manager'].includes(currentUser?.role);
     const { effectiveLocationId } = useLocationScope();
     const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
     const [selectedLocation, setSelectedLocation] = useState<number | null>(effectiveLocationId);
@@ -228,6 +230,7 @@ const CreatePackage: React.FC = () => {
         
         availability_schedules: [] as AvailabilitySchedule[],
         displayOrder: "0",
+        availableOnline: true,
     });
 
 
@@ -625,6 +628,7 @@ const CreatePackage: React.FC = () => {
                 duration_unit: form.durationUnit,
                 image: form.image,
                 status: 'active' as const,
+                ...(canChangeOnlineAvailability ? { available_online: form.availableOnline } : {}),
                 location_id: selectedLocation,
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
@@ -674,8 +678,12 @@ const CreatePackage: React.FC = () => {
             if (packageResponse.success && packageResponse.data) {
                 await packageCacheService.addPackageToCache(packageResponse.data);
             }
-            
-            showToast("Package created successfully!", "success");
+
+            if (canChangeOnlineAvailability && !form.availableOnline && packageResponse.data?.available_online !== false) {
+                showToast("The package was created, but it is on the booking site: the server has not been updated for Front-End Availability yet, so it could not be made backend only.", "error");
+            } else {
+                showToast("Package created successfully!", "success");
+            }
             
             setForm({
                 name: "",
@@ -711,6 +719,7 @@ const CreatePackage: React.FC = () => {
                 minBookingNoticeHours: "",
                 availability_schedules: [],
                 displayOrder: "0",
+                availableOnline: true,
             });
             setImagePreview("");
             
@@ -1192,7 +1201,7 @@ const CreatePackage: React.FC = () => {
                                 </div>
 
                                 <div className="mb-4">
-                                    <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" />
+                                    <CallToBookNotice active={packageIsCallToBook(form.availability_schedules)} itemLabel="package" backendOnly={!form.availableOnline} />
                                 </div>
 
                                 {form.availability_schedules.length > 1 && (
@@ -1968,7 +1977,13 @@ const CreatePackage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-3">Optional: Customers can access this invitation template after booking.</p>
                             </div>
 
-                            
+                            <OnlineAvailabilityField
+                                checked={form.availableOnline}
+                                canChange={canChangeOnlineAvailability}
+                                themeColor={themeColor}
+                                onChange={(next) => setForm(prev => ({ ...prev, availableOnline: next }))}
+                            />
+
                             <div className="flex gap-2 mt-6">
                                 <StandardButton
                                     type="submit"
@@ -2020,6 +2035,7 @@ const CreatePackage: React.FC = () => {
                                         minBookingNoticeHours: "",
                                         availability_schedules: [],
                                         displayOrder: "0",
+                                        availableOnline: true,
                                     })}
                                 >
                                     Reset

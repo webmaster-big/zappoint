@@ -50,6 +50,7 @@ export interface Package {
   available_month_days?: string[] | number[];
   image?: string;
   is_active: boolean;
+  available_online?: boolean;
   partial_payment_percentage?: number;
   partial_payment_fixed?: number;
   has_guest_of_honor?: boolean;
@@ -141,6 +142,7 @@ export interface CreatePackageData {
   image?: string;
   status?: 'active' | 'inactive';
   is_active?: boolean;
+  available_online?: boolean;
   partial_payment_percentage?: number | null;
   partial_payment_fixed?: number | null;
   has_guest_of_honor?: boolean;
@@ -233,6 +235,11 @@ class PackageService {
 
   async toggleStatus(id: number): Promise<ApiResponse<Package>> {
     const response = await api.patch(`/packages/${id}/toggle-status`);
+    return response.data;
+  }
+
+  async setOnlineAvailability(id: number, availableOnline: boolean): Promise<ApiResponse<{ package_id: number; available_online?: boolean }>> {
+    const response = await api.patch(`/packages/${id}/online-availability`, { available_online: availableOnline });
     return response.data;
   }
 

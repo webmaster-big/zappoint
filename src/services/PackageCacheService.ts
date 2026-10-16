@@ -3,8 +3,8 @@ import packageService, { type Package, type PackageFilters } from './PackageServ
 import { normalizeCategory } from '../utils/venueCategories';
 import { getStoredUser } from '../utils/storage';
 
-const CACHE_NAME = 'zapzone-packages-cache-v2';
-const LEGACY_CACHE_NAME = 'zapzone-packages-cache-v1';
+const CACHE_NAME = 'zapzone-packages-cache-v3';
+const LEGACY_CACHE_NAMES = ['zapzone-packages-cache-v1', 'zapzone-packages-cache-v2'];
 let legacyCleared = false;
 const PACKAGES_CACHE_KEY = '/api/packages/cached';
 const CACHE_METADATA_KEY = '/api/packages/metadata';
@@ -33,6 +33,8 @@ class PackageCacheService {
   private static instance: PackageCacheService;
   private isSyncing: boolean = false;
   private syncPromise: Promise<Package[]> | null = null;
+  private changesDuringSync = new Map<number, Partial<Package>>();
+  private writeChain: Promise<unknown> = Promise.resolve();
 
   private constructor() {}
 
@@ -41,6 +43,12 @@ class PackageCacheService {
       PackageCacheService.instance = new PackageCacheService();
     }
     return PackageCacheService.instance;
+  }
+
+  private serialize<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.writeChain.then(task);
+    this.writeChain = run.catch(() => undefined);
+    return run;
   }
 
   private isCacheAvailable(): boolean {
@@ -54,7 +62,7 @@ class PackageCacheService {
     }
     if (!legacyCleared) {
       legacyCleared = true;
-      caches.delete(LEGACY_CACHE_NAME).catch(() => false);
+      LEGACY_CACHE_NAMES.forEach(name => caches.delete(name).catch(() => false));
     }
     return await caches.open(CACHE_NAME);
   }
@@ -167,15 +175,23 @@ class PackageCacheService {
     }
 
     this.isSyncing = true;
+    this.changesDuringSync = new Map();
 
     this.syncPromise = (async () => {
       try {
-        const packages = await packageService.getAllPackages(
+        const fetched = await packageService.getAllPackages(
           filters?.user_id ? { user_id: filters.user_id } : undefined,
         );
 
-        await this.cachePackages(packages, {
-          userId: filters?.user_id,
+        const packages = await this.serialize(async () => {
+          const merged = fetched.map(pkg => {
+            const changes = this.changesDuringSync.get(pkg.id);
+            return changes ? { ...pkg, ...changes } : pkg;
+          });
+          await this.cachePackages(merged, {
+            userId: filters?.user_id,
+          });
+          return merged;
         });
 
         window.dispatchEvent(new CustomEvent('packages-cache-updated', {
@@ -190,6 +206,7 @@ class PackageCacheService {
       } finally {
         this.isSyncing = false;
         this.syncPromise = null;
+        this.changesDuringSync.clear();
       }
     })();
 
@@ -225,6 +242,28 @@ class PackageCacheService {
     window.dispatchEvent(new CustomEvent('packages-cache-updated', {
       detail: { packageId: updatedPackage.id, source: 'update' }
     }));
+  }
+
+  async patchPackageInCache(packageId: number, changes: Partial<Package>): Promise<void> {
+    if (this.isSyncing) {
+      this.changesDuringSync.set(packageId, { ...this.changesDuringSync.get(packageId), ...changes });
+    }
+
+    const patched = await this.serialize(async () => {
+      const cachedPackages = await this.getCachedPackages();
+      const index = cachedPackages ? cachedPackages.findIndex(p => p.id === packageId) : -1;
+      if (!cachedPackages || index < 0) return false;
+
+      cachedPackages[index] = { ...cachedPackages[index], ...changes };
+      await this.cachePackages(cachedPackages);
+      return true;
+    });
+
+    if (patched) {
+      window.dispatchEvent(new CustomEvent('packages-cache-updated', {
+        detail: { packageId, changes, source: 'update' }
+      }));
+    }
   }
 
   async addPackageToCache(newPackage: Package): Promise<void> {

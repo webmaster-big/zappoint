@@ -69,6 +69,7 @@ import customFieldService, {
 } from '../../../services/CustomFieldService';
 import MobilePurchaseIntro from '../../../components/customer/MobilePurchaseIntro';
 import LocationUnavailable from '../../../components/customer/LocationUnavailable';
+import PackageUnavailable from '../../../components/customer/PackageUnavailable';
 import StaffPreviewBanner from '../../../components/customer/StaffPreviewBanner';
 import { hasStaffSession } from '../../../utils/staffSession';
 
@@ -233,6 +234,8 @@ const BookPackage: React.FC = () => {
   const [cardCVV, setCardCVV] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [refusedOnline, setRefusedOnline] = useState(false);
+  const [refusedAfterEarlierAttempt, setRefusedAfterEarlierAttempt] = useState(false);
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState("");
   const [authorizeClientKey, setAuthorizeClientKey] = useState("");
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
@@ -1394,6 +1397,17 @@ const BookPackage: React.FC = () => {
       };
       
       setNextTrackingId();
+      const refusedOnlineBooking = (err: unknown) => {
+        const refused = (err as { response?: { status?: number; data?: { code?: string; previous_attempt?: boolean } } })?.response;
+        const code = refused?.status === 422 ? refused.data?.code : undefined;
+        if (code !== 'PACKAGE_NOT_BOOKABLE_ONLINE' && code !== 'PACKAGE_NOT_AVAILABLE') {
+          return false;
+        }
+        setRefusedOnline(true);
+        setRefusedAfterEarlierAttempt(refused?.data?.previous_attempt === true);
+        setPkg(prev => (prev ? (code === 'PACKAGE_NOT_AVAILABLE' ? { ...prev, is_active: false } : { ...prev, available_online: false }) : prev));
+        return true;
+      };
       let response;
       try {
         response = await bookingService.createBooking(bookingData);
@@ -1435,6 +1449,9 @@ const BookPackage: React.FC = () => {
           checkoutKeyRef.current = newCheckoutKey();
           return;
         }
+        if (refusedOnlineBooking(createErr)) {
+          return;
+        }
         if (refusalCode !== 'BOOKED_SAME_TIME') {
           throw createErr;
         }
@@ -1444,7 +1461,14 @@ const BookPackage: React.FC = () => {
             : 'No new booking was made, and your card was not charged.');
           return;
         }
-        response = await bookingService.createBooking({ ...bookingData, book_another: true });
+        try {
+          response = await bookingService.createBooking({ ...bookingData, book_another: true });
+        } catch (anotherErr) {
+          if (refusedOnlineBooking(anotherErr)) {
+            return;
+          }
+          throw anotherErr;
+        }
       }
 
       if (!response.success || !response.data) {
@@ -1948,9 +1972,28 @@ const BookPackage: React.FC = () => {
     return <LocationUnavailable name={callToBookVenue.name} city={callToBookVenue.city} phone={callToBookVenue.phone} />;
   }
 
+  const packageTurnedOff = pkg.is_active === false;
+  const backendOnlyPackage = pkg.available_online === false;
+  if (packageTurnedOff || (backendOnlyPackage && (refusedOnline || !hasStaffSession()))) {
+    return (
+      <PackageUnavailable
+        packageName={pkg.name}
+        venueName={callToBookVenue?.name ?? pkg.location?.name}
+        city={callToBookVenue?.city ?? pkg.location?.city}
+        phone={callToBookVenue?.phone ?? pkg.location?.phone}
+        locationSlug={callToBookVenue?.slug ?? pkg.location?.slug}
+        retired={packageTurnedOff}
+        interrupted={refusedOnline}
+        earlierAttempt={refusedAfterEarlierAttempt}
+        staffHint={refusedOnline && !packageTurnedOff && hasStaffSession()}
+      />
+    );
+  }
+
   return (
     <>
       {hiddenFromGuests && <StaffPreviewBanner name={callToBookVenue?.name} city={callToBookVenue?.city} />}
+      {backendOnlyPackage && <StaffPreviewBanner packageName={pkg.name} />}
       <ConfirmationModal />
       <AddOnDetailsModal />
       

@@ -80,6 +80,7 @@ export interface OnsiteBookingPackage {
   customerNotes?: string;
   booking_window_days?: number | null;  // Package-specific max days in advance for booking (1-365)
   location_id?: number;
+  availableOnline?: boolean;
   location?: {
     id: number;
     company_id: number;

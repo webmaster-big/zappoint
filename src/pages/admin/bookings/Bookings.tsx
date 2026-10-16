@@ -4143,6 +4143,11 @@ const Bookings: React.FC = () => {
                           <div>
                             <div className="font-medium text-gray-900">{pkg.name}</div>
                             <div className="text-xs text-gray-500">{normalizeCategory(pkg.category)}</div>
+                            {pkg.available_online === false && (
+                              <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium amber-tone bg-amber-100 text-amber-800">
+                                Backend only
+                              </span>
+                            )}
                           </div>
                           <div className="text-right">
                             <div className="font-semibold text-gray-900">${Number(pkg.price || 0).toFixed(2)}</div>

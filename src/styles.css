@@ -176,6 +176,17 @@ html.dark .bg-blue-100 {
   border: 1px solid #475569 !important;
 }
 
+html.dark .amber-tone {
+  background: #2a2112 !important;
+  color: #fde68a !important;
+  border-color: #78350f !important;
+}
+
+html.dark .amber-tone-hover:hover {
+  background: #3b2c12 !important;
+  color: #fde68a !important;
+}
+
 /* Additional gray variations for modern dark mode */
 html.dark .bg-gray-200 {
   background: #3f3f46 !important;

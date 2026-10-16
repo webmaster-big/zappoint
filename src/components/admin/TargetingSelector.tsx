@@ -18,6 +18,7 @@ interface Option {
   id: number;
   name: string;
   location_id?: number;
+  backendOnly?: boolean;
 }
 
 interface Props {
@@ -44,10 +45,11 @@ const itemStores: Record<ItemKey, Map<number, CacheEntry>> = {
   event: new Map(),
 };
 
-const toOption = (x: { id: number; name: string; location_id?: number }): Option => ({
+const toOption = (x: { id: number; name: string; location_id?: number; available_online?: boolean }): Option => ({
   id: x.id,
   name: x.name,
   location_id: x.location_id,
+  backendOnly: x.available_online === false,
 });
 
 const itemFetchers: Record<ItemKey, (locationId: number) => Promise<Option[]>> = {
@@ -381,6 +383,14 @@ function AxisSection({
                   <input type="checkbox" checked={checked} onChange={() => onToggle(opt.id)} className="rounded border-gray-300 flex-shrink-0 mt-0.5" />
                   <span className="min-w-0 break-words">
                     {opt.name}
+                    {opt.backendOnly && (
+                      <span
+                        className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium amber-tone bg-amber-100 text-amber-800 align-middle"
+                        title="Customers cannot see or book this package online. Staff can still book it."
+                      >
+                        Backend only
+                      </span>
+                    )}
                     {locName && <span className="block text-xs text-gray-400">{locName}</span>}
                   </span>
                 </label>

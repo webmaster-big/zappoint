@@ -1085,7 +1085,7 @@ const EditBooking: React.FC = () => {
                   <option value="">Select a package</option>
                   {availablePackages.map((pkg) => (
                     <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} - ${Number(pkg.price).toFixed(2)}
+                      {pkg.name} - ${Number(pkg.price).toFixed(2)}{pkg.available_online === false ? ' · Backend only' : ''}
                     </option>
                   ))}
                 </select>
@@ -1093,6 +1093,11 @@ const EditBooking: React.FC = () => {
                   <div className={`bg-${themeColor}-50 border border-${themeColor}-100 rounded-lg p-3`}>
                     <p className="text-sm text-gray-700">
                       <span className="font-medium">Selected:</span> {packageDetails.name} • ${Number(packageDetails.price).toFixed(2)}
+                      {packageDetails.available_online === false && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium amber-tone bg-amber-100 text-amber-800">
+                          Backend only
+                        </span>
+                      )}
                     </p>
                   </div>
                 )}

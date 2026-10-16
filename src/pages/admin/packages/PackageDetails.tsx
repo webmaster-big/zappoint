@@ -4,6 +4,7 @@ import {
   ArrowLeft, 
   Edit, 
   Trash2,
+  EyeOff,
   Calendar, 
   Users, 
   Tag, 
@@ -187,6 +188,15 @@ const PackageDetails = () => {
               }`}>
                 {packageData.is_active ? 'Active' : 'Inactive'}
               </span>
+              {packageData.available_online === false && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium amber-tone bg-amber-100 text-amber-800"
+                  title={packageData.is_active === false ? 'Customers cannot see or book this package online. Staff can book it once it is switched on.' : 'Customers cannot see or book this package online. Staff can still book it.'}
+                >
+                  <EyeOff className="w-4 h-4" aria-hidden="true" />
+                  Backend only
+                </span>
+              )}
               <StandardButton
                 variant="primary"
                 size="md"
@@ -344,11 +354,17 @@ const PackageDetails = () => {
                     </div>
                     <div className="space-y-2">
                       <div className="flex flex-wrap gap-1.5">
-                        {schedule.day_configuration.map((day: string) => (
-                          <span key={day} className={`px-2 py-1 bg-${fullColor} text-white text-xs font-medium rounded capitalize`}>
-                            {day}
+                        {Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0 ? (
+                          schedule.day_configuration.map((day: string) => (
+                            <span key={day} className={`px-2 py-1 bg-${fullColor} text-white text-xs font-medium rounded capitalize`}>
+                              {day}
+                            </span>
+                          ))
+                        ) : schedule.availability_type === 'daily' ? (
+                          <span className={`px-2 py-1 bg-${fullColor} text-white text-xs font-medium rounded`}>
+                            Every day
                           </span>
-                        ))}
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-700">
                         <Clock size={16} className={`text-${fullColor}`} />
