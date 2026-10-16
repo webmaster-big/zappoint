@@ -850,6 +850,7 @@ const bookingService = {
       imported: number;
       skipped: number;
       errors: { row: number; error: string }[];
+      warnings?: { message: string; rows: number[] }[];
       total_rows: number;
     };
   }> {

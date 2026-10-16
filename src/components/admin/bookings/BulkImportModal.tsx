@@ -13,6 +13,7 @@ interface ImportResult {
   imported: number;
   skipped: number;
   errors: { row: number; error: string }[];
+  warnings?: { message: string; rows: number[] }[];
   total_rows: number;
 }
 
@@ -347,6 +348,25 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   {result.errors.map((err, i) => (
                     <div key={i} className="px-3 py-2 text-sm text-red-700">
                       <span className="font-medium">Row {err.row}:</span> {err.error}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(result.warnings?.length ?? 0) > 0 && (
+              <div className="mb-5">
+                <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                  <AlertTriangle size={14} className="text-amber-500" />
+                  Check these bookings
+                </h4>
+                <div className="amber-tone bg-amber-50 border border-amber-200 rounded-lg divide-y divide-amber-100 max-h-48 overflow-y-auto">
+                  {result.warnings?.map((warning, i) => (
+                    <div key={i} className="px-3 py-2 text-sm text-amber-800">
+                      <span className="font-medium">
+                        {warning.rows.length === 1 ? 'Row' : 'Rows'} {warning.rows.join(', ')}:
+                      </span>{' '}
+                      {warning.message}
                     </div>
                   ))}
                 </div>

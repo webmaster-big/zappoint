@@ -585,10 +585,13 @@ const EditBooking: React.FC = () => {
           setQuote(null);
           setQuoteError(res.message || 'Could not price this booking.');
         }
-      } catch {
+      } catch (err) {
         if (!cancelled) {
           setQuote(null);
-          setQuoteError('Could not reach the pricing service. Refresh before saving.');
+          setQuoteError(
+            (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+              || 'Could not reach the pricing service. Refresh before saving.'
+          );
         }
       } finally {
         if (!cancelled) setQuoteLoading(false);
