@@ -34,7 +34,6 @@ import { removeOrderedItems } from '../../../utils/orderedCartItems';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
-import GiftCardCheckoutField, { type AppliedGiftCard } from '../../../components/customer/GiftCardCheckoutField';
 import EmailInput from '../../../components/ui/EmailInput';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
@@ -178,7 +177,6 @@ const PurchaseAttraction = () => {
   const isCustomerMode = useMemo(() => !getStoredUser(), []);
 
   const [orderQuote, setOrderQuote] = useState<OrderQuote | null>(null);
-  const [giftCard, setGiftCard] = useState<AppliedGiftCard | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [existingPurchase, setExistingPurchase] = useState<{ quantity: number; paid: number } | null>(null);
   const [receiptEmailed, setReceiptEmailed] = useState(true);
@@ -224,7 +222,6 @@ const PurchaseAttraction = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [countrySearch, setCountrySearch] = useState('United States');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [showCallToBook, setShowCallToBook] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
@@ -507,13 +504,6 @@ const PurchaseAttraction = () => {
     };
     fetchDayOffs();
   }, [attraction]);
-
-  useEffect(() => {
-    const customerData = localStorage.getItem('zapzone_customer');
-    if (!customerData) {
-      setShowAccountModal(true);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchCustomerData = async () => {
@@ -828,22 +818,12 @@ const PurchaseAttraction = () => {
   const total = Math.max(0, totalBeforeMembership - membershipDiscount);
 
   const checkoutLocationId = attraction?.locationId ?? cart?.items[0]?.locationId ?? null;
-  const giftCardDiscount = giftCard ? Math.min(giftCard.discount_amount, total) : 0;
-  const singleDueEstimate = Math.max(0, Math.round((total - giftCardDiscount) * 100) / 100);
+  const singleDueEstimate = Math.max(0, Math.round(total * 100) / 100);
   const orderPreDue = orderQuote ? Number(orderQuote.total_amount) : null;
-  const orderGiftCardDiscount = orderMode && giftCard && orderPreDue != null
-    ? Math.min(giftCard.discount_amount, orderPreDue)
-    : 0;
   const displayDue = orderMode
-    ? Math.max(0, (orderPreDue ?? 0) - orderGiftCardDiscount)
+    ? Math.max(0, orderPreDue ?? 0)
     : singleDueEstimate;
   const cardEntryRequired = displayDue > 0;
-  const giftCardItems = orderMode && cart
-    ? cart.items.map((i) => ({ type: i.type, id: Number(i.id) }))
-    : attraction
-      ? [{ type: 'attraction' as const, id: Number(attraction.id) }]
-      : [];
-  const giftCardSubtotal = orderMode ? (orderPreDue ?? 0) : total;
   const { locations: storefrontLocations } = useStorefrontLocations();
   const callToBookVenue = checkoutLocationId ? findLocationById(storefrontLocations, checkoutLocationId) : undefined;
   const attractionCallToBook = Boolean(attraction) && attractionIsCallToBook(getAttractionAvailability());
@@ -1092,8 +1072,7 @@ const PurchaseAttraction = () => {
         quantity: quantity,
         amount: totalAmount,
         total_amount: totalAmount, // Include fees in total_amount
-        amount_paid: giftCard ? 0 : totalAmount,
-        gift_card_code: giftCard?.code ?? undefined,
+        amount_paid: totalAmount,
         currency: 'USD',
         method: 'authorize.net',
         payment_method: 'authorize.net' as 'in-store' | 'paylater' | 'authorize.net',
@@ -1135,7 +1114,6 @@ const PurchaseAttraction = () => {
             sms_consent: smsConsent,
             custom_fields: toCustomFieldPayload(customFieldAnswers),
             payment_method: 'authorize.net',
-            gift_card_code: giftCard?.code ?? null,
             notes: `Bulk order — ${orderItemsPayload.length} items`,
             checkout_key: checkoutKeyRef.current,
           });
@@ -1166,7 +1144,7 @@ const PurchaseAttraction = () => {
           setPlacedOrder(await ticketOrderService.get(order.id).catch(() => ({ ...order, amount_paid: 0, remaining_balance: 0, status: 'confirmed' })));
           checkoutKeyRef.current = newCheckoutKey();
           cart.clear();
-          setToast({ message: 'Order confirmed — your gift card covered it in full!', type: 'success' });
+          setToast({ message: 'Order confirmed!', type: 'success' });
           setPurchaseComplete(true);
           setCurrentStep(4);
           return;
@@ -1174,7 +1152,7 @@ const PurchaseAttraction = () => {
 
         if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
           await ticketOrderService.rollback(order.id).catch(() => void 0);
-          throw new Error(`This order still owes $${Number(order.total_amount).toFixed(2)} — your gift card balance changed. Please enter card details and try again.`);
+          throw new Error(`This order still owes $${Number(order.total_amount).toFixed(2)}. Please enter your card details and try again.`);
         }
 
         const orderPaymentData = {
@@ -1266,36 +1244,9 @@ const PurchaseAttraction = () => {
         console.error('⚠️ QR code generation failed:', qrError);
       }
 
-      const serverTotal = Number(createdPurchase.total_amount ?? totalAmount);
-      const serverPaid = giftCard ? Number(createdPurchase.amount_paid ?? 0) : 0;
-      const serverDue = Math.max(0, Math.round((serverTotal - serverPaid) * 100) / 100);
-
-      if (giftCard && serverDue <= 0 && createdPurchase.status === 'confirmed') {
-        setQrCodeImage(qrData);
-        checkoutKeyRef.current = newCheckoutKey();
-        setToast({ message: 'Purchase confirmed — your gift card covered it in full!', type: 'success' });
-        setPurchaseComplete(true);
-        setCurrentStep(4);
-        return;
-      }
-
-      if (giftCard && serverDue <= 0) {
-        try {
-          await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
-        } catch { void 0; }
-        throw new Error('The price of this order changed while you were checking out. Nothing was charged and your gift card was not used — please try again.');
-      }
-
-      if (giftCard && (!cardNumber || !cardMonth || !cardYear || !cardCVV)) {
-        try {
-          await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
-        } catch { void 0; }
-        throw new Error(`This order still owes $${serverDue.toFixed(2)}. Please enter your card details and try again.`);
-      }
-
       const paymentData = {
         location_id: Number(attraction.locationId),
-        amount: giftCard ? serverDue : totalAmount,
+        amount: totalAmount,
         order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`,
         description: `Attraction Purchase: ${attraction.name}`,
         customer_id: selectedCustomerId || undefined,
@@ -1400,64 +1351,7 @@ const PurchaseAttraction = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40">
       {hiddenFromGuests && <StaffPreviewBanner name={callToBookVenue?.name} city={callToBookVenue?.city} />}
-      {showAccountModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
-          <div 
-            className="bg-white max-w-sm w-full p-6 rounded-2xl shadow-2xl animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center mb-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-7 h-7 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Create an Account?</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">Sign up for faster checkout and track your purchases.</p>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              <StandardButton
-                variant="primary"
-                size="md"
-                onClick={() => navigate('/customer/register')}
-                fullWidth
-              >
-                Create Account
-              </StandardButton>
-              <StandardButton
-                variant="secondary"
-                size="md"
-                onClick={() => setShowAccountModal(false)}
-                fullWidth
-              >
-                Continue as Guest
-              </StandardButton>
-            </div>
-          </div>
-        </div>
-      )}
-
       <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scale-in {
-          from { 
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to { 
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.2s ease-out;
-        }
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out;
-        }
         @keyframes backdrop-fade {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -1539,9 +1433,6 @@ const PurchaseAttraction = () => {
                   )}
                   {orderQuote && orderQuote.fee_total > 0 && (
                     <div className="flex items-center justify-between"><span className="text-gray-500">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
-                  )}
-                  {orderGiftCardDiscount > 0 && (
-                    <div className="flex items-center justify-between"><span className="text-emerald-700">Gift card {giftCard?.code}</span><span className="tabular-nums text-emerald-700">−${orderGiftCardDiscount.toFixed(2)}</span></div>
                   )}
                   <div className="flex items-center justify-between pt-1">
                     <span className="font-bold text-gray-900">Order total</span>
@@ -2272,9 +2163,6 @@ const PurchaseAttraction = () => {
                         {orderQuote && orderQuote.fee_total > 0 && (
                           <div className="flex items-center justify-between"><span className="text-gray-600">Fees</span><span className="tabular-nums text-gray-900">${orderQuote.fee_total.toFixed(2)}</span></div>
                         )}
-                        {orderGiftCardDiscount > 0 && (
-                          <div className="flex items-center justify-between"><span className="text-emerald-700">Gift card {giftCard?.code}</span><span className="tabular-nums text-emerald-700">−${orderGiftCardDiscount.toFixed(2)}</span></div>
-                        )}
                         <div className="flex items-center justify-between pt-1">
                           <span className="font-bold text-gray-900">Order total ({orderQuote?.ticket_count ?? '…'} tickets)</span>
                           <span className="font-extrabold text-gray-900 tabular-nums">{orderQuote ? `$${displayDue.toFixed(2)}` : 'pricing…'}</span>
@@ -2309,20 +2197,6 @@ const PurchaseAttraction = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="mb-1">
-                      <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Have a gift card?</label>
-                      <GiftCardCheckoutField
-                        locationId={checkoutLocationId}
-                        items={giftCardItems}
-                        subtotal={giftCardSubtotal}
-                        applied={giftCard}
-                        onApplied={setGiftCard}
-                        disabled={submitting || isProcessingPayment}
-                      />
-                      {!cardEntryRequired && giftCard && (
-                        <p className="text-xs text-emerald-700 mt-1.5">Your gift card covers the full amount — no card needed.</p>
-                      )}
-                    </div>
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Card Number</label>
                       <div className="relative">
@@ -2497,8 +2371,8 @@ const PurchaseAttraction = () => {
                             </>
                           ) : (
                             <>
-                              <span className="hidden sm:inline">{displayDue > 0 ? `Pay $${displayDue.toFixed(2)}` : 'Complete with Gift Card'}</span>
-                              <span className="sm:hidden">{displayDue > 0 ? `$${displayDue.toFixed(2)}` : 'Use Gift Card'}</span>
+                              <span className="hidden sm:inline">{displayDue > 0 ? `Pay $${displayDue.toFixed(2)}` : 'Complete Purchase'}</span>
+                              <span className="sm:hidden">{displayDue > 0 ? `$${displayDue.toFixed(2)}` : 'Complete'}</span>
                             </>
                           )}
                         </>
@@ -2979,12 +2853,6 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
                   
-                  {giftCardDiscount > 0 && (
-                    <div className="mt-3 flex justify-between text-emerald-600 text-xs">
-                      <span>Gift card {giftCard?.code}</span>
-                      <span>-${giftCardDiscount.toFixed(2)}</span>
-                    </div>
-                  )}
                   <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-white text-sm">Total</span>
@@ -3253,12 +3121,6 @@ const PurchaseAttraction = () => {
                   </div>
                 )}
 
-                {giftCardDiscount > 0 && !orderMode && (
-                  <div className="mt-3 flex justify-between text-emerald-600 text-xs">
-                    <span>Gift card {giftCard?.code}</span>
-                    <span>-${giftCardDiscount.toFixed(2)}</span>
-                  </div>
-                )}
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-white text-sm">{orderMode ? 'This item' : 'Total'}</span>

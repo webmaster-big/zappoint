@@ -52,7 +52,6 @@ import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import { promoService } from '../../../services/PromoService';
-import { giftCardService } from '../../../services/GiftCardService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
@@ -200,9 +199,7 @@ const BookPackage: React.FC = () => {
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [promoCode, setPromoCode] = useState("");
-  const [giftCardCode, setGiftCardCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; name: string; discount_amount: number } | null>(null);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<{ code: string; name: string; discount_amount: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<number>(pkg?.min_participants || 1);
   const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
@@ -284,7 +281,6 @@ const BookPackage: React.FC = () => {
     description?: string;
     price: number;
   } | null>(null);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [showCallToBook, setShowCallToBook] = useState(false);
   const [showMobileOrderSummary, setShowMobileOrderSummary] = useState(false);
   const [showSavingsBreakdown, setShowSavingsBreakdown] = useState(false);
@@ -314,13 +310,6 @@ const BookPackage: React.FC = () => {
       });
     return () => { cancelled = true; };
   }, [pkg?.id, pkg?.location_id]);
-
-  useEffect(() => {
-    const customerData = localStorage.getItem('zapzone_customer');
-    if (!customerData) {
-      setShowAccountModal(true);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchPackage = async () => {
@@ -881,45 +870,27 @@ const BookPackage: React.FC = () => {
     setSelectedAttractions((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
 
-  const handleApplyCode = async (type: "promo" | "giftcard") => {
+  const handleApplyCode = async () => {
     if (!pkg) return;
     setCodeError(null);
     const base = Math.max(0, subtotal - specialPricingDiscount - membershipDiscount);
     const items = [{ type: 'package' as const, id: pkg.id }];
 
     try {
-      if (type === "promo") {
-        const res = await promoService.validateCode(promoCode, {
-          location_id: pkg.location_id,
-          subtotal: base,
-          items,
+      const res = await promoService.validateCode(promoCode, {
+        location_id: pkg.location_id,
+        subtotal: base,
+        items,
+      });
+      if (res.success && res.data.is_valid) {
+        setAppliedPromo({
+          code: promoCode,
+          name: res.data.promo?.name || promoCode,
+          discount_amount: Number(res.data.discount_amount || 0),
         });
-        if (res.success && res.data.is_valid) {
-          setAppliedPromo({
-            code: promoCode,
-            name: res.data.promo?.name || promoCode,
-            discount_amount: Number(res.data.discount_amount || 0),
-          });
-        } else {
-          setAppliedPromo(null);
-          setCodeError(res.message || 'Promo code is not valid for this order');
-        }
       } else {
-        const res = await giftCardService.validateCode(giftCardCode, {
-          location_id: pkg.location_id,
-          subtotal: Math.max(0, base - promoDiscount),
-          items,
-        });
-        if (res.success && res.data.is_valid) {
-          setAppliedGiftCard({
-            code: giftCardCode,
-            name: giftCardCode,
-            discount_amount: Number(res.data.discount_amount || 0),
-          });
-        } else {
-          setAppliedGiftCard(null);
-          setCodeError(res.message || 'Gift card is not valid for this order');
-        }
+        setAppliedPromo(null);
+        setCodeError(res.message || 'Promo code is not valid for this order');
       }
     } catch {
       setCodeError('Could not validate code. Please try again.');
@@ -932,9 +903,7 @@ const BookPackage: React.FC = () => {
     setSelectedAttractions({});
     setSelectedRoomId(null);
     setPromoCode("");
-    setGiftCardCode("");
     setAppliedPromo(null);
-    setAppliedGiftCard(null);
     setParticipants(pkg?.min_participants || 1);
     setForm({
       firstName: "",
@@ -1079,7 +1048,6 @@ const BookPackage: React.FC = () => {
   }, 0);
   
   const promoDiscount = appliedPromo ? Number(appliedPromo.discount_amount || 0) : 0;
-  const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_amount || 0) : 0;
 
   const benefitItems = useMemo<MembershipBenefitQuoteItem[]>(() => {
     if (!pkg) return [];
@@ -1120,7 +1088,7 @@ const BookPackage: React.FC = () => {
   };
 
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
-  const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount - membershipDiscount);
+  const discountedSubtotal = Math.max(0, subtotal - promoDiscount - membershipDiscount);
   const total = discountedSubtotal;
   
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
@@ -1129,7 +1097,7 @@ const BookPackage: React.FC = () => {
   // feeBreakdown.total is raw base + fees (no discounts applied).
   // Subtract all discounts to arrive at the actual amount the customer pays.
   const finalTotal = feeBreakdown
-    ? Math.max(0, feeBreakdown.total - specialPricingDiscount - promoDiscount - giftCardDiscount - membershipDiscount)
+    ? Math.max(0, feeBreakdown.total - specialPricingDiscount - promoDiscount - membershipDiscount)
     : totalAfterSpecialPricing;
 
   const { locations: storefrontLocations } = useStorefrontLocations();
@@ -1295,7 +1263,7 @@ const BookPackage: React.FC = () => {
       const freshFeeTotal = freshBreakdown ? freshBreakdown.total : null;
       const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const submitFinalTotal = freshFeeTotal !== null
-        ? Math.max(0, freshFeeTotal - specialPricingDiscount - promoDiscount - giftCardDiscount - membershipDiscount)
+        ? Math.max(0, freshFeeTotal - specialPricingDiscount - promoDiscount - membershipDiscount)
         : finalTotal;
       const amountToPay = partialAmount > 0 ? partialAmount : submitFinalTotal;
       
@@ -1365,14 +1333,13 @@ const BookPackage: React.FC = () => {
         participants,
         duration: pkg.duration,
         duration_unit: pkg.duration_unit,
-        total_amount: submitFinalTotal + promoDiscount + giftCardDiscount,
+        total_amount: submitFinalTotal + promoDiscount,
         amount_paid: amountToPay,
         payment_method: 'authorize.net' as const,
         send_email: false,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
         promo_code: appliedPromo ? appliedPromo.code : undefined,
-        gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
         membership_id: membershipBenefits.membershipId ?? undefined,
         membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
         notes: form.notes || undefined,
@@ -1848,12 +1815,6 @@ const BookPackage: React.FC = () => {
                     <span className="font-medium text-green-600">-${promoDiscount.toFixed(2)}</span>
                   </div>
                 )}
-                {giftCardDiscount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Gift Card:</span>
-                    <span className="font-medium text-green-600">-${giftCardDiscount.toFixed(2)}</span>
-                  </div>
-                )}
                 {membershipDiscount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">
@@ -1998,59 +1959,8 @@ const BookPackage: React.FC = () => {
       {backendOnlyPackage && <StaffPreviewBanner packageName={pkg.name} />}
       <ConfirmationModal />
       <AddOnDetailsModal />
-      
-      {showAccountModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
-          <div 
-            className="bg-white max-w-sm w-full p-6 rounded-2xl shadow-2xl animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center mb-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-7 h-7 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Create an Account?</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">Sign up for faster checkout and track your bookings.</p>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              <StandardButton
-                variant="primary"
-                size="md"
-                fullWidth
-                onClick={() => window.location.href = '/customer/register'}
-              >
-                Create Account
-              </StandardButton>
-              <StandardButton
-                variant="secondary"
-                size="md"
-                fullWidth
-                onClick={() => setShowAccountModal(false)}
-              >
-                Continue as Guest
-              </StandardButton>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scale-in {
-          from { 
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to { 
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
         @keyframes mobile-summary-fade-in {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -2058,12 +1968,6 @@ const BookPackage: React.FC = () => {
         @keyframes mobile-summary-slide-in {
           from { transform: translateX(-100%); }
           to { transform: translateX(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.2s ease-out;
-        }
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out;
         }
         .animate-mobile-summary-fade-in {
           animation: mobile-summary-fade-in 0.25s ease-out both;
@@ -2498,59 +2402,31 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
-                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Promo Code</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={promoCode}
-                          onChange={e => setPromoCode(e.target.value)}
-                          className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
-                          placeholder="Enter code"
-                        />
-                        <StandardButton
-                          type="button"
-                          variant="primary"
-                          size="md"
-                          className="shrink-0 whitespace-nowrap"
-                          onClick={() => handleApplyCode("promo")}
-                        >
-                          Apply
-                        </StandardButton>
-                      </div>
-                      {appliedPromo && (
-                        <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
-                          ✅ Applied: {appliedPromo.name} (-${promoDiscount.toFixed(2)})
-                        </div>
-                      )}
+                <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
+                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Promo Code</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={e => setPromoCode(e.target.value)}
+                      className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
+                      placeholder="Enter code"
+                    />
+                    <StandardButton
+                      type="button"
+                      variant="primary"
+                      size="md"
+                      className="shrink-0 whitespace-nowrap"
+                      onClick={() => handleApplyCode()}
+                    >
+                      Apply
+                    </StandardButton>
+                  </div>
+                  {appliedPromo && (
+                    <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
+                      ✅ Applied: {appliedPromo.name} (-${promoDiscount.toFixed(2)})
                     </div>
-                    <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
-                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Gift Card</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={giftCardCode}
-                          onChange={e => setGiftCardCode(e.target.value)}
-                          className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm"
-                          placeholder="Enter code"
-                        />
-                        <StandardButton
-                          type="button"
-                          variant="primary"
-                          size="md"
-                          className="shrink-0 whitespace-nowrap"
-                          onClick={() => handleApplyCode("giftcard")}
-                        >
-                          Apply
-                        </StandardButton>
-                      </div>
-                      {appliedGiftCard && (
-                        <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
-                          ✅ Applied: {appliedGiftCard.name} (-${giftCardDiscount.toFixed(2)})
-                        </div>
-                      )}
-                    </div>
+                  )}
                 </div>
                 {codeError && (
                   <div className="mt-2 p-2 bg-red-50 text-red-700 rounded-md text-xs">{codeError}</div>
@@ -3280,13 +3156,6 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {appliedGiftCard && (
-                <div className="flex justify-between text-blue-700 text-sm">
-                  <span>Gift Card</span>
-                  <span>-${giftCardDiscount.toFixed(2)}</span>
-                </div>
-              )}
-              
               {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
                 <div className="space-y-1">
                   {specialPricingBreakdown.discounts_applied.map((discount, index) => (
@@ -3573,13 +3442,6 @@ const BookPackage: React.FC = () => {
                   <div className="flex justify-between text-blue-700 text-sm">
                     <span>Promo Discount</span>
                     <span>-${promoDiscount.toFixed(2)}</span>
-                  </div>
-                )}
-
-                {appliedGiftCard && (
-                  <div className="flex justify-between text-blue-700 text-sm">
-                    <span>Gift Card</span>
-                    <span>-${giftCardDiscount.toFixed(2)}</span>
                   </div>
                 )}
 
