@@ -26,7 +26,7 @@ import {
   effectiveBlockedDates,
   type AvailabilitySlot,
 } from '../../utils/attractionSchedule';
-import { convertTo12Hour } from '../../utils/timeFormat';
+import { convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
 import ScheduleCalendar from '../../components/ui/ScheduleCalendar';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SiteFooter from '../../components/customer/SiteFooter';
@@ -295,7 +295,7 @@ const Cart = () => {
                   ) : (
                     item.scheduledDate && (
                       <p className="text-xs text-gray-500 mt-3">
-                        Event date: <span className="font-semibold text-gray-700">{item.scheduledDate}</span>
+                        Event date: <span className="font-semibold text-gray-700">{parseLocalDate(item.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                       </p>
                     )
                   )}
