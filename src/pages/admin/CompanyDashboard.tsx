@@ -26,8 +26,6 @@ import {
   Eye,
   EyeOff,
   Edit,
-  LogIn,
-  Loader2,
   CheckCircle,
   Ticket,
   Columns,
@@ -56,7 +54,7 @@ import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDate
 import { guestNoteOf } from '../../utils/bookingNotes';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
-import { cardFromPayments } from '../../utils/cardLabel';
+import { cardFromPayments, formatMoney } from '../../utils/cardLabel';
 import { getStoredUser } from '../../utils/storage';
 import { useQuickActions } from '../../hooks/useQuickActions';
 import { useLocationScope } from '../../contexts/LocationContext';
@@ -81,6 +79,9 @@ import DayScheduleGrid from '../../components/admin/calendar/DayScheduleGrid';
 import { matchesBookingSearch } from '../../utils/bookingSearch';
 import { resolvePaymentState, statusAfterPayment } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
+import BookingCheckInAction from '../../components/admin/bookings/BookingCheckInAction';
+import WaiverConnectionPanel from '../../components/waiver/WaiverConnectionPanel';
+import { isCheckInEligible, outstandingBalanceOf } from '../../utils/bookingCheckIn';
 import { countLabel, participantsCoveredLabel } from '../../utils/waiverCoverage';
 
 const CompanyDashboard: React.FC = () => {
@@ -136,9 +137,6 @@ const CompanyDashboard: React.FC = () => {
   // --- Breakdown data from API ---
   const [dashboardBreakdowns, setDashboardBreakdowns] = useState<any>({});
   const [membershipCount, setMembershipCount] = useState(0);
-
-  const [checkInLoading, setCheckInLoading] = useState(false);
-  const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -2378,6 +2376,10 @@ const CompanyDashboard: React.FC = () => {
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Booking ID</span>
+                    <span className="font-mono font-medium text-gray-900">#{selectedBooking.id}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Reference Number</span>
                     <span className="font-mono font-medium text-gray-900">#{selectedBooking.reference_number}</span>
                   </div>
@@ -2587,6 +2589,12 @@ const CompanyDashboard: React.FC = () => {
                       <span className="text-sm font-medium text-gray-900">${parseFloat(String(selectedBooking.amount_paid || 0)).toFixed(2)}</span>
                     </div>
                   )}
+                  {outstandingBalanceOf(selectedBooking) !== null && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Balance Due</span>
+                      <span className="text-sm font-medium text-red-600">{formatMoney(outstandingBalanceOf(selectedBooking))}</span>
+                    </div>
+                  )}
                   {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                     <div className="pt-2 border-t border-gray-100">
                       <p className="text-xs text-gray-500 mb-1">Applied Fees</p>
@@ -2621,9 +2629,12 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
+              <div className="mb-6">
+                <WaiverConnectionPanel type="booking" id={Number(selectedBooking.id)} compact checkInActions={false} />
+              </div>
 
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Link
                     to={`/bookings/${selectedBooking.id}?from=dashboard`}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -2640,16 +2651,19 @@ const CompanyDashboard: React.FC = () => {
                     <Edit size={15} />
                     Edit
                   </Link>
-                  {selectedBooking.status?.toLowerCase() !== 'checked-in' && selectedBooking.status?.toLowerCase() !== 'completed' && selectedBooking.status?.toLowerCase() !== 'cancelled' && selectedBooking.payment_status?.toLowerCase() === 'paid' && (
-                    !showCheckInConfirm ? (
-                      <button
-                        onClick={() => setShowCheckInConfirm(true)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
-                      >
-                        <LogIn size={15} />
-                        Check In
-                      </button>
-                    ) : null
+                  {isCheckInEligible(selectedBooking) && (
+                    <BookingCheckInAction
+                      key={selectedBooking.id}
+                      booking={selectedBooking}
+                      onCheckedIn={patch => {
+                        const bookingId = selectedBooking.id;
+                        // the quick view may have been closed or moved to another booking while the request ran
+                        setSelectedBooking((current: any) =>
+                          current && current.id === bookingId ? { ...current, ...patch } : current
+                        );
+                        patchBooking(bookingId, { ...patch });
+                      }}
+                    />
                   )}
                   {selectedBooking.status?.toLowerCase() !== 'checked-in' && selectedBooking.status?.toLowerCase() !== 'completed' && selectedBooking.status?.toLowerCase() !== 'cancelled' && selectedBooking.payment_status?.toLowerCase() !== 'paid' && (
                     <button
@@ -2678,45 +2692,11 @@ const CompanyDashboard: React.FC = () => {
                   )}
                 </div>
 
-                {showCheckInConfirm && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setShowCheckInConfirm(false)}
-                        className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        disabled={checkInLoading}
-                        onClick={async () => {
-                          setCheckInLoading(true);
-                          try {
-                            await bookingService.checkInBooking(selectedBooking.reference_number, getStoredUser()?.id);
-                            setSelectedBooking({ ...selectedBooking, status: 'checked-in' });
-                            patchBooking(selectedBooking.id, { status: 'checked-in' });
-                            setShowCheckInConfirm(false);
-                          } catch (err) {
-                            console.error('Check-in failed:', err);
-                          } finally {
-                            setCheckInLoading(false);
-                          }
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                      >
-                        {checkInLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                        {checkInLoading ? 'Checking in...' : 'Confirm'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <StandardButton
                   variant="secondary"
                   size="md"
                   className="w-full"
-                  onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }}
+                  onClick={() => setSelectedBooking(null)}
                 >
                   Close
                 </StandardButton>

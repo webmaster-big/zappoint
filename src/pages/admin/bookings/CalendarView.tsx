@@ -17,7 +17,6 @@ import {
   Info,
   Eye,
   Edit,
-  LogIn,
   CheckCircle,
   DollarSign,
   Ticket,
@@ -36,7 +35,7 @@ import { buildCalendarCategories, useCategoryFilter } from '../../../components/
 import { CalendarCategoryTabs } from '../../../components/admin/calendar/CategoryFilter';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
-import { matchesBookingSearch } from '../../../utils/bookingSearch';
+import { customerEmailOf, customerNameOf, customerPhoneOf, matchesBookingSearch } from '../../../utils/bookingSearch';
 import type { Booking } from '../../../services/bookingService';
 import type { EventPurchase } from '../../../types/event.types';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
@@ -48,6 +47,9 @@ import { formatDurationDisplay, parseLocalDate, getMichiganNow } from '../../../
 import { resolvePaymentState, statusAfterPayment } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
+import BookingCheckInAction from '../../../components/admin/bookings/BookingCheckInAction';
+import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import { isCheckInEligible } from '../../../utils/bookingCheckIn';
 import BlockedPeriodList from '../../../components/admin/availability/BlockedPeriodList';
 import { dayOffService, type AvailabilityBlock } from '../../../services/DayOffService';
 
@@ -105,9 +107,6 @@ const CalendarView: React.FC = () => {
   const [showColorLegend, setShowColorLegend] = useState(false);
 
   const [blockedPeriods, setBlockedPeriods] = useState<AvailabilityBlock[]>([]);
-
-  const [checkInLoading, setCheckInLoading] = useState(false);
-  const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -1587,10 +1586,10 @@ const CalendarView: React.FC = () => {
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 text-gray-400 mr-3" />
-                      <span className="font-medium text-gray-900">{selectedBooking.guest_name || 'Guest'}</span>
+                      <span className="font-medium text-gray-900">{customerNameOf(selectedBooking)}</span>
                     </div>
-                    <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_email || 'No email provided'}</div>
-                    <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_phone || 'No phone provided'}</div>
+                    <div className="text-sm text-gray-600 ml-7">{customerEmailOf(selectedBooking) || 'No email provided'}</div>
+                    <div className="text-sm text-gray-600 ml-7">{customerPhoneOf(selectedBooking) || 'No phone provided'}</div>
                   </div>
                 </div>
                 {/* directly under the customer, because it is what the desk needs before they speak */}
@@ -1618,6 +1617,10 @@ const CalendarView: React.FC = () => {
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Booking ID</span>
+                      <span className="font-mono font-medium text-gray-900">#{selectedBooking.id}</span>
+                    </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Reference Number</span>
                       <span className="font-mono font-medium text-gray-900">#{selectedBooking.reference_number}</span>
@@ -1885,7 +1888,10 @@ const CalendarView: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
+                <div className="mt-6">
+                  <WaiverConnectionPanel type="booking" id={Number(selectedBooking.id)} compact checkInActions={false} />
+                </div>
 
                 <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -1905,16 +1911,19 @@ const CalendarView: React.FC = () => {
                       <Edit size={15} />
                       Edit
                     </Link>
-                    {selectedBooking.status !== 'checked-in' && selectedBooking.status !== 'completed' && selectedBooking.status !== 'cancelled' && selectedBooking.payment_status === 'paid' && (
-                      !showCheckInConfirm ? (
-                        <button
-                          onClick={() => setShowCheckInConfirm(true)}
-                          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
-                        >
-                          <LogIn size={15} />
-                          Check In
-                        </button>
-                      ) : null
+                    {isCheckInEligible(selectedBooking) && (
+                      <BookingCheckInAction
+                        key={selectedBooking.id}
+                        booking={selectedBooking}
+                        onCheckedIn={patch => {
+                          const bookingId = selectedBooking.id;
+                          // the quick view may have been closed or moved to another booking while the request ran
+                          setSelectedBooking(current =>
+                            current && current.id === bookingId ? { ...current, ...patch } : current
+                          );
+                          setBookings(prev => prev.map(b => (b.id === bookingId ? { ...b, ...patch } : b)));
+                        }}
+                      />
                     )}
                     {selectedBooking.status !== 'checked-in' && selectedBooking.status !== 'completed' && selectedBooking.status !== 'cancelled' && selectedBooking.payment_status !== 'paid' && (
                       <button
@@ -1933,42 +1942,8 @@ const CalendarView: React.FC = () => {
                     )}
                   </div>
 
-                  {showCheckInConfirm && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                      <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setShowCheckInConfirm(false)}
-                          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          disabled={checkInLoading}
-                          onClick={async () => {
-                            setCheckInLoading(true);
-                            try {
-                              await bookingService.checkInBooking(selectedBooking.reference_number);
-                              setSelectedBooking({ ...selectedBooking, status: 'checked-in' } as any);
-                              setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'checked-in' } as any : b));
-                              setShowCheckInConfirm(false);
-                            } catch (err) {
-                              console.error('Check-in failed:', err);
-                            } finally {
-                              setCheckInLoading(false);
-                            }
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                          {checkInLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                          {checkInLoading ? 'Checking in...' : 'Confirm'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   <StandardButton
-                    onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }}
+                    onClick={() => setSelectedBooking(null)}
                     variant="secondary"
                     size="md"
                     className="w-full"

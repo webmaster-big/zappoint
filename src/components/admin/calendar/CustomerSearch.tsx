@@ -1,10 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, X, Loader2, Phone, User, CalendarDays } from 'lucide-react';
+import { Search, X, Loader2, Phone, User, CalendarDays, Mail } from 'lucide-react';
 import bookingService, { type Booking } from '../../../services/bookingService';
-import { customerNameOf, customerPhoneOf, formatPhoneForDisplay } from '../../../utils/bookingSearch';
+import {
+  customerEmailOf,
+  customerNameOf,
+  customerPhoneOf,
+  formatPhoneForDisplay,
+  isIdTerm,
+  normalizeBookingSearchTerm,
+  rankBookingSearchResults,
+} from '../../../utils/bookingSearch';
 import { convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
 
 const MIN_TERM_LENGTH = 2;
+
+// a booking id can be a single digit ("#7"), so the length minimum only applies to other text
+const isSearchable = (term: string): boolean => term.length >= MIN_TERM_LENGTH || isIdTerm(term);
 const DEBOUNCE_MS = 350;
 const RESULT_LIMIT = 20;
 
@@ -28,7 +39,7 @@ interface CustomerSearchProps {
 const CustomerSearch: React.FC<CustomerSearchProps> = ({
   locationId,
   onSelect,
-  placeholder = 'Search customer name or phone',
+  placeholder = 'Search name, phone, email or booking #',
   className,
   themeColor = 'blue',
   fullColor = 'blue-600',
@@ -45,12 +56,12 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
   const requestRef = useRef(0);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedTerm(term.trim()), DEBOUNCE_MS);
+    const timer = window.setTimeout(() => setDebouncedTerm(normalizeBookingSearchTerm(term)), DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [term]);
 
   useEffect(() => {
-    if (debouncedTerm.length < MIN_TERM_LENGTH) {
+    if (!isSearchable(debouncedTerm)) {
       requestRef.current += 1;
       setResults([]);
       setError(null);
@@ -73,7 +84,7 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
       })
       .then(response => {
         if (requestRef.current !== requestId) return;
-        setResults(response?.data?.bookings ?? []);
+        setResults(rankBookingSearchResults(response?.data?.bookings ?? [], debouncedTerm));
       })
       .catch(() => {
         if (requestRef.current !== requestId) return;
@@ -141,7 +152,7 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
     }
   };
 
-  const showPanel = open && debouncedTerm.length >= MIN_TERM_LENGTH;
+  const showPanel = open && isSearchable(debouncedTerm);
 
   const emptyMessage = useMemo(() => {
     if (loading) return null;
@@ -163,7 +174,7 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        aria-label="Search bookings by customer name or phone number"
+        aria-label="Search bookings by customer name, phone number, email or booking ID"
         role="combobox"
         aria-expanded={showPanel}
         aria-autocomplete="list"
@@ -190,6 +201,7 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
             <ul role="listbox" ref={listRef}>
               {results.map((booking, index) => {
                 const phone = customerPhoneOf(booking);
+                const email = customerEmailOf(booking);
                 const bookingDate = parseLocalDate(booking.booking_date);
                 return (
                   <li key={booking.id}>
@@ -230,9 +242,15 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
                             {formatPhoneForDisplay(phone)}
                           </span>
                         )}
+                        {email && (
+                          <span className="flex min-w-0 items-center gap-1">
+                            <Mail className="h-3 w-3 shrink-0 text-gray-400" />
+                            <span className="truncate">{email}</span>
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 truncate text-xs text-gray-500">
-                        {booking.package?.name || 'No package'} · {booking.reference_number}
+                        <span className="font-mono">#{booking.id}</span> · {booking.reference_number} · {booking.package?.name || 'No package'}
                       </div>
                     </button>
                   </li>

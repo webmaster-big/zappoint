@@ -51,6 +51,8 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
   const [waivers, setWaivers] = useState<ConnectedWaiver[]>([]);
   const [summary, setSummary] = useState<EntityWaiverSummary>({ total: 0, completed: 0, pending: 0, checked_in: 0 });
   const [loading, setLoading] = useState(true);
+  // a failed lookup says nothing about whether a waiver exists, so it must not fall through to the empty state
+  const [loadFailed, setLoadFailed] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [launching, setLaunching] = useState(false);
   const [busyId, setBusyId] = useState<number | 'all' | null>(null);
@@ -95,10 +97,14 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
       if (r.success) {
         setWaivers(r.data.waivers || []);
         setSummary(r.data.summary || { total: 0, completed: 0, pending: 0, checked_in: 0 });
+        setLoadFailed(false);
+      } else {
+        setLoadFailed(true);
       }
     } catch {
       if (ticket !== latestLoad.current) return;
       setWaivers([]);
+      setLoadFailed(true);
     } finally {
       if (ticket === latestLoad.current) setLoading(false);
     }
@@ -160,6 +166,20 @@ const WaiverConnectionPanel = ({ type, id, title = 'Waivers', compact = false, c
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <div className="flex items-center gap-2 mb-3"><ShieldCheck className={`w-4 h-4 text-${fullColor}`} /><h3 className="text-sm font-bold text-gray-900">{title}</h3></div>
         <div className={`animate-spin rounded-full h-6 w-6 border-b-2 border-${fullColor} mx-auto my-2`} />
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2"><ShieldCheck className={`w-4 h-4 text-${fullColor}`} /><h3 className="text-sm font-bold text-gray-900">{title}</h3></div>
+          <button type="button" onClick={() => void load()} className={`inline-flex items-center gap-1 text-[11px] font-semibold text-${fullColor} hover:bg-${themeColor}-50 px-2 py-1 rounded transition`}>
+            Try again
+          </button>
+        </div>
+        <p role="alert" className="text-xs text-red-600">Waivers could not be loaded, so their status is unknown. This does not mean none are connected.</p>
       </div>
     );
   }

@@ -41,6 +41,27 @@ export const customerPhoneOf = (booking: SearchableBooking): string => {
   return customerOf(booking)?.phone?.trim() || '';
 };
 
+export const customerEmailOf = (booking: SearchableBooking): string => {
+  const guest = typeof booking.guest_email === 'string' ? booking.guest_email.trim() : '';
+  if (guest) return guest;
+  return customerOf(booking)?.email?.trim() || '';
+};
+
+/**
+ * Trims and collapses whitespace, and drops a leading "#", which staff copy along with "#1234"
+ * (how a booking id is shown) or "#BK2026…" (how the quick view shows a reference). The backend
+ * only treats an all-digit term as a booking id, so "#1234" would otherwise find nothing.
+ */
+export const normalizeBookingSearchTerm = (raw: string): string =>
+  raw
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/(^| )#+ ?/g, '$1')
+    .trim();
+
+/** An all-digit term, which the backend also matches exactly against the booking id. */
+export const isIdTerm = (term: string): boolean => /^\d+$/.test(term);
+
 const textHaystack = (booking: SearchableBooking): string => {
   const customer = customerOf(booking);
   return [
@@ -69,18 +90,36 @@ const phoneHaystack = (booking: SearchableBooking): string =>
     .filter(Boolean)
     .join(' ');
 
-const matchesTerm = (text: string, phones: string, term: string): boolean => {
+const matchesTerm = (text: string, phones: string, id: string, term: string): boolean => {
   if (text.includes(term)) return true;
+  // the same exact-id rule as BookingController::applyBookingSearch
+  if (isIdTerm(term) && term === id) return true;
   const termDigits = digitsOnly(term);
   return termDigits.length >= MIN_PHONE_DIGITS && phones.includes(termDigits);
 };
 
 export const matchesBookingSearch = (booking: SearchableBooking, rawTerm: string): boolean => {
-  const terms = rawTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = normalizeBookingSearchTerm(rawTerm).toLowerCase().split(' ').filter(Boolean);
   if (terms.length === 0) return true;
   const text = textHaystack(booking);
   const phones = phoneHaystack(booking);
-  return terms.every(term => matchesTerm(text, phones, term));
+  const id = booking.id != null ? String(booking.id) : '';
+  return terms.every(term => matchesTerm(text, phones, id, term));
+};
+
+/**
+ * The server sorts matches by date, so a booking whose id or email is exactly what was typed can
+ * sit below bookings that merely share a phone fragment. Puts those exact matches first and keeps
+ * the server's order otherwise.
+ */
+export const rankBookingSearchResults = <T extends SearchableBooking>(bookings: T[], normalizedTerm: string): T[] => {
+  const term = normalizedTerm.toLowerCase();
+  if (!term) return bookings;
+  const isExact = (booking: T): boolean =>
+    (isIdTerm(term) && String(booking.id ?? '') === term) ||
+    [booking.guest_email, customerOf(booking)?.email].some(email => email?.trim().toLowerCase() === term);
+  const exact = bookings.filter(isExact);
+  return exact.length === 0 ? bookings : [...exact, ...bookings.filter(booking => !isExact(booking))];
 };
 
 const cleanPhoneInput = (value?: string | null): string =>

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, EyeOff, Edit, LogIn, CheckCircle, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle, AlertTriangle, MessageSquare, MapPin } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Eye, EyeOff, Edit, CheckCircle, DollarSign, Search, RotateCw, LocateFixed, Plus, ZoomIn, ZoomOut, AlertCircle, AlertTriangle, MessageSquare, MapPin } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
-import { customerNameOf, customerPhoneOf, matchesBookingSearch } from '../../../utils/bookingSearch';
+import { customerEmailOf, customerNameOf, customerPhoneOf, matchesBookingSearch } from '../../../utils/bookingSearch';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -26,11 +26,14 @@ import BookingHoverCard from '../../../components/admin/calendar/BookingHoverCar
 import BookingNoteBadges from '../../../components/admin/calendar/BookingNoteBadges';
 import { supportsHover } from '../../../utils/pointer';
 import { noteFlagsOf, noteSummaryOf, guestNoteOf, staffNoteOf } from '../../../utils/bookingNotes';
-import { cardFromPayments } from '../../../utils/cardLabel';
+import { cardFromPayments, formatMoney } from '../../../utils/cardLabel';
 import type { FreeState, StretchSpan, TimeRange } from '../../../utils/scheduleGeometry';
 import { buildMinuteScale, freeState, freeUntilMinute, nextFreeMinute } from '../../../utils/scheduleGeometry';
 import { buildBookingUrl } from '../../../utils/bookingPrefill';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
+import BookingCheckInAction from '../../../components/admin/bookings/BookingCheckInAction';
+import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
+import { isCheckInEligible, outstandingBalanceOf } from '../../../utils/bookingCheckIn';
 import BlockedPeriodBanner from '../../../components/admin/availability/BlockedPeriodBanner';
 import { blockBookingPath } from '../../../utils/blockBookingPath';
 
@@ -288,9 +291,6 @@ const SpaceSchedule = () => {
 
   const [nowTick, setNowTick] = useState(() => getMichiganNow());
   const [loadedDateKey, setLoadedDateKey] = useState('');
-
-  const [checkInLoading, setCheckInLoading] = useState(false);
-  const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -2701,8 +2701,8 @@ const SpaceSchedule = () => {
                     <Users className="h-4 w-4 text-gray-400 mr-3" />
                     <span className="font-medium text-gray-900">{customerNameOf(selectedBooking)}</span>
                   </div>
-                  {selectedBooking.guest_email && (
-                    <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_email}</div>
+                  {customerEmailOf(selectedBooking) && (
+                    <div className="text-sm text-gray-600 ml-7">{customerEmailOf(selectedBooking)}</div>
                   )}
                   {/* a tablet is a phone: calling the late party should be one tap, not a retype */}
                   {customerPhoneOf(selectedBooking) && (
@@ -2740,6 +2740,10 @@ const SpaceSchedule = () => {
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Booking ID</span>
+                    <span className="font-mono font-medium text-gray-900">#{selectedBooking.id}</span>
+                  </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Reference Number</span>
                     <span className="font-mono font-medium text-gray-900">#{selectedBooking.reference_number}</span>
@@ -2800,6 +2804,22 @@ const SpaceSchedule = () => {
                   )}
                 </div>
               </div>
+
+              {Array.isArray(selectedBooking.add_ons) && selectedBooking.add_ons.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    {selectedBooking.add_ons.map(addon => (
+                      <div key={addon.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                        <span className="text-sm font-medium text-gray-900">{addon.name || 'Unknown Add-On'}</span>
+                        {addon.pivot?.quantity ? (
+                          <span className="text-sm text-gray-600 ml-4">Qty: {addon.pivot.quantity}</span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {(selectedBooking as any).guest_of_honor_name && (
                 <div className="mb-6">
@@ -2883,6 +2903,12 @@ const SpaceSchedule = () => {
                         <span className="text-gray-900">${parseFloat(String(selectedBooking.amount_paid)).toFixed(2)}</span>
                       </div>
                     )}
+                    {outstandingBalanceOf(selectedBooking) !== null && (
+                      <div className="flex justify-between items-center mt-2 text-sm">
+                        <span className="text-gray-600">Balance Due</span>
+                        <span className="font-medium text-red-600">{formatMoney(outstandingBalanceOf(selectedBooking))}</span>
+                      </div>
+                    )}
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-gray-100">
                         <p className="text-xs text-gray-500 mb-1">Fees</p>
@@ -2909,9 +2935,12 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
+              <div className="mt-6">
+                <WaiverConnectionPanel type="booking" id={Number(selectedBooking.id)} compact checkInActions={false} />
+              </div>
 
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Link
                     to={`/bookings/${selectedBooking.id}?from=space-schedule`}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -2928,16 +2957,19 @@ const SpaceSchedule = () => {
                     <Edit size={15} />
                     Edit
                   </Link>
-                  {selectedBooking.status !== 'checked-in' && selectedBooking.status !== 'completed' && selectedBooking.status !== 'cancelled' && selectedBooking.payment_status === 'paid' && (
-                    !showCheckInConfirm ? (
-                      <button
-                        onClick={() => setShowCheckInConfirm(true)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
-                      >
-                        <LogIn size={15} />
-                        Check In
-                      </button>
-                    ) : null
+                  {isCheckInEligible(selectedBooking) && (
+                    <BookingCheckInAction
+                      key={selectedBooking.id}
+                      booking={selectedBooking}
+                      onCheckedIn={patch => {
+                        const bookingId = selectedBooking.id;
+                        // the quick view may have been closed or moved to another booking while the request ran
+                        setSelectedBooking(current =>
+                          current && current.id === bookingId ? { ...current, ...patch } : current
+                        );
+                        setBookings(prev => prev.map(b => (b.id === bookingId ? { ...b, ...patch } : b)));
+                      }}
+                    />
                   )}
                   {selectedBooking.status !== 'checked-in' && selectedBooking.status !== 'completed' && selectedBooking.status !== 'cancelled' && selectedBooking.payment_status !== 'paid' && (
                     <button
@@ -2956,42 +2988,8 @@ const SpaceSchedule = () => {
                   )}
                 </div>
 
-                {showCheckInConfirm && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setShowCheckInConfirm(false)}
-                        className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        disabled={checkInLoading}
-                        onClick={async () => {
-                          setCheckInLoading(true);
-                          try {
-                            await bookingService.checkInBooking(selectedBooking.reference_number);
-                            setSelectedBooking({ ...selectedBooking, status: 'checked-in' } as any);
-                            setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'checked-in' } as any : b));
-                            setShowCheckInConfirm(false);
-                          } catch (err) {
-                            console.error('Check-in failed:', err);
-                          } finally {
-                            setCheckInLoading(false);
-                          }
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                      >
-                        {checkInLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                        {checkInLoading ? 'Checking in...' : 'Confirm'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <StandardButton
-                  onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }}
+                  onClick={() => setSelectedBooking(null)}
                   variant="secondary"
                   size="md"
                   className="w-full"

@@ -21,8 +21,6 @@ import {
   CalendarDays,
   Eye,
   Edit,
-  LogIn,
-  Loader2,
   PackageIcon,
   House,
   IdCard,
@@ -68,9 +66,12 @@ import { parseLocalDate, convertTo12Hour, formatDurationDisplay, formatLocalDate
 import { guestNoteOf } from '../../utils/bookingNotes';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
-import { cardFromPayments } from '../../utils/cardLabel';
+import { cardFromPayments, formatMoney } from '../../utils/cardLabel';
 import { resolvePaymentState, statusAfterPayment } from '../../types/Bookings.types';
 import InternalNotesLog from '../../components/admin/bookings/InternalNotesLog';
+import BookingCheckInAction from '../../components/admin/bookings/BookingCheckInAction';
+import WaiverConnectionPanel from '../../components/waiver/WaiverConnectionPanel';
+import { isCheckInEligible, outstandingBalanceOf } from '../../utils/bookingCheckIn';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
 import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
 import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
@@ -124,9 +125,6 @@ const AttendantDashboard: React.FC = () => {
    const [recentBookings, setRecentBookings] = useState<any[]>([]);
    const [recentEventPurchases, setRecentEventPurchases] = useState<any[]>([]);
    const [newBookings, setNewBookings] = useState<any[]>([]);
-
-   const [checkInLoading, setCheckInLoading] = useState(false);
-   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
 
    const [showPaymentModal, setShowPaymentModal] = useState(false);
    const [paymentAmount, setPaymentAmount] = useState('');
@@ -1435,7 +1433,7 @@ const AttendantDashboard: React.FC = () => {
                                ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
                                : 'bg-rose-50 border-rose-200 hover:border-rose-300'
                            }`}
-                           onClick={() => { setSelectedBooking(booking); setShowCheckInConfirm(false); }}
+                           onClick={() => setSelectedBooking(booking)}
                          >
                            <div className="flex justify-between items-start">
                              <div>
@@ -1529,12 +1527,12 @@ const AttendantDashboard: React.FC = () => {
          )}
 
          {selectedBooking && (
-           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200" onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }}>
+           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200" onClick={() => setSelectedBooking(null)}>
              <div className="bg-white rounded-xl shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
                <div className="p-6">
                  <div className="flex justify-between items-center mb-6">
                    <h3 className="text-xl font-semibold text-gray-900">Booking Details</h3>
-                   <StandardButton variant="ghost" size="sm" icon={X} onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }} />
+                   <StandardButton variant="ghost" size="sm" icon={X} onClick={() => setSelectedBooking(null)} />
                  </div>
 
                  <div className="mb-6">
@@ -1569,6 +1567,10 @@ const AttendantDashboard: React.FC = () => {
                  <div className="mb-6">
                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm text-gray-600">Booking ID</span>
+                       <span className="font-mono font-medium text-gray-900">#{selectedBooking.id}</span>
+                     </div>
                      <div className="flex justify-between items-center">
                        <span className="text-sm text-gray-600">Reference</span>
                        <span className="font-mono font-medium text-gray-900">#{selectedBooking.reference_number}</span>
@@ -1641,6 +1643,22 @@ const AttendantDashboard: React.FC = () => {
                    </div>
                  )}
 
+                 {Array.isArray(selectedBooking.addOns || selectedBooking.add_ons) && (selectedBooking.addOns || selectedBooking.add_ons).length > 0 && (
+                   <div className="mb-6">
+                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
+                     <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                       {(selectedBooking.addOns || selectedBooking.add_ons).map((addon: any, index: number) => (
+                         <div key={addon.id ?? index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                           <span className="text-sm font-medium text-gray-900">{addon.name || 'Unknown Add-On'}</span>
+                           {(addon.quantity || addon.pivot?.quantity) && (
+                             <span className="text-sm text-gray-600 ml-4">Qty: {addon.quantity || addon.pivot?.quantity}</span>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
                  <div className="mb-6">
                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment</h4>
                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1654,6 +1672,12 @@ const AttendantDashboard: React.FC = () => {
                          {resolvePaymentState(selectedBooking).label}
                        </span>
                      </div>
+                     {outstandingBalanceOf(selectedBooking) !== null && (
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Balance Due</span>
+                         <span className="text-sm font-medium text-red-600">{formatMoney(outstandingBalanceOf(selectedBooking))}</span>
+                       </div>
+                     )}
                      {cardFromPayments(selectedBooking.payments) && (
                        <div className="flex justify-between items-center">
                          <span className="text-sm text-gray-600">Card</span>
@@ -1694,9 +1718,12 @@ const AttendantDashboard: React.FC = () => {
                    </div>
                  )}
 
+                 <div className="mb-6">
+                   <WaiverConnectionPanel type="booking" id={Number(selectedBooking.id)} compact checkInActions={false} />
+                 </div>
 
                  <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
-                   <div className="flex gap-2">
+                   <div className="flex flex-wrap gap-2">
                      <Link
                        to={`/bookings/${selectedBooking.id}?from=dashboard`}
                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -1713,16 +1740,19 @@ const AttendantDashboard: React.FC = () => {
                        <Edit size={15} />
                        Edit
                      </Link>
-                     {selectedBooking.status?.toLowerCase() !== 'checked-in' && selectedBooking.status?.toLowerCase() !== 'completed' && selectedBooking.status?.toLowerCase() !== 'cancelled' && selectedBooking.payment_status?.toLowerCase() === 'paid' && (
-                       !showCheckInConfirm ? (
-                         <button
-                           onClick={() => setShowCheckInConfirm(true)}
-                           className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
-                         >
-                           <LogIn size={15} />
-                           Check In
-                         </button>
-                       ) : null
+                     {isCheckInEligible(selectedBooking) && (
+                       <BookingCheckInAction
+                         key={selectedBooking.id}
+                         booking={selectedBooking}
+                         onCheckedIn={patch => {
+                           const bookingId = selectedBooking.id;
+                           // the quick view may have been closed or moved to another booking while the request ran
+                           setSelectedBooking((current: any) =>
+                             current && current.id === bookingId ? { ...current, ...patch } : current
+                           );
+                           patchBooking(bookingId, { ...patch });
+                         }}
+                       />
                      )}
                      {selectedBooking.status?.toLowerCase() !== 'checked-in' && selectedBooking.status?.toLowerCase() !== 'completed' && selectedBooking.status?.toLowerCase() !== 'cancelled' && selectedBooking.payment_status?.toLowerCase() !== 'paid' && (
                        <button
@@ -1751,42 +1781,8 @@ const AttendantDashboard: React.FC = () => {
                      )}
                    </div>
 
-                   {showCheckInConfirm && (
-                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                       <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
-                       <div className="flex gap-2">
-                         <button
-                           onClick={() => setShowCheckInConfirm(false)}
-                           className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                         >
-                           Cancel
-                         </button>
-                         <button
-                           disabled={checkInLoading}
-                           onClick={async () => {
-                             setCheckInLoading(true);
-                             try {
-                               await bookingService.checkInBooking(selectedBooking.reference_number, getStoredUser()?.id);
-                               setSelectedBooking({ ...selectedBooking, status: 'checked-in' });
-                               patchBooking(selectedBooking.id, { status: 'checked-in' });
-                               setShowCheckInConfirm(false);
-                             } catch (err) {
-                               console.error('Check-in failed:', err);
-                             } finally {
-                               setCheckInLoading(false);
-                             }
-                           }}
-                           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                         >
-                           {checkInLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                           {checkInLoading ? 'Checking in...' : 'Confirm'}
-                         </button>
-                       </div>
-                     </div>
-                   )}
-
                    <StandardButton
-                     onClick={() => { setSelectedBooking(null); setShowCheckInConfirm(false); }}
+                     onClick={() => setSelectedBooking(null)}
                      variant="secondary"
                      size="md"
                      className="w-full"
