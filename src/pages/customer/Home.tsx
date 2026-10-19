@@ -41,6 +41,7 @@ import NotFound from '../NotFound';
 import LocationUnavailable from '../../components/customer/LocationUnavailable';
 import StaffPreviewBanner from '../../components/customer/StaffPreviewBanner';
 import { hasStaffSession } from '../../utils/staffSession';
+import { monthlyPatternLabel } from '../../utils/packageSchedule';
 // import MembershipCarousel from '../../components/customer/MembershipCarousel';
 
 
@@ -169,7 +170,10 @@ const attractionViewFields = (src: AttractionScalars): AttractionViewFields => (
 });
 
 const attractionOverrides = (attr: GroupedAttraction): Record<number, Partial<Attraction>> =>
-  byLocation(attr.locations.filter(carriesLocationScalars), attractionViewFields);
+  byLocation(attr.locations, loc => ({
+    ...(carriesLocationScalars(loc) ? attractionViewFields(loc) : {}),
+    ...(loc.availability !== undefined ? { availability: loc.availability ?? [] } : {}),
+  }));
 
 interface PackageScalars {
   description?: string;
@@ -219,7 +223,10 @@ const packageViewFields = (src: PackageScalars): PackageViewFields => {
 };
 
 const packageOverrides = (pkg: GroupedPackage): Record<number, Partial<PackageType>> =>
-  byLocation(pkg.locations.filter(carriesLocationScalars), packageViewFields);
+  byLocation(pkg.locations, loc => ({
+    ...(carriesLocationScalars(loc) ? packageViewFields(loc) : {}),
+    ...(loc.availability_schedules !== undefined ? { availability_schedules: loc.availability_schedules } : {}),
+  }));
 
 interface EventScalars {
   description?: string | null;
@@ -851,13 +858,13 @@ const EntertainmentLandingPage = () => {
   };
 
   const packageCTB = (pkg: PackageType, locationId?: number | null) =>
-    itemCallToBookAt(pkg.callToBookByLocation, packageIsCallToBook(pkg.availability_schedules), locationId ?? activeLocation?.id ?? null);
+    itemCallToBookAt(pkg.callToBookByLocation, packageIsCallToBook(pkg.availability_schedules), locationId ?? viewedLocationId);
 
   const attractionCTB = (attraction: Attraction, locationId?: number | null) =>
-    itemCallToBookAt(attraction.callToBookByLocation, attractionIsCallToBook(attraction.availability), locationId ?? activeLocation?.id ?? null);
+    itemCallToBookAt(attraction.callToBookByLocation, attractionIsCallToBook(attraction.availability), locationId ?? viewedLocationId);
 
   const eventCTB = (evt: DisplayEvent, locationId?: number | null) =>
-    itemCallToBookAt(evt.callToBookByLocation, eventIsCallToBook(evt), locationId ?? activeLocation?.id ?? null);
+    itemCallToBookAt(evt.callToBookByLocation, eventIsCallToBook(evt), locationId ?? viewedLocationId);
 
   const imageFor = (item: { image?: string | null; imageByLocation?: Record<number, string | null> }) => {
     if (viewedLocationId !== null) {
@@ -2417,9 +2424,9 @@ const EntertainmentLandingPage = () => {
               )}
 
               {Array.isArray(selectedPackage.availability_schedules)
-                && selectedPackage.availability_schedules.some(s =>
-                  (Array.isArray(s.day_configuration) && s.day_configuration.length > 0)
-                  || s.availability_type === 'daily') && (
+                && selectedPackage.availability_schedules.some(s => s.is_active !== false
+                  && ((Array.isArray(s.day_configuration) && s.day_configuration.length > 0)
+                  || s.availability_type === 'daily')) && (
               <div className="mb-5">
                 <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-800" />
@@ -2429,14 +2436,15 @@ const EntertainmentLandingPage = () => {
                   <>
                     <div className="space-y-2 mb-4">
                       {selectedPackage.availability_schedules.map((schedule, index) => (
-                        (schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0)
-                          || schedule.availability_type === 'daily' ? (
+                        schedule.is_active !== false
+                          && ((schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0)
+                          || schedule.availability_type === 'daily') ? (
                           <div key={index} className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
                             <div className="flex flex-wrap gap-1 mb-2">
                               {(schedule.day_configuration ?? []).length > 0
                                 ? (schedule.day_configuration ?? []).map((day) => (
                                     <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
-                                      {day.substring(0, 3)}
+                                      {schedule.availability_type === 'monthly' ? monthlyPatternLabel(day, true) : day.substring(0, 3)}
                                     </span>
                                   ))
                                 : (

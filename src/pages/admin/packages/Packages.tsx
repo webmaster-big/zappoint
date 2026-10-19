@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, EyeOff, Globe, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical, CalendarDays, DoorOpen } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
@@ -10,6 +10,7 @@ import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { createSlugWithId } from '../../../utils/slug';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { requestErrorMessage } from '../../../utils/requestError';
 
 interface UserData {
   name: string;
@@ -37,6 +38,8 @@ const Packages: React.FC = () => {
   const [selectedForExport, setSelectedForExport] = useState<number[]>([]);
   const [importData, setImportData] = useState<string>("");
   const [importLocationId, setImportLocationId] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importingRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -45,6 +48,10 @@ const Packages: React.FC = () => {
   const [showBulkMinNoticeModal, setShowBulkMinNoticeModal] = useState(false);
   const [bulkMinNoticeHours, setBulkMinNoticeHours] = useState<string>("");
   const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  useEffect(() => {
+    setSelectedForBulkUpdate([]);
+  }, [effectiveLocationId]);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showDuplicateLocationModal, setShowDuplicateLocationModal] = useState(false);
@@ -291,8 +298,8 @@ const Packages: React.FC = () => {
         })
       );
       alert('Display order updated successfully!');
-    } catch {
-      alert('Failed to update display order. Please try again.');
+    } catch (err) {
+      alert(requestErrorMessage(err, 'Failed to update display order. Please try again.'));
     }
   };
 
@@ -338,6 +345,10 @@ const Packages: React.FC = () => {
   };
 
   const handleImport = async () => {
+    if (importingRef.current) return;
+    importingRef.current = true;
+    setImporting(true);
+
     try {
       const parsedData = JSON.parse(importData);
       
@@ -394,12 +405,19 @@ const Packages: React.FC = () => {
 
       const response = await packageService.bulkImport(packagesForImport);
       
-      const allPackages = await packageService.getAllPackages({ user_id: getStoredUser()?.id });
-      await packageCacheService.cachePackages(allPackages);
-      setPackages(allPackages.filter((pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at));
-      
       setShowImportModal(false);
       setImportData('');
+      
+      let listRefreshed = true;
+      try {
+        const allPackages = await packageService.getAllPackages({ user_id: getStoredUser()?.id });
+        await packageCacheService.cachePackages(allPackages);
+        setPackages(allPackages.filter((pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at));
+      } catch (refreshError) {
+        console.error('Could not refresh packages after the import:', refreshError);
+        listRefreshed = false;
+      }
+      const refreshNote = listRefreshed || (response.data.imported_count || 0) === 0 ? '' : '\n\nThe list could not refresh. Reload the page to see the imported packages - do not import the file again.';
       
       const successCount = response.data.imported_count || 0;
       const failedCount = response.data.failed_count || 0;
@@ -413,13 +431,16 @@ const Packages: React.FC = () => {
       if (failedCount > 0) {
         console.error('Import errors:', response.errors);
         const reasons = (response.errors ?? []).slice(0, 3).map(item => `- ${item.name}: ${item.error}`).join('\n');
-        alert(`Imported ${successCount} package(s). ${failedCount} failed.${reasons ? `\n\n${reasons}` : ' Check console for details.'}`);
+        alert(`Imported ${successCount} package(s). ${failedCount} failed.${reasons ? `\n\n${reasons}` : ' Check console for details.'}${refreshNote}`);
       } else {
-        alert(`Successfully imported ${successCount} package(s)!`);
+        alert(`Successfully imported ${successCount} package(s)!${refreshNote}`);
       }
     } catch (error) {
       console.error('Import error:', error);
-      alert('Error importing packages. Please check the format and try again.');
+      alert(requestErrorMessage(error, 'Error importing packages. Please check the format and try again.'));
+    } finally {
+      importingRef.current = false;
+      setImporting(false);
     }
   };
 
@@ -440,11 +461,12 @@ const Packages: React.FC = () => {
       try {
         await packageService.deletePackage(id);
         setPackages(prev => prev.filter(pkg => pkg.id !== id));
+        setSelectedForBulkUpdate(prev => prev.filter(selectedId => selectedId !== id));
         await packageCacheService.removePackageFromCache(id);
         alert('Package deleted successfully!');
       } catch (err) {
         console.error('Error deleting package:', err);
-        alert('Failed to delete package. Please try again.');
+        alert(requestErrorMessage(err, 'Failed to delete package. Please try again.'));
       }
     }
   };
@@ -462,7 +484,7 @@ const Packages: React.FC = () => {
       alert(`Package ${statusText} successfully!`);
     } catch (err) {
       console.error('Error toggling package status:', err);
-      alert('Failed to update package status. Please try again.');
+      alert(requestErrorMessage(err, 'Failed to update package status. Please try again.'));
     }
   };
 
@@ -603,7 +625,10 @@ const Packages: React.FC = () => {
       const response = await packageService.bulkUpdateMinNotice(selectedForBulkUpdate, minHours);
       
       if (response.success) {
-        const responseData = response.data as unknown as { packages?: Package[] } | Package[];
+        const responseData = response.data as unknown as { packages?: Package[]; package_ids?: number[] } | Package[];
+        const changedIds = !Array.isArray(responseData) && Array.isArray(responseData?.package_ids)
+          ? responseData.package_ids.map(Number)
+          : selectedForBulkUpdate;
         const updatedPackages: Package[] = Array.isArray(responseData) 
           ? responseData 
           : (responseData?.packages || []);
@@ -619,21 +644,24 @@ const Packages: React.FC = () => {
           }
         } else {
           setPackages(prev => prev.map(pkg => {
-            if (selectedForBulkUpdate.includes(pkg.id)) {
+            if (changedIds.includes(pkg.id)) {
               return { ...pkg, min_booking_notice_hours: minHours };
             }
             return pkg;
           }));
         }
         
-        alert(`Advance booking time updated successfully for ${selectedForBulkUpdate.length} package(s)!`);
+        const skipped = selectedForBulkUpdate.length - changedIds.length;
+        alert(skipped > 0
+          ? `Advance booking time updated for ${changedIds.length} package(s). ${skipped} could not be changed: they may have been deleted, or belong to a location you don't manage.`
+          : `Advance booking time updated successfully for ${changedIds.length} package(s)!`);
         setShowBulkMinNoticeModal(false);
         setSelectedForBulkUpdate([]);
         setBulkMinNoticeHours("");
       }
     } catch (err) {
       console.error('Error bulk updating packages:', err);
-      alert('Failed to update packages. Please try again.');
+      alert(requestErrorMessage(err, 'Failed to update packages. Please try again.'));
     } finally {
       setBulkUpdating(false);
     }
@@ -1246,12 +1274,12 @@ const Packages: React.FC = () => {
               </StandardButton>
               <StandardButton
                 onClick={handleImport}
-                disabled={!importData.trim() || (isCompanyAdmin && allLocations.length > 1 && !importLocationId)}
+                disabled={importing || !importData.trim() || (isCompanyAdmin && allLocations.length > 1 && !importLocationId)}
                 variant="primary"
                 size="md"
                 icon={Upload}
               >
-                Import Packages
+                {importing ? 'Importing…' : 'Import Packages'}
               </StandardButton>
             </div>
           </div>

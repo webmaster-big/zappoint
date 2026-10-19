@@ -1,3 +1,6 @@
+import { scheduleMatchesDate } from './packageSchedule';
+import { scheduleWindowMinutes } from './timeSlots';
+
 export function parseLocalDate(isoDateString: string): Date {
   if (!isoDateString) return new Date();
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -223,6 +226,12 @@ function timeToMinutes(time: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
+function windowEndMinute(start: string, end: string): number {
+  const length = scheduleWindowMinutes(start, end);
+  if (length === null) return timeToMinutes(end);
+  return timeToMinutes(start) + (length === 0 ? 24 * 60 : length);
+}
+
 export function getUpcomingAttractionSessions(
   schedules: { days: string[]; start_time: string; end_time: string }[],
   count = 5,
@@ -244,7 +253,7 @@ export function getUpcomingAttractionSessions(
       const matchesDay = schedule.days.some(d => d.toLowerCase() === dayNameFull);
       if (!matchesDay) continue;
       
-      const endMin = timeToMinutes(schedule.end_time);
+      const endMin = windowEndMinute(schedule.start_time, schedule.end_time);
       const startMin = timeToMinutes(schedule.start_time);
       const isToday = offset === 0;
       const hasEnded = isToday && currentMinutes >= endMin;
@@ -268,6 +277,7 @@ export function getUpcomingAttractionSessions(
         hasEnded,
         hasStarted,
       });
+      break;
     }
   }
   
@@ -281,7 +291,7 @@ export function getUpcomingAttractionSessions(
 }
 
 export function getUpcomingPackageSessions(
-  schedules: { day_configuration: string[]; time_slot_start: string; time_slot_end: string; is_active?: boolean }[],
+  schedules: { availability_type?: string | null; day_configuration?: string[] | null; time_slot_start: string; time_slot_end: string; is_active?: boolean; priority?: number | null }[],
   count = 5,
 ): UpcomingSession[] {
   if (!schedules || schedules.length === 0) return [];
@@ -293,40 +303,39 @@ export function getUpcomingPackageSessions(
   for (let offset = 0; offset < 14 && sessions.length < count; offset++) {
     const targetDate = new Date(mi.year, mi.month - 1, mi.day + offset);
     const targetDow = targetDate.getDay();
-    const dayNameFull = DAY_NAMES_FULL[targetDow];
+    const schedule = schedules
+      .filter(candidate => candidate.is_active !== false
+        && scheduleMatchesDate({ availability_type: candidate.availability_type ?? 'weekly', day_configuration: candidate.day_configuration }, targetDate))
+      .reduce<(typeof schedules)[number] | null>((chosen, candidate) => (
+        chosen === null || Number(candidate.priority ?? 0) > Number(chosen.priority ?? 0) ? candidate : chosen
+      ), null);
     
-    for (const schedule of schedules) {
-      if (schedule.is_active === false) continue;
-      if (!schedule.day_configuration || !Array.isArray(schedule.day_configuration)) continue;
-      
-      const matchesDay = schedule.day_configuration.some(d => d.toLowerCase() === dayNameFull);
-      if (!matchesDay) continue;
-      
-      const endMin = timeToMinutes(schedule.time_slot_end);
-      const startMin = timeToMinutes(schedule.time_slot_start);
-      const isToday = offset === 0;
-      const hasEnded = isToday && currentMinutes >= endMin;
-      const hasStarted = isToday && currentMinutes >= startMin;
-      
-      let label: string;
-      if (isToday) {
-        label = `Today (${DAY_NAMES_SHORT[targetDow]})`;
-      } else if (offset === 1) {
-        label = `Tomorrow (${DAY_NAMES_SHORT[targetDow]})`;
-      } else {
-        label = `${DAY_NAMES_SHORT[targetDow]}, ${MONTH_NAMES_SHORT[targetDate.getMonth()]} ${targetDate.getDate()}`;
-      }
-      
-      sessions.push({
-        label,
-        startTime: convertTo12Hour(schedule.time_slot_start),
-        endTime: convertTo12Hour(schedule.time_slot_end),
-        sortDate: targetDate,
-        isToday,
-        hasEnded,
-        hasStarted,
-      });
+    if (!schedule) continue;
+    
+    const endMin = windowEndMinute(schedule.time_slot_start, schedule.time_slot_end);
+    const startMin = timeToMinutes(schedule.time_slot_start);
+    const isToday = offset === 0;
+    const hasEnded = isToday && currentMinutes >= endMin;
+    const hasStarted = isToday && currentMinutes >= startMin;
+    
+    let label: string;
+    if (isToday) {
+      label = `Today (${DAY_NAMES_SHORT[targetDow]})`;
+    } else if (offset === 1) {
+      label = `Tomorrow (${DAY_NAMES_SHORT[targetDow]})`;
+    } else {
+      label = `${DAY_NAMES_SHORT[targetDow]}, ${MONTH_NAMES_SHORT[targetDate.getMonth()]} ${targetDate.getDate()}`;
     }
+    
+    sessions.push({
+      label,
+      startTime: convertTo12Hour(schedule.time_slot_start),
+      endTime: convertTo12Hour(schedule.time_slot_end),
+      sortDate: targetDate,
+      isToday,
+      hasEnded,
+      hasStarted,
+    });
   }
   
   sessions.sort((a, b) => {

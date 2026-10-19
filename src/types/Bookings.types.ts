@@ -216,7 +216,7 @@ const toCents = (value: number | string | null | undefined): number => {
 };
 
 export const statusAfterPayment = (current: string | null | undefined): 'confirmed' | undefined =>
-  current === 'checked-in' || current === 'completed' ? undefined : 'confirmed';
+  current === 'checked-in' || current === 'completed' || current === 'cancelled' ? undefined : 'confirmed';
 
 export const resolvePaymentState = (input: {
   payment_status?: string | null;

@@ -9,6 +9,7 @@ import { useLocationScope } from '../../../contexts/LocationContext';
 import { createSlugWithId } from '../../../utils/slug';
 import Toast from '../../../components/ui/Toast';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { requestErrorMessage } from '../../../utils/requestError';
 
 const packageTypeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
   custom: { label: 'Custom', icon: Sparkles, color: 'text-blue-600', bgColor: 'bg-blue-50' },
@@ -177,7 +178,7 @@ const CustomPackages: React.FC = () => {
         setToast({ message: 'Package deleted successfully!', type: 'success' });
       } catch (err) {
         console.error('Error deleting package:', err);
-        setToast({ message: 'Failed to delete package. Please try again.', type: 'error' });
+        setToast({ message: requestErrorMessage(err, 'Failed to delete package. Please try again.'), type: 'error' });
       }
     }
   };
@@ -196,7 +197,7 @@ const CustomPackages: React.FC = () => {
       setToast({ message: `Package ${statusText} successfully!`, type: 'success' });
     } catch (err) {
       console.error('Error toggling package status:', err);
-      setToast({ message: 'Failed to update package status. Please try again.', type: 'error' });
+      setToast({ message: requestErrorMessage(err, 'Failed to update package status. Please try again.'), type: 'error' });
     }
   };
 

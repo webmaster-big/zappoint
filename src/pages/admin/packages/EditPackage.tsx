@@ -1370,7 +1370,7 @@ const EditPackage: React.FC = () => {
                                                                     onClick={() => {
                                                                         updateSchedule(index, {
                                                                             availability_type: type,
-                                                                            day_configuration: type === 'daily' ? null : schedule.day_configuration
+                                                                            day_configuration: type === schedule.availability_type ? schedule.day_configuration : null
                                                                         });
                                                                     }}
                                                                 >

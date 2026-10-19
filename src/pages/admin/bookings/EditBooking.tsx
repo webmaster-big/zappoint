@@ -28,6 +28,7 @@ import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/s
 import type { AppliedFee } from '../../../utils/fees';
 import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns } from '../../../utils/addOnQuantity';
 import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
+import { scheduleMatchesDate } from '../../../utils/packageSchedule';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -653,19 +654,6 @@ const EditBooking: React.FC = () => {
 
   const selectedSlotIsBlocked = displayedTimeSlots.some(slot => slot.blocked && slot.start_time === formData.time);
 
-  const getWeekOfMonth = (date: Date): number => {
-    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const dayOfMonth = date.getDate();
-    const firstDayWeekday = firstDayOfMonth.getDay();
-    return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
-  };
-
-  const isLastWeekOfMonth = (date: Date): boolean => {
-    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
-    return daysUntilEndOfMonth < 7;
-  };
-
   useEffect(() => {
     if (!packageDetails) return;
 
@@ -685,40 +673,10 @@ const EditBooking: React.FC = () => {
 
       if (packageDetails.availability_schedules && packageDetails.availability_schedules.length > 0) {
         for (const schedule of packageDetails.availability_schedules) {
-          if (!schedule.is_active) continue;
-
-          if (schedule.availability_type === "daily") {
+          if (schedule.is_active && scheduleMatchesDate(schedule, date)) {
             isAvailable = true;
             break;
-          } else if (schedule.availability_type === "weekly") {
-            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
-            if (schedule.day_configuration && schedule.day_configuration.includes(dayName)) {
-              isAvailable = true;
-              break;
-            }
-          } else if (schedule.availability_type === "monthly") {
-            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
-            const weekOfMonth = getWeekOfMonth(date);
-            const isInLastWeek = isLastWeekOfMonth(date);
-
-            if (schedule.day_configuration) {
-              for (const pattern of schedule.day_configuration) {
-                const [day, week] = pattern.split('-');
-                if (day === dayName) {
-                  if ((week === 'last' && isInLastWeek) ||
-                      (week === 'first' && weekOfMonth === 1) ||
-                      (week === 'second' && weekOfMonth === 2) ||
-                      (week === 'third' && weekOfMonth === 3) ||
-                      (week === 'fourth' && weekOfMonth === 4)) {
-                    isAvailable = true;
-                    break;
-                  }
-                }
-              }
-            }
           }
-
-          if (isAvailable) break;
         }
       }
 

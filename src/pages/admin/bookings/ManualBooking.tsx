@@ -43,6 +43,8 @@ import customFieldService, {
   type ApplicableCustomField,
 } from '../../../services/CustomFieldService';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { scheduleMatchesDate } from '../../../utils/packageSchedule';
+import { requestErrorMessage } from '../../../utils/requestError';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -181,19 +183,6 @@ const ManualBooking: React.FC = () => {
     guestZip: '',
     guestCountry: ''
   });
-
-  const getWeekOfMonth = (date: Date): number => {
-    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const dayOfMonth = date.getDate();
-    const firstDayWeekday = firstDayOfMonth.getDay();
-    return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
-  };
-
-  const isLastWeekOfMonth = (date: Date): boolean => {
-    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
-    return daysUntilEndOfMonth < 7;
-  };
 
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string, roomId?: number | null): boolean => {
     if (!form.bookingDate || dayOffsWithTime.length === 0 || !pkg) return false;
@@ -425,51 +414,10 @@ const ManualBooking: React.FC = () => {
       
       if (pkg.availability_schedules && pkg.availability_schedules.length > 0) {
         for (const schedule of pkg.availability_schedules) {
-          if (!schedule.is_active) continue;
-          
-          if (schedule.availability_type === "daily") {
+          if (schedule.is_active && scheduleMatchesDate(schedule, date)) {
             isAvailable = true;
             break;
-          } 
-          else if (schedule.availability_type === "weekly") {
-            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
-            if (schedule.day_configuration && schedule.day_configuration.includes(dayName)) {
-              isAvailable = true;
-              break;
-            }
-          } 
-          else if (schedule.availability_type === "monthly") {
-            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
-            const weekOfMonth = getWeekOfMonth(date);
-            const isInLastWeek = isLastWeekOfMonth(date);
-            
-            if (schedule.day_configuration) {
-              for (const pattern of schedule.day_configuration) {
-                const [day, week] = pattern.split('-');
-                
-                if (day === dayName) {
-                  if (week === 'last' && isInLastWeek) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'first' && weekOfMonth === 1) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'second' && weekOfMonth === 2) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'third' && weekOfMonth === 3) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'fourth' && weekOfMonth === 4) {
-                    isAvailable = true;
-                    break;
-                  }
-                }
-              }
-            }
           }
-          
-          if (isAvailable) break;
         }
       }
       
@@ -661,14 +609,16 @@ const ManualBooking: React.FC = () => {
     try {
       setCreatingRoom(true);
       const user = getStoredUser();
-      
-      if (!user?.location_id) {
+      const packageLocationId = pkg && Number(pkg.id) === Number(form.packageId) ? pkg.location_id : null;
+      const roomLocationId = packageLocationId || effectiveLocationId || user?.location_id;
+
+      if (!roomLocationId) {
         setToast({ message: 'User location not found', type: 'error' });
         return;
       }
 
       const response = await roomService.createRoom({
-        location_id: user.location_id,
+        location_id: roomLocationId,
         name: roomName.trim(),
         is_available: true
       });
@@ -682,6 +632,9 @@ const ManualBooking: React.FC = () => {
             });
           } catch (error) {
             console.error('Error linking space to package:', error);
+            const reason = requestErrorMessage(error, '');
+            setToast({ message: `The space "${roomName.trim()}" was created but could not be added to this package.${reason ? ` ${reason}` : ''}`, type: 'error' });
+            return;
           }
         }
 

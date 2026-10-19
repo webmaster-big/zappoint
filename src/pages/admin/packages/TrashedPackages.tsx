@@ -9,6 +9,7 @@ import { getStoredUser } from "../../../utils/storage";
 import { useLocationScope } from '../../../contexts/LocationContext';
 import Toast from '../../../components/ui/Toast';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { requestErrorMessage } from '../../../utils/requestError';
 
 interface UserData {
   name: string;
@@ -152,7 +153,7 @@ const TrashedPackages: React.FC = () => {
       setToast({ message: `Package "${pkg.name}" restored successfully!`, type: 'success' });
     } catch (err) {
       console.error('Error restoring package:', err);
-      setToast({ message: 'Failed to restore package. Please try again.', type: 'error' });
+      setToast({ message: requestErrorMessage(err, 'Failed to restore package. Please try again.'), type: 'error' });
     } finally {
       setActionLoading(null);
     }
@@ -171,7 +172,7 @@ const TrashedPackages: React.FC = () => {
       setShowForceDeleteModal(null);
     } catch (err) {
       console.error('Error permanently deleting package:', err);
-      setToast({ message: 'Failed to permanently delete package. Please try again.', type: 'error' });
+      setToast({ message: requestErrorMessage(err, 'Failed to permanently delete package. Please try again.'), type: 'error' });
     } finally {
       setActionLoading(null);
     }

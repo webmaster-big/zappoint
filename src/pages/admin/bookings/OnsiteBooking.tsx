@@ -66,6 +66,7 @@ import customFieldService, {
   type ApplicableCustomField,
 } from '../../../services/CustomFieldService';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { scheduleMatchesDate } from '../../../utils/packageSchedule';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -856,20 +857,6 @@ const OnsiteBooking: React.FC = () => {
     };
   }, [gatewayLocationId]);
 
-  const getWeekOfMonth = (date: Date): number => {
-    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const dayOfMonth = date.getDate();
-    const firstDayWeekday = firstDayOfMonth.getDay();
-    
-    return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
-  };
-
-  const isLastWeekOfMonth = (date: Date): boolean => {
-    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
-    return daysUntilEndOfMonth < 7;
-  };
-
   useEffect(() => {
     if (!selectedPackage) {
       console.log('⚠️ No selected package, skipping date calculation');
@@ -895,54 +882,10 @@ const OnsiteBooking: React.FC = () => {
       
       if (selectedPackage.availability_schedules && selectedPackage.availability_schedules.length > 0) {
         for (const schedule of selectedPackage.availability_schedules) {
-          if (!schedule.is_active) continue;
-          
-          if (schedule.availability_type === "daily") {
+          if (schedule.is_active && scheduleMatchesDate(schedule, date)) {
             isAvailable = true;
             break;
-          } 
-          else if (schedule.availability_type === "weekly") {
-            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
-            if (i < 7) {
-              console.log(`📅 Checking ${date.toDateString()} (${dayName}) against schedule:`, schedule.day_configuration);
-            }
-            if (schedule.day_configuration && schedule.day_configuration.includes(dayName)) {
-              isAvailable = true;
-              break;
-            }
-          } 
-          else if (schedule.availability_type === "monthly") {
-            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
-            const weekOfMonth = getWeekOfMonth(date);
-            const isInLastWeek = isLastWeekOfMonth(date);
-            
-            if (schedule.day_configuration) {
-              for (const pattern of schedule.day_configuration) {
-                const [day, week] = pattern.split('-');
-                
-                if (day === dayName) {
-                  if (week === 'last' && isInLastWeek) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'first' && weekOfMonth === 1) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'second' && weekOfMonth === 2) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'third' && weekOfMonth === 3) {
-                    isAvailable = true;
-                    break;
-                  } else if (week === 'fourth' && weekOfMonth === 4) {
-                    isAvailable = true;
-                    break;
-                  }
-                }
-              }
-            }
           }
-          
-          if (isAvailable) break;
         }
       }
       

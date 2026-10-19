@@ -23,6 +23,8 @@ import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeForma
 import { normalizeCategory } from '../../../utils/venueCategories';
 import { startCadenceLabel } from '../../../components/admin/packages/ScheduleStartTimes';
 import { DEFAULT_SLOT_CLEANUP_MINUTES } from '../../../utils/timeSlots';
+import { monthlyPatternLabel } from '../../../utils/packageSchedule';
+import { requestErrorMessage } from '../../../utils/requestError';
 
 const PackageDetails = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -78,7 +80,7 @@ const PackageDetails = () => {
         setTimeout(() => navigate('/packages'), 1500);
       } catch (error) {
         console.error('Error deleting package:', error);
-        setToast({ message: 'Failed to delete package', type: 'error' });
+        setToast({ message: requestErrorMessage(error, 'Failed to delete package'), type: 'error' });
       }
     }
   };
@@ -357,7 +359,7 @@ const PackageDetails = () => {
                         {Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0 ? (
                           schedule.day_configuration.map((day: string) => (
                             <span key={day} className={`px-2 py-1 bg-${fullColor} text-white text-xs font-medium rounded capitalize`}>
-                              {day}
+                              {schedule.availability_type === 'monthly' ? monthlyPatternLabel(day) : day}
                             </span>
                           ))
                         ) : schedule.availability_type === 'daily' ? (
