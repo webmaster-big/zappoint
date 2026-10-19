@@ -24,12 +24,6 @@ const carouselSlides = [
   },
   {
     step: '03',
-    title: 'Gift Cards',
-    description: 'Browse available gift cards by location, purchase one for yourself or someone else, and redeem the code when booking your next visit.',
-    features: ['Browse & purchase cards', 'Copy redemption code', 'Redeem on your next visit'],
-  },
-  {
-    step: '04',
     title: 'Your Reservations',
     description: 'See all upcoming and past bookings in one place. View booking details, get your QR code for check-in, and stay updated with notifications.',
     features: ['View booking details', 'QR code check-in', 'Booking notifications'],

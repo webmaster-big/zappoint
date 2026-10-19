@@ -76,7 +76,6 @@ import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLog
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 import ManageAddOns from "./pages/admin/packages/AddOns";
 import CustomerReservations from "./pages/customer/CustomerReservation";
-import CustomerGiftCards from './pages/customer/CustomerGiftCards';
 import CustomerNotifications from "./pages/customer/CustomerNotifications";
 import CustomerLayout from "./layouts/CustomerLayout";
 import Settings from "./pages/admin/Settings";
@@ -224,7 +223,6 @@ function App() {
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_reservations" /><CustomerReservations /></></CustomerProtectedRoute>} />
           <Route path="/customer/attractions" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_attractions" /><MyAttractions /></></CustomerProtectedRoute>} />
           <Route path="/customer/events" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_events" /><MyEvents /></></CustomerProtectedRoute>} />
-          <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_gift_cards" /><CustomerGiftCards /></></CustomerProtectedRoute>} />
           <Route path="/customer/notifications" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_notifications" /><CustomerNotifications /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_membership" /><MyMembership /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership/purchase" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_purchase" /><PurchaseMembership /></></CustomerProtectedRoute>} />
