@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ClipboardList,
   Pencil,
   Trash2,
   Calendar,
@@ -67,6 +68,7 @@ const Events = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
   const currentUser = getStoredUser();
+  const canManageRegistrations = currentUser?.role === 'company_admin' || currentUser?.role === 'location_manager';
   const { effectiveLocationId } = useLocationScope();
   const selectedLocation = effectiveLocationId;
 
@@ -615,6 +617,16 @@ const Events = () => {
             >
               <Pencil className="h-4 w-4" />
             </button>
+            {canManageRegistrations && (
+              <button
+                onClick={() => navigate(`/registration-events?from_event=${event.id}`)}
+                className="text-gray-600 hover:text-gray-800"
+                title="Registration form"
+                aria-label={`Registration form for ${event.name}`}
+              >
+                <ClipboardList className="h-4 w-4" />
+              </button>
+            )}
             <StandardButton
               onClick={() => handleDelete(event.id)}
               disabled={deletingId === event.id}

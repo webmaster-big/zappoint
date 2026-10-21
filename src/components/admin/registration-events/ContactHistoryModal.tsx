@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { History, Loader2, X } from 'lucide-react';
+import StandardButton from '../../ui/StandardButton';
 import eventRegistrationService from '../../../services/EventRegistrationService';
 import type { RegistrationHistoryResponse } from '../../../types/eventRegistration.types';
 import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import { formatPhoneForDisplay } from '../../../utils/bookingSearch';
 import { locationDisplayName } from '../../../utils/locationName';
-import { LAST_YEAR_CHIP, REGISTERED_BEFORE_CHIP, describeFailure } from './registrationEventUi';
+import { LAST_YEAR_CHIP, THIS_FORM_CHIP, describeFailure } from './registrationEventUi';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 
 interface ContactHistoryModalProps {
   eventId: number;
@@ -14,6 +16,7 @@ interface ContactHistoryModalProps {
 }
 
 const ContactHistoryModal = ({ eventId, contactId, onClose }: ContactHistoryModalProps) => {
+  const { themeColor } = useThemeColor();
   const [history, setHistory] = useState<RegistrationHistoryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,41 +47,50 @@ const ContactHistoryModal = ({ eventId, contactId, onClose }: ContactHistoryModa
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] flex flex-col"
+        className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col relative animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="registration-history-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="border-b border-gray-100 px-5 py-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 id="registration-history-title" className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <History className="h-5 w-5 text-gray-500" aria-hidden="true" />
-              Registration history
-            </h2>
-            <p className="text-sm text-gray-600 mt-0.5">Shows registrations only — not who attended.</p>
+        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`p-2 rounded-lg bg-${themeColor}-100 flex-shrink-0`}>
+              <History className={`w-5 h-5 text-${themeColor}-600`} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <h3 id="registration-history-title" className="text-lg font-bold text-gray-900">
+                Registration History
+              </h3>
+              <p className="text-xs text-gray-500">Shows registrations only — not who attended.</p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100">
-            <X size={18} />
-          </button>
+          <StandardButton
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            icon={X}
+            title="Close"
+            className="text-gray-400 hover:text-gray-600"
+          />
         </div>
 
-        <div className="p-5 overflow-y-auto space-y-4">
+        <div className="px-6 py-5 overflow-y-auto space-y-4">
           {error ? (
             <p className="text-sm text-red-700" role="alert">{error}</p>
           ) : !history ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500" role="status">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              Loading…
+            <div className="py-12 flex justify-center" role="status">
+              <Loader2 className={`w-6 h-6 animate-spin text-${themeColor}-600`} aria-hidden="true" />
+              <span className="sr-only">Loading…</span>
             </div>
           ) : (
             <>
-              <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-0.5">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-0.5">
                 <p className="font-medium text-gray-900 break-all">{history.contact.email}</p>
                 <p>{formatPhoneForDisplay(history.contact.phone) || history.contact.phone}</p>
                 <p className="text-xs text-gray-500 pt-1">
@@ -86,16 +98,16 @@ const ContactHistoryModal = ({ eventId, contactId, onClose }: ContactHistoryModa
                 </p>
               </div>
 
-              <ul className="divide-y divide-gray-100 border border-gray-100 rounded-md">
+              <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
                 {history.history.map((item) => (
                   <li key={item.entry_id} className="px-4 py-3 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-gray-900">{item.event_name}</span>
                       {item.is_current_event && (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${REGISTERED_BEFORE_CHIP}`}>This form</span>
+                        <span className={THIS_FORM_CHIP}>This form</span>
                       )}
                       {item.is_previous_edition && (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${LAST_YEAR_CHIP}`}>Last year&apos;s edition</span>
+                        <span className={LAST_YEAR_CHIP}>Last year&apos;s edition</span>
                       )}
                     </div>
                     <p className="text-sm text-gray-600">

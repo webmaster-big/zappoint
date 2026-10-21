@@ -26,7 +26,7 @@ interface LocationContextType {
   workLocations: WorkLocation[];
   canSwitchLocation: boolean;
   switchingLocationId: number | null;
-  switchLocation: (id: number) => Promise<void>;
+  switchLocation: (id: number, returnTo?: string) => Promise<void>;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
@@ -149,7 +149,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => window.removeEventListener('storage', onStorage);
   }, [isLocationManager, userId, ownLocationId]);
 
-  const switchLocation = useCallback(async (id: number) => {
+  const switchLocation = useCallback(async (id: number, returnTo?: string) => {
     if (!isLocationManager || switchingLocationId !== null) return;
     if (Number(id) === Number(ownLocationId)) return;
 
@@ -159,7 +159,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       storeStaffLocationState(state);
       await purgeAllZapzoneCaches();
       if (userId) rememberManagerLocation(userId, id);
-      const target = pathAfterLocationSwitch(window.location.pathname, role);
+      const target = returnTo ?? pathAfterLocationSwitch(window.location.pathname, role);
       if (target) window.location.assign(target);
       else window.location.reload();
     } catch (error) {

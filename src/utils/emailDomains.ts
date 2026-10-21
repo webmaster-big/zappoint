@@ -50,6 +50,8 @@ export const EMAIL_DOMAINS: string[] = [
   'zap-zone.com',
 ];
 
+const KNOWN_VALID_DOMAINS = new Set(['att.com', 'gm.com', 'ge.com', 'hp.com', 'hotmail.ca', 'live.ca', 'yahoo.ca']);
+
 const POPULAR_DOMAINS: string[] = [
   'gmail.com',
   'yahoo.com',
@@ -159,7 +161,7 @@ export const suggestEmails = (value: string, options: SuggestOptions = {}): Emai
     }));
   }
 
-  if (domains.includes(domain)) return [];
+  if (domains.includes(domain) || KNOWN_VALID_DOMAINS.has(domain)) return [];
 
   const prefixed = domains.filter((d) => d.startsWith(domain));
   if (prefixed.length > 0) {

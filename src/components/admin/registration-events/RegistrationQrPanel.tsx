@@ -7,6 +7,7 @@ import { generateQRCode } from '../../../utils/qrcode';
 import { formatDateLong } from '../../../utils/timeFormat';
 import { locationDisplayName } from '../../../utils/locationName';
 import { fileSlug } from './registrationEventUi';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 
 interface RegistrationQrPanelProps {
   event: RegistrationEventSummary;
@@ -48,6 +49,7 @@ const openPrintSign = (title: string, lines: string[], url: string, image: strin
 };
 
 const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
+  const { themeColor } = useThemeColor();
   const urlRef = useRef<HTMLInputElement>(null);
   const kioskRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'download' | 'print' | null>(null);
@@ -85,7 +87,12 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
       const image = await generateQRCode(event.public_url, { width: PRINT_SIZE, margin: 4 });
       const lines = [
         'Scan to register',
-        [formatDateLong(event.event_date), event.location_name ? locationDisplayName(event.location_name) : null].filter(Boolean).join(' · '),
+        [
+          event.event?.start_date && event.event.end_date && event.event.start_date < event.event_date && event.event_date <= event.event.end_date
+            ? `${formatDateLong(event.event.start_date)} – ${formatDateLong(event.event_date)}`
+            : formatDateLong(event.event_date),
+          event.location_name ? locationDisplayName(event.location_name) : null,
+        ].filter(Boolean).join(' · '),
       ];
       if (!openPrintSign(event.name, lines, event.public_url, image)) {
         onNotify('The print window was blocked. Allow pop-ups for this site, or use Download QR.', 'info');
@@ -122,7 +129,7 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
               readOnly
               value={event.public_url}
               onFocus={(e) => e.currentTarget.select()}
-              className="flex-1 min-w-0 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className={`flex-1 min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-${themeColor}-800`}
             />
             <StandardButton variant="secondary" size="sm" icon={Copy} onClick={() => void copy(event.public_url, 'Link copied', urlRef.current)}>
               Copy
@@ -145,13 +152,13 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
             </StandardButton>
           </div>
           <p className="text-xs text-gray-500">Preview shows exactly what guests see but never saves a registration.</p>
-          <div className="rounded-md border border-gray-200 bg-gray-50 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
                 <Tablet className="h-4 w-4 text-gray-500" aria-hidden="true" />
                 Sign-up tablet at the venue
               </span>
-              <StandardButton variant="ghost" size="sm" icon={Copy} onClick={() => void copy(kioskUrl, 'Kiosk link copied', kioskRef.current)}>
+              <StandardButton variant="ghost" size="sm" icon={Copy} onClick={() => void copy(kioskUrl, 'Kiosk link copied', kioskRef.current)} className="whitespace-nowrap">
                 Copy kiosk link
               </StandardButton>
             </div>
@@ -164,7 +171,7 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
               readOnly
               value={kioskUrl}
               onFocus={(e) => e.currentTarget.select()}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className={`w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-${themeColor}-800`}
             />
             <p className="text-xs text-gray-600">
               The kiosk link clears each guest&apos;s details after they register. Open it in a browser that is not signed in to

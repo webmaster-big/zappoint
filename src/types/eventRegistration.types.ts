@@ -10,6 +10,7 @@ export interface RegistrationFormPage {
   name: string;
   description: string | null;
   event_date: string;
+  starts_on: string | null;
   status: RegistrationFormStatus;
   location_name: string | null;
   location_logo_path: string | null;
@@ -38,6 +39,28 @@ export interface RegistrationEventEdition {
   event_date: string;
 }
 
+export interface RegistrationLinkedEvent {
+  id: number;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export interface RegistrationEventOption {
+  id: number;
+  name: string;
+  location_id: number;
+  location_name: string | null;
+  description: string | null;
+  image: string | null;
+  has_image: boolean;
+  date_type: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+  registration_form_ids: number[];
+}
+
 export interface RegistrationCounts {
   total_entries: number;
   unique_registrations: number;
@@ -63,6 +86,7 @@ export interface RegistrationEventSummary {
   header_image_height: number | null;
   location_id: number;
   location_name: string | null;
+  event: RegistrationLinkedEvent | null;
   previous_edition: RegistrationEventEdition | null;
   next_edition: RegistrationEventEdition | null;
   total_entries: number;
@@ -78,7 +102,12 @@ export interface RegistrationEventDetail extends RegistrationEventSummary {
 
 export interface RegistrationEventInput {
   name: string;
-  location_id: number;
+  location_id?: number;
+  location_ids?: number[];
+  event_id?: number | null;
+  event_links?: Record<number, number>;
+  use_event_image?: boolean;
+  copy_header_image_from?: number | null;
   event_date: string;
   description: string;
   confirmation_message: string;
@@ -86,6 +115,11 @@ export interface RegistrationEventInput {
   is_open: boolean;
   header_image?: File | null;
   remove_header_image?: boolean;
+}
+
+export interface RegistrationCreateResult {
+  event: RegistrationEventDetail;
+  created: RegistrationEventSummary[];
 }
 
 export type RegistrationListFilter = 'all' | 'duplicates' | 'returning' | 'previous_edition' | 'hidden';

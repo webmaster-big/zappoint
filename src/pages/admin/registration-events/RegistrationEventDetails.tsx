@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
+  CalendarCheck,
+  CalendarClock,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
+  ClipboardList,
+  CopyPlus,
   Download,
   EyeOff,
   History,
@@ -16,22 +18,30 @@ import {
   RotateCcw,
   Search,
   Trash2,
+  UserCheck,
   Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import LoadingSpinner from '../../../components/ui/LoadingSpinner';
-import RegistrationEventFormModal from '../../../components/admin/registration-events/RegistrationEventFormModal';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
+import Pagination from '../../../components/ui/Pagination';
+import RegistrationEventFormModal, { type RegistrationFormPrefill } from '../../../components/admin/registration-events/RegistrationEventFormModal';
 import RegistrationQrPanel from '../../../components/admin/registration-events/RegistrationQrPanel';
 import ContactHistoryModal from '../../../components/admin/registration-events/ContactHistoryModal';
 import {
   LAST_YEAR_CHIP,
-  REGISTERED_BEFORE_CHIP,
   SAME_CONTACT_CHIP,
   STATUS_LABELS,
-  STATUS_PILL,
   describeFailure,
+  formatEventDates,
+  registeredBeforeChip,
+  statusPillClass,
+  themedClasses,
   fileSlug,
+  nextYearDate,
+  yearShift,
 } from '../../../components/admin/registration-events/registrationEventUi';
 import { downloadCsv, toCsv } from '../../../components/admin/table';
 import eventRegistrationService from '../../../services/EventRegistrationService';
@@ -44,6 +54,7 @@ import type {
   RegistrationPagination,
 } from '../../../types/eventRegistration.types';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import { formatPhoneForDisplay } from '../../../utils/bookingSearch';
 import { locationDisplayName } from '../../../utils/locationName';
@@ -53,23 +64,41 @@ type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null
 interface LoadFailure {
   message: string;
   switchLocationId: number | null;
+  status: number | null;
 }
 
 const PER_PAGE = 25;
 
 const yesNo = (value: boolean): string => (value ? 'Yes' : 'No');
 
-const Tile = ({ label, value, hint }: { label: string; value: number | string; hint: string }) => (
-  <div className="bg-white rounded-md border border-gray-200 p-4">
-    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
-    <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
-    <p className="mt-1 text-xs text-gray-500">{hint}</p>
+const MAX_SEARCH = 100;
+
+const editionLabel = (edition: { name: string; event_date: string } | null | undefined): string => {
+  if (!edition) return '';
+  const year = edition.event_date.slice(0, 4);
+  return edition.name.includes(year) ? edition.name : `${edition.name} (${year})`;
+};
+
+const MetricTile = ({ icon: Icon, label, value, hint, accent }: { icon: LucideIcon; label: string; value: number; hint: string; accent: string }) => (
+  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+    <div className="flex items-center gap-2 mb-2">
+      <div className={`p-2 rounded-lg ${accent}`}>
+        <Icon size={20} />
+      </div>
+      <span className="text-base font-semibold text-gray-800">{label}</span>
+    </div>
+    <div className="flex items-end gap-2 mt-2">
+      <CounterAnimation value={value} className="text-2xl font-bold text-gray-900" />
+    </div>
+    <p className="text-xs mt-1 text-gray-400">{hint}</p>
   </div>
 );
 
 const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   const navigate = useNavigate();
   const { switchLocation, canSwitchLocation } = useLocationScope();
+  const { themeColor, fullColor } = useThemeColor();
+  const theme = themedClasses(themeColor, fullColor);
   const [event, setEvent] = useState<RegistrationEventDetail | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [failure, setFailure] = useState<LoadFailure | null>(null);
@@ -84,6 +113,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<ToastState>(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [nextEdition, setNextEdition] = useState<RegistrationFormPrefill | null>(null);
   const [historyContactId, setHistoryContactId] = useState<number | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -99,7 +129,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
       setFailure(null);
     } catch (error: unknown) {
       const described = describeFailure(error, 'This registration form could not be loaded.');
-      setFailure({ message: described.message, switchLocationId: described.switchLocationId });
+      setFailure({ message: described.message, switchLocationId: described.switchLocationId, status: described.status });
     } finally {
       setLoadingEvent(false);
     }
@@ -140,13 +170,29 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setSearch(searchInput.trim());
+      setSearch(searchInput.trim().slice(0, MAX_SEARCH));
       setPage(1);
     }, 350);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
   const closeEdit = useCallback(() => setShowEdit(false), []);
+  const closeNextEdition = useCallback(() => setNextEdition(null), []);
+
+  const startNextEdition = () => {
+    if (!event) return;
+    const shifted = yearShift(event.name, 1);
+    setNextEdition({
+      name: shifted !== event.name ? shifted : `${event.name} ${Number(event.event_date.slice(0, 4)) + 1}`,
+      locationIds: [event.location_id],
+      eventDate: nextYearDate(event.event_date),
+      description: event.description ?? '',
+      confirmationMessage: event.confirmation_message ?? '',
+      previousEditionId: event.id,
+      copyHeaderImageFrom: event.header_image_path ? event.id : null,
+      headerImagePath: event.header_image_path,
+    });
+  };
   const closeHistory = useCallback(() => setHistoryContactId(null), []);
 
   const hasPreviousEdition = Boolean(event?.previous_edition);
@@ -179,7 +225,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
     setActing('delete');
     try {
       await eventRegistrationService.deleteEvent(event.id);
-      navigate('/registration-events');
+      navigate('/registration-events', { state: { deletedName: event.name } });
     } catch (error: unknown) {
       notify(describeFailure(error, 'The form could not be deleted.').message, 'error');
       setActing(null);
@@ -212,6 +258,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
     setActing('export');
     try {
       const result = await eventRegistrationService.exportRegistrations(event.id);
+      const previousLabel = editionLabel(event.previous_edition);
       const csv = toCsv(
         [
           'Entry ID',
@@ -223,7 +270,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           'Entries with same contact',
           'Same contact details',
           'Registered before',
-          "Registered for last year's edition",
+          ...(previousLabel ? [`Registered for ${previousLabel}`] : []),
         ],
         result.rows.map((row) => [
           row.entry_id,
@@ -235,7 +282,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           row.same_contact_entries,
           yesNo(row.is_duplicate),
           yesNo(row.returning),
-          yesNo(row.registered_previous_edition),
+          ...(previousLabel ? [yesNo(row.registered_previous_edition)] : []),
         ]),
       );
       downloadCsv(`${fileSlug(event.name, 'registrations')}-registrations-${new Date().toISOString().slice(0, 10)}.csv`, csv);
@@ -265,12 +312,23 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           <h1 className="text-xl font-bold text-gray-900">{failure?.message ?? 'This registration form could not be loaded.'}</h1>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             {failure?.switchLocationId && canSwitchLocation && (
-              <StandardButton variant="primary" onClick={() => void switchLocation(failure.switchLocationId as number)}>
+              <StandardButton variant="primary" onClick={() => void switchLocation(failure.switchLocationId as number, `/registration-events/${eventId}`)}>
                 Switch to that location
               </StandardButton>
             )}
+            {failure && !failure.switchLocationId && (failure.status === null || failure.status >= 500) && (
+              <StandardButton
+                variant="primary"
+                onClick={() => {
+                  setLoadingEvent(true);
+                  void loadEvent();
+                }}
+              >
+                Try again
+              </StandardButton>
+            )}
             <StandardButton variant="secondary" icon={ArrowLeft} onClick={() => navigate('/registration-events')}>
-              Back to registration forms
+              Back to Registration Forms
             </StandardButton>
           </div>
         </div>
@@ -282,21 +340,23 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   const past = event.status === 'past';
   const firstShown = pagination && pagination.total > 0 ? (pagination.current_page - 1) * pagination.per_page + 1 : 0;
   const lastShown = pagination ? Math.min(pagination.current_page * pagination.per_page, pagination.total) : 0;
-  const previousName = event.previous_edition?.name ?? '';
+  const previousName = editionLabel(event.previous_edition);
+  const tileAccent = `bg-${themeColor}-100 text-${fullColor}`;
+  const unfiltered = filter === 'all' && !search;
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-5">
+    <div className="px-4 sm:px-6 py-8 max-w-5xl mx-auto space-y-5">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="space-y-3">
         <StandardButton variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate('/registration-events')}>
-          Registration forms
+          Back to Registration Forms
         </StandardButton>
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
           <div className="space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900 break-words">{event.name}</h1>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[event.status]}`}>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{event.name}</h1>
+              <span className={statusPillClass(event.status, themeColor, fullColor)}>
                 {STATUS_LABELS[event.status]}
               </span>
             </div>
@@ -312,15 +372,25 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                 </span>
               )}
             </div>
+            {event.event && (
+              <p className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                <CalendarCheck className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                For the event{' '}
+                <Link to={`/events/${event.event.id}/edit`} className={theme.link}>
+                  {event.event.name}
+                </Link>
+                <span>· {formatEventDates(event.event)}</span>
+              </p>
+            )}
             {(event.previous_edition || event.next_edition) && (
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 {event.previous_edition && (
-                  <Link to={`/registration-events/${event.previous_edition.id}`} className="text-blue-700 hover:underline">
+                  <Link to={`/registration-events/${event.previous_edition.id}`} className={theme.link}>
                     Last year&apos;s edition: {event.previous_edition.name}
                   </Link>
                 )}
                 {event.next_edition && (
-                  <Link to={`/registration-events/${event.next_edition.id}`} className="text-blue-700 hover:underline">
+                  <Link to={`/registration-events/${event.next_edition.id}`} className={theme.link}>
                     Next edition: {event.next_edition.name}
                   </Link>
                 )}
@@ -328,9 +398,14 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
             )}
           </div>
           <div className="flex flex-wrap gap-2 flex-shrink-0">
-            <StandardButton variant="secondary" size="sm" icon={Pencil} onClick={() => setShowEdit(true)}>
+            <StandardButton variant="secondary" size="sm" icon={Pencil} onClick={() => setShowEdit(true)} disabled={acting !== null}>
               Edit
             </StandardButton>
+            {!event.next_edition && (
+              <StandardButton variant="secondary" size="sm" icon={CopyPlus} onClick={startNextEdition}>
+                Next year&apos;s edition
+              </StandardButton>
+            )}
             <StandardButton
               variant="secondary"
               size="sm"
@@ -354,28 +429,67 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
 
       <RegistrationQrPanel event={event} onNotify={notify} />
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${hasPreviousEdition ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
-        <Tile label="Total entries" value={tallies.total_entries} hint="Every form submitted, including repeats." />
-        <Tile
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${hasPreviousEdition ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <MetricTile
+          icon={ClipboardList}
+          accent={tileAccent}
+          label="Total entries"
+          value={tallies.total_entries}
+          hint={
+            tallies.hidden_entries > 0
+              ? `Every form submitted, including repeats. ${tallies.hidden_entries} hidden entr${tallies.hidden_entries === 1 ? 'y is' : 'ies are'} not counted.`
+              : 'Every form submitted, including repeats.'
+          }
+        />
+        <MetricTile
+          icon={UserCheck}
+          accent={tileAccent}
           label="Unique registrations"
           value={tallies.unique_registrations}
           hint="Entries with the same phone and the same email count once — e.g. a parent who registers 3 children with their own details: 3 entries, 1 unique."
         />
-        <Tile
+        <MetricTile
+          icon={Users}
+          accent={tileAccent}
           label="Same-contact groups"
           value={tallies.duplicate_groups}
           hint={`${tallies.duplicate_groups} group${tallies.duplicate_groups === 1 ? '' : 's'} covering ${tallies.entries_in_duplicate_groups} entr${tallies.entries_in_duplicate_groups === 1 ? 'y' : 'ies'}.`}
         />
-        <Tile label="Registered before" value={tallies.returning_contacts} hint="Registered for an earlier event that had already taken place." />
+        <MetricTile
+          icon={History}
+          accent={tileAccent}
+          label="Registered before"
+          value={tallies.returning_contacts}
+          hint="Registered for an earlier event that had already taken place."
+        />
         {hasPreviousEdition && (
-          <Tile
+          <MetricTile
+            icon={CalendarClock}
+            accent={tileAccent}
             label={`Registered for ${previousName}`}
             value={tallies.previous_edition_registrants}
             hint="The same person also registered for last year's edition."
           />
         )}
       </div>
-      <p className="text-xs text-gray-500 -mt-2">These numbers count registrations only. They don&apos;t show who attended.</p>
+      <p className="text-xs text-gray-500 -mt-2">
+        These numbers count registrations only. They don&apos;t show who attended.
+        {tallies.hidden_entries > 0 && filter !== 'hidden' && (
+          <>
+            {' '}
+            <button
+              type="button"
+              onClick={() => {
+                setFilter('hidden');
+                setPage(1);
+              }}
+              className={theme.link}
+            >
+              View {tallies.hidden_entries} hidden entr{tallies.hidden_entries === 1 ? 'y' : 'ies'}
+            </button>
+          </>
+        )}
+      </p>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
         <div className="p-4 border-b border-gray-100 space-y-3">
@@ -396,8 +510,9 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
+                maxLength={MAX_SEARCH}
                 placeholder="Search name, email or phone"
-                className="w-full rounded-md border border-gray-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className={`${theme.input} pl-9`}
               />
             </label>
             <label className="sm:w-64">
@@ -408,7 +523,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                   setFilter(e.target.value as RegistrationListFilter);
                   setPage(1);
                 }}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className={theme.input}
               >
                 <option value="all">All registrations</option>
                 <option value="duplicates">Same contact details</option>
@@ -422,7 +537,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
             <p className="text-xs text-gray-500">
               {pagination.total === 0
                 ? 'No matching contacts'
-                : `Showing ${firstShown}–${lastShown} of ${pagination.total} contact${pagination.total === 1 ? '' : 's'} · ${tallies.total_entries} entr${tallies.total_entries === 1 ? 'y' : 'ies'}`}
+                : `Showing ${firstShown}–${lastShown} of ${pagination.total} contact${pagination.total === 1 ? '' : 's'}${unfiltered ? ` · ${tallies.total_entries} entr${tallies.total_entries === 1 ? 'y' : 'ies'}` : ''}`}
             </p>
           )}
         </div>
@@ -441,8 +556,12 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-500">
-            {filter === 'all' && !search ? 'No one has registered yet.' : 'No registrations match.'}
+          <div className="p-10 text-center">
+            <Users className="w-10 h-10 mx-auto text-gray-300 mb-3" aria-hidden="true" />
+            <p className="text-gray-700 font-medium">{unfiltered ? 'No one has registered yet.' : 'No registrations match.'}</p>
+            {unfiltered && (
+              <p className="text-sm text-gray-500 mt-1">Share the QR code or link above. Registrations show up here as soon as guests submit the form.</p>
+            )}
           </div>
         ) : (
           <ul className={`divide-y divide-gray-100 ${listLoading ? 'opacity-60' : ''}`}>
@@ -456,7 +575,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {group.is_duplicate && (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SAME_CONTACT_CHIP}`}>
+                        <span className={SAME_CONTACT_CHIP}>
                           Same contact ×{group.entry_count}
                         </span>
                       )}
@@ -473,7 +592,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                     </StandardButton>
                   )}
                 </div>
-                <ul className="rounded-md border border-gray-100 divide-y divide-gray-100">
+                <ul className="rounded-lg border border-gray-100 divide-y divide-gray-100">
                   {group.entries.map((entry) => (
                     <li key={entry.id} className="px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="min-w-0 space-y-1">
@@ -482,10 +601,10 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                         {(entry.returning || entry.registered_previous_edition) && (
                           <div className="flex flex-wrap gap-1.5">
                             {entry.returning && (
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${REGISTERED_BEFORE_CHIP}`}>Registered before</span>
+                              <span className={registeredBeforeChip(themeColor, fullColor)}>Registered before</span>
                             )}
                             {entry.registered_previous_edition && (
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${LAST_YEAR_CHIP}`}>Registered for {previousName}</span>
+                              <span className={LAST_YEAR_CHIP}>Registered for {previousName}</span>
                             )}
                           </div>
                         )}
@@ -494,7 +613,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
                         type="button"
                         onClick={() => void toggleEntry(entry)}
                         disabled={acting !== null}
-                        className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                        className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                       >
                         {entry.hidden_at === null ? (
                           <>
@@ -516,31 +635,13 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           </ul>
         )}
 
-        {pagination && pagination.last_page > 1 && (
-          <div className="flex items-center justify-between gap-2 p-4 border-t border-gray-100">
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              icon={ChevronLeft}
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={pagination.current_page <= 1 || listLoading}
-            >
-              Previous
-            </StandardButton>
-            <span className="text-sm text-gray-600">
-              Page {pagination.current_page} of {pagination.last_page}
-            </span>
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              icon={ChevronRight}
-              iconPosition="right"
-              onClick={() => setPage((current) => Math.min(pagination.last_page, current + 1))}
-              disabled={pagination.current_page >= pagination.last_page || listLoading}
-            >
-              Next
-            </StandardButton>
-          </div>
+        {pagination && (
+          <Pagination
+            currentPage={pagination.current_page}
+            totalPages={pagination.last_page}
+            onPageChange={setPage}
+            className="p-4 border-t border-gray-100"
+          />
         )}
       </div>
 
@@ -548,11 +649,23 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
         <RegistrationEventFormModal
           eventId={event.id}
           onClose={closeEdit}
-          onSaved={(updated) => {
+          onSaved={(result) => {
             setShowEdit(false);
-            setEvent(updated);
-            setCounts(updated.counts);
+            setEvent(result.event);
+            setCounts(result.event.counts);
             notify('Registration form saved', 'success');
+          }}
+        />
+      )}
+
+      {nextEdition && (
+        <RegistrationEventFormModal
+          eventId={null}
+          prefill={nextEdition}
+          onClose={closeNextEdition}
+          onSaved={(result) => {
+            setNextEdition(null);
+            navigate(`/registration-events/${result.event.id}`);
           }}
         />
       )}

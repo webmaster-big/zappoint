@@ -53,11 +53,14 @@ interface FailureBody {
 
 const IDLE_RESET_MS = 90_000;
 const SUCCESS_RESET_MS = 8_000;
+const KIOSK_RECHECK_MS = 60_000;
+const PRIMARY_BUTTON = 'w-full min-h-[52px] rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-base font-semibold transition';
 const FIELD_ORDER: FieldKey[] = ['name', 'phone', 'email'];
 const BUSY_SUBMIT = 'Lots of people are registering right now. Please wait a few seconds and tap Register again.';
 const UNCONFIRMED = "We couldn't confirm your registration. Tap Register again without changing anything — you won't be registered twice.";
 
-const normalisedName = (value: string): string => value.trim().replace(/\s+/g, ' ');
+const normalisedName = (value: string): string =>
+  value.replace(/(?:(?![\t\n\x0B\f\r])[\p{Cc}\p{Cf}])+/gu, '').replace(/[\t\n\x0B\f\r\p{Z}]+/gu, ' ').trim();
 
 const phoneTooLong = (value: string): boolean => {
   const raw = value.trim();
@@ -103,7 +106,7 @@ const FieldError = ({ id, message }: { id: string; message?: string }) =>
 
 const StatusCard = ({ title, children }: { title: string; children?: ReactNode }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center space-y-3">
-    <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+    <h1 className="text-2xl font-bold text-gray-900 break-words">{title}</h1>
     {children}
   </div>
 );
@@ -113,7 +116,9 @@ const EventRegistrationForm = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const code = (params.code ?? '').toLowerCase();
   const kioskRequested = searchParams.get('kiosk') === '1';
-  const preview = searchParams.get('preview') === '1';
+  const previewRequested = searchParams.get('preview') === '1';
+  const [staffSession] = useState(() => Boolean(getStoredUser()?.token));
+  const preview = previewRequested && staffSession;
 
   const [stage, setStage] = useState<Stage>('loading');
   const [page, setPage] = useState<RegistrationFormPage | null>(null);
@@ -139,7 +144,7 @@ const EventRegistrationForm = () => {
   const phoneRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const doneRef = useRef<HTMLHeadingElement>(null);
-  const suggestionRef = useRef<HTMLButtonElement>(null);
+  const suggestionRef = useRef<HTMLDivElement>(null);
 
   const brand = useLocationBrand(page?.location_logo_path, page?.location_name);
 
@@ -159,7 +164,7 @@ const EventRegistrationForm = () => {
         if (cancelled) return;
         setPage(form);
         setImageFailed(false);
-        setStage(form.status === 'open' ? 'ready' : 'closed');
+        setStage(form.status === 'open' || (preview && form.status === 'closed') ? 'ready' : 'closed');
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -169,7 +174,30 @@ const EventRegistrationForm = () => {
     return () => {
       cancelled = true;
     };
-  }, [code, attempt]);
+  }, [code, attempt, preview]);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [brand.logoPath]);
+
+  useEffect(() => {
+    if (!kiosk || stage !== 'closed' || page?.status !== 'closed') return undefined;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      eventRegistrationService
+        .getForm(code)
+        .then((form) => {
+          if (cancelled || form.status !== 'open') return;
+          setPage(form);
+          setStage('ready');
+        })
+        .catch(() => undefined);
+    }, KIOSK_RECHECK_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [kiosk, stage, page?.status, code]);
 
   useEffect(() => {
     if (page) document.title = `${page.name} | Register`;
@@ -409,6 +437,12 @@ const EventRegistrationForm = () => {
     setStaffBlocked(false);
   };
 
+  const leavePreview = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('preview');
+    setSearchParams(next, { replace: true });
+  };
+
   const leaveKioskMode = () => {
     const next = new URLSearchParams(searchParams);
     next.delete('kiosk');
@@ -429,15 +463,15 @@ const EventRegistrationForm = () => {
   const autoComplete = (token: string) => (kiosk ? 'off' : token);
 
   const inputClass = (field: FieldKey) =>
-    `w-full min-h-12 rounded-xl border bg-white px-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 read-only:bg-gray-50 ${
-      fieldErrors[field] ? 'border-red-500!' : 'border-gray-300'
+    `w-full min-h-12 rounded-lg border bg-gray-50/50 px-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition read-only:bg-gray-50 ${
+      fieldErrors[field] ? 'border-red-500!' : 'border-gray-200'
     }`;
 
   const eventFacts = page ? (
     <div className="space-y-1.5 text-sm text-gray-700">
       <p className="flex items-center gap-2">
         <CalendarDays className="h-4 w-4 text-gray-500 flex-shrink-0" aria-hidden="true" />
-        <span>{formatDateLong(page.event_date)}</span>
+        <span>{page.starts_on ? `${formatDateLong(page.starts_on)} – ${formatDateLong(page.event_date)}` : formatDateLong(page.event_date)}</span>
       </p>
       {venue && (
         <p className="flex items-center gap-2">
@@ -449,6 +483,19 @@ const EventRegistrationForm = () => {
   ) : null;
 
   const renderBody = () => {
+    if (previewRequested && !staffSession) {
+      return (
+        <StatusCard title="This is a staff preview link">
+          <p className="text-sm text-gray-600">
+            Registrations made from a preview link are not saved. Use the form&apos;s regular link to register.
+          </p>
+          <button type="button" onClick={leavePreview} className={PRIMARY_BUTTON}>
+            Open the registration form
+          </button>
+        </StatusCard>
+      );
+    }
+
     if (staffBlocked) {
       return (
         <StatusCard title="Start the sign-up kiosk?">
@@ -459,14 +506,14 @@ const EventRegistrationForm = () => {
             <button
               type="button"
               onClick={() => void signOutForKiosk()}
-              className="w-full min-h-[48px] rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-base font-semibold"
+              className={PRIMARY_BUTTON}
             >
               Sign out and start kiosk
             </button>
             <button
               type="button"
               onClick={leaveKioskMode}
-              className="w-full min-h-[48px] rounded-xl border border-gray-300 bg-white text-gray-800 text-base font-medium hover:bg-gray-50"
+              className="w-full min-h-[52px] rounded-lg border border-gray-300 bg-white text-gray-800 text-base font-medium hover:bg-gray-50 transition"
             >
               Cancel
             </button>
@@ -501,7 +548,7 @@ const EventRegistrationForm = () => {
           <button
             type="button"
             onClick={() => setAttempt((value) => value + 1)}
-            className="inline-flex items-center justify-center gap-2 w-full min-h-[48px] rounded-xl bg-gray-900 text-white text-base font-semibold hover:bg-gray-700"
+            className={`${PRIMARY_BUTTON} inline-flex items-center justify-center gap-2`}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Try again
@@ -519,9 +566,9 @@ const EventRegistrationForm = () => {
             <Lock className="h-4 w-4" aria-hidden="true" />
             <span className="text-xs font-semibold uppercase tracking-wider">Registration closed</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{page.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 break-words">{page.name}</h1>
           {eventFacts}
-          <p className="text-base text-gray-700" role="alert">
+          <p className="text-base text-gray-700 break-words" role="alert">
             {page.status === 'past'
               ? 'This event has already taken place, so registration is closed.'
               : `Registration for ${page.name} is closed.`}
@@ -529,7 +576,7 @@ const EventRegistrationForm = () => {
           {page.next_edition && (
             <a
               href={withModeFlags(page.next_edition.url)}
-              className="inline-flex items-center justify-center w-full min-h-[48px] rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-base font-semibold px-4 text-center"
+              className={`${PRIMARY_BUTTON} inline-flex items-center justify-center px-4 text-center break-words`}
             >
               Register for {page.next_edition.name}
             </a>
@@ -545,10 +592,10 @@ const EventRegistrationForm = () => {
           <h1 ref={doneRef} tabIndex={-1} className="text-2xl font-bold text-gray-900 focus:outline-none">
             You&apos;re registered!
           </h1>
-          <p className="text-base text-gray-700">
+          <p className="text-base text-gray-700 break-words">
             {kiosk ? `You're on the list for ${confirmation.eventName}.` : `${confirmation.firstName}, you're on the list for ${confirmation.eventName}.`}
           </p>
-          {confirmation.message && <p className="text-base text-gray-700 whitespace-pre-line">{confirmation.message}</p>}
+          {confirmation.message && <p className="text-base text-gray-700 whitespace-pre-line break-words">{confirmation.message}</p>}
           {confirmation.preview && (
             <p className="text-sm font-medium text-amber-800">Preview only — nothing was saved.</p>
           )}
@@ -556,7 +603,7 @@ const EventRegistrationForm = () => {
           <button
             type="button"
             onClick={registerAnother}
-            className="w-full min-h-[52px] rounded-xl border border-blue-700 bg-white text-blue-800 text-base font-semibold hover:bg-blue-50"
+            className="w-full min-h-[52px] rounded-lg border border-blue-700 bg-white text-blue-800 text-base font-semibold hover:bg-blue-50 transition"
           >
             Register another person
           </button>
@@ -568,9 +615,9 @@ const EventRegistrationForm = () => {
     return (
       <>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 sm:p-6 space-y-3">
-          <h1 className="text-2xl font-bold text-gray-900">{page.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 break-words">{page.name}</h1>
           {eventFacts}
-          {page.description && <p className="text-base text-gray-700 whitespace-pre-line">{page.description}</p>}
+          {page.description && <p className="text-base text-gray-700 whitespace-pre-line break-words">{page.description}</p>}
         </div>
 
         <form
@@ -586,7 +633,7 @@ const EventRegistrationForm = () => {
           </div>
 
           <div>
-            <label htmlFor={`${fieldNames.name}-input`} className="block text-sm font-medium text-gray-800 mb-1">
+            <label htmlFor={`${fieldNames.name}-input`} className="block text-xs font-semibold text-gray-700 mb-1">
               Full name
             </label>
             <input
@@ -613,7 +660,7 @@ const EventRegistrationForm = () => {
           </div>
 
           <div>
-            <label htmlFor={`${fieldNames.phone}-input`} className="block text-sm font-medium text-gray-800 mb-1">
+            <label htmlFor={`${fieldNames.phone}-input`} className="block text-xs font-semibold text-gray-700 mb-1">
               Phone number
             </label>
             <input
@@ -641,7 +688,7 @@ const EventRegistrationForm = () => {
           </div>
 
           <div>
-            <label htmlFor={`${fieldNames.email}-input`} className="block text-sm font-medium text-gray-800 mb-1">
+            <label htmlFor={`${fieldNames.email}-input`} className="block text-xs font-semibold text-gray-700 mb-1">
               Email address
             </label>
             <EmailInput
@@ -664,25 +711,24 @@ const EventRegistrationForm = () => {
             />
             <FieldError id="registration-email-error" message={fieldErrors.email} />
             {emailSuggestion && (
-              <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2" role="alert">
+              <div ref={suggestionRef} tabIndex={-1} className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2 focus:outline-none" role="alert">
                 <p className="text-sm text-amber-900">
                   Did you mean <span className="font-semibold break-all">{emailSuggestion}</span>?
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
-                    ref={suggestionRef}
                     type="button"
                     onClick={applySuggestion}
-                    className="flex-1 min-h-[44px] rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-3 break-all"
+                    className="flex-1 min-h-12 rounded-lg border border-amber-400 bg-white text-amber-900 text-base font-semibold px-3 break-all hover:bg-amber-100 transition"
                   >
                     Use {emailSuggestion}
                   </button>
                   <button
                     type="button"
                     onClick={keepTypedEmail}
-                    className="flex-1 min-h-[44px] rounded-lg border border-amber-300 bg-white text-amber-900 text-sm font-medium px-3"
+                    className="flex-1 min-h-12 rounded-lg border border-amber-400 bg-white text-amber-900 text-base font-semibold px-3 break-all hover:bg-amber-100 transition"
                   >
-                    Keep mine
+                    Keep {cleanEmailAddress(values.email)}
                   </button>
                 </div>
               </div>
@@ -690,7 +736,7 @@ const EventRegistrationForm = () => {
           </div>
 
           {formError && (
-            <p className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700!" role="alert">
+            <p className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700!" role="alert">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
               <span>{formError}</span>
             </p>
@@ -699,7 +745,7 @@ const EventRegistrationForm = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full min-h-[52px] rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-base font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-70"
+            className={`${PRIMARY_BUTTON} inline-flex items-center justify-center gap-2 disabled:opacity-70`}
           >
             {submitting ? (
               <>
@@ -720,6 +766,7 @@ const EventRegistrationForm = () => {
       {preview && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm font-medium text-amber-900" role="note">
           Preview — registrations are not saved.
+          {page?.status === 'closed' ? ' This form is closed to guests right now.' : ''}
         </div>
       )}
 
