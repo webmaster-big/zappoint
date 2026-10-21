@@ -56,7 +56,8 @@ import {
   Send as SendIcon,
   PhoneCall,
   Footprints,
-  KeyRound
+  KeyRound,
+  ClipboardList
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -134,6 +135,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Settings': 'Configure application settings',
     'Employee PINs': 'Issue staff PINs and set the automatic logout',
     'Custom Fields': 'Extra checkboxes shown at checkout',
+    'Registration Forms': 'Free sign-up forms with a QR code for each event',
     'Attendants Management': 'Manage attendant accounts and permissions',
     'Manage Attendants': 'View and edit attendant accounts',
     'Create Attendant': 'Create new attendant account',
@@ -289,7 +291,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Events', href: '/events', icon: List },
           { label: 'Create Event', href: '/events/create', icon: Plus },
           { label: 'Event Purchases', href: '/events/purchases', icon: ShoppingCart },
-          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine }
+          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine },
+          { label: 'Registration Forms', href: '/registration-events', icon: ClipboardList }
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
@@ -378,7 +381,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Events', href: '/events', icon: List },
           { label: 'Create Event', href: '/events/create', icon: Plus },
           { label: 'Event Purchases', href: '/events/purchases', icon: ShoppingCart },
-          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine }
+          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine },
+          { label: 'Registration Forms', href: '/registration-events', icon: ClipboardList }
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },

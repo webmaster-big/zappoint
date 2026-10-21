@@ -73,6 +73,7 @@ const ADMIN_ROUTE_PREFIXES = [
   '/location-change-requests',
   '/photos',
   '/staff-pins',
+  '/registration-events',
 ];
 
 const PUBLIC_PATH_PREFIXES = ['/photos/kiosk', '/photos/slideshow', '/photos/qr'];

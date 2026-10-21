@@ -149,6 +149,9 @@ import PhotoSettings from "./pages/admin/photos/PhotoSettings";
 import PhotoReports from "./pages/admin/photos/PhotoReports";
 import EscapeRoomSessions from "./pages/admin/photos/EscapeRoomSessions";
 import EscapeRoomWaiverKiosk from "./pages/public/EscapeRoomWaiverKiosk";
+import EventRegistrationForm from "./pages/public/EventRegistrationForm";
+import RegistrationEvents from "./pages/admin/registration-events/RegistrationEvents";
+import RegistrationEventDetails from "./pages/admin/registration-events/RegistrationEventDetails";
 
 const ScrollToTop = () => {
   const { pathname, hash } = useLocation();
@@ -204,6 +207,7 @@ function App() {
         <Route path="/events/:eventId/purchase" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdParam="eventId" /><PurchaseEvent /></>} />
         <Route path="/rsvp/:token" element={<><PageViewBeacon pageType="rsvp" /><RsvpPage /></>} />
         <Route path="/feedback/:token" element={<VisitFeedback />} />
+        <Route path="/register/:code" element={<EventRegistrationForm />} />
         <Route path="/waiver/kiosk/:id" element={<><PageViewBeacon pageType="waiver_kiosk" /><WaiverKiosk /></>} />
         <Route path="/waiver/kiosk-session/:token" element={<><PageViewBeacon pageType="waiver_kiosk_session" /><WaiverKioskSession /></>} />
         <Route path="/waiver/bulk/:manageToken" element={<><PageViewBeacon pageType="waiver_bulk" /><WaiverBulk /></>} />
@@ -283,6 +287,8 @@ function App() {
           <Route path="/waivers/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><WaiverSettings /></ProtectedRoute>} />
 
           <Route path="/settings/custom-fields" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><CustomFields /></ProtectedRoute>} />
+          <Route path="/registration-events" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><RegistrationEvents /></ProtectedRoute>} />
+          <Route path="/registration-events/:id" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><RegistrationEventDetails /></ProtectedRoute>} />
 
           <Route path="/photos/capture" element={<PhotoCapture />} />
           <Route path="/photos/escape-rooms" element={<EscapeRoomSessions />} />

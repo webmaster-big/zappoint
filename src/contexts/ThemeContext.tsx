@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -17,10 +18,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return saved === 'dark' ? 'dark' : 'light';
   });
 
+  const { pathname } = useLocation();
+  const forceLight = pathname.startsWith('/register/');
+
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    document.documentElement.className = theme;
-  }, [theme]);
+    document.documentElement.className = forceLight ? 'light' : theme;
+  }, [theme, forceLight]);
 
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 

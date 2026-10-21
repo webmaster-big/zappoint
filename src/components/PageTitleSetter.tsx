@@ -38,6 +38,7 @@ const titles: Record<string, string> = {
   '/users/activity': 'Account Activity Log',
   '/users/performance': 'Attendants Performance',
   '/admin/users/create': 'Create Accounts',
+  '/registration-events': 'Registration Forms',
   '/embed/booking/:packageId': 'Booking Widget',
 };
 
