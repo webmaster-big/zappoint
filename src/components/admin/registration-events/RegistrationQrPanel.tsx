@@ -54,6 +54,7 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
   const kioskRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'download' | 'print' | null>(null);
   const kioskUrl = `${event.public_url}?kiosk=1`;
+  const venue = event.location_name ? locationDisplayName(event.location_name).replace(/\s*\(.*\)\s*$/, '') : null;
 
   const copy = async (value: string, done: string, field: HTMLInputElement | null) => {
     try {
@@ -114,9 +115,9 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
         </div>
         <div className="flex-1 min-w-0 space-y-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">QR code and link</h2>
+            <h2 className="text-base font-semibold text-gray-900">{venue ? `${venue} form · QR code & link` : 'QR code & link'}</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              Guests scan this code to open this form on their phone. It never changes, even if you rename the form.
+              Guests scan this code to open this form on their phone. It never changes, even if the event is renamed.
             </p>
           </div>
           <div className="flex gap-2">
@@ -174,8 +175,9 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
               className={`w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-${themeColor}-800`}
             />
             <p className="text-xs text-gray-600">
-              The kiosk link clears each guest&apos;s details after they register. Open it in a browser that is not signed in to
-              ZapZone, turn off the browser&apos;s autofill, and use Guided Access (iPad) or screen pinning (Android).
+              Use this link on {venue ? `${venue}'s` : 'the venue'} sign-up tablet. It clears each guest&apos;s details after they
+              register. Open it in a browser that is not signed in to ZapZone, turn off autofill, and use Guided Access (iPad) or
+              screen pinning (Android).
             </p>
           </div>
         </div>

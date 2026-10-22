@@ -1,40 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarCheck, CalendarDays, ClipboardList, MapPin, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { CalendarDays, CalendarRange, ChevronRight, ClipboardList, MapPin, Plus, UserCheck, Users } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
-import RegistrationEventFormModal, { type RegistrationFormPrefill } from '../../../components/admin/registration-events/RegistrationEventFormModal';
+import RegistrationMetricTile from '../../../components/admin/registration-events/RegistrationMetricTile';
+import RegistrationEventGroupModal, { type RegistrationGroupPrefill } from '../../../components/admin/registration-events/RegistrationEventGroupModal';
 import {
   STATUS_LABELS,
   describeFailure,
-  formatEventDates,
   statusPillClass,
-  themedClasses,
 } from '../../../components/admin/registration-events/registrationEventUi';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import eventRegistrationService from '../../../services/EventRegistrationService';
-import type { RegistrationCreateResult, RegistrationEventOption, RegistrationEventSummary } from '../../../types/eventRegistration.types';
+import type { RegistrationEventGroupList } from '../../../types/eventRegistration.types';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { formatDateLong } from '../../../utils/timeFormat';
 import { locationDisplayName } from '../../../utils/locationName';
+import { getStoredUser } from '../../../utils/storage';
+import { michiganTodayKey } from '../../../utils/dashboardTimeframe';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
-
-interface EventFilter {
-  id: number;
-  name: string;
-  dates: string;
-  locationId: number;
-  venue: string | null;
-}
-
-const filterFrom = (option: RegistrationEventOption): EventFilter => ({
-  id: option.id,
-  name: option.name.trim(),
-  dates: formatEventDates(option),
-  locationId: option.location_id,
-  venue: option.location_name ? locationDisplayName(option.location_name) : null,
-});
 
 const EVENT_NOT_FOUND = "That event couldn't be found. It may have been deleted.";
 
@@ -42,86 +27,44 @@ const RegistrationEvents = () => {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { effectiveLocationId, isCompanyAdmin } = useLocationScope();
+  const { effectiveLocationId, isCompanyAdmin, locations } = useLocationScope();
   const { themeColor, fullColor } = useThemeColor();
-  const theme = themedClasses(themeColor, fullColor);
-  const [events, setEvents] = useState<RegistrationEventSummary[]>([]);
-  const [eventFilter, setEventFilter] = useState<EventFilter | null>(null);
+  const currentUser = getStoredUser();
+  const [thisYear] = useState(() => Number(michiganTodayKey().slice(0, 4)));
+  const requestedYear = Number(searchParams.get('year') ?? 0);
+  const year = requestedYear >= 2000 && requestedYear <= 2100 ? requestedYear : thisYear;
+  const fromEvent = Number(searchParams.get('from_event') ?? 0);
+
+  const [data, setData] = useState<{ key: string; result: RegistrationEventGroupList } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
-  const [modalEventId, setModalEventId] = useState<number | null>(null);
-  const [prefill, setPrefill] = useState<RegistrationFormPrefill | undefined>(undefined);
+  const [prefill, setPrefill] = useState<RegistrationGroupPrefill | undefined>(undefined);
   const [showModal, setShowModal] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const sequence = useRef(0);
+  const requestKey = `${year}|${effectiveLocationId ?? 'all'}`;
 
   const load = useCallback(async () => {
     const current = ++sequence.current;
+    const key = `${year}|${effectiveLocationId ?? 'all'}`;
     setLoading(true);
     setLoadError(null);
     try {
-      const result = await eventRegistrationService.listEvents({
-        location_id: eventFilter ? eventFilter.locationId : effectiveLocationId ?? undefined,
-      });
+      const result = await eventRegistrationService.listGroups({ year, location_id: effectiveLocationId ?? undefined });
       if (current !== sequence.current) return;
-      setEvents(eventFilter ? result.filter((form) => form.event?.id === eventFilter.id) : result);
+      setData({ key, result });
     } catch (error: unknown) {
       if (current !== sequence.current) return;
-      setLoadError(describeFailure(error, 'Registration forms could not be loaded.').message);
+      setLoadError(describeFailure(error, 'Registration events could not be loaded.').message);
     } finally {
       if (current === sequence.current) setLoading(false);
     }
-  }, [effectiveLocationId, eventFilter]);
-
-  const fromEvent = Number(searchParams.get('from_event') ?? 0);
-  const filterEventId = Number(searchParams.get('event') ?? 0);
-  const filterPending = filterEventId > 0 && eventFilter?.id !== filterEventId;
-  const lastLocation = useRef(effectiveLocationId);
+  }, [year, effectiveLocationId]);
 
   useEffect(() => {
-    if (fromEvent || filterPending) return;
+    if (fromEvent) return;
     void load();
-  }, [load, fromEvent, filterPending]);
-
-  const failLookup = useCallback((error: unknown) => {
-    const failure = describeFailure(error, "That event's registration forms couldn't be opened. Please try again.");
-    if (failure.status !== 401 && failure.status !== 403) setToast({ message: failure.message, type: 'error' });
-  }, []);
-
-  useEffect(() => {
-    if (lastLocation.current === effectiveLocationId) return;
-    lastLocation.current = effectiveLocationId;
-    if (filterEventId) setSearchParams({}, { replace: true });
-  }, [effectiveLocationId, filterEventId, setSearchParams]);
-
-  useEffect(() => {
-    if (!filterEventId) {
-      setEventFilter(null);
-      return undefined;
-    }
-    if (eventFilter?.id === filterEventId) return undefined;
-    let cancelled = false;
-    eventRegistrationService
-      .eventOptions({ id: filterEventId })
-      .then((options) => {
-        if (cancelled) return;
-        if (!options[0]) {
-          setSearchParams({}, { replace: true });
-          setToast({ message: EVENT_NOT_FOUND, type: 'info' });
-          return;
-        }
-        setEventFilter(filterFrom(options[0]));
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setSearchParams({}, { replace: true });
-        failLookup(error);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [filterEventId, eventFilter, setSearchParams, failLookup]);
+  }, [load, fromEvent]);
 
   useEffect(() => {
     const deletedName = (routerLocation.state as { deletedName?: string } | null)?.deletedName;
@@ -133,234 +76,189 @@ const RegistrationEvents = () => {
   useEffect(() => {
     if (!fromEvent) return undefined;
     let cancelled = false;
+    const keepYear = () => setSearchParams(requestedYear ? { year: String(requestedYear) } : {}, { replace: true });
     eventRegistrationService
       .eventOptions({ id: fromEvent })
       .then((options) => {
         if (cancelled) return;
         const option = options[0];
-        const linked = option?.registration_form_ids ?? [];
-        if (linked.length === 1) {
-          navigate(`/registration-events/${linked[0]}`, { replace: true });
+        const forms = option?.registration_form_ids ?? [];
+        if (forms.length > 0) {
+          navigate(`/registration-events/${forms[forms.length - 1]}`, { replace: true });
           return;
         }
+        keepYear();
         if (!option) {
-          setSearchParams({}, { replace: true });
           setToast({ message: EVENT_NOT_FOUND, type: 'info' });
           return;
         }
-        if (linked.length > 1) {
-          setEventFilter(filterFrom(option));
-          setSearchParams({ event: String(option.id) }, { replace: true });
-          return;
-        }
-        setSearchParams({}, { replace: true });
-        setModalEventId(null);
         setPrefill({ eventId: option.id });
         setShowModal(true);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setSearchParams({}, { replace: true });
-        failLookup(error);
+        keepYear();
+        const failure = describeFailure(error, "That event's registration form couldn't be opened. Please try again.");
+        if (failure.status !== 401 && failure.status !== 403) setToast({ message: failure.message, type: 'error' });
       });
     return () => {
       cancelled = true;
     };
-  }, [fromEvent, navigate, setSearchParams, failLookup]);
+  }, [fromEvent, navigate, setSearchParams, requestedYear]);
 
   const openCreate = () => {
-    setModalEventId(null);
-    setPrefill(undefined);
-    setShowModal(true);
-  };
-
-  const openEdit = (id: number) => {
-    setModalEventId(id);
     setPrefill(undefined);
     setShowModal(true);
   };
 
   const closeModal = useCallback(() => setShowModal(false), []);
 
-  const handleSaved = (result: RegistrationCreateResult, created: boolean) => {
-    setShowModal(false);
-    if (created && result.created.length > 1) {
-      setToast({ message: `Created ${result.created.length} registration forms, one per location`, type: 'success' });
-      void load();
-      return;
-    }
-    if (created) {
-      navigate(`/registration-events/${result.event.id}`);
-      return;
-    }
-    setToast({ message: 'Registration form saved', type: 'success' });
-    void load();
-  };
+  const chooseYear = (value: number) => setSearchParams(value === thisYear ? {} : { year: String(value) });
 
-  const remove = async (event: RegistrationEventSummary) => {
-    const confirmed = window.confirm(
-      `Delete "${event.name}"? Its QR code and link will stop working and its registrations will no longer count in other forms' history. To stop new sign-ups but keep everything, close the form instead.`,
-    );
-    if (!confirmed) return;
-    setDeletingId(event.id);
-    try {
-      await eventRegistrationService.deleteEvent(event.id);
-      setToast({ message: 'Registration form deleted', type: 'success' });
-      void load();
-    } catch (error: unknown) {
-      setToast({ message: describeFailure(error, 'The form could not be deleted.').message, type: 'error' });
-    } finally {
-      setDeletingId(null);
-    }
+  const sidebarLocation = isCompanyAdmin && effectiveLocationId
+    ? locations.find((location) => Number(location.id) === Number(effectiveLocationId))?.name ?? null
+    : null;
+  const scopeLabel = isCompanyAdmin
+    ? sidebarLocation ? locationDisplayName(sidebarLocation) : 'All locations'
+    : currentUser?.location_name ? locationDisplayName(currentUser.location_name) : 'Your location';
+  const scoped = !isCompanyAdmin || Boolean(sidebarLocation);
+  const shown = data && data.key === requestKey ? data.result : null;
+  const years = Array.from(new Set([...(data?.result.years ?? []), thisYear, year])).sort((a, b) => b - a);
+  const totals = shown?.totals ?? null;
+  const groups = shown?.event_groups ?? [];
+  const tileAccent = `bg-${themeColor}-100 text-${fullColor}`;
+  const venueSummary = (names: string[], count: number) => {
+    if (count === 1 && names.length === 1) return locationDisplayName(names[0]);
+    return `${count} location form${count === 1 ? '' : 's'}`;
   };
-
-  const showVenue = isCompanyAdmin && effectiveLocationId === null;
 
   return (
-    <div className="px-4 sm:px-6 py-8">
+    <div className="px-4 sm:px-6 py-8 space-y-5">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Registration Forms</h1>
-          <p className="text-gray-600 mt-1">
-            A separate sign-up form and QR code for each event. Forms close automatically after the event date.
-          </p>
+          <p className="text-gray-600 mt-1">Manage events and their participating location forms.</p>
         </div>
         <StandardButton variant="primary" size="md" icon={Plus} onClick={openCreate} className="whitespace-nowrap flex-shrink-0">
-          New Registration Form
+          New event
         </StandardButton>
       </div>
 
-      {eventFilter && (
-        <div className={`mb-4 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme.softPanel}`}>
-          <p className="text-sm text-gray-800">
-            Forms for <span className="font-semibold">{eventFilter.name}</span> · {eventFilter.dates}
-            {eventFilter.venue ? ` · ${eventFilter.venue}` : ''}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <StandardButton
-              variant="secondary"
-              size="sm"
-              icon={Plus}
-              onClick={() => {
-                setModalEventId(null);
-                setPrefill({ eventId: eventFilter.id });
-                setShowModal(true);
-              }}
-            >
-              New form for this event
-            </StandardButton>
-            <StandardButton variant="ghost" size="sm" onClick={() => setSearchParams({})}>
-              Show all forms
-            </StandardButton>
-          </div>
-        </div>
-      )}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-800 min-w-0">
+          <CalendarDays className={`h-4 w-4 flex-shrink-0 text-${fullColor}`} aria-hidden="true" />
+          <span className="truncate">All events · {scopeLabel}</span>
+        </span>
+        <label className="flex-shrink-0">
+          <span className="sr-only">Year</span>
+          <select
+            value={year}
+            onChange={(event) => chooseYear(Number(event.target.value))}
+            className={`rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-${themeColor}-800 focus:border-${themeColor}-800`}
+          >
+            {years.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <RegistrationMetricTile icon={ClipboardList} accent={tileAccent} label="Total entries" value={totals?.total_entries ?? null} hint="Every form submitted, including repeats." />
+        <RegistrationMetricTile icon={UserCheck} accent={tileAccent} label="Unique registrations" value={totals?.unique_registrations ?? null} hint="Entries with the same phone and email count once." />
+        <RegistrationMetricTile icon={CalendarRange} accent={tileAccent} label="Events" value={totals?.events ?? null} hint={`Total events in ${year}.`} />
+        <RegistrationMetricTile icon={MapPin} accent={tileAccent} label="Location forms" value={totals?.location_forms ?? null} hint="Total location forms across all events." />
+      </div>
+      <p className="text-xs text-gray-500 -mt-2">
+        Totals include all {year} events and their location forms{scoped ? ` at ${scopeLabel}` : ''}. They count registrations only, not who attended.
+      </p>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <span className="text-sm font-semibold text-gray-700">
-            {events.length} form{events.length === 1 ? '' : 's'}
-          </span>
+          <h2 className="text-base font-semibold text-gray-900">{year} events</h2>
           <span className="text-xs text-gray-500">Newest event first</span>
         </div>
 
-        {loading && events.length === 0 ? (
-          <div className="p-4 space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-gray-100 rounded-md animate-pulse" />
-            ))}
-          </div>
-        ) : loadError ? (
+        {loadError ? (
           <div className="p-8 text-center space-y-3">
             <p className="text-sm text-red-700" role="alert">{loadError}</p>
             <StandardButton variant="secondary" size="sm" onClick={() => void load()}>
               Try again
             </StandardButton>
           </div>
-        ) : events.length === 0 ? (
+        ) : !shown ? (
+          <div className="p-4 space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : groups.length === 0 ? (
           <div className="p-10 text-center">
-            <ClipboardList className="w-10 h-10 mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-700 font-medium">No registration forms yet</p>
+            <CalendarRange className="w-10 h-10 mx-auto text-gray-300 mb-3" aria-hidden="true" />
+            <p className="text-gray-700 font-medium">No events in {year}{scoped ? ` at ${scopeLabel}` : ''} yet</p>
             <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-              Create a form for an event like Halloween or Christmas. Guests scan its QR code, enter their name, phone and
-              email, and you see every registration here. To try it end to end, make a test form, register, then delete it.
+              Create an event like Trunk or Treat, pick the locations running it, and each one gets its own sign-up form, QR code and
+              registration list.
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100">
-            {events.map((event) => (
-              <li key={event.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <ul className={`divide-y divide-gray-100 ${loading ? 'opacity-60' : ''}`}>
+            {groups.map((group) => (
+              <li key={group.id} className="p-4 flex items-center gap-3">
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      to={`/registration-events/${event.id}`}
-                      className="font-semibold text-gray-900 hover:underline break-words"
-                    >
-                      {event.name}
+                    <Link to={`/registration-events/event/${group.id}`} className="font-semibold text-gray-900 hover:underline break-words">
+                      {group.name}
                     </Link>
-                    <span className={statusPillClass(event.status, themeColor, fullColor)}>
-                      {STATUS_LABELS[event.status]}
-                    </span>
+                    <span className={statusPillClass(group.status, themeColor, fullColor)}>{STATUS_LABELS[group.status]}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarDays className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                      {formatDateLong(event.event_date)}
+                      {formatDateLong(group.event_date)}
                     </span>
-                    {showVenue && event.location_name && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                        {locationDisplayName(event.location_name)}
-                      </span>
-                    )}
+                    <span
+                      className="inline-flex items-center gap-1.5 min-w-0"
+                      title={group.location_names.map((name) => locationDisplayName(name)).join(', ') || undefined}
+                    >
+                      <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                      <span className="truncate">{venueSummary(group.location_names, group.location_forms)}</span>
+                    </span>
                     <span className="inline-flex items-center gap-1.5">
                       <Users className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                      {event.total_entries} total {event.total_entries === 1 ? 'entry' : 'entries'} · {event.unique_registrations} unique
+                      {group.total_entries} entr{group.total_entries === 1 ? 'y' : 'ies'}
                     </span>
                   </div>
-                  {(event.event || event.previous_edition) && (
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                      {event.event && (
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                          Event: {event.event.name} · {formatEventDates(event.event)}
-                        </span>
-                      )}
-                      {event.previous_edition && <span>Last year: {event.previous_edition.name}</span>}
-                    </div>
-                  )}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <StandardButton variant="secondary" size="sm" onClick={() => navigate(`/registration-events/${event.id}`)}>
-                    View
-                  </StandardButton>
-                  <button
-                    type="button"
-                    onClick={() => openEdit(event.id)}
-                    aria-label={`Edit ${event.name}`}
-                    className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void remove(event)}
-                    disabled={deletingId === event.id}
-                    aria-label={`Delete ${event.name}`}
-                    className="p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  icon={ChevronRight}
+                  iconPosition="right"
+                  onClick={() => navigate(`/registration-events/event/${group.id}`)}
+                  className="flex-shrink-0 whitespace-nowrap"
+                >
+                  View event
+                </StandardButton>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      {showModal && <RegistrationEventFormModal eventId={modalEventId} prefill={prefill} onClose={closeModal} onSaved={handleSaved} />}
+      {showModal && (
+        <RegistrationEventGroupModal
+          mode="create"
+          prefill={prefill}
+          onClose={closeModal}
+          onSaved={(created) => {
+            setShowModal(false);
+            navigate(`/registration-events/event/${created.id}`);
+          }}
+        />
+      )}
     </div>
   );
 };

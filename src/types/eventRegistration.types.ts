@@ -59,6 +59,14 @@ export interface RegistrationEventOption {
   end_date: string | null;
   is_active: boolean;
   registration_form_ids: number[];
+  registration_groups?: RegistrationOptionGroup[];
+}
+
+export interface RegistrationOptionGroup {
+  id: number;
+  name: string;
+  can_manage: boolean;
+  forms: { id: number; location_id: number; event_id: number | null; event_date: string }[];
 }
 
 export interface RegistrationCounts {
@@ -86,6 +94,7 @@ export interface RegistrationEventSummary {
   header_image_height: number | null;
   location_id: number;
   location_name: string | null;
+  group: RegistrationGroupRef | null;
   event: RegistrationLinkedEvent | null;
   previous_edition: RegistrationEventEdition | null;
   next_edition: RegistrationEventEdition | null;
@@ -98,6 +107,114 @@ export interface RegistrationEventSummary {
 export interface RegistrationEventDetail extends RegistrationEventSummary {
   counts: RegistrationCounts;
   location_locked: boolean;
+  can_manage_event?: boolean;
+  group_form_count?: number;
+}
+
+export interface RegistrationGroupRef {
+  id: number;
+  name: string;
+  event_date: string;
+}
+
+export interface RegistrationEventGroupSummary {
+  id: number;
+  name: string;
+  event_date: string;
+  status: RegistrationFormStatus;
+  location_forms: number;
+  location_names: string[];
+  total_entries: number;
+  unique_registrations: number;
+  can_manage: boolean;
+}
+
+export interface RegistrationEventGroupList {
+  year: number;
+  years: number[];
+  totals: {
+    total_entries: number;
+    unique_registrations: number;
+    events: number;
+    location_forms: number;
+  };
+  event_groups: RegistrationEventGroupSummary[];
+}
+
+export interface RegistrationEventGroupDetail {
+  id: number;
+  name: string;
+  event_date: string;
+  description: string | null;
+  confirmation_message: string | null;
+  header_image_path: string | null;
+  header_image_width: number | null;
+  header_image_height: number | null;
+  status: RegistrationFormStatus;
+  can_manage: boolean;
+  location_forms_total: number;
+  previous_group: RegistrationGroupRef | null;
+  next_group: RegistrationGroupRef | null;
+  counts: {
+    total_entries: number;
+    unique_registrations: number;
+    registered_before: number;
+    location_forms: number;
+  };
+  forms: RegistrationEventSummary[];
+  merge_candidates?: RegistrationMergeCandidate[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RegistrationMergeCandidate {
+  id: number;
+  location_id: number;
+  location_name: string | null;
+  event_date: string;
+  status: RegistrationFormStatus;
+  total_entries: number;
+  group_id: number | null;
+  group_name: string | null;
+  group_event_date: string | null;
+  group_location_forms: number;
+}
+
+export interface RegistrationEventGroupInput {
+  name?: string;
+  event_date?: string;
+  description?: string;
+  confirmation_message?: string;
+  location_id?: number;
+  location_ids?: number[];
+  event_id?: number | null;
+  event_links?: Record<number, number>;
+  use_event_image?: boolean;
+  copy_header_image_from_group?: number | null;
+  previous_group_id?: number | null;
+  is_open?: boolean;
+  header_image?: File | null;
+  remove_header_image?: boolean;
+  confirm_remove?: boolean;
+  move_form_ids?: number[];
+  expected_location_ids?: number[];
+}
+
+export interface RegistrationFormDeleteResult {
+  group_deleted: boolean;
+  group_id: number | null;
+}
+
+export interface RegistrationGroupExportRow extends RegistrationExportRow {
+  location_id: number;
+  location_name: string | null;
+}
+
+export interface RegistrationGroupExportResponse {
+  rows: RegistrationGroupExportRow[];
+  total: number;
+  capped: boolean;
+  has_previous_group: boolean;
 }
 
 export interface RegistrationEventInput {

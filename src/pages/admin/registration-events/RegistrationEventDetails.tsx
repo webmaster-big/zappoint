@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -6,8 +6,9 @@ import {
   CalendarCheck,
   CalendarClock,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
-  CopyPlus,
   Download,
   EyeOff,
   History,
@@ -17,31 +18,28 @@ import {
   Pencil,
   RotateCcw,
   Search,
-  Trash2,
   UserCheck,
   Users,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import LoadingSpinner from '../../../components/ui/LoadingSpinner';
-import CounterAnimation from '../../../components/ui/CounterAnimation';
 import Pagination from '../../../components/ui/Pagination';
-import RegistrationEventFormModal, { type RegistrationFormPrefill } from '../../../components/admin/registration-events/RegistrationEventFormModal';
+import RegistrationEventFormModal from '../../../components/admin/registration-events/RegistrationEventFormModal';
 import RegistrationQrPanel from '../../../components/admin/registration-events/RegistrationQrPanel';
 import ContactHistoryModal from '../../../components/admin/registration-events/ContactHistoryModal';
+import RegistrationMetricTile from '../../../components/admin/registration-events/RegistrationMetricTile';
+import RegistrationRowMenu from '../../../components/admin/registration-events/RegistrationRowMenu';
 import {
   LAST_YEAR_CHIP,
   SAME_CONTACT_CHIP,
   STATUS_LABELS,
   describeFailure,
+  fileSlug,
   formatEventDates,
   registeredBeforeChip,
   statusPillClass,
   themedClasses,
-  fileSlug,
-  nextYearDate,
-  yearShift,
 } from '../../../components/admin/registration-events/registrationEventUi';
 import { downloadCsv, toCsv } from '../../../components/admin/table';
 import eventRegistrationService from '../../../services/EventRegistrationService';
@@ -69,30 +67,15 @@ interface LoadFailure {
 
 const PER_PAGE = 25;
 
-const yesNo = (value: boolean): string => (value ? 'Yes' : 'No');
-
 const MAX_SEARCH = 100;
+
+const yesNo = (value: boolean): string => (value ? 'Yes' : 'No');
 
 const editionLabel = (edition: { name: string; event_date: string } | null | undefined): string => {
   if (!edition) return '';
   const year = edition.event_date.slice(0, 4);
   return edition.name.includes(year) ? edition.name : `${edition.name} (${year})`;
 };
-
-const MetricTile = ({ icon: Icon, label, value, hint, accent }: { icon: LucideIcon; label: string; value: number; hint: string; accent: string }) => (
-  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
-    <div className="flex items-center gap-2 mb-2">
-      <div className={`p-2 rounded-lg ${accent}`}>
-        <Icon size={20} />
-      </div>
-      <span className="text-base font-semibold text-gray-800">{label}</span>
-    </div>
-    <div className="flex items-end gap-2 mt-2">
-      <CounterAnimation value={value} className="text-2xl font-bold text-gray-900" />
-    </div>
-    <p className="text-xs mt-1 text-gray-400">{hint}</p>
-  </div>
-);
 
 const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   const navigate = useNavigate();
@@ -113,8 +96,8 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<ToastState>(null);
   const [showEdit, setShowEdit] = useState(false);
-  const [nextEdition, setNextEdition] = useState<RegistrationFormPrefill | null>(null);
   const [historyContactId, setHistoryContactId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const [acting, setActing] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const listSequence = useRef(0);
@@ -177,22 +160,6 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   }, [searchInput]);
 
   const closeEdit = useCallback(() => setShowEdit(false), []);
-  const closeNextEdition = useCallback(() => setNextEdition(null), []);
-
-  const startNextEdition = () => {
-    if (!event) return;
-    const shifted = yearShift(event.name, 1);
-    setNextEdition({
-      name: shifted !== event.name ? shifted : `${event.name} ${Number(event.event_date.slice(0, 4)) + 1}`,
-      locationIds: [event.location_id],
-      eventDate: nextYearDate(event.event_date),
-      description: event.description ?? '',
-      confirmationMessage: event.confirmation_message ?? '',
-      previousEditionId: event.id,
-      copyHeaderImageFrom: event.header_image_path ? event.id : null,
-      headerImagePath: event.header_image_path,
-    });
-  };
   const closeHistory = useCallback(() => setHistoryContactId(null), []);
 
   const hasPreviousEdition = Boolean(event?.previous_edition);
@@ -201,33 +168,26 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
     if (filter === 'previous_edition' && !hasPreviousEdition) setFilter('all');
   }, [filter, hasPreviousEdition]);
 
+  const toggleExpanded = (contactId: number) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(contactId)) next.delete(contactId);
+      else next.add(contactId);
+      return next;
+    });
+  };
+
   const toggleOpen = async () => {
     if (!event) return;
     setActing('toggle');
     try {
       const updated = await eventRegistrationService.updateEvent(event.id, { is_open: !event.is_open });
-      setEvent(updated);
+      setEvent((current) => (current ? { ...updated, can_manage_event: current.can_manage_event, group_form_count: current.group_form_count } : updated));
       setCounts(updated.counts);
       notify(updated.is_open ? 'Registration reopened' : 'Registration closed', 'success');
     } catch (error: unknown) {
       notify(describeFailure(error, 'The form could not be updated.').message, 'error');
     } finally {
-      setActing(null);
-    }
-  };
-
-  const remove = async () => {
-    if (!event) return;
-    const confirmed = window.confirm(
-      `Delete "${event.name}"? Its QR code and link will stop working and its registrations will no longer count in other forms' history. To stop new sign-ups but keep everything, close the form instead.`,
-    );
-    if (!confirmed) return;
-    setActing('delete');
-    try {
-      await eventRegistrationService.deleteEvent(event.id);
-      navigate('/registration-events', { state: { deletedName: event.name } });
-    } catch (error: unknown) {
-      notify(describeFailure(error, 'The form could not be deleted.').message, 'error');
       setActing(null);
     }
   };
@@ -285,7 +245,8 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           ...(previousLabel ? [yesNo(row.registered_previous_edition)] : []),
         ]),
       );
-      downloadCsv(`${fileSlug(event.name, 'registrations')}-registrations-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+      const venueSlug = event.location_name ? `${fileSlug(event.location_name, 'location')}-` : '';
+      downloadCsv(`${fileSlug(event.name, 'registrations')}-${venueSlug}registrations-${new Date().toISOString().slice(0, 10)}.csv`, csv);
       if (result.capped) {
         notify(`The export holds the first ${result.rows.length.toLocaleString()} of ${result.total.toLocaleString()} entries.`, 'info');
       }
@@ -328,7 +289,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
               </StandardButton>
             )}
             <StandardButton variant="secondary" icon={ArrowLeft} onClick={() => navigate('/registration-events')}>
-              Back to Registration Forms
+              Back to all events
             </StandardButton>
           </div>
         </div>
@@ -343,37 +304,42 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
   const previousName = editionLabel(event.previous_edition);
   const tileAccent = `bg-${themeColor}-100 text-${fullColor}`;
   const unfiltered = filter === 'all' && !search;
+  const venue = event.location_name ? locationDisplayName(event.location_name) : 'This location';
+  const shortVenue = venue.replace(/\s*\(.*\)\s*$/, '');
+  const eventName = event.group?.name ?? event.name;
+  const eventPath = event.group ? `/registration-events/event/${event.group.id}` : '/registration-events';
 
   return (
     <div className="px-4 sm:px-6 py-8 max-w-5xl mx-auto space-y-5">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="space-y-3">
-        <StandardButton variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate('/registration-events')}>
-          Back to Registration Forms
+        <StandardButton variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate(eventPath)}>
+          {event.group ? eventName : 'All events'}
         </StandardButton>
+        <nav aria-label="Breadcrumb" className="text-sm text-gray-500 flex flex-wrap items-center gap-1.5">
+          <Link to="/registration-events" className="hover:underline">All events</Link>
+          {event.group && (
+            <>
+              <span aria-hidden="true">/</span>
+              <Link to={eventPath} className="hover:underline">{eventName}</Link>
+            </>
+          )}
+          <span aria-hidden="true">/</span>
+          <span className="text-gray-700">{shortVenue}</span>
+        </nav>
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
           <div className="space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{event.name}</h1>
-              <span className={statusPillClass(event.status, themeColor, fullColor)}>
-                {STATUS_LABELS[event.status]}
-              </span>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{venue}</h1>
+              <span className={statusPillClass(event.status, themeColor, fullColor)}>{STATUS_LABELS[event.status]}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-              <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                {formatDateLong(event.event_date)}
-              </span>
-              {event.location_name && (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                  {locationDisplayName(event.location_name)}
-                </span>
-              )}
-            </div>
+            <p className="inline-flex flex-wrap items-center gap-1.5 text-sm text-gray-600">
+              <CalendarDays className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              {eventName} · {formatDateLong(event.event_date)}
+            </p>
             {event.event && (
-              <p className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+              <p className="flex flex-wrap items-center gap-1.5 text-sm text-gray-600">
                 <CalendarCheck className="h-4 w-4 text-gray-400" aria-hidden="true" />
                 For the event{' '}
                 <Link to={`/events/${event.event.id}/edit`} className={theme.link}>
@@ -386,12 +352,12 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 {event.previous_edition && (
                   <Link to={`/registration-events/${event.previous_edition.id}`} className={theme.link}>
-                    Last year&apos;s edition: {event.previous_edition.name}
+                    Last year&apos;s form: {previousName}
                   </Link>
                 )}
                 {event.next_edition && (
                   <Link to={`/registration-events/${event.next_edition.id}`} className={theme.link}>
-                    Next edition: {event.next_edition.name}
+                    Next year&apos;s form: {event.next_edition.name}
                   </Link>
                 )}
               </div>
@@ -399,13 +365,8 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           </div>
           <div className="flex flex-wrap gap-2 flex-shrink-0">
             <StandardButton variant="secondary" size="sm" icon={Pencil} onClick={() => setShowEdit(true)} disabled={acting !== null}>
-              Edit
+              Edit form
             </StandardButton>
-            {!event.next_edition && (
-              <StandardButton variant="secondary" size="sm" icon={CopyPlus} onClick={startNextEdition}>
-                Next year&apos;s edition
-              </StandardButton>
-            )}
             <StandardButton
               variant="secondary"
               size="sm"
@@ -417,9 +378,6 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
             >
               {event.is_open ? 'Close registration' : 'Reopen registration'}
             </StandardButton>
-            <StandardButton variant="danger" size="sm" icon={Trash2} onClick={() => void remove()} disabled={acting !== null} loading={acting === 'delete'}>
-              Delete
-            </StandardButton>
           </div>
         </div>
         {past && (
@@ -427,10 +385,15 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
         )}
       </div>
 
-      <RegistrationQrPanel event={event} onNotify={notify} />
+      <div className={`rounded-lg px-4 py-3 text-sm text-gray-800 flex items-center gap-2 ${theme.softPanel}`}>
+        <MapPin className={`h-4 w-4 flex-shrink-0 ${theme.icon}`} aria-hidden="true" />
+        <span>
+          <span className="font-semibold">This event</span> · {shortVenue} only
+        </span>
+      </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${hasPreviousEdition ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
-        <MetricTile
+      <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${hasPreviousEdition ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <RegistrationMetricTile
           icon={ClipboardList}
           accent={tileAccent}
           label="Total entries"
@@ -441,21 +404,21 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
               : 'Every form submitted, including repeats.'
           }
         />
-        <MetricTile
+        <RegistrationMetricTile
           icon={UserCheck}
           accent={tileAccent}
           label="Unique registrations"
           value={tallies.unique_registrations}
-          hint="Entries with the same phone and the same email count once — e.g. a parent who registers 3 children with their own details: 3 entries, 1 unique."
+          hint="Entries with the same phone and the same email count once."
         />
-        <MetricTile
+        <RegistrationMetricTile
           icon={Users}
           accent={tileAccent}
           label="Same-contact groups"
           value={tallies.duplicate_groups}
-          hint={`${tallies.duplicate_groups} group${tallies.duplicate_groups === 1 ? '' : 's'} covering ${tallies.entries_in_duplicate_groups} entr${tallies.entries_in_duplicate_groups === 1 ? 'y' : 'ies'}.`}
+          hint={`${tallies.duplicate_groups} contact${tallies.duplicate_groups === 1 ? '' : 's'} with multiple entries.`}
         />
-        <MetricTile
+        <RegistrationMetricTile
           icon={History}
           accent={tileAccent}
           label="Registered before"
@@ -463,17 +426,17 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           hint="Registered for an earlier event that had already taken place."
         />
         {hasPreviousEdition && (
-          <MetricTile
+          <RegistrationMetricTile
             icon={CalendarClock}
             accent={tileAccent}
             label={`Registered for ${previousName}`}
             value={tallies.previous_edition_registrants}
-            hint="The same person also registered for last year's edition."
+            hint="The same person also registered for last year's edition here."
           />
         )}
       </div>
       <p className="text-xs text-gray-500 -mt-2">
-        These numbers count registrations only. They don&apos;t show who attended.
+        Registration totals for {shortVenue}&apos;s {eventName} form only. They don&apos;t show who attended.
         {tallies.hidden_entries > 0 && filter !== 'hidden' && (
           <>
             {' '}
@@ -491,11 +454,13 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
         )}
       </p>
 
+      <RegistrationQrPanel event={event} onNotify={notify} />
+
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
         <div className="p-4 border-b border-gray-100 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <Users className="h-5 w-5 text-gray-500" aria-hidden="true" />
+              <Users className={`h-5 w-5 ${theme.icon}`} aria-hidden="true" />
               Registrations
             </h2>
             <StandardButton variant="secondary" size="sm" icon={Download} onClick={() => void exportCsv()} loading={acting === 'export'} disabled={acting !== null}>
@@ -552,7 +517,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
         ) : listLoading && groups.length === 0 ? (
           <div className="p-4 space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-gray-100 rounded-md animate-pulse" />
+              <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
             ))}
           </div>
         ) : groups.length === 0 ? (
@@ -565,73 +530,109 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           </div>
         ) : (
           <ul className={`divide-y divide-gray-100 ${listLoading ? 'opacity-60' : ''}`}>
-            {groups.map((group) => (
-              <li key={group.contact_id} className="p-4 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-medium text-gray-900 break-all">{group.email}</p>
-                    <p className="text-sm text-gray-600">
-                      {formatPhoneForDisplay(group.phone) || group.phone} · {group.entry_count} entr{group.entry_count === 1 ? 'y' : 'ies'}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.is_duplicate && (
-                        <span className={SAME_CONTACT_CHIP}>
-                          Same contact ×{group.entry_count}
+            {groups.map((group) => {
+              const open = expanded.has(group.contact_id);
+              const primaryName = group.entries[0]?.name ?? group.names[0] ?? group.email;
+              const otherNames = Math.max(group.names.length - 1, 0);
+              return (
+                <li key={group.contact_id}>
+                  <div className="flex items-center gap-2 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(group.contact_id)}
+                      aria-expanded={open}
+                      className="flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_7rem_11rem] items-center gap-x-3 gap-y-0.5 text-left"
+                    >
+                      <span className="min-w-0 flex items-center gap-2">
+                        <span className="font-medium text-gray-900 truncate">
+                          {primaryName}
+                          {otherNames > 0 ? ` +${otherNames}` : ''}
                         </span>
-                      )}
-                      {group.registered_before_other_name && (
-                        <span className="text-xs text-gray-500">These contact details registered before under another name</span>
-                      )}
-                    </div>
+                        {group.is_duplicate && <span className={`${SAME_CONTACT_CHIP} hidden sm:inline`}>Same contact ×{group.entry_count}</span>}
+                      </span>
+                      <span className="text-sm text-gray-600 text-right sm:text-left">
+                        {group.entry_count} entr{group.entry_count === 1 ? 'y' : 'ies'}
+                      </span>
+                      <span className="col-span-2 sm:col-span-1 text-xs sm:text-sm text-gray-500 sm:text-gray-600">
+                        {formatDateLong(group.last_registered_at.slice(0, 10))}
+                      </span>
+                    </button>
+                    {open ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0 hidden sm:block" aria-hidden="true" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 hidden sm:block" aria-hidden="true" />
+                    )}
+                    <RegistrationRowMenu
+                      label={`Actions for ${primaryName}`}
+                      items={[
+                        {
+                          label: open ? 'Hide details' : 'Show details',
+                          icon: open ? ChevronUp : ChevronDown,
+                          onClick: () => toggleExpanded(group.contact_id),
+                          returnFocus: true,
+                        },
+                        {
+                          label: group.other_event_count > 0
+                            ? `Registration history (${group.other_event_count} other form${group.other_event_count === 1 ? '' : 's'})`
+                            : 'Registration history',
+                          icon: History,
+                          onClick: () => setHistoryContactId(group.contact_id),
+                          hidden: filter === 'hidden',
+                        },
+                      ]}
+                    />
                   </div>
-                  {filter !== 'hidden' && (
-                    <StandardButton variant="ghost" size="sm" icon={History} onClick={() => setHistoryContactId(group.contact_id)}>
-                      {group.other_event_count > 0
-                        ? `Registration history (${group.other_event_count} other form${group.other_event_count === 1 ? '' : 's'})`
-                        : 'Registration history'}
-                    </StandardButton>
-                  )}
-                </div>
-                <ul className="rounded-lg border border-gray-100 divide-y divide-gray-100">
-                  {group.entries.map((entry) => (
-                    <li key={entry.id} className="px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium text-gray-900 break-words">{entry.name}</p>
-                        <p className="text-xs text-gray-500">Registered {formatDateTimeET(entry.registered_at)}</p>
-                        {(entry.returning || entry.registered_previous_edition) && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {entry.returning && (
-                              <span className={registeredBeforeChip(themeColor, fullColor)}>Registered before</span>
-                            )}
-                            {entry.registered_previous_edition && (
-                              <span className={LAST_YEAR_CHIP}>Registered for {previousName}</span>
-                            )}
-                          </div>
-                        )}
+                  {open && (
+                    <div className="px-4 pb-4 space-y-3">
+                      <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 space-y-1">
+                        <p className="break-all">{group.email}</p>
+                        <p>{formatPhoneForDisplay(group.phone) || group.phone}</p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {group.is_duplicate && <span className={SAME_CONTACT_CHIP}>Same contact ×{group.entry_count}</span>}
+                          {group.registered_before_other_name && (
+                            <span className="text-xs text-gray-500">These contact details registered before under another name</span>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void toggleEntry(entry)}
-                        disabled={acting !== null}
-                        className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-                      >
-                        {entry.hidden_at === null ? (
-                          <>
-                            <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
-                            Hide
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                            Restore
-                          </>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+                      <ul className="rounded-lg border border-gray-100 divide-y divide-gray-100">
+                        {group.entries.map((entry) => (
+                          <li key={entry.id} className="px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div className="min-w-0 space-y-1">
+                              <p className="text-sm font-medium text-gray-900 break-words">{entry.name}</p>
+                              <p className="text-xs text-gray-500">Registered {formatDateTimeET(entry.registered_at)}</p>
+                              {(entry.returning || entry.registered_previous_edition) && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {entry.returning && <span className={registeredBeforeChip(themeColor, fullColor)}>Registered before</span>}
+                                  {entry.registered_previous_edition && <span className={LAST_YEAR_CHIP}>Registered for {previousName}</span>}
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void toggleEntry(entry)}
+                              disabled={acting !== null}
+                              className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              {entry.hidden_at === null ? (
+                                <Fragment>
+                                  <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+                                  Hide
+                                </Fragment>
+                              ) : (
+                                <Fragment>
+                                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                                  Restore
+                                </Fragment>
+                              )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -648,24 +649,20 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
       {showEdit && (
         <RegistrationEventFormModal
           eventId={event.id}
+          canRemove={Boolean(event.can_manage_event)}
           onClose={closeEdit}
-          onSaved={(result) => {
+          onSaved={(updated) => {
             setShowEdit(false);
-            setEvent(result.event);
-            setCounts(result.event.counts);
-            notify('Registration form saved', 'success');
+            setEvent((current) => (current ? { ...updated, can_manage_event: current.can_manage_event, group_form_count: current.group_form_count } : updated));
+            setCounts(updated.counts);
+            notify('Form saved', 'success');
           }}
-        />
-      )}
-
-      {nextEdition && (
-        <RegistrationEventFormModal
-          eventId={null}
-          prefill={nextEdition}
-          onClose={closeNextEdition}
-          onSaved={(result) => {
-            setNextEdition(null);
-            navigate(`/registration-events/${result.event.id}`);
+          onRemoved={(eventDeleted, groupId, groupName) => {
+            if (!eventDeleted && groupId !== null) {
+              navigate(`/registration-events/event/${groupId}`, { state: { removedVenue: venue } });
+              return;
+            }
+            navigate('/registration-events', { state: { deletedName: groupName ?? eventName } });
           }}
         />
       )}

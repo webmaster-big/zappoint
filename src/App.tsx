@@ -152,6 +152,7 @@ import EscapeRoomWaiverKiosk from "./pages/public/EscapeRoomWaiverKiosk";
 import EventRegistrationForm from "./pages/public/EventRegistrationForm";
 import RegistrationEvents from "./pages/admin/registration-events/RegistrationEvents";
 import RegistrationEventDetails from "./pages/admin/registration-events/RegistrationEventDetails";
+import RegistrationEventGroupPage from "./pages/admin/registration-events/RegistrationEventGroupPage";
 
 const ScrollToTop = () => {
   const { pathname, hash } = useLocation();
@@ -288,6 +289,7 @@ function App() {
 
           <Route path="/settings/custom-fields" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><CustomFields /></ProtectedRoute>} />
           <Route path="/registration-events" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><RegistrationEvents /></ProtectedRoute>} />
+          <Route path="/registration-events/event/:groupId" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><RegistrationEventGroupPage /></ProtectedRoute>} />
           <Route path="/registration-events/:id" element={<ProtectedRoute allowedRoles={['company_admin', 'location_manager']}><RegistrationEventDetails /></ProtectedRoute>} />
 
           <Route path="/photos/capture" element={<PhotoCapture />} />
