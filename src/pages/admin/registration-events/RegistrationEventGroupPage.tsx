@@ -355,11 +355,11 @@ const RegistrationEventGroupView = ({ groupId }: { groupId: number }) => {
               return (
                 <li
                   key={form.id}
-                  className={`rounded-lg border p-3 sm:p-4 flex items-center gap-3 ${highlighted ? `border-${themeColor}-300 bg-${themeColor}-50` : 'border-gray-100'}`}
+                  className={`relative rounded-lg border p-3 sm:p-4 flex items-center gap-3 transition-colors ${highlighted ? `border-${themeColor}-300 bg-${themeColor}-50` : 'border-gray-100 hover:bg-gray-100'}`}
                 >
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link to={`/registration-events/${form.id}`} className="font-semibold text-gray-900 hover:underline break-words">
+                      <Link to={`/registration-events/${form.id}`} className="font-semibold text-gray-900 hover:underline break-words after:absolute after:inset-0 after:rounded-lg">
                         {form.location_name ? locationDisplayName(form.location_name) : 'Location'}
                       </Link>
                       <span className={statusPillClass(form.status, themeColor, fullColor)}>{STATUS_LABELS[form.status]}</span>
@@ -381,7 +381,7 @@ const RegistrationEventGroupView = ({ groupId }: { groupId: number }) => {
                     icon={ChevronRight}
                     iconPosition="right"
                     onClick={() => navigate(`/registration-events/${form.id}`)}
-                    className="flex-shrink-0 whitespace-nowrap"
+                    className="relative z-10 flex-shrink-0 whitespace-nowrap"
                   >
                     View form
                   </StandardButton>

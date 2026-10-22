@@ -206,10 +206,14 @@ const RegistrationEvents = () => {
         ) : (
           <ul className={`divide-y divide-gray-100 ${loading ? 'opacity-60' : ''}`}>
             {groups.map((group) => (
-              <li key={group.id} className="p-4 flex items-center gap-3">
+              <li key={group.id} className="relative p-4 flex items-center gap-3 hover:bg-gray-100 transition-colors">
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link to={`/registration-events/event/${group.id}`} className="font-semibold text-gray-900 hover:underline break-words">
+                    <Link
+                      to={`/registration-events/event/${group.id}`}
+                      title={group.location_names.map((name) => locationDisplayName(name)).join(', ') || undefined}
+                      className="font-semibold text-gray-900 hover:underline break-words after:absolute after:inset-0"
+                    >
                       {group.name}
                     </Link>
                     <span className={statusPillClass(group.status, themeColor, fullColor)}>{STATUS_LABELS[group.status]}</span>
@@ -219,10 +223,7 @@ const RegistrationEvents = () => {
                       <CalendarDays className="h-4 w-4 text-gray-400" aria-hidden="true" />
                       {formatDateLong(group.event_date)}
                     </span>
-                    <span
-                      className="inline-flex items-center gap-1.5 min-w-0"
-                      title={group.location_names.map((name) => locationDisplayName(name)).join(', ') || undefined}
-                    >
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
                       <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
                       <span className="truncate">{venueSummary(group.location_names, group.location_forms)}</span>
                     </span>
@@ -238,7 +239,7 @@ const RegistrationEvents = () => {
                   icon={ChevronRight}
                   iconPosition="right"
                   onClick={() => navigate(`/registration-events/event/${group.id}`)}
-                  className="flex-shrink-0 whitespace-nowrap"
+                  className="relative z-10 flex-shrink-0 whitespace-nowrap"
                 >
                   View event
                 </StandardButton>

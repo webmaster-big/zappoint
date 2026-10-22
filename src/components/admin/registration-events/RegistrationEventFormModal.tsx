@@ -214,7 +214,7 @@ const RegistrationEventFormModal = ({ eventId, canRemove = false, onClose, onSav
         aria-modal="true"
         aria-labelledby="registration-form-modal-title"
       >
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`p-2 rounded-lg bg-${themeColor}-100 flex-shrink-0`}>
               <ClipboardList className={`w-5 h-5 text-${themeColor}-600`} aria-hidden="true" />
@@ -247,7 +247,7 @@ const RegistrationEventFormModal = ({ eventId, canRemove = false, onClose, onSav
             <p className="text-sm text-red-700" role="alert">{loadError}</p>
           </div>
         ) : (
-          <div className="px-6 py-5 space-y-5">
+          <div className="px-4 sm:px-6 py-5 space-y-5">
             <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 border-${themeColor}-200 bg-${themeColor}-50`}>
               <MapPin className={`w-4 h-4 mt-0.5 shrink-0 text-${fullColor}`} aria-hidden="true" />
               <div className="min-w-0 space-y-0.5">
@@ -429,7 +429,7 @@ const RegistrationEventFormModal = ({ eventId, canRemove = false, onClose, onSav
           </div>
         )}
 
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex flex-wrap items-center justify-end gap-3">
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {canRemove && detail && (
             <StandardButton
               variant="ghost"
@@ -438,12 +438,12 @@ const RegistrationEventFormModal = ({ eventId, canRemove = false, onClose, onSav
               onClick={() => void remove()}
               disabled={saving || removing}
               loading={removing}
-              className="mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="order-last w-full sm:order-none sm:w-auto sm:mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
             >
               {grouped && !lastForm ? 'Remove location' : lastForm ? 'Delete event' : 'Delete form'}
             </StandardButton>
           )}
-          <StandardButton variant="secondary" size="md" onClick={onClose} disabled={saving || removing}>
+          <StandardButton variant="secondary" size="md" onClick={onClose} disabled={saving || removing} className="flex-1 min-w-fit sm:flex-none">
             Cancel
           </StandardButton>
           <StandardButton
@@ -452,6 +452,7 @@ const RegistrationEventFormModal = ({ eventId, canRemove = false, onClose, onSav
             onClick={() => void save()}
             disabled={saving || removing || loading || Boolean(loadError)}
             loading={saving}
+            className="flex-1 min-w-fit sm:flex-none"
           >
             Save changes
           </StandardButton>

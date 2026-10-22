@@ -107,19 +107,19 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 sm:p-5">
-      <div className="flex flex-col sm:flex-row gap-5">
-        <div className="flex justify-center sm:block">
-          <div className="p-2 bg-white border border-gray-200 rounded-md">
-            <QRCodeCanvas value={event.public_url} size={176} level="M" marginSize={4} />
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-3 sm:gap-x-5">
+        <div className="self-start sm:row-span-2">
+          <div className="box-content h-24 w-24 sm:h-44 sm:w-44 p-1.5 sm:p-2 bg-white border border-gray-200 rounded-md">
+            <QRCodeCanvas value={event.public_url} size={176} level="M" marginSize={4} className="block" style={{ width: '100%', height: '100%' }} />
           </div>
         </div>
-        <div className="flex-1 min-w-0 space-y-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">{venue ? `${venue} form · QR code & link` : 'QR code & link'}</h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Guests scan this code to open this form on their phone. It never changes, even if the event is renamed.
-            </p>
-          </div>
+        <div className="min-w-0 self-center sm:self-start">
+          <h2 className="text-base font-semibold text-gray-900">{venue ? `${venue} form · QR code & link` : 'QR code & link'}</h2>
+          <p className="text-sm text-gray-600 mt-0.5">
+            Guests scan this code to open this form on their phone. It never changes, even if the event is renamed.
+          </p>
+        </div>
+        <div className="col-span-2 sm:col-span-1 sm:col-start-2 min-w-0 space-y-3">
           <div className="flex gap-2">
             <label htmlFor={`registration-url-${event.id}`} className="sr-only">
               Registration link
@@ -136,11 +136,11 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
               Copy
             </StandardButton>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <StandardButton variant="secondary" size="sm" icon={Download} onClick={() => void download()} loading={busy === 'download'} disabled={busy !== null}>
+          <div className="flex flex-wrap gap-2">
+            <StandardButton variant="secondary" size="sm" icon={Download} onClick={() => void download()} loading={busy === 'download'} disabled={busy !== null} className="flex-1 min-w-fit whitespace-nowrap">
               Download QR
             </StandardButton>
-            <StandardButton variant="secondary" size="sm" icon={Printer} onClick={() => void print()} loading={busy === 'print'} disabled={busy !== null}>
+            <StandardButton variant="secondary" size="sm" icon={Printer} onClick={() => void print()} loading={busy === 'print'} disabled={busy !== null} className="flex-1 min-w-fit whitespace-nowrap">
               Print sign
             </StandardButton>
             <StandardButton
@@ -148,6 +148,7 @@ const RegistrationQrPanel = ({ event, onNotify }: RegistrationQrPanelProps) => {
               size="sm"
               icon={Eye}
               onClick={() => window.open(`${event.public_url}?preview=1`, '_blank', 'noopener')}
+              className="flex-1 min-w-fit whitespace-nowrap"
             >
               Preview form
             </StandardButton>

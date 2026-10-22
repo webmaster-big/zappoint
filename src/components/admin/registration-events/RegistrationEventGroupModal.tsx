@@ -605,7 +605,7 @@ const RegistrationEventGroupModal = ({ mode, group, prefill, onClose, onSaved, o
         aria-modal="true"
         aria-labelledby="registration-group-modal-title"
       >
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`p-2 rounded-lg bg-${themeColor}-100 flex-shrink-0`}>
               <CalendarRange className={`w-5 h-5 text-${themeColor}-600`} aria-hidden="true" />
@@ -626,7 +626,7 @@ const RegistrationEventGroupModal = ({ mode, group, prefill, onClose, onSaved, o
           />
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-4 sm:px-6 py-5 space-y-5">
           {creating && (
             <div className={`rounded-lg p-4 space-y-2 ${theme.softPanel}`}>
               <label htmlFor="registration-group-source" className="flex items-center gap-2 text-sm font-semibold text-gray-800">
@@ -1048,7 +1048,7 @@ const RegistrationEventGroupModal = ({ mode, group, prefill, onClose, onSaved, o
           {formError && <p className="text-sm text-red-700" role="alert">{formError}</p>}
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex flex-wrap items-center justify-end gap-3">
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {editing && group?.can_manage && (
             <StandardButton
               variant="ghost"
@@ -1057,12 +1057,12 @@ const RegistrationEventGroupModal = ({ mode, group, prefill, onClose, onSaved, o
               onClick={() => void remove()}
               disabled={saving || deleting || linking}
               loading={deleting}
-              className="mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="order-last w-full sm:order-none sm:w-auto sm:mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
             >
               Delete event
             </StandardButton>
           )}
-          <StandardButton variant="secondary" size="md" onClick={onClose} disabled={saving || deleting || linking}>
+          <StandardButton variant="secondary" size="md" onClick={onClose} disabled={saving || deleting || linking} className="flex-1 min-w-fit sm:flex-none">
             Cancel
           </StandardButton>
           <StandardButton
@@ -1071,6 +1071,7 @@ const RegistrationEventGroupModal = ({ mode, group, prefill, onClose, onSaved, o
             onClick={() => void save()}
             disabled={saving || deleting || waitingForEvents || linking}
             loading={saving || waitingForEvents}
+            className="flex-1 min-w-fit sm:flex-none"
           >
             {saveLabel}
           </StandardButton>

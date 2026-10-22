@@ -458,7 +458,7 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
         <div className="p-4 border-b border-gray-100 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
               <Users className={`h-5 w-5 ${theme.icon}`} aria-hidden="true" />
               Registrations

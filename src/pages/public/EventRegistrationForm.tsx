@@ -466,12 +466,13 @@ const EventRegistrationForm = () => {
   const posterWidth = page?.header_image_width ?? null;
   const posterHeight = page?.header_image_height ?? null;
   const posterRatio = posterWidth && posterHeight ? posterWidth / posterHeight : null;
+  const tallPoster = posterRatio !== null && posterRatio < 1.2;
   const posterStyle = posterRatio === null
     ? undefined
     : ({ aspectRatio: `${posterWidth} / ${posterHeight}`, '--poster-ratio': posterRatio } as CSSProperties);
   const posterSize = posterRatio === null
     ? 'sm:w-auto sm:max-w-full'
-    : 'sm:w-[min(100%,calc(50vh*var(--poster-ratio)))] split:w-[min(100%,calc(86vh*var(--poster-ratio)))]';
+    : 'sm:w-[min(100%,calc(36vh*var(--poster-ratio)))] split:w-[min(100%,calc(86vh*var(--poster-ratio)))]';
   const previewNote = preview ? (
     <>
       Preview — registrations are not saved.
@@ -484,16 +485,17 @@ const EventRegistrationForm = () => {
       fieldErrors[field] ? 'border-red-500!' : 'border-gray-200'
     }`;
 
-  const factChip = 'inline-flex max-w-full items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700';
+  const factChip = 'inline-flex max-w-full items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium text-gray-700';
+  const factIcon = 'h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0';
   const eventFacts = (centered = false) => (page ? (
-    <div className={`flex flex-wrap gap-2 ${centered ? 'justify-center' : ''}`}>
+    <div className={`flex flex-wrap gap-1.5 sm:gap-2 ${centered ? 'justify-center' : ''}`}>
       <span className={factChip}>
-        <CalendarDays className="h-4 w-4 text-gray-500 flex-shrink-0" aria-hidden="true" />
+        <CalendarDays className={factIcon} aria-hidden="true" />
         <span>{page.starts_on ? `${formatDateLong(page.starts_on)} – ${formatDateLong(page.event_date)}` : formatDateLong(page.event_date)}</span>
       </span>
       {venue && (
         <span className={factChip}>
-          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" aria-hidden="true" />
+          <MapPin className={factIcon} aria-hidden="true" />
           <span className="break-words">{venue}</span>
         </span>
       )}
@@ -634,24 +636,19 @@ const EventRegistrationForm = () => {
 
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-5 sm:p-7 space-y-3">
+        <div className="p-4 sm:p-7 space-y-2.5 sm:space-y-3">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 break-words">{page.name}</h1>
           {eventFacts()}
-          {page.description && <p className="text-base text-gray-700 whitespace-pre-line break-words">{page.description}</p>}
+          {page.description && <p className="text-sm sm:text-base text-gray-700 whitespace-pre-line break-words">{page.description}</p>}
         </div>
 
         <form
           key={formKey}
           noValidate
           onSubmit={handleSubmit}
-          className="border-t border-gray-100 p-5 sm:p-7 space-y-5"
+          className="border-t border-gray-100 p-4 sm:p-7 space-y-4 sm:space-y-5"
           aria-label={`Register for ${page.name}`}
         >
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Register</h2>
-            <p className="text-sm text-gray-600 mt-1">One form per person. After you register you can add someone else.</p>
-          </div>
-
           <div>
             <label htmlFor={`${fieldNames.name}-input`} className="block text-xs font-semibold text-gray-700 mb-1">
               Full name
@@ -776,13 +773,14 @@ const EventRegistrationForm = () => {
               'Register'
             )}
           </button>
+          <p className="text-center text-xs sm:text-sm text-gray-500">One form per person. After you register you can add someone else.</p>
         </form>
       </div>
     );
   };
 
   return (
-    <div className="min-h-dvh bg-gray-50">
+    <div className="min-h-dvh bg-gray-50" data-poster={headerImage && tallPoster ? 'tall' : undefined}>
       {previewNote && (
         <div className={`bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm font-medium text-amber-900 ${headerImage ? 'split:hidden' : ''}`} role="note">
           {previewNote}
@@ -806,7 +804,7 @@ const EventRegistrationForm = () => {
                 alt=""
                 decoding="async"
                 style={posterStyle}
-                className={`block h-auto w-full max-h-[45vh] object-contain sm:max-h-[50vh] sm:rounded-2xl sm:shadow-2xl split:max-h-[86vh] ${posterSize}`}
+                className={`block h-auto w-full max-h-[40vh] object-contain sm:max-h-[36vh] sm:rounded-2xl sm:shadow-2xl split:max-h-[86vh] ${posterSize}`}
                 onError={() => setImageFailed(true)}
               />
             </div>
@@ -825,7 +823,7 @@ const EventRegistrationForm = () => {
         )}
 
         <main className={headerImage ? 'split:flex split:items-center split:justify-center' : ''}>
-          <div className="mx-auto w-full max-w-md sm:max-w-lg px-4 py-5 sm:py-8 space-y-4">
+          <div className="mx-auto w-full max-w-md sm:max-w-lg px-4 py-4 sm:py-8 space-y-4">
             {previewNote && headerImage && (
               <div className="hidden split:block rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-900" role="note">
                 {previewNote}

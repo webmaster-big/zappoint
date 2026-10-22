@@ -5,8 +5,13 @@ html.dark label {
 @import "tailwindcss";
 
 @custom-variant split {
-  @media (min-width: 64rem), (min-width: 48rem) and (min-aspect-ratio: 5/4) {
+  @media (min-width: 48rem) and (min-aspect-ratio: 5/4) {
     @slot;
+  }
+  @media (min-width: 64rem) {
+    &:is([data-poster="tall"], [data-poster="tall"] *) {
+      @slot;
+    }
   }
 }
 
