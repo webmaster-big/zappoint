@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { AlertCircle, CalendarDays, CheckCircle2, Loader2, Lock, MapPin, RefreshCw } from 'lucide-react';
@@ -24,6 +24,7 @@ import { locationDisplayName } from '../../utils/locationName';
 import { requestErrorMessage } from '../../utils/requestError';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import { useLocationBrand } from '../../hooks/useLocationBrand';
+import { celebrate } from '../../utils/celebrate';
 
 type Stage = 'loading' | 'not_found' | 'failed' | 'busy' | 'ready' | 'closed' | 'submitted';
 
@@ -321,6 +322,7 @@ const EventRegistrationForm = () => {
         setConfirmation({ ...snapshot, eventName: result.event_name, message: result.confirmation_message });
         setStage('submitted');
         finish();
+        celebrate();
         return;
       } catch (error: unknown) {
         if (generation !== generationRef.current) return;
@@ -461,26 +463,42 @@ const EventRegistrationForm = () => {
   const headerImage = page?.header_image_path && !imageFailed ? getImageUrl(page.header_image_path) : '';
   const logoSrc = !logoFailed && brand.logoPath ? getImageUrl(brand.logoPath) : DEFAULT_LOGO_SRC;
   const autoComplete = (token: string) => (kiosk ? 'off' : token);
+  const posterWidth = page?.header_image_width ?? null;
+  const posterHeight = page?.header_image_height ?? null;
+  const posterRatio = posterWidth && posterHeight ? posterWidth / posterHeight : null;
+  const posterStyle = posterRatio === null
+    ? undefined
+    : ({ aspectRatio: `${posterWidth} / ${posterHeight}`, '--poster-ratio': posterRatio } as CSSProperties);
+  const posterSize = posterRatio === null
+    ? 'sm:w-auto sm:max-w-full'
+    : 'sm:w-[min(100%,calc(50vh*var(--poster-ratio)))] split:w-[min(100%,calc(86vh*var(--poster-ratio)))]';
+  const previewNote = preview ? (
+    <>
+      Preview — registrations are not saved.
+      {page?.status === 'closed' ? ' This form is closed to guests right now.' : ''}
+    </>
+  ) : null;
 
   const inputClass = (field: FieldKey) =>
     `w-full min-h-12 rounded-lg border bg-gray-50/50 px-4 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition read-only:bg-gray-50 ${
       fieldErrors[field] ? 'border-red-500!' : 'border-gray-200'
     }`;
 
-  const eventFacts = page ? (
-    <div className="space-y-1.5 text-sm text-gray-700">
-      <p className="flex items-center gap-2">
+  const factChip = 'inline-flex max-w-full items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700';
+  const eventFacts = (centered = false) => (page ? (
+    <div className={`flex flex-wrap gap-2 ${centered ? 'justify-center' : ''}`}>
+      <span className={factChip}>
         <CalendarDays className="h-4 w-4 text-gray-500 flex-shrink-0" aria-hidden="true" />
         <span>{page.starts_on ? `${formatDateLong(page.starts_on)} – ${formatDateLong(page.event_date)}` : formatDateLong(page.event_date)}</span>
-      </p>
+      </span>
       {venue && (
-        <p className="flex items-center gap-2">
+        <span className={factChip}>
           <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" aria-hidden="true" />
-          <span>{venue}</span>
-        </p>
+          <span className="break-words">{venue}</span>
+        </span>
       )}
     </div>
-  ) : null;
+  ) : null);
 
   const renderBody = () => {
     if (previewRequested && !staffSession) {
@@ -566,8 +584,8 @@ const EventRegistrationForm = () => {
             <Lock className="h-4 w-4" aria-hidden="true" />
             <span className="text-xs font-semibold uppercase tracking-wider">Registration closed</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 break-words">{page.name}</h1>
-          {eventFacts}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 break-words">{page.name}</h1>
+          {eventFacts()}
           <p className="text-base text-gray-700 break-words" role="alert">
             {page.status === 'past'
               ? 'This event has already taken place, so registration is closed.'
@@ -587,9 +605,11 @@ const EventRegistrationForm = () => {
 
     if (stage === 'submitted' && confirmation) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center space-y-4">
-          <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto" aria-hidden="true" />
-          <h1 ref={doneRef} tabIndex={-1} className="text-2xl font-bold text-gray-900 focus:outline-none">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 text-center space-y-4">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/60">
+            <CheckCircle2 className="h-12 w-12 text-emerald-500" aria-hidden="true" />
+          </div>
+          <h1 ref={doneRef} tabIndex={-1} className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 focus:outline-none">
             You&apos;re registered!
           </h1>
           <p className="text-base text-gray-700 break-words">
@@ -599,7 +619,7 @@ const EventRegistrationForm = () => {
           {confirmation.preview && (
             <p className="text-sm font-medium text-amber-800">Preview only — nothing was saved.</p>
           )}
-          <div className="text-left inline-block">{eventFacts}</div>
+          {eventFacts(true)}
           <button
             type="button"
             onClick={registerAnother}
@@ -613,10 +633,10 @@ const EventRegistrationForm = () => {
     }
 
     return (
-      <>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 sm:p-6 space-y-3">
-          <h1 className="text-2xl font-bold text-gray-900 break-words">{page.name}</h1>
-          {eventFacts}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-5 sm:p-7 space-y-3">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 break-words">{page.name}</h1>
+          {eventFacts()}
           {page.description && <p className="text-base text-gray-700 whitespace-pre-line break-words">{page.description}</p>}
         </div>
 
@@ -624,7 +644,7 @@ const EventRegistrationForm = () => {
           key={formKey}
           noValidate
           onSubmit={handleSubmit}
-          className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 sm:p-6 space-y-5"
+          className="border-t border-gray-100 p-5 sm:p-7 space-y-5"
           aria-label={`Register for ${page.name}`}
         >
           <div>
@@ -757,48 +777,65 @@ const EventRegistrationForm = () => {
             )}
           </button>
         </form>
-      </>
+      </div>
     );
   };
 
   return (
     <div className="min-h-dvh bg-gray-50">
-      {preview && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm font-medium text-amber-900" role="note">
-          Preview — registrations are not saved.
-          {page?.status === 'closed' ? ' This form is closed to guests right now.' : ''}
+      {previewNote && (
+        <div className={`bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm font-medium text-amber-900 ${headerImage ? 'split:hidden' : ''}`} role="note">
+          {previewNote}
         </div>
       )}
 
-      {headerImage ? (
-        <div className="bg-gray-900">
-          <img
-            src={headerImage}
-            width={page?.header_image_width ?? undefined}
-            height={page?.header_image_height ?? undefined}
-            alt=""
-            decoding="async"
-            className="block w-full h-auto max-h-[50vh] object-contain mx-auto"
-            onError={() => setImageFailed(true)}
-          />
-        </div>
-      ) : (
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
-            <img
-              src={logoSrc}
-              alt={venue ?? locationDisplayName(brand.name)}
-              className="h-10 w-auto object-contain"
-              onError={() => setLogoFailed(true)}
+      <div className={headerImage ? 'split:grid split:min-h-dvh split:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]' : ''}>
+        {headerImage ? (
+          <div className="relative overflow-hidden bg-gray-900 split:sticky split:top-0 split:h-dvh">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 scale-110 bg-cover bg-center opacity-70 blur-2xl"
+              style={{ backgroundImage: `url(${JSON.stringify(headerImage)})` }}
             />
+            <div aria-hidden="true" className="absolute inset-0 bg-gray-950/40" />
+            <div className="relative flex h-full items-center justify-center sm:p-8 split:p-12">
+              <img
+                src={headerImage}
+                width={posterWidth ?? undefined}
+                height={posterHeight ?? undefined}
+                alt=""
+                decoding="async"
+                style={posterStyle}
+                className={`block h-auto w-full max-h-[45vh] object-contain sm:max-h-[50vh] sm:rounded-2xl sm:shadow-2xl split:max-h-[86vh] ${posterSize}`}
+                onError={() => setImageFailed(true)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-white border-b border-gray-200">
+            <div className="max-w-md sm:max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
+              <img
+                src={logoSrc}
+                alt={venue ?? locationDisplayName(brand.name)}
+                className="h-10 w-auto object-contain"
+                onError={() => setLogoFailed(true)}
+              />
+            </div>
+          </div>
+        )}
 
-      <main className="max-w-md mx-auto px-4 py-5 space-y-4">
-        {renderBody()}
-        <p className="pt-2 text-center text-xs text-gray-400">Powered by ZapZone</p>
-      </main>
+        <main className={headerImage ? 'split:flex split:items-center split:justify-center' : ''}>
+          <div className="mx-auto w-full max-w-md sm:max-w-lg px-4 py-5 sm:py-8 space-y-4">
+            {previewNote && headerImage && (
+              <div className="hidden split:block rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-900" role="note">
+                {previewNote}
+              </div>
+            )}
+            {renderBody()}
+            <p className="pt-2 text-center text-xs text-gray-400">Powered by ZapZone</p>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

@@ -24,6 +24,7 @@ import InfoTooltip from '../../components/ui/InfoTooltip';
 import { useToast } from '../../hooks/useToast';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import { formatMembershipPrice } from '../../utils/membershipFormat';
+import { celebrate } from '../../utils/celebrate';
 
 
 function benefitLabel(b: MembershipPlanBenefit): string {
@@ -325,6 +326,7 @@ const PurchaseMembership = () => {
         }
         await membershipService.upgradePlan(existingMembership.id, selectedPlan.id, opaqueData);
         showSuccess('Membership plan updated!');
+        celebrate();
       } else {
         const opaque = await tokenizeCard(
           { cardNumber: cardDigits, month: expMonth, year: expYear, cardCode: cvc },
@@ -339,6 +341,7 @@ const PurchaseMembership = () => {
           recurring_billing_authorized: recurringAuthorized,
         });
         showSuccess('Membership activated!');
+        celebrate();
       }
       await membershipCache.invalidate();
       setTimeout(() => navigate('/customer/membership'), 800);

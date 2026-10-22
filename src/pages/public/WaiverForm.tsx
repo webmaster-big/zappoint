@@ -11,6 +11,7 @@ import {
   WaiverSuccess,
 } from '../../components/waiver/WaiverStates';
 import EscapeRoomGameBanner from '../../components/waiver/EscapeRoomGameBanner';
+import { celebrate } from '../../utils/celebrate';
 
 /** Token-addressed customer waiver page: /waiver/:token (email / SMS / staff-sent link). */
 const WaiverForm = () => {
@@ -50,6 +51,7 @@ const WaiverForm = () => {
     try {
       await waiverService.submit(token, data);
       setDone(true);
+      celebrate();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };

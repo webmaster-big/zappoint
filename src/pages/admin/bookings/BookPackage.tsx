@@ -8,6 +8,7 @@ import timeSlotService, { type TimeSlot } from '../../../services/timeSlotServic
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import { getImageUrl, formatTimeTo12Hour, getStoredUser } from "../../../utils/storage";
+import { celebrate } from '../../../utils/celebrate';
 
 interface DayOffWithTime {
   date: Date;
@@ -1361,6 +1362,7 @@ const BookPackage: React.FC = () => {
             },
           });
           setShowConfirmation(true);
+          if (isCustomerMode) celebrate();
           checkoutKeyRef.current = newCheckoutKey();
           return;
         }
@@ -1429,6 +1431,7 @@ const BookPackage: React.FC = () => {
           notice: emailSent ? undefined : "We couldn't send your confirmation email. Please save or screenshot this confirmation.",
         });
         setShowConfirmation(true);
+        if (isCustomerMode) celebrate();
         checkoutKeyRef.current = newCheckoutKey();
         return;
       }
@@ -1505,6 +1508,7 @@ const BookPackage: React.FC = () => {
         },
       });
       setShowConfirmation(true);
+      if (isCustomerMode) celebrate();
       checkoutKeyRef.current = newCheckoutKey();
     } catch (err: any) {
       const userFriendlyMessage = getPaymentErrorMessage(err);

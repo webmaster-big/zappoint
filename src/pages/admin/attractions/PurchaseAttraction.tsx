@@ -36,6 +36,7 @@ import { generatePurchaseQRCode, generateOrderQRCode } from '../../../utils/qrco
 import Toast from '../../../components/ui/Toast';
 import EmailInput from '../../../components/ui/EmailInput';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
+import { celebrate } from '../../../utils/celebrate';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
 import CallToBookPanel from '../../../components/customer/CallToBookPanel';
 import CallToBookModal from '../../../components/customer/CallToBookModal';
@@ -1124,6 +1125,7 @@ const PurchaseAttraction = () => {
             const stillInCart = removeOrderedItems(cart, createErr.order);
             setToast({ message: stillInCart > 0 ? `${createErr.message} The other items in your cart still need checking out.` : createErr.message, type: 'success' });
             setPurchaseComplete(true);
+            if (isCustomerMode) celebrate();
             setCurrentStep(4);
             return;
           }
@@ -1146,6 +1148,7 @@ const PurchaseAttraction = () => {
           cart.clear();
           setToast({ message: 'Order confirmed!', type: 'success' });
           setPurchaseComplete(true);
+          if (isCustomerMode) celebrate();
           setCurrentStep(4);
           return;
         }
@@ -1200,6 +1203,7 @@ const PurchaseAttraction = () => {
         cart.clear();
         setToast({ message: 'Order confirmed! Receipt sent to your email.', type: 'success' });
         setPurchaseComplete(true);
+        if (isCustomerMode) celebrate();
         setCurrentStep(4);
         return;
       }
@@ -1225,6 +1229,7 @@ const PurchaseAttraction = () => {
           setToast({ message: refusal.data.message || 'This purchase already went through, so your card was not charged again.', type: 'success' });
           checkoutKeyRef.current = newCheckoutKey();
           setPurchaseComplete(true);
+          if (isCustomerMode) celebrate();
           setCurrentStep(4);
           setShowQRModal(true);
           return;
@@ -1304,6 +1309,7 @@ const PurchaseAttraction = () => {
       localStorage.setItem('_lastAttractionPurchaseTime', Date.now().toString());
 
       setPurchaseComplete(true);
+      if (isCustomerMode) celebrate();
       setCurrentStep(4);
       setShowQRModal(true);
 

@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import type { RsvpPageData, RsvpSubmitRequest } from '../../types/invitation.types';
 import invitationService from '../../services/invitationService';
 import EmailInput from '../../components/ui/EmailInput';
+import { celebrate, prefersReducedMotion } from '../../utils/celebrate';
 
 const ConfettiCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -104,7 +105,7 @@ const RsvpPage = () => {
   }, [token]);
 
   useEffect(() => {
-    if (pageData && !loading) {
+    if (pageData && !loading && !prefersReducedMotion()) {
       setShowConfetti(true);
       const t = setTimeout(() => setShowConfetti(false), 4500);
       return () => clearTimeout(t);
@@ -154,6 +155,7 @@ const RsvpPage = () => {
       const res = await invitationService.submitRsvp(token!, payload);
       setSubmitted(true);
       setConfirmationData(res);
+      if (rsvpStatus === 'attending') celebrate();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setError(axiosErr.response?.data?.message || 'Failed to submit RSVP. Please try again.');

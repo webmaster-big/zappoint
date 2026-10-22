@@ -14,6 +14,7 @@ import { WaiverShell, WaiverLoading, WaiverError } from '../../components/waiver
 import WaiverReturningPanel, { WaiverReturningSummary } from '../../components/waiver/WaiverReturningPanel';
 import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
 import StaffReturnControl from '../../components/waiver/StaffReturnControl';
+import { celebrate } from '../../utils/celebrate';
 
 // long enough for a guest to actually read the confirmation and scan the QR
 const SUCCESS_HOLD_SECONDS = 25;
@@ -160,6 +161,7 @@ const WaiverKiosk = () => {
       setCompletedWaiverId(res?.data?.id ?? null);
       setCompletedWaiverRef(res?.data?.reference_number ?? null);
       setJustCompleted(true);
+      celebrate();
       const holdSeconds = ad ? 2 + ad.display_seconds : SUCCESS_HOLD_SECONDS;
       completeTimer.current = setTimeout(resetForm, (holdSeconds + 90) * 1000);
     } catch (err: unknown) {

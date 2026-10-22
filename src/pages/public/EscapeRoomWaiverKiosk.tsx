@@ -15,6 +15,7 @@ import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
 import StaffReturnControl from '../../components/waiver/StaffReturnControl';
 import RoomPreviewImage from '../../components/waiver/RoomPreviewImage';
 import { parseLocalDate } from '../../utils/timeFormat';
+import { celebrate } from '../../utils/celebrate';
 
 const SUCCESS_HOLD_SECONDS = 25;
 const RETRY_SECONDS = 30;
@@ -415,6 +416,7 @@ const EscapeRoomWaiverKiosk = () => {
       setCompletedAd(result.ad ?? null);
       setCompletedWaiverId(result.id ?? null);
       setJustCompleted(true);
+      celebrate();
       const holdSeconds = holdFor(result.ad);
       completeTimer.current = setTimeout(resetAll, (holdSeconds + 90) * 1000);
     } catch (err: unknown) {

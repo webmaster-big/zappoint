@@ -6,6 +6,7 @@ import WaiverFormBody from '../../components/waiver/WaiverFormBody';
 import { WaiverShell, WaiverLoading, WaiverError, WaiverCompleted, WaiverSuccess } from '../../components/waiver/WaiverStates';
 import WaiverSuccessModal from '../../components/waiver/WaiverSuccessModal';
 import EscapeRoomGameBanner from '../../components/waiver/EscapeRoomGameBanner';
+import { celebrate } from '../../utils/celebrate';
 
 const WaiverKioskSession = () => {
   const { token } = useParams<{ token: string }>();
@@ -81,6 +82,7 @@ const WaiverKioskSession = () => {
       setCompletedWaiverRef(res?.data?.reference_number ?? null);
       setSignerFirstName(data.adult_first_name);
       setDone(true);
+      celebrate();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };

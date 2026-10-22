@@ -22,6 +22,7 @@ import { dayOffService, type DayOff } from '../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../utils/dayOffClosure';
 import { customerService, type Customer } from '../../services/CustomerService';
 import { getImageUrl, ASSET_URL, getStoredUser } from '../../utils/storage';
+import { celebrate } from '../../utils/celebrate';
 import ScheduleHelpModal from '../../components/customer/ScheduleHelpModal';
 import CallToBookPanel from '../../components/customer/CallToBookPanel';
 import CallToBookModal from '../../components/customer/CallToBookModal';
@@ -922,6 +923,7 @@ const PurchaseEvent = () => {
             const stillInCart = removeOrderedItems(cart, createErr.order);
             setToast({ message: stillInCart > 0 ? `${createErr.message} The other items in your cart still need checking out.` : createErr.message, type: 'success' });
             setPurchaseComplete(true);
+            if (!staffSession) celebrate();
             setCurrentStep(4);
             return;
           }
@@ -944,6 +946,7 @@ const PurchaseEvent = () => {
           cart.clear();
           setToast({ message: 'Order confirmed!', type: 'success' });
           setPurchaseComplete(true);
+          if (!staffSession) celebrate();
           setCurrentStep(4);
           return;
         }
@@ -989,6 +992,7 @@ const PurchaseEvent = () => {
         checkoutKeyRef.current = newCheckoutKey();
         cart.clear();
         setPurchaseComplete(true);
+        if (!staffSession) celebrate();
         setCurrentStep(4);
         return;
       }
@@ -1061,6 +1065,7 @@ const PurchaseEvent = () => {
           setToast({ message: refusal.data.message || 'This purchase already went through, so your card was not charged again.', type: 'success' });
           checkoutKeyRef.current = newCheckoutKey();
           setPurchaseComplete(true);
+          if (!staffSession) celebrate();
           setCurrentStep(4);
           return;
         }
@@ -1079,6 +1084,7 @@ const PurchaseEvent = () => {
         checkoutKeyRef.current = newCheckoutKey();
         setToast({ message: 'Purchase confirmed!', type: 'success' });
         setPurchaseComplete(true);
+        if (!staffSession) celebrate();
         setCurrentStep(4);
         return;
       }
@@ -1151,6 +1157,7 @@ const PurchaseEvent = () => {
       localStorage.setItem('_lastEventPurchaseTime', Date.now().toString());
 
       setPurchaseComplete(true);
+      if (!staffSession) celebrate();
       setCurrentStep(4);
     } catch (err: unknown) {
       const errorMsg = getPaymentErrorMessage(err);
