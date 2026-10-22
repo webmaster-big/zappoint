@@ -124,10 +124,14 @@ export interface PhotoRecord {
   location_name?: string | null;
 }
 
+export type PhotoRecipientSource = 'waiver' | 'registration';
+
 export interface PhotoDeliveryRecord {
   id: number;
   photo_session_id: number;
   waiver_id: number | null;
+  registration_entry_id?: number | null;
+  recipient_source?: PhotoRecipientSource | null;
   kind: PhotoDeliveryKind;
   channel: PhotoChannel;
   destination_masked: string;
@@ -198,6 +202,7 @@ export interface PhotoSessionRecord {
   delivery_status: SessionDeliveryStatus;
   deliveries: PhotoDeliveryRecord[];
   waivers: Array<{ id: number; name: string }>;
+  registrations?: Array<{ id: number; name: string; event_name: string | null }>;
   captured_at: string | null;
   capture_date: string | null;
   operating_day: string | null;
@@ -246,6 +251,38 @@ export interface PhotoWaiverMatch {
   location_name: string | null;
   signed_on: string | null;
   visit_date: string | null;
+}
+
+export interface PhotoWaiverRecipient extends PhotoWaiverMatch {
+  kind: 'waiver';
+}
+
+export interface PhotoRegistrationMatch {
+  kind: 'registration';
+  id: number;
+  name: string;
+  email_masked: string | null;
+  phone_masked: string | null;
+  has_email: boolean;
+  has_phone: boolean;
+  can_email: boolean;
+  can_text: boolean;
+  contactable: boolean;
+  unavailable_reason: string | null;
+  photo_video_consent: boolean | null;
+  event_name: string | null;
+  first_day: string | null;
+  event_date: string | null;
+  covers_photo_day: boolean;
+  registered_on: string | null;
+}
+
+export type PhotoRecipientMatch = PhotoWaiverRecipient | PhotoRegistrationMatch;
+
+export interface PhotoPeopleSearchResult {
+  reference_day: string | null;
+  waivers: PhotoWaiverRecipient[];
+  registrations: PhotoRegistrationMatch[];
 }
 
 export interface PhotoCaptureContext {
@@ -320,11 +357,27 @@ export interface SlideshowQueueResponse {
   cutoff_hour: number;
 }
 
+export interface PhotoOverlayEvent {
+  id: number;
+  name: string;
+  first_day: string;
+  event_date: string;
+  day_count: number;
+  window_start: string | null;
+  window_end: string | null;
+  effective_start: string | null;
+  effective_end: string | null;
+  location_form_removed: boolean;
+  never_runs: boolean;
+}
+
 export interface PhotoOverlayRecord {
   id: number;
   location_id: number;
   package_id?: number | null;
   room_name?: string | null;
+  registration_event_id?: number | null;
+  event?: PhotoOverlayEvent | null;
   name: string;
   image_url: string | null;
   starts_at: string | null;
@@ -343,7 +396,41 @@ export interface PhotoOverlayConflict {
   conflicts_with_id: number;
   conflicts_with_name: string;
   winner_id: number;
+  winner_name?: string | null;
   location_id?: number;
+}
+
+export interface PhotoOverlayCopies {
+  created: Array<{ overlay_id: number; location_name: string | null }>;
+  skipped: Array<{ location_name: string | null; reason: string | null }>;
+}
+
+export interface PhotoEventDaySibling {
+  form_id: number;
+  location_id: number;
+  location_name: string | null;
+  first_day: string;
+  event_date: string;
+  usable: boolean;
+  reason: string | null;
+}
+
+export interface PhotoEventDay {
+  id: number;
+  name: string;
+  event_date: string;
+  first_day: string;
+  day_count: number;
+  group_id: number | null;
+  window_start: string | null;
+  window_end: string | null;
+  has_frame: boolean;
+  siblings: PhotoEventDaySibling[];
+}
+
+export interface PhotoEventDaysResponse {
+  available: boolean;
+  forms: PhotoEventDay[];
 }
 
 export interface PhotoOverlayResponse {

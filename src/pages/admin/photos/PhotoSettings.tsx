@@ -44,7 +44,7 @@ const BACKGROUND_LABELS: Record<string, string> = {
 };
 
 const KIND_LABELS: Record<string, string> = {
-  immediate: 'Immediate waiver delivery',
+  immediate: 'Immediate delivery',
   next_day: '9:00 AM next-day delivery',
   kiosk: 'Kiosk delivery',
   escape_room: 'Escape-room group photo',
@@ -466,8 +466,9 @@ const PhotoSettings = () => {
             <section className="bg-white border border-gray-200 rounded-2xl p-5">
               <h2 className="font-semibold text-gray-900 mb-1">Delivery channels</h2>
               <p className="text-sm text-gray-600 mb-4">
-                Whether this site can actually send a photo link right now. Waivers that only carry an unavailable
-                channel are shown as not contactable, so staff are pointed at the direct QR code instead.
+                Whether this site can actually send a photo link right now. Waivers and event registrations that only
+                carry an unavailable channel are shown as not contactable, so staff are pointed at the direct QR code
+                instead.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

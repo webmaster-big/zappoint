@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import photoService from '../../../services/PhotoService';
 import type { PhotoDeliveryRecord, PhotoSendOutcome } from '../../../types/photo.types';
-import { OUTCOME_TONE_BADGE, channelName, mergeDeliveries } from '../../../utils/photoDeliveryOutcome';
+import { OUTCOME_TONE_BADGE, channelName, mergeDeliveries, recipientLabel } from '../../../utils/photoDeliveryOutcome';
 
 const POLL_INTERVAL_MS = 5000;
 const PAUSED_INTERVAL_MS = 60000;
@@ -249,7 +249,7 @@ const DeliveryOutcomePanel = ({ outcome, deliveries, onResultChange }: DeliveryO
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-900 break-words">
                     {channelName(delivery)} · {delivery.destination_masked}
-                    {delivery.recipient_name && <span className="text-gray-500"> · {delivery.recipient_name}</span>}
+                    {recipientLabel(delivery) && <span className="text-gray-500"> · {recipientLabel(delivery)}</span>}
                   </p>
                   <OutcomeBadge delivery={delivery} polling={polling} className="mt-1 inline-flex sm:hidden" />
                   {delivery.outcome_detail && <p className="mt-0.5 text-xs text-gray-600">{delivery.outcome_detail}</p>}

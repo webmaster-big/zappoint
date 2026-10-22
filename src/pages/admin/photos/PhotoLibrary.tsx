@@ -10,7 +10,6 @@ import {
   Images,
   MapPin,
   RefreshCcw,
-  Search,
   Send,
   Trash2,
   X,
@@ -19,16 +18,18 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
 import { confirmPhotoRelease, releaseConfirmMessage } from '../../../utils/photoRelease';
+import { receivingCount, recipientIds } from '../../../utils/photoRecipients';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import DeliveryOutcomePanel from '../../../components/admin/photos/DeliveryOutcomePanel';
+import RecipientPicker from '../../../components/admin/photos/RecipientPicker';
 import type {
   PhotoLibraryResponse,
+  PhotoRecipientMatch,
   PhotoRecord,
   PhotoSendOutcome,
   PhotoSessionRecord,
-  PhotoWaiverMatch,
 } from '../../../types/photo.types';
 
 const errorMessage = (e: unknown, fallback: string): string =>
@@ -76,10 +77,8 @@ const PhotoLibrary = () => {
 
   const [sendFor, setSendFor] = useState<PhotoRecord | null>(null);
   const [sendResult, setSendResult] = useState<{ outcome: PhotoSendOutcome; session: PhotoSessionRecord } | null>(null);
-  const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<PhotoWaiverMatch[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [chosen, setChosen] = useState<number[]>([]);
+  const [chosen, setChosen] = useState<PhotoRecipientMatch[]>([]);
+  const [textRegistrants, setTextRegistrants] = useState(false);
   const [schedule, setSchedule] = useState<'immediate' | 'next_day_9am'>('immediate');
   const [sending, setSending] = useState(false);
 
@@ -194,23 +193,27 @@ const PhotoLibrary = () => {
     [load],
   );
 
-  const runSearch = useCallback(async () => {
-    if (query.trim().length < 2) return;
-    setSearching(true);
-    try {
-      setMatches(await photoService.searchWaivers(query.trim(), effectiveLocationId));
-    } catch (e) {
-      setToast({ message: errorMessage(e, 'The waiver search failed.'), type: 'error' });
-    } finally {
-      setSearching(false);
-    }
-  }, [effectiveLocationId, query]);
+  const showError = useCallback((message: string) => setToast({ message, type: 'error' }), []);
+
+  const openSend = useCallback((photo: PhotoRecord) => {
+    setSendFor(photo);
+    setSendResult(null);
+    setChosen([]);
+    setTextRegistrants(false);
+  }, []);
+
+  const closeSend = useCallback(() => {
+    setSendFor(null);
+    setSendResult(null);
+    setChosen([]);
+    setTextRegistrants(false);
+  }, []);
 
   const send = useCallback(async () => {
-    if (!sendFor || chosen.length === 0) return;
+    if (!sendFor || receivingCount(chosen, textRegistrants) === 0) return;
     setSending(true);
     try {
-      const result = await photoService.sendPhoto(sendFor.id, { waiver_ids: chosen, schedule });
+      const result = await photoService.sendPhoto(sendFor.id, { ...recipientIds(chosen, textRegistrants), schedule });
       if (result.outcome) {
         setSendResult({ outcome: result.outcome, session: result.data });
       } else {
@@ -218,15 +221,14 @@ const PhotoLibrary = () => {
         setSendFor(null);
       }
       setChosen([]);
-      setMatches([]);
-      setQuery('');
+      setTextRegistrants(false);
       void load();
     } catch (e) {
       setToast({ message: errorMessage(e, 'That send failed.'), type: 'error' });
     } finally {
       setSending(false);
     }
-  }, [chosen, load, schedule, sendFor]);
+  }, [chosen, load, schedule, sendFor, textRegistrants]);
 
   if (!effectiveLocationId) {
     return (
@@ -245,6 +247,7 @@ const PhotoLibrary = () => {
   }
 
   const fieldCls = `border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600`;
+  const sendCount = receivingCount(chosen, textRegistrants);
 
   return (
     <div className="min-h-screen px-4 sm:px-6 py-8">
@@ -445,12 +448,7 @@ const PhotoLibrary = () => {
                         {!escapeRoomNote(photo) && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setSendFor(photo);
-                              setChosen([]);
-                              setMatches([]);
-                              setQuery('');
-                            }}
+                            onClick={() => openSend(photo)}
                             disabled={photo.session?.access_status !== 'active'}
                             className="flex-1 inline-flex items-center justify-center gap-1 text-xs border border-gray-200 rounded-lg py-1.5 hover:bg-gray-50 disabled:opacity-40"
                           >
@@ -614,11 +612,9 @@ const PhotoLibrary = () => {
               <h2 className="font-semibold text-gray-900">{sendResult ? 'How it went' : 'Send this photo again'}</h2>
               <button
                 type="button"
-                onClick={() => {
-                  setSendFor(null);
-                  setSendResult(null);
-                }}
+                onClick={closeSend}
                 aria-label="Close"
+                className="-mr-2 inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -631,73 +627,31 @@ const PhotoLibrary = () => {
                   outcome={sendResult.outcome}
                   deliveries={sendResult.session.deliveries}
                 />
-                <StandardButton
-                  className="mt-5"
-                  fullWidth
-                  onClick={() => {
-                    setSendFor(null);
-                    setSendResult(null);
-                  }}
-                >
+                <StandardButton className="mt-5" fullWidth onClick={closeSend}>
                   Done
                 </StandardButton>
               </div>
             ) : (
               <div className="p-5">
                 <p className="text-sm text-gray-600 mb-4">
-                  This uses the normal waiver message delivery flow, and the action is recorded in the activity log.
+                  Find the guest&apos;s waiver or event registration. Event registrations are listed for the day this
+                  photo was taken. The photo goes out as the usual email or text, and the send is recorded in the
+                  activity log.
                 </p>
 
-                <div className="flex gap-2 mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void runSearch();
-                      }}
-                      placeholder="Name, phone or email"
-                      className={`w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
-                    />
-                  </div>
-                  <StandardButton size="sm" onClick={() => void runSearch()} loading={searching}>
-                    Search
-                  </StandardButton>
+                <div className="mb-5">
+                  <RecipientPicker
+                    key={sendFor.id}
+                    variant="library"
+                    photoSessionId={sendFor.photo_session_id}
+                    locationId={effectiveLocationId}
+                    selected={chosen}
+                    onSelectedChange={setChosen}
+                    textRegistrants={textRegistrants}
+                    onTextRegistrantsChange={setTextRegistrants}
+                    onError={showError}
+                  />
                 </div>
-
-                <ul className="space-y-2 max-h-56 overflow-y-auto mb-4">
-                  {matches.map((waiver) => (
-                    <li key={waiver.id}>
-                      <label
-                        className={`flex items-start gap-3 rounded-xl border p-3 ${
-                          waiver.contactable ? 'cursor-pointer border-gray-200' : 'border-gray-200 bg-gray-50'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={chosen.includes(waiver.id)}
-                          disabled={!waiver.contactable}
-                          onChange={() =>
-                            setChosen((prev) =>
-                              prev.includes(waiver.id) ? prev.filter((id) => id !== waiver.id) : [...prev, waiver.id],
-                            )
-                          }
-                          className={`mt-1 h-4 w-4 accent-${themeColor}-700`}
-                        />
-                        <span className="flex-1">
-                          <span className="block text-sm font-medium text-gray-900">{waiver.name}</span>
-                          <span className="block text-xs text-gray-500">
-                            {waiver.email_masked || 'no email'} · {waiver.phone_masked || 'no phone'}
-                          </span>
-                          {!waiver.contactable && (
-                            <span className="text-[11px] text-amber-800">no contact method on this waiver</span>
-                          )}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
 
                 <div className="space-y-2 mb-5">
                   <label className="flex items-center gap-3 cursor-pointer text-sm">
@@ -722,8 +676,8 @@ const PhotoLibrary = () => {
                   </label>
                 </div>
 
-                <StandardButton fullWidth onClick={() => void send()} loading={sending} disabled={chosen.length === 0}>
-                  Send to {chosen.length} waiver{chosen.length === 1 ? '' : 's'}
+                <StandardButton fullWidth onClick={() => void send()} loading={sending} disabled={sendCount === 0}>
+                  Send to {sendCount} {sendCount === 1 ? 'person' : 'people'}
                 </StandardButton>
               </div>
             )}

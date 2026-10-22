@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowLeft,
   CalendarCheck,
+  Camera,
   CalendarClock,
   CalendarDays,
   ChevronDown,
@@ -391,6 +392,36 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
           <span className="font-semibold">This event</span> · {shortVenue} only
         </span>
       </div>
+
+      {event.photo_frames && (
+        <div className="flex items-start gap-2 text-sm text-gray-600">
+          <Camera className={`h-4 w-4 mt-0.5 flex-shrink-0 ${theme.icon}`} aria-hidden="true" />
+          {event.photo_frames.frames.length > 0 ? (
+            <p className="min-w-0">
+              Photo frame: <span className="font-medium text-gray-800">{event.photo_frames.frames[0].name}</span>
+              {!event.photo_frames.frames[0].is_enabled ? ' (turned off)' : event.photo_frames.frames[0].never_runs ? ' (never used)' : ''}
+              {event.photo_frames.frames.length > 1 ? ` +${event.photo_frames.frames.length - 1} more` : ''}
+              {' · used for photos on '}
+              {event.photo_frames.first_day === event.photo_frames.event_date
+                ? formatDateLong(event.photo_frames.event_date)
+                : `${formatDateLong(event.photo_frames.first_day)} – ${formatDateLong(event.photo_frames.event_date)}`}
+              {' · '}
+              <Link to="/photos/overlays" className={theme.link}>
+                Photo overlays
+              </Link>
+            </p>
+          ) : past ? (
+            <p>No photo frame. The event day has passed.</p>
+          ) : (
+            <p>
+              No photo frame.{' '}
+              <Link to={`/photos/overlays?event=${event.id}&location=${event.location_id}`} className={theme.link}>
+                Add one
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
 
       <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${hasPreviousEdition ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
         <RegistrationMetricTile

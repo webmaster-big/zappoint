@@ -79,6 +79,20 @@ export interface RegistrationCounts {
   hidden_entries: number;
 }
 
+export interface RegistrationPhotoFrame {
+  id: number;
+  name: string;
+  status: 'active' | 'scheduled' | 'expired' | 'disabled';
+  is_enabled: boolean;
+  never_runs: boolean;
+}
+
+export interface RegistrationPhotoFrames {
+  first_day: string;
+  event_date: string;
+  frames: RegistrationPhotoFrame[];
+}
+
 export interface RegistrationEventSummary {
   id: number;
   name: string;
@@ -100,6 +114,7 @@ export interface RegistrationEventSummary {
   next_edition: RegistrationEventEdition | null;
   total_entries: number;
   unique_registrations: number;
+  photo_frames?: RegistrationPhotoFrames;
   created_at: string | null;
   updated_at: string | null;
 }

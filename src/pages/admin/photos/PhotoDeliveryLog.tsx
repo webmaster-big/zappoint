@@ -8,7 +8,7 @@ import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PhotoDeliveryRecord } from '../../../types/photo.types';
-import { OUTCOME_TONE_BADGE, mergeDeliveries } from '../../../utils/photoDeliveryOutcome';
+import { OUTCOME_TONE_BADGE, mergeDeliveries, recipientLabel } from '../../../utils/photoDeliveryOutcome';
 
 const errorMessage = (e: unknown, fallback: string): string =>
   (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -246,7 +246,7 @@ const PhotoDeliveryLog = () => {
               onChange={(e) => { setIncludeDuplicates(e.target.checked); setPageNumber(1); }}
               className={`h-4 w-4 accent-${themeColor}-700`}
             />
-            Show deduplicated waiver links
+            Show deduplicated links
           </label>
         </div>
 
@@ -286,7 +286,7 @@ const PhotoDeliveryLog = () => {
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-gray-900">{delivery.destination_masked}</p>
-                      {delivery.recipient_name && <p className="text-xs text-gray-500">{delivery.recipient_name}</p>}
+                      {recipientLabel(delivery) && <p className="text-xs text-gray-500">{recipientLabel(delivery)}</p>}
                       {delivery.is_duplicate && (
                         <p className="text-xs text-amber-700">
                           same destination as #{delivery.duplicate_of_id} — recorded, not sent twice

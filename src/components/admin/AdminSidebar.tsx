@@ -153,7 +153,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Manage Accounts': 'View and edit user accounts',
     'Payments': 'Manage and view all payment transactions',
     'Photos': 'Capture, deliver and display customer photos',
-    'Take Photos': 'Capture up to three photos and send them to a waiver or a QR code',
+    'Take Photos': 'Capture up to three photos and send them by email or text, or show a QR code',
     'Escape Rooms': "The day's escape-room games: group photo, finish time and the send to that game's players",
     'Photo Library': 'Browse, download and resend photos grouped by operating day',
     'Slideshow Queue': 'Manage what the venue screen is showing right now',

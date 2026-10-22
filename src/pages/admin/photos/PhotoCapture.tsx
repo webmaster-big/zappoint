@@ -10,12 +10,9 @@ import {
   Image as ImageIcon,
   Mail,
   MapPin,
-  MessageSquare,
   QrCode,
-  Search,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -25,11 +22,14 @@ import photoService from '../../../services/PhotoService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import DeliveryOutcomePanel from '../../../components/admin/photos/DeliveryOutcomePanel';
+import RecipientPicker from '../../../components/admin/photos/RecipientPicker';
+import { receivingCount, recipientIds } from '../../../utils/photoRecipients';
+import { recipientLabel } from '../../../utils/photoDeliveryOutcome';
 import type {
   PhotoCaptureContext,
+  PhotoRecipientMatch,
   PhotoSendOutcome,
   PhotoSessionRecord,
-  PhotoWaiverMatch,
 } from '../../../types/photo.types';
 
 type Step = 'consent' | 'capture' | 'delivery' | 'done';
@@ -52,11 +52,8 @@ const PhotoCapture = () => {
 
   const [method, setMethod] = useState<'waiver_message' | 'staff_qr' | null>(null);
   const [schedule, setSchedule] = useState<'immediate' | 'next_day_9am'>('immediate');
-  const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<PhotoWaiverMatch[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [selected, setSelected] = useState<PhotoWaiverMatch[]>([]);
+  const [selected, setSelected] = useState<PhotoRecipientMatch[]>([]);
+  const [textRegistrants, setTextRegistrants] = useState(false);
   const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
   const [deliveryOutcome, setDeliveryOutcome] = useState<PhotoSendOutcome | null>(null);
   const [offerQr, setOfferQr] = useState(false);
@@ -81,6 +78,12 @@ const PhotoCapture = () => {
     [session],
   );
 
+  const applyContext = useCallback((ctx: PhotoCaptureContext) => {
+    setContext(ctx);
+    slideshowDefaultRef.current = ctx.slideshow_enabled && ctx.slideshow_auto_add_staff;
+    setSlideshowOptIn(slideshowDefaultRef.current);
+  }, []);
+
   useEffect(() => {
     if (!effectiveLocationId) {
       setContext(null);
@@ -91,11 +94,7 @@ const PhotoCapture = () => {
     (async () => {
       try {
         const ctx = await photoService.getCaptureContext(effectiveLocationId);
-        if (!cancelled) {
-          setContext(ctx);
-          slideshowDefaultRef.current = ctx.slideshow_enabled && ctx.slideshow_auto_add_staff;
-          setSlideshowOptIn(slideshowDefaultRef.current);
-        }
+        if (!cancelled) applyContext(ctx);
       } catch (e) {
         if (!cancelled) setToast({ message: errorMessage(e, 'Could not load this location.'), type: 'error' });
       }
@@ -104,7 +103,7 @@ const PhotoCapture = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveLocationId]);
+  }, [applyContext, effectiveLocationId]);
 
   const { requestMotionAccess } = camera;
   const startSession = useCallback(async () => {
@@ -112,8 +111,12 @@ const PhotoCapture = () => {
     requestMotionAccess();
     setBusy(true);
     try {
-      const created = await photoService.startSession(effectiveLocationId);
+      const [created, freshContext] = await Promise.all([
+        photoService.startSession(effectiveLocationId),
+        photoService.getCaptureContext(effectiveLocationId).catch(() => null),
+      ]);
       setSession(created);
+      if (freshContext) applyContext(freshContext);
       setStep('capture');
       await startCamera();
     } catch (e) {
@@ -121,7 +124,7 @@ const PhotoCapture = () => {
     } finally {
       setBusy(false);
     }
-  }, [consent, effectiveLocationId, requestMotionAccess, startCamera]);
+  }, [applyContext, consent, effectiveLocationId, requestMotionAccess, startCamera]);
 
   const takePhoto = useCallback(async () => {
     if (!session || atCap) return;
@@ -192,25 +195,7 @@ const PhotoCapture = () => {
     [session],
   );
 
-  const runSearch = useCallback(async () => {
-    if (query.trim().length < 2) return;
-    setSearching(true);
-    setSearched(false);
-    try {
-      setMatches(await photoService.searchWaivers(query.trim(), effectiveLocationId));
-      setSearched(true);
-    } catch (e) {
-      setToast({ message: errorMessage(e, 'The waiver search failed.'), type: 'error' });
-    } finally {
-      setSearching(false);
-    }
-  }, [effectiveLocationId, query]);
-
-  const toggleWaiver = useCallback((waiver: PhotoWaiverMatch) => {
-    setSelected((prev) =>
-      prev.some((w) => w.id === waiver.id) ? prev.filter((w) => w.id !== waiver.id) : [...prev, waiver],
-    );
-  }, []);
+  const showError = useCallback((message: string) => setToast({ message, type: 'error' }), []);
 
   const deliver = useCallback(async () => {
     if (!session || !method) return;
@@ -219,7 +204,7 @@ const PhotoCapture = () => {
       const result = await photoService.deliver(session.id, {
         method,
         schedule: method === 'waiver_message' ? schedule : undefined,
-        waiver_ids: method === 'waiver_message' ? selected.map((w) => w.id) : undefined,
+        ...(method === 'waiver_message' ? recipientIds(selected, textRegistrants) : {}),
         slideshow_opt_in: slideshowOptIn,
       });
       setSession(result.data);
@@ -233,7 +218,7 @@ const PhotoCapture = () => {
     } finally {
       setBusy(false);
     }
-  }, [method, schedule, selected, session, slideshowOptIn, stopCamera]);
+  }, [method, schedule, selected, session, slideshowOptIn, stopCamera, textRegistrants]);
 
   const resetAll = useCallback(() => {
     stopCamera();
@@ -242,10 +227,8 @@ const PhotoCapture = () => {
     setConsent(false);
     setMethod(null);
     setSchedule('immediate');
-    setQuery('');
-    setMatches([]);
-    setSearched(false);
     setSelected([]);
+    setTextRegistrants(false);
     setDeliveryNote(null);
     setDeliveryOutcome(null);
     setOfferQr(false);
@@ -283,7 +266,7 @@ const PhotoCapture = () => {
     );
   }
 
-  const selectableCount = selected.filter((w) => w.contactable).length;
+  const selectableCount = receivingCount(selected, textRegistrants);
 
   return (
     <div className="min-h-screen px-4 sm:px-6 py-8">
@@ -424,7 +407,7 @@ const PhotoCapture = () => {
                   This session ({photoCount}/{maxPhotos})
                 </h2>
                 <p className="text-xs text-gray-500 mb-4">
-                  Each photo already carries the location overlay and the capture date.
+                  Each photo already carries today&apos;s overlay and the capture date.
                 </p>
 
                 {photoCount === 0 && (
@@ -524,12 +507,13 @@ const PhotoCapture = () => {
               >
                 <div className="flex items-center gap-2 mb-2">
                   <Mail className={`w-5 h-5 text-${themeColor}-700`} />
-                  <span className="font-semibold text-gray-900">Waiver message delivery</span>
+                  <span className="font-semibold text-gray-900">Send by email or text</span>
                   <span className="ml-auto text-[11px] uppercase tracking-wide text-gray-500">Default</span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Search completed waivers by name, phone or email. Every available email and mobile number on the
-                  waivers you pick receives the secure link.
+                  Search waivers and event registrations by name, phone or email. Every available email and mobile
+                  number on the waivers you pick receives the secure link. Event registrations get it by email, and by
+                  text only when the guest asked for one.
                 </p>
               </button>
 
@@ -573,111 +557,17 @@ const PhotoCapture = () => {
                   </div>
                 )}
 
-                <h2 className="font-semibold text-gray-900 mb-3">Find the waiver</h2>
-                <div className="flex gap-2 mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void runSearch();
-                      }}
-                      placeholder="Name, phone or email"
-                      className={`w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600`}
-                    />
-                  </div>
-                  <StandardButton onClick={() => void runSearch()} loading={searching} disabled={query.trim().length < 2}>
-                    Search
-                  </StandardButton>
-                </div>
-
-                {searched && matches.length === 0 && (
-                  <p className="text-sm text-gray-500 py-4">No completed waivers matched that search.</p>
-                )}
-
-                <ul className="space-y-2 max-h-80 overflow-y-auto">
-                  {matches.map((waiver) => {
-                    const checked = selected.some((w) => w.id === waiver.id);
-                    return (
-                      <li key={waiver.id}>
-                        <label
-                          className={`flex items-start gap-3 rounded-xl border p-3 ${
-                            waiver.contactable
-                              ? `cursor-pointer ${checked ? `border-${themeColor}-600 bg-${themeColor}-50/50` : 'border-gray-200'}`
-                              : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={!waiver.contactable}
-                            onChange={() => toggleWaiver(waiver)}
-                            className={`mt-1 h-4 w-4 accent-${themeColor}-700`}
-                          />
-                          <span className="flex-1 min-w-0">
-                            <span className="block text-sm font-medium text-gray-900">{waiver.name}</span>
-                            <span className="block text-xs text-gray-500">
-                              {waiver.email_masked || 'no email'} · {waiver.phone_masked || 'no phone'}
-                              {waiver.signed_on && ` · signed ${waiver.signed_on}`}
-                            </span>
-                            <span className="mt-1 flex flex-wrap gap-1">
-                              {waiver.unavailable_reason && (
-                                <span className="text-[11px] rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
-                                  {waiver.unavailable_reason}
-                                </span>
-                              )}
-                              {waiver.has_email && (
-                                <span className="inline-flex items-center gap-1 text-[11px] rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
-                                  <Mail className="w-3 h-3" /> email
-                                </span>
-                              )}
-                              {waiver.has_phone && (
-                                <span className="inline-flex items-center gap-1 text-[11px] rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
-                                  <MessageSquare className="w-3 h-3" /> SMS
-                                </span>
-                              )}
-                              {waiver.photo_video_consent === false && (
-                                <span className="text-[11px] rounded-full bg-red-100 px-2 py-0.5 text-red-800">
-                                  declined the photo release
-                                </span>
-                              )}
-                              {waiver.photo_video_consent === null && (
-                                <span className="text-[11px] rounded-full bg-gray-200 px-2 py-0.5 text-gray-700">
-                                  photo release never asked
-                                </span>
-                              )}
-                            </span>
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-
-                {selected.length > 0 && (
-                  <div className="mt-4 border-t border-gray-100 pt-4">
-                    <p className="text-sm font-medium text-gray-900 mb-2">
-                      Selected ({selectableCount} will receive the link)
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {selected.map((waiver) => (
-                        <span
-                          key={waiver.id}
-                          className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-800"
-                        >
-                          {waiver.name}
-                          <button type="button" onClick={() => toggleWaiver(waiver)} aria-label={`Remove ${waiver.name}`}>
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-xs text-gray-500">
-                      Waivers that share an email or mobile number are recorded individually but only sent once.
-                    </p>
-                  </div>
-                )}
+                <RecipientPicker
+                  heading="Find the waiver or registration"
+                  variant="capture"
+                  photoSessionId={session.id}
+                  locationId={effectiveLocationId}
+                  selected={selected}
+                  onSelectedChange={setSelected}
+                  textRegistrants={textRegistrants}
+                  onTextRegistrantsChange={setTextRegistrants}
+                  onError={showError}
+                />
 
                 <div className="mt-5 border-t border-gray-100 pt-4">
                   <p className="text-sm font-medium text-gray-900 mb-2">When should it go out?</p>
@@ -794,8 +684,11 @@ const PhotoCapture = () => {
                   <ul className="space-y-1 text-sm">
                     {session.deliveries.map((delivery) => (
                       <li key={delivery.id} className="flex items-center justify-between gap-3">
-                        <span className="text-gray-700">
+                        <span className="min-w-0 break-words text-gray-700">
                           {delivery.channel === 'email' ? 'Email' : 'SMS'} · {delivery.destination_masked}
+                          {recipientLabel(delivery) && (
+                            <span className="text-gray-500"> · {recipientLabel(delivery)}</span>
+                          )}
                           {delivery.is_duplicate && (
                             <span className="ml-2 text-xs text-gray-500">(same destination — not sent twice)</span>
                           )}

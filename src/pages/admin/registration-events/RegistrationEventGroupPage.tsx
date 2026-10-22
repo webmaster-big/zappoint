@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowLeft,
   CalendarDays,
+  Camera,
   ChevronRight,
   ClipboardList,
   CopyPlus,
@@ -373,6 +374,14 @@ const RegistrationEventGroupView = ({ groupId }: { groupId: number }) => {
                         <Users className="h-4 w-4 text-gray-400" aria-hidden="true" />
                         {form.total_entries} entr{form.total_entries === 1 ? 'y' : 'ies'} · {form.unique_registrations} unique
                       </span>
+                      {form.photo_frames && (
+                        <span className="inline-flex items-center gap-1.5 min-w-0">
+                          <Camera className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                          <span className="truncate">
+                            {form.photo_frames.frames.length > 0 ? `Frame: ${form.photo_frames.frames[0].name}` : 'No frame'}
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <StandardButton

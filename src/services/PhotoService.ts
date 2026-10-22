@@ -10,10 +10,15 @@ import type {
   PhotoCaptureContext,
   PhotoChannel,
   PhotoDeliveryRecord,
+  PhotoEventDaysResponse,
   PhotoLibraryResponse,
   PhotoMessageTemplateRecord,
+  PhotoOverlayCopies,
+  PhotoOverlayRecord,
   PhotoOverlayResponse,
+  PhotoPeopleSearchResult,
   PhotoRecord,
+  PhotoRegistrationMatch,
   PhotoSendOutcome,
   PhotoSessionRecord,
   PhotoSettingsResponse,
@@ -80,6 +85,30 @@ const deviceHeaders = (token: string | null, sessionSecret?: string) => {
   return { headers };
 };
 
+const responseOf = (error: unknown) =>
+  (error as { response?: { status?: number; data?: { message?: unknown } } })?.response;
+
+const isMissingRoute = (error: unknown): boolean => {
+  const response = responseOf(error);
+  if (response?.status !== 404) return false;
+  const message = response.data?.message;
+  return typeof message !== 'string' || /route .*could not be found/i.test(message);
+};
+
+const searchWaiverRows = async (q: string, locationId?: number | null): Promise<PhotoWaiverMatch[]> =>
+  (await api.get('/photo-sessions/waiver-search', {
+    params: locationId != null ? { q, location_id: locationId } : { q },
+  })).data.data;
+
+const asWaiverRecipients = (rows: PhotoWaiverMatch[] | null | undefined) =>
+  (Array.isArray(rows) ? rows : []).map((row) => ({ ...row, kind: 'waiver' as const }));
+
+type RecipientIds = {
+  waiver_ids?: number[];
+  registration_entry_ids?: number[];
+  text_registrants?: boolean;
+};
+
 const photoService = {
   // ---- staff capture and delivery ----
   getCaptureContext: async (locationId: number): Promise<PhotoCaptureContext> =>
@@ -112,17 +141,35 @@ const photoService = {
   reorderPhotos: async (sessionId: number, order: number[]): Promise<PhotoSessionRecord> =>
     (await api.post(`/photo-sessions/${sessionId}/photos/reorder`, { order })).data.data,
 
-  searchWaivers: async (q: string, locationId?: number | null): Promise<PhotoWaiverMatch[]> =>
-    (await api.get('/photo-sessions/waiver-search', {
-      params: locationId != null ? { q, location_id: locationId } : { q },
-    })).data.data,
+  searchWaivers: searchWaiverRows,
+
+  searchPeople: async (q: string, photoSessionId: number, locationId?: number | null): Promise<PhotoPeopleSearchResult> => {
+    try {
+      const data = (await api.get('/photo-sessions/people-search', { params: { q, photo_session_id: photoSessionId } }))
+        .data.data as Partial<{
+          reference_day: string | null;
+          waivers: PhotoWaiverMatch[];
+          registrations: Omit<PhotoRegistrationMatch, 'kind'>[];
+        }> | null;
+      return {
+        reference_day: data?.reference_day ?? null,
+        waivers: asWaiverRecipients(data?.waivers),
+        registrations: (Array.isArray(data?.registrations) ? data.registrations : []).map((row) => ({
+          ...row,
+          kind: 'registration' as const,
+        })),
+      };
+    } catch (error) {
+      if (!isMissingRoute(error)) throw error;
+      return { reference_day: null, waivers: asWaiverRecipients(await searchWaiverRows(q, locationId)), registrations: [] };
+    }
+  },
 
   deliver: async (
     sessionId: number,
-    payload: {
+    payload: RecipientIds & {
       method: 'waiver_message' | 'staff_qr';
       schedule?: string;
-      waiver_ids?: number[];
       slideshow_opt_in?: boolean;
     },
   ): Promise<{ data: PhotoSessionRecord; message?: string; outcome?: PhotoSendOutcome }> => {
@@ -151,7 +198,7 @@ const photoService = {
 
   sendPhoto: async (
     photoId: number,
-    payload: { waiver_ids: number[]; schedule?: string },
+    payload: RecipientIds & { schedule?: string },
   ): Promise<{ data: PhotoSessionRecord; message?: string; outcome?: PhotoSendOutcome }> => {
     const res = await api.post(`/photo-library/${photoId}/send`, payload);
     return { data: res.data.data, message: res.data.message, outcome: res.data.outcome };
@@ -204,8 +251,32 @@ const photoService = {
   getOverlays: async (locationId: number): Promise<PhotoOverlayResponse> =>
     (await api.get('/photo-overlays', { params: { location_id: locationId } })).data.data,
 
-  createOverlay: async (form: FormData) =>
-    (await api.post('/photo-overlays', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data.data,
+  getEventDays: async (locationId: number): Promise<PhotoEventDaysResponse> => {
+    try {
+      const data = (await api.get('/photo-overlays/event-days', { params: { location_id: locationId } })).data.data as
+        | Partial<PhotoEventDaysResponse>
+        | null;
+      return {
+        available: Boolean(data?.available),
+        forms: Array.isArray(data?.forms) ? data.forms : [],
+      };
+    } catch (error) {
+      if (responseOf(error)?.status === 404) return { available: false, forms: [] };
+      throw error;
+    }
+  },
+
+  createOverlay: async (form: FormData): Promise<{ overlay: PhotoOverlayRecord; copies: PhotoOverlayCopies }> => {
+    const res = await api.post('/photo-overlays', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const copies = res.data.copies as Partial<PhotoOverlayCopies> | null | undefined;
+    return {
+      overlay: res.data.data,
+      copies: {
+        created: Array.isArray(copies?.created) ? copies.created : [],
+        skipped: Array.isArray(copies?.skipped) ? copies.skipped : [],
+      },
+    };
+  },
 
   updateOverlay: async (overlayId: number, form: FormData) =>
     (await api.post(`/photo-overlays/${overlayId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } })).data

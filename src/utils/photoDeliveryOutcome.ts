@@ -25,6 +25,11 @@ export const TEXTING_STATE_CARD: Record<PhotoTextingState, string> = {
 export const channelName = (delivery: Pick<PhotoDeliveryRecord, 'channel'>): string =>
   delivery.channel === 'email' ? 'Email' : 'Text message';
 
+export const recipientLabel = (delivery: Pick<PhotoDeliveryRecord, 'recipient_name' | 'recipient_source'>): string =>
+  [delivery.recipient_name, delivery.recipient_source === 'registration' ? 'Event registration' : null]
+    .filter(Boolean)
+    .join(' · ');
+
 export const mergeDeliveries = (
   current: PhotoDeliveryRecord[],
   updates: PhotoDeliveryRecord[],
