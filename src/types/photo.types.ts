@@ -489,17 +489,35 @@ export interface PhotoSettingsResponse {
 export interface PhotoMessageTemplateRecord {
   id: number;
   company_id: number | null;
-  kind: 'immediate' | 'next_day' | 'kiosk' | 'escape_room';
+  kind: 'immediate' | 'next_day' | 'kiosk' | 'escape_room' | 'registration';
   email_subject: string;
   email_body: string;
   sms_body: string;
   is_active: boolean;
+  attach_photos?: boolean;
+}
+
+export interface PhotoMessageLink {
+  id: number;
+  key: string;
+  variable: string;
+  label: string;
+  default_url: string | null;
+  urls: { location_id: number; url: string }[];
+}
+
+export interface PhotoMessageLinksResponse {
+  links: PhotoMessageLink[];
+  locations: { id: number; name: string }[];
+  can_manage_links: boolean;
+  max_links: number;
 }
 
 export interface PhotoTemplatesResponse {
   templates: PhotoMessageTemplateRecord[];
   variables: string[];
   variables_by_kind?: Record<string, string[]>;
+  link_variables?: { variable: string; label: string }[];
   kinds: string[];
   escape_room_email?: { id: number; name: string; is_active: boolean; rooms_without_email?: string[]; emails?: Array<{ id: number; name: string; rooms: string[] }> } | null;
 }

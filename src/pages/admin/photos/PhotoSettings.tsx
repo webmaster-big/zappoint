@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { followUpEmailName } from '../../../utils/visitFollowUpNotice';
 import {
   Copy,
@@ -21,7 +21,8 @@ import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import EmailInput from '../../../components/ui/EmailInput';
-import type { PhotoChannel, PhotoMessageTemplateRecord, PhotoSettingsResponse } from '../../../types/photo.types';
+import MessageLinksPanel from '../../../components/admin/photos/MessageLinksPanel';
+import type { PhotoChannel, PhotoMessageLink, PhotoMessageTemplateRecord, PhotoSettingsResponse } from '../../../types/photo.types';
 import { TEXTING_STATE_BADGE, TEXTING_STATE_CARD } from '../../../utils/photoDeliveryOutcome';
 
 const TEST_POLL_INTERVAL_MS = 4000;
@@ -48,6 +49,7 @@ const KIND_LABELS: Record<string, string> = {
   next_day: '9:00 AM next-day delivery',
   kiosk: 'Kiosk delivery',
   escape_room: 'Escape-room group photo',
+  registration: 'Event registration photos',
 };
 
 const ChannelTest = ({
@@ -217,6 +219,12 @@ const PhotoSettings = () => {
   const [templateDraft, setTemplateDraft] = useState<Record<number, PhotoMessageTemplateRecord>>({});
   const [templateTestTo, setTemplateTestTo] = useState<Record<number, string>>({});
   const [templateTesting, setTemplateTesting] = useState<number | null>(null);
+  const [linkVariables, setLinkVariables] = useState<string[]>([]);
+  const routeLocation = useLocation();
+  const openedFromHash = useRef(false);
+
+  const notify = useCallback((message: string, type: 'success' | 'error' | 'info') => setToast({ message, type }), []);
+  const handleLinksChanged = useCallback((links: PhotoMessageLink[]) => setLinkVariables(links.map((link) => link.variable)), []);
 
   const [resettingTexting, setResettingTexting] = useState(false);
   const canResetTexting = ['company_admin', 'admin'].includes(String(getStoredUser()?.role ?? ''));
@@ -306,6 +314,7 @@ const PhotoSettings = () => {
       setTemplates(templateData.templates);
       setVariables(templateData.variables);
       setVariablesByKind(templateData.variables_by_kind ?? null);
+      setLinkVariables((templateData.link_variables ?? []).map((link) => link.variable));
       setEscapeRoomEmail(templateData.escape_room_email ?? null);
       setTemplateDraft(
         Object.fromEntries(templateData.templates.map((t) => [t.id, t])) as Record<number, PhotoMessageTemplateRecord>,
@@ -376,6 +385,7 @@ const PhotoSettings = () => {
           email_subject: draft.email_subject,
           email_body: draft.email_body,
           sms_body: draft.sms_body,
+          ...(draft.kind === 'registration' ? { is_active: draft.is_active, attach_photos: Boolean(draft.attach_photos) } : {}),
         });
         setToast({ message: 'Template saved.', type: 'success' });
         await load();
@@ -403,6 +413,15 @@ const PhotoSettings = () => {
     },
     [load],
   );
+
+  useEffect(() => {
+    if (openedFromHash.current || routeLocation.hash !== '#registration-email') return;
+    const registration = templates.find((template) => template.kind === 'registration');
+    if (!registration) return;
+    openedFromHash.current = true;
+    setOpenTemplate(registration.id);
+    window.setTimeout(() => document.getElementById('registration-email')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }, [routeLocation.hash, templates]);
 
   if (!effectiveLocationId) {
     return (
@@ -974,10 +993,10 @@ const PhotoSettings = () => {
                 {templates.map((template) => {
                   const draft = templateDraft[template.id] ?? template;
                   const open = openTemplate === template.id;
-                  const templateVariables = variablesByKind?.[template.kind] ?? variables;
+                  const templateVariables = [...(variablesByKind?.[template.kind] ?? variables), ...linkVariables];
 
                   return (
-                    <div key={template.id} className="rounded-xl border border-gray-100">
+                    <div key={template.id} id={template.kind === 'registration' ? 'registration-email' : undefined} className="rounded-xl border border-gray-100 scroll-mt-4">
                       <button
                         type="button"
                         onClick={() => setOpenTemplate(open ? null : template.id)}
@@ -989,6 +1008,32 @@ const PhotoSettings = () => {
 
                       {open && (
                         <div className="px-4 pb-4 space-y-3">
+                          {template.kind === 'registration' && (
+                            <div className="rounded-lg bg-gray-50 border border-gray-100 p-3 space-y-2">
+                              <p className="text-sm text-gray-700">
+                                Used for every photo sent to someone who registered for an event, from the photo screen or the photo
+                                library. Change the wording between events; {'{{event_name}}'} and {'{{event_date}}'} fill in by themselves.
+                              </p>
+                              <label className="flex items-start gap-2 text-sm text-gray-800">
+                                <input
+                                  type="checkbox"
+                                  checked={draft.is_active}
+                                  onChange={(e) => setTemplateDraft((prev) => ({ ...prev, [template.id]: { ...draft, is_active: e.target.checked } }))}
+                                  className="mt-1 h-4 w-4"
+                                />
+                                <span>Use this email for event registrations (when off, registrants get the usual photo email)</span>
+                              </label>
+                              <label className="flex items-start gap-2 text-sm text-gray-800">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(draft.attach_photos)}
+                                  onChange={(e) => setTemplateDraft((prev) => ({ ...prev, [template.id]: { ...draft, attach_photos: e.target.checked } }))}
+                                  className="mt-1 h-4 w-4"
+                                />
+                                <span>Attach the photos to the email as well as the link</span>
+                              </label>
+                            </div>
+                          )}
                           <p className="text-xs text-gray-500">
                             Variables for this message: {templateVariables.map((v) => `{{${v}}}`).join(', ')}
                           </p>
@@ -1071,6 +1116,29 @@ const PhotoSettings = () => {
                                 className={fieldCls}
                               />
                               <p className="mt-1 text-xs text-gray-500">{draft.sms_body.length} characters</p>
+                              {template.kind === 'registration' && (
+                                <div className="mt-3 flex flex-wrap items-end gap-2">
+                                  <label className="text-xs text-gray-600 flex flex-col gap-1 flex-1 min-w-[200px]">
+                                    Send a test of the saved email to
+                                    <input
+                                      type="email"
+                                      value={templateTestTo[template.id] ?? ''}
+                                      onChange={(e) => setTemplateTestTo((prev) => ({ ...prev, [template.id]: e.target.value }))}
+                                      placeholder="you@example.com"
+                                      className={fieldCls}
+                                    />
+                                  </label>
+                                  <StandardButton
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => void sendTemplateTest(template)}
+                                    loading={templateTesting === template.id}
+                                    disabled={templateTesting !== null}
+                                  >
+                                    Send test email
+                                  </StandardButton>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1094,6 +1162,8 @@ const PhotoSettings = () => {
                 })}
               </div>
             </section>
+
+            <MessageLinksPanel fieldCls={fieldCls} onNotify={notify} onLinksChanged={handleLinksChanged} />
 
             <section className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
               <h2 className="font-semibold text-gray-900 mb-3">Fixed rules</h2>

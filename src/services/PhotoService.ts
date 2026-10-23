@@ -12,6 +12,8 @@ import type {
   PhotoDeliveryRecord,
   PhotoEventDaysResponse,
   PhotoLibraryResponse,
+  PhotoMessageLink,
+  PhotoMessageLinksResponse,
   PhotoMessageTemplateRecord,
   PhotoOverlayCopies,
   PhotoOverlayRecord,
@@ -388,8 +390,31 @@ const photoService = {
 
   updateTemplate: async (
     templateId: number,
-    payload: { email_subject: string; email_body: string; sms_body: string; is_active?: boolean },
+    payload: { email_subject: string; email_body: string; sms_body: string; is_active?: boolean; attach_photos?: boolean },
   ): Promise<PhotoMessageTemplateRecord> => (await api.put(`/photo-templates/${templateId}`, payload)).data.data,
+
+  getMessageLinks: async (): Promise<PhotoMessageLinksResponse | null> => {
+    try {
+      return (await api.get('/photo-message-links')).data.data;
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 404 || status === 503) return null;
+      throw error;
+    }
+  },
+
+  createMessageLink: async (payload: { label: string; default_url?: string | null }): Promise<PhotoMessageLink> =>
+    (await api.post('/photo-message-links', payload)).data.data,
+
+  updateMessageLink: async (linkId: number, payload: { label?: string; default_url?: string | null }): Promise<PhotoMessageLink> =>
+    (await api.put(`/photo-message-links/${linkId}`, payload)).data.data,
+
+  setMessageLinkUrl: async (linkId: number, locationId: number, url: string | null): Promise<PhotoMessageLink> =>
+    (await api.put(`/photo-message-links/${linkId}/url`, { location_id: locationId, url })).data.data,
+
+  deleteMessageLink: async (linkId: number): Promise<void> => {
+    await api.delete(`/photo-message-links/${linkId}`);
+  },
 
   resetTemplate: async (templateId: number): Promise<PhotoMessageTemplateRecord> =>
     (await api.post(`/photo-templates/${templateId}/reset`)).data.data,
