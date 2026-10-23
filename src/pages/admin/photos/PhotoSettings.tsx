@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { followUpEmailName } from '../../../utils/visitFollowUpNotice';
 import {
   Copy,
@@ -18,6 +18,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import photoService from '../../../services/PhotoService';
 import { getStoredUser } from '../../../utils/storage';
+import { locationShortName } from '../../../utils/locationName';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import EmailInput from '../../../components/ui/EmailInput';
@@ -202,7 +203,8 @@ const ChannelTest = ({
 
 const PhotoSettings = () => {
   const { themeColor } = useThemeColor();
-  const { effectiveLocationId, isCompanyAdmin } = useLocationScope();
+  const { effectiveLocationId, isCompanyAdmin, locations, setSelectedLocationId } = useLocationScope();
+  const navigate = useNavigate();
 
   const [data, setData] = useState<PhotoSettingsResponse | null>(null);
   const [form, setForm] = useState<Record<string, unknown>>({});
@@ -222,6 +224,7 @@ const PhotoSettings = () => {
   const [linkVariables, setLinkVariables] = useState<string[]>([]);
   const routeLocation = useLocation();
   const openedFromHash = useRef(false);
+  const linkLocationRead = useRef(false);
 
   const notify = useCallback((message: string, type: 'success' | 'error' | 'info') => setToast({ message, type }), []);
   const handleLinksChanged = useCallback((links: PhotoMessageLink[]) => setLinkVariables(links.map((link) => link.variable)), []);
@@ -415,6 +418,18 @@ const PhotoSettings = () => {
   );
 
   useEffect(() => {
+    const params = new URLSearchParams(routeLocation.search);
+    if (linkLocationRead.current || !params.has('location')) return;
+    linkLocationRead.current = true;
+    navigate({ pathname: routeLocation.pathname, hash: routeLocation.hash }, { replace: true });
+    const target = Number(params.get('location'));
+    if (!isCompanyAdmin || effectiveLocationId || !Number.isInteger(target) || target <= 0) return;
+    const listed = locations.find((location) => Number(location.id) === target)?.name;
+    setSelectedLocationId(target);
+    setToast({ message: `Switched to ${listed ? locationShortName(listed) : 'that location'} to edit the photo emails`, type: 'info' });
+  }, [routeLocation.search, routeLocation.pathname, routeLocation.hash, navigate, isCompanyAdmin, effectiveLocationId, locations, setSelectedLocationId]);
+
+  useEffect(() => {
     if (openedFromHash.current || routeLocation.hash !== '#registration-email') return;
     const registration = templates.find((template) => template.kind === 'registration');
     if (!registration) return;
@@ -431,7 +446,7 @@ const PhotoSettings = () => {
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Choose a location first</h1>
           <p className="text-gray-600 text-sm">
             {isCompanyAdmin
-              ? 'Kiosk and slideshow passcodes, overlays and retention are all per location.'
+              ? 'Kiosk and slideshow passcodes, overlays and retention are all per location. Pick any location in the sidebar to also edit the message templates and links, which every location shares.'
               : 'Your account is not assigned to a location yet.'}
           </p>
         </div>
@@ -1014,6 +1029,11 @@ const PhotoSettings = () => {
                                 Used for every photo sent to someone who registered for an event, from the photo screen or the photo
                                 library. Change the wording between events; {'{{event_name}}'} and {'{{event_date}}'} fill in by themselves.
                               </p>
+                              <p className="text-xs text-gray-600">
+                                This one email is shared by every location, and changes apply everywhere straight away. Use{' '}
+                                {'{{event_name}}'} and {'{{location_name}}'} rather than typing an event or venue. Photos still waiting to go
+                                out (9:00 AM sends and retries) use the wording saved when they are sent.
+                              </p>
                               <label className="flex items-start gap-2 text-sm text-gray-800">
                                 <input
                                   type="checkbox"
@@ -1137,6 +1157,9 @@ const PhotoSettings = () => {
                                   >
                                     Send test email
                                   </StandardButton>
+                                  <p className="basis-full text-xs text-gray-500">
+                                    The test fills in a sample event and doesn&apos;t attach photos. Real emails attach them when that box is ticked.
+                                  </p>
                                 </div>
                               )}
                             </div>

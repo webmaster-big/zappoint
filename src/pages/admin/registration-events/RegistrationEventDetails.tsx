@@ -428,9 +428,19 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
         <div className="flex items-start gap-2 text-sm text-gray-600 -mt-2">
           <Mail className={`h-4 w-4 mt-0.5 flex-shrink-0 ${theme.icon}`} aria-hidden="true" />
           <p className="min-w-0">
-            Photos sent to people who registered use the <span className="font-medium text-gray-800">Event registration photos</span> email.{' '}
-            <Link to="/photos/settings#registration-email" className={theme.link}>
-              Edit its wording
+            {event.photo_email_active === false ? (
+              <>
+                The <span className="font-medium text-gray-800">Event registration photos</span> email is switched off, so people who
+                registered get the usual photo email.{' '}
+              </>
+            ) : (
+              <>
+                Photos sent to people who registered use the <span className="font-medium text-gray-800">Event registration photos</span>{' '}
+                email.{' '}
+              </>
+            )}
+            <Link to={`/photos/settings?location=${event.location_id}#registration-email`} className={theme.link}>
+              {event.photo_email_active === false ? 'Turn it on or edit it' : 'Edit its wording'}
             </Link>
           </p>
         </div>
