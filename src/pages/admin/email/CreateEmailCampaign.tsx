@@ -61,6 +61,7 @@ import type {
   EmailTemplate,
   PreviewRecipientsResponse
 } from '../../../types/EmailCampaign.types';
+import { safeHtml } from '../../../utils/safeHtml';
 
 interface VariableItem {
   name: string;
@@ -318,11 +319,11 @@ const CreateEmailCampaign: React.FC = () => {
         setFormData(prev => ({
           ...prev,
           subject: template.subject,
-          body: template.body,
+          body: safeHtml(template.body),
           email_template_id: templateId
         }));
         if (bodyEditorRef.current) {
-          bodyEditorRef.current.innerHTML = template.body;
+          bodyEditorRef.current.innerHTML = safeHtml(template.body);
           resetSelection();
         }
       }
@@ -1459,7 +1460,7 @@ const CreateEmailCampaign: React.FC = () => {
                 <label className="text-sm font-medium text-gray-500">Body</label>
                 <div 
                   className="mt-2 prose prose-sm max-w-none overflow-x-auto border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: previewData.body }}
+                  dangerouslySetInnerHTML={{ __html: safeHtml(previewData.body) }}
                 />
               </div>
             </div>

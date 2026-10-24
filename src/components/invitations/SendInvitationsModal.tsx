@@ -5,6 +5,7 @@ import type { InvitationGuest, InvitationPreviewResponse } from '../../types/inv
 import invitationService from '../../services/invitationService';
 import EmailInput from '../ui/EmailInput';
 import { convertTo12Hour } from '../../utils/timeFormat';
+import { safeHtml } from '../../utils/safeHtml';
 
 interface Props {
   booking: Booking;
@@ -368,7 +369,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
                     </div>
                     <div
                       className="p-4 text-sm"
-                      dangerouslySetInnerHTML={{ __html: preview.html }}
+                      dangerouslySetInnerHTML={{ __html: safeHtml(preview.html) }}
                     />
                   </div>
                   {preview.has_invitation_file && (

@@ -58,6 +58,7 @@ import {
 } from '../../../utils/emailTemplateOptions';
 import type { TemplateLocationsValue } from '../../../utils/emailTemplateOptions';
 import type { CreateEmailTemplateData, EmailTemplateStatus, EmailTemplateVariablesData } from '../../../types/EmailCampaign.types';
+import { safeHtml } from '../../../utils/safeHtml';
 
 const CreateEmailTemplate: React.FC = () => {
   const navigate = useNavigate();
@@ -851,7 +852,7 @@ const CreateEmailTemplate: React.FC = () => {
                 <label className="text-sm font-medium text-gray-500">Body</label>
                 <div 
                   className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: previewData.body }}
+                  dangerouslySetInnerHTML={{ __html: safeHtml(previewData.body) }}
                 />
               </div>
             </div>

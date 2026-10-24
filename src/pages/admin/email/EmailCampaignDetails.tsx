@@ -27,6 +27,7 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { requestErrorMessage } from '../../../utils/requestError';
 
 import type { EmailCampaign, EmailCampaignStatus, RecipientType } from '../../../types/EmailCampaign.types';
+import { safeHtml } from '../../../utils/safeHtml';
 
 const RECIPIENT_TYPE_LABELS: Record<RecipientType, string> = {
   customers: 'Customers',
@@ -318,7 +319,7 @@ const EmailCampaignDetails: React.FC = () => {
                 <label className="text-sm font-medium text-gray-500">Body</label>
                 <div 
                   className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: campaign.body }}
+                  dangerouslySetInnerHTML={{ __html: safeHtml(campaign.body) }}
                 />
               </div>
             </div>

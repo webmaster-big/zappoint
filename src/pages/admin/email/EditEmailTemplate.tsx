@@ -61,6 +61,7 @@ import {
 } from '../../../utils/emailTemplateOptions';
 import type { TemplateLocationsValue } from '../../../utils/emailTemplateOptions';
 import type { UpdateEmailTemplateData, EmailTemplateStatus, EmailTemplate, EmailTemplateVariablesData } from '../../../types/EmailCampaign.types';
+import { safeHtml } from '../../../utils/safeHtml';
 
 const EditEmailTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,7 +170,7 @@ const EditEmailTemplate: React.FC = () => {
           setFormData({
             name: template.name,
             subject: template.subject,
-            body: template.body,
+            body: safeHtml(template.body),
             status: template.status,
             category: template.category || ''
           });
@@ -179,7 +180,7 @@ const EditEmailTemplate: React.FC = () => {
           setInitialBodySet(false);
           
           if (bodyEditorRef.current) {
-            bodyEditorRef.current.innerHTML = template.body;
+            bodyEditorRef.current.innerHTML = safeHtml(template.body);
             resetSelection();
           }
         } else {
@@ -232,7 +233,7 @@ const EditEmailTemplate: React.FC = () => {
 
   useEffect(() => {
     if (bodyEditorRef.current && formData.body && !loading && !initialBodySet) {
-      bodyEditorRef.current.innerHTML = formData.body;
+      bodyEditorRef.current.innerHTML = safeHtml(formData.body);
       resetSelection();
       setInitialBodySet(true);
     }
@@ -975,7 +976,7 @@ const EditEmailTemplate: React.FC = () => {
                 <label className="text-sm font-medium text-gray-500">Body</label>
                 <div 
                   className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: previewData.body }}
+                  dangerouslySetInnerHTML={{ __html: safeHtml(previewData.body) }}
                 />
               </div>
             </div>

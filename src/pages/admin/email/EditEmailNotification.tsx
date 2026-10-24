@@ -47,7 +47,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
-import { EVENT_PHOTOS_CATEGORY } from '../../../utils/emailTemplateOptions';
+import { EVENT_PHOTOS_CATEGORY, escapeHtml, linkHref } from '../../../utils/emailTemplateOptions';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
@@ -66,6 +66,7 @@ import type {
   VisitEmailOverride
 } from '../../../types/EmailNotification.types';
 import type { EmailTemplate } from '../../../types/EmailCampaign.types';
+import { safeHtml } from '../../../utils/safeHtml';
 
 interface VariableItem {
   name: string;
@@ -285,7 +286,7 @@ const EditEmailNotification: React.FC = () => {
           
           setTimeout(() => {
             if (bodyEditorRef.current) {
-              bodyEditorRef.current.innerHTML = initialBody;
+              bodyEditorRef.current.innerHTML = safeHtml(initialBody);
             }
           }, 100);
         }
@@ -470,7 +471,7 @@ const EditEmailNotification: React.FC = () => {
       setEditorMode('wysiwyg');
       setTimeout(() => {
         if (bodyEditorRef.current) {
-          bodyEditorRef.current.innerHTML = formData.body || '';
+          bodyEditorRef.current.innerHTML = safeHtml(formData.body);
         }
       }, 0);
     }
@@ -489,7 +490,7 @@ const EditEmailNotification: React.FC = () => {
         setIsBodyCustomized(false);
         setIsSubjectCustomized(false);
         if (bodyEditorRef.current) {
-          bodyEditorRef.current.innerHTML = newBody;
+          bodyEditorRef.current.innerHTML = safeHtml(newBody);
         }
         setToast({ message: 'Reset to default template', type: 'success' });
       }
@@ -561,11 +562,11 @@ const EditEmailNotification: React.FC = () => {
       setToast({ message: 'Please enter a URL', type: 'error' });
       return;
     }
-    const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
+    const url = linkHref(linkUrl);
     const text = linkText.trim() || url;
     if (bodyEditorRef.current) {
       bodyEditorRef.current.focus();
-      const linkHtml = `<a href="${url}" target="_blank" style="color: #3182ce; text-decoration: underline;">${text}</a>`;
+      const linkHtml = `<a href="${escapeHtml(url)}" target="_blank" style="color: #3182ce; text-decoration: underline;">${escapeHtml(text)}</a>`;
       document.execCommand('insertHTML', false, linkHtml);
       handleBodyChange();
     }
@@ -607,7 +608,7 @@ const EditEmailNotification: React.FC = () => {
       if (response.success) {
         if (bodyEditorRef.current) {
           bodyEditorRef.current.focus();
-          const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
+          const imgHtml = `<img src="${escapeHtml(response.data.url)}" alt="${escapeHtml(response.data.original_name)}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
           document.execCommand('insertHTML', false, imgHtml);
           handleBodyChange();
         }
@@ -1462,7 +1463,7 @@ const EditEmailNotification: React.FC = () => {
                     <label className="text-sm font-medium text-gray-500">Body</label>
                     <div
                       className="mt-2 prose prose-sm max-w-none overflow-x-auto border border-gray-200 rounded-lg p-4 bg-gray-50"
-                      dangerouslySetInnerHTML={{ __html: previewBody ?? formData.body ?? '<p class="text-gray-400">(No content)</p>' }}
+                      dangerouslySetInnerHTML={{ __html: (previewBody ?? formData.body) ? safeHtml(previewBody ?? formData.body) : '<p class="text-gray-400">(No content)</p>' }}
                     />
                   </div>
                   {formData.include_qr_code && (

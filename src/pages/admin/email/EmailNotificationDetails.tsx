@@ -44,6 +44,7 @@ import type {
 } from '../../../types/EmailNotification.types';
 import { isVisitTrigger } from '../../../types/EmailNotification.types';
 import { getStoredUser } from '../../../utils/storage';
+import { safeHtml } from '../../../utils/safeHtml';
 
 const EmailNotificationDetails: React.FC = () => {
   const navigate = useNavigate();
@@ -604,7 +605,7 @@ const EmailNotificationDetails: React.FC = () => {
                   <label className="text-sm font-medium text-gray-500">Body Preview</label>
                   <div 
                     className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto"
-                    dangerouslySetInnerHTML={{ __html: notification.body || '<p class="text-gray-400">(No content)</p>' }}
+                    dangerouslySetInnerHTML={{ __html: notification.body ? safeHtml(notification.body) : '<p class="text-gray-400">(No content)</p>' }}
                   />
                 </div>
               </div>
@@ -865,7 +866,7 @@ const EmailNotificationDetails: React.FC = () => {
                 <label className="text-sm font-medium text-gray-500">Body</label>
                 <div 
                   className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: notification.body || '<p class="text-gray-400">(No content)</p>' }}
+                  dangerouslySetInnerHTML={{ __html: notification.body ? safeHtml(notification.body) : '<p class="text-gray-400">(No content)</p>' }}
                 />
               </div>
               {notification.include_qr_code && (

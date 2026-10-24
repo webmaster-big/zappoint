@@ -42,6 +42,7 @@ import {
 } from '../../../components/admin/table';
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 import type { EmailTemplate, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
+import { safeHtml } from '../../../utils/safeHtml';
 
 const EmailTemplates: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -636,7 +637,7 @@ const EmailTemplates: React.FC = () => {
                 <label className="text-sm font-medium text-gray-500">Body</label>
                 <div
                   className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: previewTemplate.body }}
+                  dangerouslySetInnerHTML={{ __html: safeHtml(previewTemplate.body) }}
                 />
               </div>
             </div>
