@@ -128,7 +128,8 @@ const EmailCampaignDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error resending campaign:', error);
-      setToast({ message: 'Failed to resend campaign', type: 'error' });
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setToast({ message: message || 'Failed to resend campaign', type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -222,7 +223,7 @@ const EmailCampaignDetails: React.FC = () => {
                   Cancel
                 </StandardButton>
               )}
-              {campaign.status === 'completed' && campaign.failed_count > 0 && (
+              {campaign.status === 'completed' && campaign.failed_count > 0 && !campaign.recipient_types?.includes('customers') && (
                 <StandardButton
                   variant="primary"
                   icon={RotateCcw}
@@ -466,7 +467,10 @@ const EmailCampaignDetails: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Actions</h3>
                 <div className="space-y-2">
-                  {campaign.failed_count > 0 && (
+                  {campaign.failed_count > 0 && campaign.recipient_types?.includes('customers') && (
+                    <p className="text-xs text-gray-500">Resending is paused for campaigns that went to customers.</p>
+                  )}
+                  {campaign.failed_count > 0 && !campaign.recipient_types?.includes('customers') && (
                     <StandardButton
                       variant="secondary"
                       icon={RotateCcw}

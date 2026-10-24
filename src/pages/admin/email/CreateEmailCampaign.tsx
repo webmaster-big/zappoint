@@ -126,6 +126,7 @@ const CreateEmailCampaign: React.FC = () => {
     location_managers: { label: 'Location Managers', icon: MapPin, description: 'Location managers' },
     custom: { label: 'Custom Emails', icon: Mail, description: 'Add specific email addresses' }
   };
+  const pausedRecipientTypes: RecipientType[] = ['customers'];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -707,16 +708,19 @@ const CreateEmailCampaign: React.FC = () => {
                   const config = recipientTypeConfig[type];
                   const Icon = config.icon;
                   const isSelected = formData.recipient_types.includes(type);
+                  const isPaused = pausedRecipientTypes.includes(type);
                   return (
                     <button
                       key={type}
                       type="button"
                       onClick={() => toggleRecipientType(type)}
+                      disabled={isPaused && !isSelected}
+                      aria-disabled={isPaused}
                       className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors text-left ${
                         isSelected 
                           ? `border-${themeColor}-500 bg-${themeColor}-50` 
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      } ${isPaused && !isSelected ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       <div className={`p-2 rounded-lg ${isSelected ? `bg-${themeColor}-100` : 'bg-gray-100'}`}>
                         <Icon className={`w-5 h-5 ${isSelected ? `text-${fullColor}` : 'text-gray-500'}`} />
@@ -725,7 +729,9 @@ const CreateEmailCampaign: React.FC = () => {
                         <p className={`font-medium ${isSelected ? `text-${fullColor}` : 'text-gray-900'}`}>
                           {config.label}
                         </p>
-                        <p className="text-xs text-gray-500">{config.description}</p>
+                        <p className="text-xs text-gray-500">
+                          {isPaused ? 'Paused until campaign emails carry an unsubscribe link' : config.description}
+                        </p>
                       </div>
                     </button>
                   );

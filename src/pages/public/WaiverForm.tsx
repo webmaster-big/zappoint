@@ -26,6 +26,11 @@ const WaiverForm = () => {
 
   useEffect(() => {
     if (!token) return;
+    if (token === 'sample') {
+      setError('This is a sample waiver link from a test email. Guests get a link to their own waiver.');
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         setLoading(true);
