@@ -156,14 +156,13 @@ const CreateEmailCampaign: React.FC = () => {
   }, []);
 
   const recipientTypeConfig: Record<RecipientType, { label: string; icon: React.ElementType; description: string }> = {
-    customers: { label: 'Customers', icon: Users, description: 'All active customers' },
+    customers: { label: 'Customers', icon: Users, description: 'All active customers; each email has an unsubscribe link' },
     attendants: { label: 'Attendants', icon: UserCheck, description: 'Staff members at location' },
     company_admin: { label: 'Company Admins', icon: Building2, description: 'Company administrators' },
     location_managers: { label: 'Location Managers', icon: MapPin, description: 'Location managers' },
     custom: { label: 'Custom Emails', icon: Mail, description: 'Add specific email addresses' },
     event_registrants: { label: 'Event Registrants', icon: CalendarDays, description: 'People who registered for the events you pick' }
   };
-  const pausedRecipientTypes: RecipientType[] = ['customers'];
   const cardRecipientTypes = (Object.keys(recipientTypeConfig) as RecipientType[])
     .filter(type => type !== 'custom' && (type !== 'event_registrants' || canEmailRegistrants));
 
@@ -865,19 +864,16 @@ const CreateEmailCampaign: React.FC = () => {
                   const config = recipientTypeConfig[type];
                   const Icon = config.icon;
                   const isSelected = formData.recipient_types.includes(type);
-                  const isPaused = pausedRecipientTypes.includes(type);
                   return (
                     <button
                       key={type}
                       type="button"
                       onClick={() => toggleRecipientType(type)}
-                      disabled={isPaused && !isSelected}
-                      aria-disabled={isPaused}
                       className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors text-left ${
-                        isSelected 
-                          ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                        isSelected
+                          ? `border-${themeColor}-500 bg-${themeColor}-50`
                           : 'border-gray-200 hover:border-gray-300'
-                      } ${isPaused && !isSelected ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      }`}
                     >
                       <div className={`p-2 rounded-lg ${isSelected ? `bg-${themeColor}-100` : 'bg-gray-100'}`}>
                         <Icon className={`w-5 h-5 ${isSelected ? `text-${fullColor}` : 'text-gray-500'}`} />
@@ -886,9 +882,7 @@ const CreateEmailCampaign: React.FC = () => {
                         <p className={`font-medium ${isSelected ? `text-${fullColor}` : 'text-gray-900'}`}>
                           {config.label}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {isPaused ? 'Paused until campaign emails carry an unsubscribe link' : config.description}
-                        </p>
+                        <p className="text-xs text-gray-500">{config.description}</p>
                       </div>
                     </button>
                   );
