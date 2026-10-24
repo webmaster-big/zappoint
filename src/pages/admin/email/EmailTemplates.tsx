@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus,
   RefreshCcw,
@@ -12,7 +12,8 @@ import {
   Clock,
   Archive,
   Download,
-  LayoutTemplate
+  LayoutTemplate,
+  CopyPlus
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
@@ -21,6 +22,17 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../../utils/storage';
+import { requestErrorMessage } from '../../../utils/requestError';
+import {
+  EMAIL_TEMPLATE_CATEGORIES,
+  EVENT_PHOTOS_CATEGORY,
+  canManageEventPhotoEmails,
+  emailTemplateCategoryLabel,
+  isCompanyLevelRole,
+  isSharedEventPhotoTemplate,
+  templateCoversLocation,
+  templateLocationSummary,
+} from '../../../utils/emailTemplateOptions';
 import {
   AdminDataTable,
   AdminTableToolbar,
@@ -31,20 +43,14 @@ import {
 import type { AdminColumn, AdminFilterDef } from '../../../components/admin/table';
 import type { EmailTemplate, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
 
-const categoryOptions = [
-  { value: 'onboarding', label: 'Onboarding' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'transactional', label: 'Transactional' },
-  { value: 'newsletter', label: 'Newsletter' },
-  { value: 'reminder', label: 'Reminder' },
-  { value: 'notification', label: 'Notification' },
-  { value: 'other', label: 'Other' }
-];
-
 const EmailTemplates: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const navigate = useNavigate();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const isCompanyLevel = isCompanyLevelRole(currentUser?.role);
+  const canEventPhotos = canManageEventPhotoEmails(currentUser?.role);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +74,7 @@ const EmailTemplates: React.FC = () => {
 
   useEffect(() => {
     const fetchLocations = async () => {
-      if (isCompanyAdmin) {
+      if (isCompanyLevel) {
         try {
           const response = await locationService.getLocations();
           if (response.success && response.data) {
@@ -80,7 +86,7 @@ const EmailTemplates: React.FC = () => {
       }
     };
     fetchLocations();
-  }, [isCompanyAdmin]);
+  }, [isCompanyLevel]);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -119,11 +125,29 @@ const EmailTemplates: React.FC = () => {
       }
     } catch (error) {
       console.error('Error deleting template:', error);
-      setToast({ message: 'Failed to delete template', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to delete template'), type: 'error' });
     } finally {
       setDeleteConfirm(null);
     }
   };
+
+  const handleDuplicate = async (template: EmailTemplate) => {
+    try {
+      setDuplicatingId(template.id);
+      const response = await emailCampaignService.duplicateTemplate(template.id);
+      if (response.success && response.data) {
+        navigate(`/admin/email/templates/edit/${response.data.id}`);
+      }
+    } catch (error) {
+      console.error('Error duplicating template:', error);
+      setToast({ message: requestErrorMessage(error, 'The template could not be copied'), type: 'error' });
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
+  const canDuplicate = (template: EmailTemplate) =>
+    (template.category !== EVENT_PHOTOS_CATEGORY || canEventPhotos) && (isCompanyLevel || !isSharedEventPhotoTemplate(template));
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -176,11 +200,11 @@ const EmailTemplates: React.FC = () => {
       label: 'Category',
       group: 'Template',
       sortable: true,
-      sortValue: t => t.category || '',
-      exportValue: t => t.category || '',
+      sortValue: t => emailTemplateCategoryLabel(t.category),
+      exportValue: t => emailTemplateCategoryLabel(t.category),
       render: t => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 capitalize`}>
-          {t.category || 'Uncategorized'}
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200`}>
+          {emailTemplateCategoryLabel(t.category)}
         </span>
       ),
     },
@@ -203,13 +227,16 @@ const EmailTemplates: React.FC = () => {
     },
     {
       key: 'location',
-      label: 'Location',
+      label: 'Locations',
       group: 'Ownership',
       sortable: true,
-      sortValue: t => t.location?.name || '',
-      exportValue: t => t.location?.name || (t.location_id ? String(t.location_id) : ''),
-      defaultVisible: false,
-      render: t => <span className="text-sm text-gray-900">{t.location?.name || '—'}</span>,
+      sortValue: t => templateLocationSummary(t),
+      exportValue: t => (t.all_locations ? 'Every location' : (t.location_names ?? []).join('; ') || templateLocationSummary(t)),
+      render: t => (
+        <span className="text-sm text-gray-900" title={t.all_locations ? undefined : (t.location_names ?? []).join(', ')}>
+          {templateLocationSummary(t)}
+        </span>
+      ),
     },
     {
       key: 'creator',
@@ -261,8 +288,8 @@ const EmailTemplates: React.FC = () => {
         key: 'category',
         label: 'Category',
         allLabel: 'All Categories',
-        options: categoryOptions,
-        predicate: (t, value) => (t.category || '').toLowerCase() === value,
+        options: EMAIL_TEMPLATE_CATEGORIES,
+        predicate: (t, value) => (t.category || '') === value,
       },
       {
         type: 'daterange',
@@ -277,18 +304,18 @@ const EmailTemplates: React.FC = () => {
         getDate: t => t.updated_at,
       },
     ];
-    if (isCompanyAdmin && locations.length > 0) {
+    if (isCompanyLevel && locations.length > 0) {
       defs.splice(2, 0, {
         type: 'select',
         key: 'location',
         label: 'Location',
         allLabel: 'All Locations',
         options: locations.map(loc => ({ value: String(loc.id), label: loc.name })),
-        predicate: (t, value) => String(t.location_id ?? '') === value,
+        predicate: (t, value) => templateCoversLocation(t, Number(value)),
       });
     }
     return defs;
-  }, [isCompanyAdmin, locations]);
+  }, [isCompanyLevel, locations]);
 
   const table = useAdminTable<EmailTemplate>({
     data: templates,
@@ -301,27 +328,41 @@ const EmailTemplates: React.FC = () => {
       t.name,
       t.subject,
       t.category,
+      emailTemplateCategoryLabel(t.category),
       t.status,
       creatorName(t),
-      t.location?.name,
+      templateLocationSummary(t),
+      ...(t.location_names ?? []),
     ],
     defaultSort: (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
     itemsPerPage: 10,
   });
 
   const handleBulkStatusChange = async (newStatus: EmailTemplateStatus) => {
-    if (table.selectedIds.length === 0) return;
-    try {
-      await Promise.all(
-        table.selectedIds.map(id => emailCampaignService.updateTemplateStatus(Number(id), newStatus))
-      );
-      setToast({ message: `${table.selectedIds.length} template(s) updated successfully`, type: 'success' });
-      table.clearSelection();
-      fetchTemplates();
-    } catch (error) {
-      console.error('Error updating templates:', error);
-      setToast({ message: 'Failed to update some templates', type: 'error' });
+    const ids = [...table.selectedIds];
+    if (ids.length === 0 || bulkUpdating) return;
+    setBulkUpdating(true);
+    const failures: unknown[] = [];
+    for (const id of ids) {
+      try {
+        await emailCampaignService.updateTemplateStatus(Number(id), newStatus);
+      } catch (error) {
+        failures.push(error);
+      }
     }
+    if (failures.length === 0) {
+      setToast({ message: `${ids.length} template(s) updated successfully`, type: 'success' });
+    } else {
+      console.error('Error updating templates:', failures);
+      const updated = ids.length - failures.length;
+      setToast({
+        message: `${updated} updated, ${failures.length} not changed. ${requestErrorMessage(failures[0], 'Some templates could not be updated.')}`,
+        type: 'error'
+      });
+    }
+    setBulkUpdating(false);
+    table.clearSelection();
+    fetchTemplates();
   };
 
   const exportToCsv = () => {
@@ -332,7 +373,7 @@ const EmailTemplates: React.FC = () => {
       extraColumns: [
         { label: 'Body (HTML)', value: t => t.body },
         { label: 'Company', value: t => t.company?.company_name || '' },
-        { label: 'Location ID', value: t => t.location_id ?? '' },
+        { label: 'Location IDs', value: t => (t.all_locations ? '' : (t.location_ids ?? []).join('; ')) },
         { label: 'Creator Email', value: t => t.creator?.email || '' },
       ],
     });
@@ -472,7 +513,8 @@ const EmailTemplates: React.FC = () => {
               handleBulkStatusChange(e.target.value as EmailTemplateStatus);
             }
           }}
-          className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
+          disabled={bulkUpdating}
+          className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 disabled:opacity-60`}
         >
           <option value="">Change Status</option>
           <option value="draft">Mark as Draft</option>
@@ -516,17 +558,29 @@ const EmailTemplates: React.FC = () => {
             <Link
               to={`/admin/email/templates/edit/${template.id}`}
               className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-              title="Edit"
+              title={template.can_manage === false ? 'View' : 'Edit'}
             >
               <Edit className="w-4 h-4" />
             </Link>
-            <button
-              onClick={() => setDeleteConfirm(template.id)}
-              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {canDuplicate(template) && (
+              <button
+                onClick={() => void handleDuplicate(template)}
+                disabled={duplicatingId !== null}
+                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                title={isCompanyLevel ? 'Duplicate' : 'Duplicate for my location'}
+              >
+                <CopyPlus className="w-4 h-4" />
+              </button>
+            )}
+            {template.can_manage !== false && (
+              <button
+                onClick={() => setDeleteConfirm(template.id)}
+                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
       />
@@ -591,8 +645,8 @@ const EmailTemplates: React.FC = () => {
                 Close
               </StandardButton>
               <Link to={`/admin/email/templates/edit/${previewTemplate.id}`}>
-                <StandardButton variant="primary" icon={Edit}>
-                  Edit Template
+                <StandardButton variant="primary" icon={previewTemplate.can_manage === false ? Eye : Edit}>
+                  {previewTemplate.can_manage === false ? 'View Template' : 'Edit Template'}
                 </StandardButton>
               </Link>
             </div>

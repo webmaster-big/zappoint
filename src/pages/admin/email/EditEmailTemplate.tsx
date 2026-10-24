@@ -5,13 +5,10 @@ import {
   Save,
   Eye,
   FileText,
-  Info,
-  ChevronDown,
-  ChevronUp,
-  Copy,
+  CopyPlus,
   X,
   Mail,
-  Code,
+  MapPin,
   Loader2,
   Bold,
   Italic,
@@ -38,36 +35,62 @@ import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
+import TemplateLocationsPicker from '../../../components/admin/email/TemplateLocationsPicker';
+import EventPhotoEmailSettings from '../../../components/admin/email/EventPhotoEmailSettings';
+import TemplateVariablesPanel from '../../../components/admin/email/TemplateVariablesPanel';
+import { useTemplateFieldInsert, TEMPLATE_FIELD_LABELS } from '../../../hooks/useTemplateFieldInsert';
 import { getStoredUser } from '../../../utils/storage';
-import type { UpdateEmailTemplateData, EmailTemplateStatus, EmailTemplate } from '../../../types/EmailCampaign.types';
-
-interface VariableItem {
-  name: string;
-  sampleValue: string;
-}
-
-interface VariableGroup {
-  name: string;
-  variables: VariableItem[];
-}
+import { locationShortName } from '../../../utils/locationName';
+import { requestErrorMessage } from '../../../utils/requestError';
+import {
+  EMAIL_TEMPLATE_CATEGORIES,
+  EVENT_PHOTOS_CATEGORY,
+  EVENT_PHOTO_SMS_LIMIT,
+  TEMPLATE_SUBJECT_LIMIT,
+  canManageEventPhotoEmails,
+  isSharedEventPhotoTemplate,
+  escapeHtml,
+  insertAtCaret,
+  isCompanyLevelRole,
+  linkHref,
+  templateLocationIds,
+  templateLocationsFrom,
+  templatePreviewLocationId,
+  templateLocationSummary,
+  templateVariableGroups,
+} from '../../../utils/emailTemplateOptions';
+import type { TemplateLocationsValue } from '../../../utils/emailTemplateOptions';
+import type { UpdateEmailTemplateData, EmailTemplateStatus, EmailTemplate, EmailTemplateVariablesData } from '../../../types/EmailCampaign.types';
 
 const EditEmailTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const doneTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (doneTimer.current !== null) window.clearTimeout(doneTimer.current);
+  }, []);
   const { fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const isCompanyLevel = isCompanyLevelRole(currentUser?.role);
+  const canEventPhotos = canManageEventPhotoEmails(currentUser?.role);
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  const smsRef = useRef<HTMLTextAreaElement>(null);
 
   const [formData, setFormData] = useState<UpdateEmailTemplateData>({
     name: '',
     subject: '',
     body: '',
     status: 'draft',
-    category: '',
-    location_id: undefined
+    category: ''
   });
+  const [locationsValue, setLocationsValue] = useState<TemplateLocationsValue>({ allLocations: true, selectedIds: [] });
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [attachPhotos, setAttachPhotos] = useState(true);
+  const [smsBody, setSmsBody] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
   const [originalTemplate, setOriginalTemplate] = useState<EmailTemplate | null>(null);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -85,105 +108,30 @@ const EditEmailTemplate: React.FC = () => {
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
 
-  const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    default: true,
-    customer: false,
-    user: false
-  });
-  const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
+  const [variablesData, setVariablesData] = useState<EmailTemplateVariablesData | null>(null);
 
+  const isEventPhotos = formData.category === EVENT_PHOTOS_CATEGORY;
+  const readOnly = originalTemplate?.can_manage === false;
   const categories = [
     { value: '', label: 'Select Category' },
-    { value: 'onboarding', label: 'Onboarding' },
-    { value: 'marketing', label: 'Marketing' },
-    { value: 'transactional', label: 'Transactional' },
-    { value: 'newsletter', label: 'Newsletter' },
-    { value: 'reminder', label: 'Reminder' },
-    { value: 'notification', label: 'Notification' },
-    { value: 'other', label: 'Other' }
+    ...EMAIL_TEMPLATE_CATEGORIES.filter(
+      category => category.value !== EVENT_PHOTOS_CATEGORY || canEventPhotos || originalTemplate?.category === EVENT_PHOTOS_CATEGORY
+    )
   ];
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) {
-        navigate('/admin/email/templates');
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        const templateResponse = await emailCampaignService.getTemplate(parseInt(id));
-        if (templateResponse.success && templateResponse.data) {
-          const template = templateResponse.data;
-          setOriginalTemplate(template);
-          setFormData({
-            name: template.name,
-            subject: template.subject,
-            body: template.body,
-            status: template.status,
-            category: template.category || '',
-            location_id: template.location_id
-          });
-          
-          if (bodyEditorRef.current) {
-            bodyEditorRef.current.innerHTML = template.body;
-          }
-        } else {
-          setToast({ message: 'Template not found', type: 'error' });
-          setTimeout(() => navigate('/admin/email/templates'), 1500);
-          return;
-        }
-
-        if (isCompanyAdmin) {
-          const locResponse = await locationService.getLocations();
-          if (locResponse.success && locResponse.data) {
-            setLocations(locResponse.data);
-          }
-        }
-
-        const varResponse = await emailCampaignService.getTemplateVariables();
-        if (varResponse.success && varResponse.data) {
-          const parseVariables = (obj: Record<string, string> | undefined): VariableItem[] => {
-            if (!obj || typeof obj !== 'object') return [];
-            return Object.entries(obj).map(([name, sampleValue]) => ({
-              name,
-              sampleValue: String(sampleValue)
-            }));
-          };
-          
-          const groups: VariableGroup[] = [
-            { name: 'default', variables: parseVariables(varResponse.data.default) },
-            { name: 'customer', variables: parseVariables(varResponse.data.customer) },
-            { name: 'user', variables: parseVariables(varResponse.data.user) }
-          ];
-          setVariableGroups(groups.filter(g => g.variables.length > 0));
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setToast({ message: 'Failed to load template', type: 'error' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id, isCompanyAdmin, navigate]);
-
-  useEffect(() => {
-    if (bodyEditorRef.current && formData.body && !loading && !initialBodySet) {
-      bodyEditorRef.current.innerHTML = formData.body;
-      setInitialBodySet(true);
-    }
-  }, [loading, formData.body, initialBodySet]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'location_id' ? (value ? parseInt(value) : undefined) : value
-    }));
-  };
+  const linkShortcuts = isEventPhotos
+    ? Object.keys(variablesData?.event ?? {}).filter(name => name === 'photo_link' || name.startsWith('link_'))
+    : [];
+  const sharedEventPhotos = originalTemplate ? isSharedEventPhotoTemplate(originalTemplate) : false;
+  const readOnlyReason = !readOnly || !originalTemplate
+    ? ''
+    : originalTemplate.category === EVENT_PHOTOS_CATEGORY && !canEventPhotos
+      ? 'Only managers and admins can change event photo emails.'
+      : sharedEventPhotos
+        ? 'This event photo email is shared by several locations, so only a company admin can change it. Ask a company admin to change it, or to take your location off it if you need your own.'
+        : originalTemplate.all_locations
+          ? 'This template is used at every location, so only a company admin can change it. Duplicate it to make a version for your location.'
+          : 'This template is used at other locations, so only a company admin can change it. Duplicate it to make a version for your location.';
+  const canDuplicate = readOnly && !sharedEventPhotos && (originalTemplate?.category !== EVENT_PHOTOS_CATEGORY || canEventPhotos);
 
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
@@ -194,44 +142,140 @@ const EditEmailTemplate: React.FC = () => {
     }
   };
 
-  const insertVariable = (variable: string) => {
-    const variableText = `{{ ${variable} }}`;
-    
-    if (bodyEditorRef.current) {
-      bodyEditorRef.current.focus();
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const textNode = document.createTextNode(variableText);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      } else {
-        bodyEditorRef.current.innerHTML += variableText;
-      }
-      handleBodyChange();
+  const { activeField, setActiveField, focusedField, insertIntoBody, resetSelection } = useTemplateFieldInsert(bodyEditorRef, handleBodyChange);
+  const insertTarget = activeField === 'sms' && !isEventPhotos ? 'body' : activeField;
+
+  useEffect(() => {
+    if (!id) {
+      navigate('/admin/email/templates');
+      return;
     }
+
+    let active = true;
+    let leaveTimer: number | undefined;
+    const leaveSoon = (delay: number) => {
+      leaveTimer = window.setTimeout(() => navigate('/admin/email/templates'), delay);
+    };
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        const templateResponse = await emailCampaignService.getTemplate(parseInt(id));
+        if (!active) return;
+        if (templateResponse.success && templateResponse.data) {
+          const template = templateResponse.data;
+          setOriginalTemplate(template);
+          setFormData({
+            name: template.name,
+            subject: template.subject,
+            body: template.body,
+            status: template.status,
+            category: template.category || ''
+          });
+          setLocationsValue(templateLocationsFrom(template));
+          setAttachPhotos(template.category === EVENT_PHOTOS_CATEGORY ? Boolean(template.attach_photos) : true);
+          setSmsBody(template.sms_body ?? '');
+          setInitialBodySet(false);
+          
+          if (bodyEditorRef.current) {
+            bodyEditorRef.current.innerHTML = template.body;
+            resetSelection();
+          }
+        } else {
+          setToast({ message: 'Template not found', type: 'error' });
+          leaveSoon(1500);
+          return;
+        }
+
+        if (isCompanyLevel) {
+          try {
+            const locResponse = await locationService.getLocations();
+            if (!active) return;
+            if (locResponse.success && locResponse.data) {
+              setLocations(locResponse.data);
+            }
+          } catch (error) {
+            if (!active) return;
+            console.error('Error fetching locations:', error);
+            setToast({ message: 'Could not load the location list.', type: 'error' });
+          }
+        }
+
+        try {
+          const varResponse = await emailCampaignService.getTemplateVariables();
+          if (!active) return;
+          if (varResponse.success && varResponse.data) {
+            setVariablesData(varResponse.data);
+          }
+        } catch (error) {
+          if (!active) return;
+          console.error('Error fetching template variables:', error);
+          setToast({ message: 'Could not load the template variables.', type: 'error' });
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error('Error fetching data:', error);
+        setToast({ message: requestErrorMessage(error, 'Failed to load template'), type: 'error' });
+        leaveSoon(2500);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchData();
+
+    return () => {
+      active = false;
+      window.clearTimeout(leaveTimer);
+    };
+  }, [id, isCompanyLevel, navigate, resetSelection]);
+
+  useEffect(() => {
+    if (bodyEditorRef.current && formData.body && !loading && !initialBodySet) {
+      bodyEditorRef.current.innerHTML = formData.body;
+      resetSelection();
+      setInitialBodySet(true);
+    }
+  }, [loading, formData.body, initialBodySet, resetSelection]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const copyVariable = (variable: string) => {
+  const insertVariable = (variable: string) => {
+    if (readOnly) return;
     const variableText = `{{ ${variable} }}`;
-    navigator.clipboard.writeText(variableText);
-    setCopiedVariable(variable);
-    setTimeout(() => setCopiedVariable(null), 2000);
-  };
+    const focused = focusedField(subjectInputRef.current, smsRef.current) ?? insertTarget;
+    const target = focused === 'sms' && !isEventPhotos ? 'body' : focused;
 
-  const toggleGroup = (groupName: string) => {
-    setExpandedGroups(prev => {
-      const isCurrentlyOpen = prev[groupName];
-      const allClosed = Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {} as Record<string, boolean>);
-      return { ...allClosed, [groupName]: !isCurrentlyOpen };
+    if (target === 'body') {
+      insertIntoBody('insertText', variableText);
+      return;
+    }
+
+    const field = target === 'subject' ? subjectInputRef.current : smsRef.current;
+    const limit = target === 'subject' ? TEMPLATE_SUBJECT_LIMIT : EVENT_PHOTO_SMS_LIMIT;
+    const { value, caret } = insertAtCaret(field, target === 'subject' ? formData.subject ?? '' : smsBody, variableText);
+
+    if (value.length > limit) {
+      setToast({ message: `The ${TEMPLATE_FIELD_LABELS[target]} can be up to ${limit} characters.`, type: 'error' });
+      return;
+    }
+
+    if (target === 'subject') {
+      setFormData(prev => ({ ...prev, subject: value }));
+    } else {
+      setSmsBody(value);
+    }
+
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(caret, caret);
     });
-  };
-
-  const formatGroupName = (name: string) => {
-    return name.charAt(0).toUpperCase() + name.slice(1) + ' Variables';
   };
 
   const handlePreview = async () => {
@@ -240,11 +284,14 @@ const EditEmailTemplate: React.FC = () => {
       return;
     }
 
+    const previewLocationId = isCompanyLevel ? templatePreviewLocationId(locationsValue, locations) : undefined;
+
     try {
       setPreviewLoading(true);
       const response = await emailCampaignService.previewContent({
         subject: formData.subject,
-        body: formData.body
+        body: formData.body,
+        ...(previewLocationId ? { location_id: previewLocationId } : {})
       });
       
       if (response.success) {
@@ -253,14 +300,33 @@ const EditEmailTemplate: React.FC = () => {
       }
     } catch (error) {
       console.error('Error previewing template:', error);
-      setToast({ message: 'Failed to preview template', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to preview template'), type: 'error' });
     } finally {
       setPreviewLoading(false);
     }
   };
 
-  const handleSave = async (status?: EmailTemplateStatus) => {
+  const handleDuplicate = async () => {
     if (!id) return;
+
+    try {
+      setDuplicating(true);
+      const response = await emailCampaignService.duplicateTemplate(parseInt(id));
+
+      if (response.success && response.data) {
+        setToast({ message: 'Copy made for your location. Opening it now.', type: 'success' });
+        navigate(`/admin/email/templates/edit/${response.data.id}`);
+      }
+    } catch (error) {
+      console.error('Error duplicating template:', error);
+      setToast({ message: requestErrorMessage(error, 'The template could not be copied'), type: 'error' });
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  const handleSave = async (status?: EmailTemplateStatus) => {
+    if (!id || readOnly) return;
 
     if (!formData.name?.trim()) {
       setToast({ message: 'Please enter a template name', type: 'error' });
@@ -275,25 +341,39 @@ const EditEmailTemplate: React.FC = () => {
       return;
     }
 
+    const locationIds = templateLocationIds(locationsValue);
+    if (isCompanyLevel && !locationsValue.allLocations && locationIds.length === 0) {
+      setLocationError('Tick at least one location, or choose Every location.');
+      setToast({ message: 'Choose which locations use this template', type: 'error' });
+      return;
+    }
+    setLocationError(null);
+
     try {
       setSaving(true);
-      const updateData: UpdateEmailTemplateData = { ...formData };
-      if (status) {
-        updateData.status = status;
-      }
+      const updateData: UpdateEmailTemplateData = {
+        name: formData.name,
+        subject: formData.subject,
+        body: formData.body,
+        category: formData.category,
+        status: status ?? formData.status,
+        ...(isCompanyLevel ? { location_ids: locationIds } : {}),
+        ...(isEventPhotos ? { attach_photos: attachPhotos, sms_body: smsBody.trim() === '' ? null : smsBody } : {})
+      };
 
       const response = await emailCampaignService.updateTemplate(parseInt(id), updateData);
 
       if (response.success) {
         setToast({ message: 'Template updated successfully!', type: 'success' });
-        setTimeout(() => {
-          navigate('/admin/email/templates');
-        }, 1500);
+        doneTimer.current = window.setTimeout(() => navigate('/admin/email/templates'), 1500);
+        return;
       }
+      setSaving(false);
     } catch (error) {
       console.error('Error saving template:', error);
-      setToast({ message: 'Failed to save template', type: 'error' });
-    } finally {
+      const fieldError = (error as { response?: { data?: { errors?: Record<string, string[]> } } })?.response?.data?.errors?.location_ids?.[0];
+      if (fieldError) setLocationError(fieldError);
+      setToast({ message: requestErrorMessage(error, 'Failed to save template'), type: 'error' });
       setSaving(false);
     }
   };
@@ -340,12 +420,10 @@ const EditEmailTemplate: React.FC = () => {
       const response = await emailCampaignService.uploadImage(pendingImageFile);
       
       if (response.success) {
-        if (bodyEditorRef.current) {
-          bodyEditorRef.current.focus();
-          const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
-          document.execCommand('insertHTML', false, imgHtml);
-          handleBodyChange();
-        }
+        insertIntoBody(
+          'insertHTML',
+          `<img src="${escapeHtml(response.data.url)}" alt="${escapeHtml(response.data.original_name)}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`
+        );
         setToast({ message: 'Image uploaded and inserted!', type: 'success' });
       }
     } catch (error) {
@@ -374,15 +452,13 @@ const EditEmailTemplate: React.FC = () => {
       return;
     }
     
-    const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
+    const url = linkHref(linkUrl);
     const text = linkText.trim() || url;
     
-    if (bodyEditorRef.current) {
-      bodyEditorRef.current.focus();
-      const linkHtml = `<a href="${url}" target="_blank" style="color: #3182ce; text-decoration: underline;">${text}</a>`;
-      document.execCommand('insertHTML', false, linkHtml);
-      handleBodyChange();
-    }
+    insertIntoBody(
+      'insertHTML',
+      `<a href="${escapeHtml(url)}" target="_blank" style="color: #3182ce; text-decoration: underline;">${escapeHtml(text)}</a>`
+    );
     
     setShowLinkModal(false);
     setLinkUrl('');
@@ -412,6 +488,13 @@ const EditEmailTemplate: React.FC = () => {
           <Loader2 className={`w-10 h-10 text-${fullColor} animate-spin mx-auto mb-4`} />
           <p className="text-gray-500">Loading template...</p>
         </div>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
       </div>
     );
   }
@@ -438,7 +521,7 @@ const EditEmailTemplate: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <StandardButton
                 variant="secondary"
                 icon={Eye}
@@ -447,15 +530,17 @@ const EditEmailTemplate: React.FC = () => {
               >
                 Preview
               </StandardButton>
-              <StandardButton
-                variant="secondary"
-                icon={Save}
-                onClick={() => handleSave()}
-                disabled={saving}
-              >
-                Save Changes
-              </StandardButton>
-              {formData.status !== 'active' && (
+              {!readOnly && (
+                <StandardButton
+                  variant="secondary"
+                  icon={Save}
+                  onClick={() => handleSave()}
+                  disabled={saving}
+                >
+                  Save Changes
+                </StandardButton>
+              )}
+              {!readOnly && formData.status !== 'active' && (
                 <StandardButton
                   variant="primary"
                   icon={FileText}
@@ -472,8 +557,18 @@ const EditEmailTemplate: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {readOnly && (
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <p>{readOnlyReason}</p>
+            {canDuplicate && (
+              <StandardButton variant="secondary" size="sm" icon={CopyPlus} onClick={handleDuplicate} loading={duplicating} disabled={duplicating}>
+                Duplicate for my location
+              </StandardButton>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+          <fieldset disabled={readOnly} className="lg:col-span-2 space-y-6 min-w-0 border-0 p-0 m-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Template Information</h2>
               
@@ -508,25 +603,41 @@ const EditEmailTemplate: React.FC = () => {
                 </div>
               </div>
 
+              {isCompanyLevel && locations.length > 0 && (
+                <div className="mb-4">
+                  <TemplateLocationsPicker
+                    locations={locations}
+                    targetLocations={originalTemplate?.target_locations}
+                    value={locationsValue}
+                    onChange={(value) => {
+                      setLocationsValue(value);
+                      setLocationError(null);
+                    }}
+                    disabled={readOnly}
+                    error={locationError ?? undefined}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {isEventPhotos
+                      ? 'People who registered for an event at these locations get this email with their photos.'
+                      : 'Staff at these locations can use this template.'}
+                  </p>
+                </div>
+              )}
+
+              {!isCompanyLevel && originalTemplate && (
+                <p className="flex items-start gap-2 text-sm text-gray-600 mb-4">
+                  <MapPin className="w-4 h-4 mt-0.5 text-gray-400 flex-shrink-0" />
+                  <span>
+                    {readOnly
+                      ? originalTemplate.all_locations
+                        ? 'Used at every location.'
+                        : `Used at ${templateLocationSummary(originalTemplate)}.`
+                      : `For ${originalTemplate.location_names?.[0] ? locationShortName(originalTemplate.location_names[0]) : currentUser?.location_name ? locationShortName(currentUser.location_name) : 'your location'} only. A company admin can share a template with other locations.`}
+                  </span>
+                </p>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isCompanyAdmin && locations.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Location (Optional)
-                    </label>
-                    <select
-                      name="location_id"
-                      value={formData.location_id || ''}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">All Locations</option>
-                      {locations.map(loc => (
-                        <option key={loc.id} value={loc.id}>{loc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Status
@@ -553,10 +664,13 @@ const EditEmailTemplate: React.FC = () => {
                   Subject Line <span className="text-red-500">*</span>
                 </label>
                 <input
+                  ref={subjectInputRef}
                   type="text"
                   name="subject"
                   value={formData.subject}
                   onChange={handleInputChange}
+                  onFocus={() => setActiveField('subject')}
+                  maxLength={TEMPLATE_SUBJECT_LIMIT}
                   placeholder="e.g., Welcome to {{ company_name }}, {{ recipient_first_name }}!"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -779,10 +893,11 @@ const EditEmailTemplate: React.FC = () => {
                 <div className="relative">
                   <div
                     ref={bodyEditorRef}
-                    contentEditable
+                    contentEditable={!readOnly}
                     suppressContentEditableWarning
                     onInput={handleBodyChange}
                     onFocus={(e) => {
+                      setActiveField('body');
                       e.currentTarget.classList.add('ring-2', 'ring-blue-500', 'border-blue-500');
                     }}
                     onBlur={(e) => {
@@ -800,89 +915,38 @@ const EditEmailTemplate: React.FC = () => {
                   />
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <p className="text-xs text-gray-500">Click on a variable in the panel to insert it at cursor position. Supports Ctrl+B (bold), Ctrl+I (italic), Ctrl+U (underline).</p>
+                  <p className="text-xs text-gray-500">
+                    {readOnly
+                      ? 'This template is read-only here.'
+                      : 'Click on a variable in the panel to insert it at cursor position. Supports Ctrl+B (bold), Ctrl+I (italic), Ctrl+U (underline).'}
+                  </p>
                   <p className="text-xs text-gray-400">{formData.body ? `${formData.body.length} characters` : '0 characters'}</p>
                 </div>
               </div>
             </div>
-          </div>
+
+            {isEventPhotos && (
+              <EventPhotoEmailSettings
+                attachPhotos={attachPhotos}
+                onAttachPhotosChange={setAttachPhotos}
+                smsBody={smsBody}
+                onSmsBodyChange={setSmsBody}
+                smsRef={smsRef}
+                onSmsFocus={() => setActiveField('sms')}
+                disabled={readOnly}
+              />
+            )}
+          </fieldset>
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-24">
-              <div className="flex items-center gap-2 mb-4">
-                <Code className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Template Variables</h2>
-              </div>
-              <p className="text-sm text-gray-500 mb-4">
-                Click to insert or copy variables that will be replaced with actual data when sent.
-              </p>
-
-              <div className="space-y-3">
-                {variableGroups.map(group => (
-                  <div key={group.name} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(group.name)}
-                      className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <span className="font-medium text-gray-700">{formatGroupName(group.name)}</span>
-                      {expandedGroups[group.name] ? (
-                        <ChevronUp className="w-4 h-4 text-gray-500" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-gray-500" />
-                      )}
-                    </button>
-                    {expandedGroups[group.name] && (
-                      <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
-                        {group.variables.map(variable => (
-                          <div
-                            key={variable.name}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 group"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => insertVariable(variable.name)}
-                                className="text-sm font-mono text-blue-600 hover:underline block truncate"
-                              >
-                                {'{{ ' + variable.name + ' }}'}
-                              </button>
-                              <p className="text-xs text-gray-500 truncate" title={variable.sampleValue}>
-                                Sample: {variable.sampleValue}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => copyVariable(variable.name)}
-                              className="ml-2 p-1.5 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Copy to clipboard"
-                            >
-                              {copiedVariable === variable.name ? (
-                                <span className="text-xs text-green-600">Copied!</span>
-                              ) : (
-                                <Copy className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                        {group.variables.length === 0 && (
-                          <p className="text-sm text-gray-400 text-center py-2">No variables available</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-blue-700">
-                    Variables are automatically replaced with recipient-specific data when emails are sent. Use them to personalize your emails.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <TemplateVariablesPanel
+              key={isEventPhotos ? 'event' : 'general'}
+              groups={templateVariableGroups(variablesData, isEventPhotos)}
+              targetLabel={TEMPLATE_FIELD_LABELS[insertTarget]}
+              onInsert={insertVariable}
+              iconClassName={`text-${fullColor}`}
+              readOnly={readOnly}
+            />
           </div>
         </div>
       </div>
@@ -1016,13 +1080,31 @@ const EditEmailTemplate: React.FC = () => {
                   URL <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://example.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   autoFocus
                 />
+                {linkShortcuts.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Or link to:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {linkShortcuts.map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setLinkUrl(`{{ ${name} }}`)}
+                          className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-xs font-mono text-blue-700"
+                        >
+                          {name === 'photo_link' ? 'their photos' : name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

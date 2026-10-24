@@ -386,7 +386,8 @@ const photoService = {
     return { message: res.data.message, texting: res.data.data };
   },
 
-  getTemplates: async (): Promise<PhotoTemplatesResponse> => (await api.get('/photo-templates')).data.data,
+  getTemplates: async (locationId?: number): Promise<PhotoTemplatesResponse> =>
+    (await api.get('/photo-templates', { params: locationId ? { location_id: locationId } : undefined })).data.data,
 
   updateTemplate: async (
     templateId: number,

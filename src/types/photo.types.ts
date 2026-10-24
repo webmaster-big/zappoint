@@ -519,7 +519,17 @@ export interface PhotoTemplatesResponse {
   variables_by_kind?: Record<string, string[]>;
   link_variables?: { variable: string; label: string }[];
   kinds: string[];
+  event_photo_email?: PhotoEventEmailRef | null;
   escape_room_email?: { id: number; name: string; is_active: boolean; rooms_without_email?: string[]; emails?: Array<{ id: number; name: string; rooms: string[] }> } | null;
+}
+
+export interface PhotoEventEmailRef {
+  id: number;
+  name: string;
+  all_locations: boolean;
+  location_names: string[];
+  attach_photos: boolean;
+  can_manage: boolean;
 }
 
 export interface KioskContext {

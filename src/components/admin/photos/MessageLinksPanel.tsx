@@ -198,7 +198,8 @@ const MessageLinksPanel = ({ fieldCls, onNotify, onLinksChanged }: MessageLinksP
       </h2>
       <p className="text-sm text-gray-600 mt-1 mb-4">
         Add social media and other links once, then give each location its own address. A location without its own address uses the
-        default. In the photo messages above, <code className="text-xs bg-gray-100 rounded px-1">{'{{links}}'}</code> lists the
+        default. In the photo messages above and in Event photos emails (Email Templates),{' '}
+        <code className="text-xs bg-gray-100 rounded px-1">{'{{links}}'}</code> lists the
         location&apos;s links and a link&apos;s own name (for example{' '}
         <code className="text-xs bg-gray-100 rounded px-1 break-all">{'{{link_instagram}}'}</code>) gives just its address. Emails list
         every link; text messages list as many as fit in about 480 characters, so in texts use one or two link names instead. Escape-room

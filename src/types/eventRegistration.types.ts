@@ -116,6 +116,7 @@ export interface RegistrationEventSummary {
   unique_registrations: number;
   photo_frames?: RegistrationPhotoFrames;
   photo_email_active?: boolean;
+  photo_email?: { id: number; name: string; can_manage: boolean; all_locations?: boolean; location_count?: number } | null;
   created_at: string | null;
   updated_at: string | null;
 }

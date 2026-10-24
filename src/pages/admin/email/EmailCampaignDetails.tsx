@@ -24,8 +24,29 @@ import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import { requestErrorMessage } from '../../../utils/requestError';
 
-import type { EmailCampaign, EmailCampaignStatus } from '../../../types/EmailCampaign.types';
+import type { EmailCampaign, EmailCampaignStatus, RecipientType } from '../../../types/EmailCampaign.types';
+
+const RECIPIENT_TYPE_LABELS: Record<RecipientType, string> = {
+  customers: 'Customers',
+  attendants: 'Attendants',
+  company_admin: 'Company Admins',
+  location_managers: 'Location Managers',
+  custom: 'Custom Emails',
+  event_registrants: 'Event Registrants',
+};
+
+const LOG_RECIPIENT_TYPE_LABELS: Record<string, string> = {
+  customer: 'Customer',
+  attendant: 'Attendant',
+  company_admin: 'Company Admin',
+  location_manager: 'Location Manager',
+  custom: 'Custom',
+  event_registrant: 'Event Registrant',
+};
+
+const isOn = (value: unknown) => value === true || value === 1 || value === '1' || value === 'true';
 
 const EmailCampaignDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +55,7 @@ const EmailCampaignDetails: React.FC = () => {
 
   const [campaign, setCampaign] = useState<EmailCampaign | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -62,13 +84,17 @@ const EmailCampaignDetails: React.FC = () => {
       
       if (response.success && response.data) {
         setCampaign(response.data);
+        setLoadError(null);
       } else {
         setToast({ message: 'Campaign not found', type: 'error' });
         setTimeout(() => navigate('/admin/email/campaigns'), 1500);
       }
     } catch (error) {
       console.error('Error fetching campaign:', error);
-      setToast({ message: 'Failed to load campaign details', type: 'error' });
+      const status = Number((error as { response?: { status?: number } })?.response?.status ?? 0);
+      const message = requestErrorMessage(error, 'Failed to load campaign details');
+      setLoadError(status >= 400 && status < 500 && status !== 404 ? message : null);
+      setToast({ message, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -90,7 +116,7 @@ const EmailCampaignDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error deleting campaign:', error);
-      setToast({ message: 'Failed to delete campaign', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to delete campaign'), type: 'error' });
     } finally {
       setActionLoading(false);
       setShowDeleteConfirm(false);
@@ -109,7 +135,7 @@ const EmailCampaignDetails: React.FC = () => {
       }
     } catch (error) {
       console.error('Error cancelling campaign:', error);
-      setToast({ message: 'Failed to cancel campaign', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to cancel campaign'), type: 'error' });
     } finally {
       setActionLoading(false);
       setShowCancelConfirm(false);
@@ -123,13 +149,12 @@ const EmailCampaignDetails: React.FC = () => {
       setActionLoading(true);
       const response = await emailCampaignService.resendCampaign(campaign.id, type);
       if (response.success) {
-        setToast({ message: `Resending to ${type === 'failed' ? 'failed recipients' : 'all recipients'}...`, type: 'success' });
+        setToast({ message: response.message || `Resending to ${type === 'failed' ? 'failed recipients' : 'all recipients'}...`, type: 'success' });
         fetchCampaign();
       }
     } catch (error) {
       console.error('Error resending campaign:', error);
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setToast({ message: message || 'Failed to resend campaign', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to resend campaign'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -171,8 +196,8 @@ const EmailCampaignDetails: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <XCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Campaign Not Found</h2>
-          <p className="text-gray-500 mb-6">The campaign you're looking for doesn't exist.</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{loadError ? 'You can’t open this campaign' : 'Campaign Not Found'}</h2>
+          <p className="text-gray-500 mb-6 max-w-md mx-auto px-4">{loadError ?? 'The campaign you’re looking for doesn’t exist.'}</p>
           <Link to="/admin/email/campaigns">
             <StandardButton variant="primary">Back to Campaigns</StandardButton>
           </Link>
@@ -185,6 +210,8 @@ const EmailCampaignDetails: React.FC = () => {
   const successRate = campaign.total_recipients > 0 
     ? Math.round((campaign.sent_count / campaign.total_recipients) * 100) 
     : 0;
+  const eventFormIds = campaign.recipient_filters?.registration_event_ids;
+  const eventFormCount = Array.isArray(eventFormIds) ? eventFormIds.length : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -223,7 +250,7 @@ const EmailCampaignDetails: React.FC = () => {
                   Cancel
                 </StandardButton>
               )}
-              {campaign.status === 'completed' && campaign.failed_count > 0 && !campaign.recipient_types?.includes('customers') && (
+              {(campaign.status === 'completed' || campaign.status === 'failed') && campaign.failed_count > 0 && !campaign.recipient_types?.includes('customers') && (
                 <StandardButton
                   variant="primary"
                   icon={RotateCcw}
@@ -270,6 +297,13 @@ const EmailCampaignDetails: React.FC = () => {
           </div>
         </div>
 
+        {campaign.status === 'failed' && campaign.error_message && (
+          <div className="mb-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <p className="min-w-0 break-words">{campaign.error_message}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -312,7 +346,7 @@ const EmailCampaignDetails: React.FC = () => {
                           <td className="py-3 px-4 text-sm text-gray-900">{log.recipient_email}</td>
                           <td className="py-3 px-4">
                             <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded capitalize">
-                              {log.recipient_type}
+                              {LOG_RECIPIENT_TYPE_LABELS[log.recipient_type] ?? log.recipient_type.replace(/_/g, ' ')}
                             </span>
                           </td>
                           <td className="py-3 px-4">
@@ -421,12 +455,18 @@ const EmailCampaignDetails: React.FC = () => {
               <div className="space-y-2">
                 {campaign.recipient_types.map(type => (
                   <div key={type} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                    <span className="text-sm text-gray-600 capitalize">{type.replace('_', ' ')}</span>
+                    <span className="text-sm text-gray-600 capitalize">{RECIPIENT_TYPE_LABELS[type] ?? String(type).replace(/_/g, ' ')}</span>
                     <span className={`text-xs px-2 py-0.5 rounded bg-${themeColor}-100 text-${fullColor}`}>
                       Included
                     </span>
                   </div>
                 ))}
+                {campaign.recipient_types.includes('event_registrants') && (
+                  <p className="text-xs text-gray-500 pt-2">
+                    {eventFormCount} registration form{eventFormCount === 1 ? '' : 's'}
+                    {isOn(campaign.recipient_filters?.only_with_photos) ? ' · only people whose photos were ready' : ''}
+                  </p>
+                )}
                 {campaign.custom_emails && campaign.custom_emails.length > 0 && (
                   <div className="pt-2">
                     <p className="text-xs text-gray-500 mb-2">Custom Emails ({campaign.custom_emails.length})</p>

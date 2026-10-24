@@ -45,6 +45,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
+import { EVENT_PHOTOS_CATEGORY } from '../../../utils/emailTemplateOptions';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
@@ -210,7 +211,7 @@ const CreateEmailNotification: React.FC = () => {
         }
         const templateResponse = await emailCampaignService.getTemplates({ status: 'active', per_page: 100 });
         if (templateResponse.success && templateResponse.data) {
-          setTemplates(templateResponse.data.data);
+          setTemplates(templateResponse.data.data.filter(template => template.category !== EVENT_PHOTOS_CATEGORY));
         }
       } catch (error) {
         console.error('Error fetching data:', error);

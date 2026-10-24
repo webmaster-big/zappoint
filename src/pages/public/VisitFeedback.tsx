@@ -149,14 +149,14 @@ const VisitFeedback = () => {
               <>
                 <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
                 <h1 className="text-lg font-semibold text-gray-900">You are unsubscribed</h1>
-                <p className="text-sm text-gray-600">We will not send you any more review requests or offers. Thanks for letting us know.</p>
+                <p className="text-sm text-gray-600">We will not send you any more event emails, review requests or offers. Thanks for letting us know.</p>
               </>
             ) : (
               <>
-                <h1 className="text-lg font-semibold text-gray-900">Stop review requests and offers?</h1>
+                <h1 className="text-lg font-semibold text-gray-900">Stop event emails, review requests and offers?</h1>
                 <p className="text-sm text-gray-600">
-                  We will stop asking you to rate your visits and stop sending you return-visit offers from{' '}
-                  {page.company_name ?? venue}, at all of our locations. Booking confirmations, receipts and your photos still arrive as usual.
+                  We will stop sending you event emails, review requests and return-visit offers from {page.company_name ?? venue}, at all of
+                  our locations. Booking confirmations, receipts and your photos still arrive as usual.
                 </p>
                 <button
                   type="button"

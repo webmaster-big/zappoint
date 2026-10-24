@@ -8,6 +8,13 @@ export interface EmailTemplate {
   category?: string;
   company_id: number;
   location_id?: number;
+  location_ids?: number[];
+  all_locations?: boolean;
+  location_names?: string[];
+  target_locations?: EmailTemplateTargetLocation[];
+  attach_photos?: boolean;
+  sms_body?: string | null;
+  can_manage?: boolean;
   created_by?: number;
   created_at: string;
   updated_at: string;
@@ -28,6 +35,12 @@ export interface EmailTemplate {
   };
 }
 
+export interface EmailTemplateTargetLocation {
+  id: number;
+  name: string | null;
+  active: boolean;
+}
+
 export type EmailTemplateStatus = 'draft' | 'active' | 'archived';
 
 export interface CreateEmailTemplateData {
@@ -36,7 +49,9 @@ export interface CreateEmailTemplateData {
   body: string;
   status?: EmailTemplateStatus;
   category?: string;
-  location_id?: number;
+  location_ids?: number[];
+  attach_photos?: boolean;
+  sms_body?: string | null;
 }
 
 export interface UpdateEmailTemplateData {
@@ -45,7 +60,9 @@ export interface UpdateEmailTemplateData {
   body?: string;
   status?: EmailTemplateStatus;
   category?: string;
-  location_id?: number;
+  location_ids?: number[];
+  attach_photos?: boolean;
+  sms_body?: string | null;
 }
 
 export interface EmailTemplateFilters {
@@ -66,6 +83,7 @@ export interface EmailTemplateVariablesData {
   default: Record<string, string>;
   customer: Record<string, string>;
   user: Record<string, string>;
+  event?: Record<string, string>;
 }
 
 export interface EmailTemplateVariablesResponse {
@@ -76,6 +94,7 @@ export interface EmailTemplateVariablesResponse {
 export interface PreviewTemplateRequest {
   subject: string;
   body: string;
+  location_id?: number;
 }
 
 export interface PreviewTemplateResponse {
@@ -99,6 +118,7 @@ export interface EmailCampaign {
   sent_count: number;
   failed_count: number;
   status: EmailCampaignStatus;
+  error_message?: string | null;
   scheduled_at?: string;
   sent_at?: string;
   completed_at?: string;
@@ -127,12 +147,14 @@ export interface EmailCampaign {
 
 export type EmailCampaignStatus = 'pending' | 'sending' | 'completed' | 'failed' | 'cancelled';
 
-export type RecipientType = 'customers' | 'attendants' | 'company_admin' | 'location_managers' | 'custom';
+export type RecipientType = 'customers' | 'attendants' | 'company_admin' | 'location_managers' | 'custom' | 'event_registrants';
 
 export interface RecipientFilters {
   status?: string;
   location_id?: number;
-  [key: string]: string | number | boolean | undefined;
+  registration_event_ids?: number[];
+  only_with_photos?: boolean;
+  [key: string]: string | number | boolean | number[] | undefined;
 }
 
 export interface StoredAttachment {
@@ -203,9 +225,10 @@ export interface PreviewRecipientsResponse {
     by_type: {
       [key: string]: number;
     };
+    with_photos?: number;
     sample_recipients?: Array<{
       email: string;
-      name: string;
+      name: string | null;
       type: string;
     }>;
   };

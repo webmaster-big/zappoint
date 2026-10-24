@@ -47,6 +47,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
+import { EVENT_PHOTOS_CATEGORY } from '../../../utils/emailTemplateOptions';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
@@ -290,7 +291,7 @@ const EditEmailNotification: React.FC = () => {
         }
         
         if (templateRes?.success && templateRes.data) {
-          setTemplates(templateRes.data.data);
+          setTemplates(templateRes.data.data.filter(template => template.category !== EVENT_PHOTOS_CATEGORY));
         }
         
         if (locRes?.success && locRes.data) {

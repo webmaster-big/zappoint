@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
   Eye,
   FileText,
-  Info,
-  ChevronDown,
-  ChevronUp,
-  Copy,
   X,
   Mail,
-  Code,
+  MapPin,
   Bold,
   Italic,
   Underline,
@@ -38,35 +34,60 @@ import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
+import TemplateLocationsPicker from '../../../components/admin/email/TemplateLocationsPicker';
+import EventPhotoEmailSettings from '../../../components/admin/email/EventPhotoEmailSettings';
+import TemplateVariablesPanel from '../../../components/admin/email/TemplateVariablesPanel';
+import { useTemplateFieldInsert, TEMPLATE_FIELD_LABELS } from '../../../hooks/useTemplateFieldInsert';
 import { getStoredUser } from '../../../utils/storage';
-import type { CreateEmailTemplateData, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
-
-interface VariableItem {
-  name: string;
-  sampleValue: string;
-}
-
-interface VariableGroup {
-  name: string;
-  variables: VariableItem[];
-}
+import { locationShortName } from '../../../utils/locationName';
+import { requestErrorMessage } from '../../../utils/requestError';
+import {
+  EMAIL_TEMPLATE_CATEGORIES,
+  EVENT_PHOTOS_CATEGORY,
+  EVENT_PHOTO_SMS_LIMIT,
+  EVENT_PHOTO_STARTER,
+  TEMPLATE_SUBJECT_LIMIT,
+  canManageEventPhotoEmails,
+  escapeHtml,
+  insertAtCaret,
+  isCompanyLevelRole,
+  linkHref,
+  templateLocationIds,
+  templatePreviewLocationId,
+  templateVariableGroups,
+} from '../../../utils/emailTemplateOptions';
+import type { TemplateLocationsValue } from '../../../utils/emailTemplateOptions';
+import type { CreateEmailTemplateData, EmailTemplateStatus, EmailTemplateVariablesData } from '../../../types/EmailCampaign.types';
 
 const CreateEmailTemplate: React.FC = () => {
   const navigate = useNavigate();
+  const doneTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (doneTimer.current !== null) window.clearTimeout(doneTimer.current);
+  }, []);
+  const [searchParams] = useSearchParams();
   const { fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const isCompanyLevel = isCompanyLevelRole(currentUser?.role);
+  const canEventPhotos = canManageEventPhotoEmails(currentUser?.role);
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  const smsRef = useRef<HTMLTextAreaElement>(null);
+  const prefillRead = useRef(false);
 
   const [formData, setFormData] = useState<CreateEmailTemplateData>({
     name: '',
     subject: '',
     body: '',
     status: 'draft',
-    category: '',
-    location_id: undefined
+    category: ''
   });
+  const [locationsValue, setLocationsValue] = useState<TemplateLocationsValue>({ allLocations: true, selectedIds: [] });
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [attachPhotos, setAttachPhotos] = useState(true);
+  const [smsBody, setSmsBody] = useState('');
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -81,66 +102,16 @@ const CreateEmailTemplate: React.FC = () => {
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
 
-  const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    default: true,
-    customer: false,
-    user: false
-  });
-  const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
+  const [variablesData, setVariablesData] = useState<EmailTemplateVariablesData | null>(null);
 
+  const isEventPhotos = formData.category === EVENT_PHOTOS_CATEGORY;
   const categories = [
     { value: '', label: 'Select Category' },
-    { value: 'onboarding', label: 'Onboarding' },
-    { value: 'marketing', label: 'Marketing' },
-    { value: 'transactional', label: 'Transactional' },
-    { value: 'newsletter', label: 'Newsletter' },
-    { value: 'reminder', label: 'Reminder' },
-    { value: 'notification', label: 'Notification' },
-    { value: 'other', label: 'Other' }
+    ...EMAIL_TEMPLATE_CATEGORIES.filter(category => category.value !== EVENT_PHOTOS_CATEGORY || canEventPhotos)
   ];
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (isCompanyAdmin) {
-          const locResponse = await locationService.getLocations();
-          if (locResponse.success && locResponse.data) {
-            setLocations(locResponse.data);
-          }
-        }
-
-        const varResponse = await emailCampaignService.getTemplateVariables();
-        if (varResponse.success && varResponse.data) {
-          const parseVariables = (obj: Record<string, string> | undefined): VariableItem[] => {
-            if (!obj || typeof obj !== 'object') return [];
-            return Object.entries(obj).map(([name, sampleValue]) => ({
-              name,
-              sampleValue: String(sampleValue)
-            }));
-          };
-          
-          const groups: VariableGroup[] = [
-            { name: 'default', variables: parseVariables(varResponse.data.default) },
-            { name: 'customer', variables: parseVariables(varResponse.data.customer) },
-            { name: 'user', variables: parseVariables(varResponse.data.user) }
-          ];
-          setVariableGroups(groups.filter(g => g.variables.length > 0));
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
-    fetchData();
-  }, [isCompanyAdmin]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'location_id' ? (value ? parseInt(value) : undefined) : value
-    }));
-  };
+  const linkShortcuts = isEventPhotos
+    ? Object.keys(variablesData?.event ?? {}).filter(name => name === 'photo_link' || name.startsWith('link_'))
+    : [];
 
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
@@ -151,44 +122,107 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  const insertVariable = (variable: string) => {
-    const variableText = `{{ ${variable} }}`;
-    
-    if (bodyEditorRef.current) {
-      bodyEditorRef.current.focus();
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const textNode = document.createTextNode(variableText);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      } else {
-        bodyEditorRef.current.innerHTML += variableText;
+  const { activeField, setActiveField, focusedField, insertIntoBody, resetSelection } = useTemplateFieldInsert(bodyEditorRef, handleBodyChange);
+  const insertTarget = activeField === 'sms' && !isEventPhotos ? 'body' : activeField;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (isCompanyLevel) {
+          const locResponse = await locationService.getLocations();
+          if (locResponse.success && locResponse.data) {
+            setLocations(locResponse.data);
+          }
+        }
+
+        const varResponse = await emailCampaignService.getTemplateVariables();
+        if (varResponse.success && varResponse.data) {
+          setVariablesData(varResponse.data);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
       }
-      handleBodyChange();
+    };
+    fetchData();
+  }, [isCompanyLevel]);
+
+  useEffect(() => {
+    if (prefillRead.current) return;
+    prefillRead.current = true;
+    if (searchParams.get('category') !== EVENT_PHOTOS_CATEGORY || !canEventPhotos) return;
+    setFormData(prev => ({
+      ...prev,
+      category: EVENT_PHOTOS_CATEGORY,
+      name: prev.name || EVENT_PHOTO_STARTER.name,
+      subject: prev.subject || EVENT_PHOTO_STARTER.subject,
+      body: prev.body || EVENT_PHOTO_STARTER.body
+    }));
+    if (bodyEditorRef.current && !bodyEditorRef.current.innerHTML.trim()) {
+      bodyEditorRef.current.innerHTML = EVENT_PHOTO_STARTER.body;
+      resetSelection();
+    }
+    const target = Number(searchParams.get('location'));
+    if (isCompanyLevel && Number.isInteger(target) && target > 0) {
+      setLocationsValue({ allLocations: false, selectedIds: [target] });
+    }
+  }, [searchParams, canEventPhotos, isCompanyLevel, resetSelection]);
+
+  const applyCategory = (category: string) => {
+    const useStarter = category === EVENT_PHOTOS_CATEGORY && !formData.subject.trim() && !formData.body.trim();
+    setFormData(prev => ({
+      ...prev,
+      category,
+      ...(useStarter
+        ? { name: prev.name || EVENT_PHOTO_STARTER.name, subject: EVENT_PHOTO_STARTER.subject, body: EVENT_PHOTO_STARTER.body }
+        : {})
+    }));
+    if (useStarter && bodyEditorRef.current) {
+      bodyEditorRef.current.innerHTML = EVENT_PHOTO_STARTER.body;
+      resetSelection();
     }
   };
 
-  const copyVariable = (variable: string) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (name === 'category') {
+      applyCategory(value);
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const insertVariable = (variable: string) => {
     const variableText = `{{ ${variable} }}`;
-    navigator.clipboard.writeText(variableText);
-    setCopiedVariable(variable);
-    setTimeout(() => setCopiedVariable(null), 2000);
-  };
+    const focused = focusedField(subjectInputRef.current, smsRef.current) ?? insertTarget;
+    const target = focused === 'sms' && !isEventPhotos ? 'body' : focused;
 
-  const toggleGroup = (groupName: string) => {
-    setExpandedGroups(prev => {
-      const isCurrentlyOpen = prev[groupName];
-      const allClosed = Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {} as Record<string, boolean>);
-      return { ...allClosed, [groupName]: !isCurrentlyOpen };
+    if (target === 'body') {
+      insertIntoBody('insertText', variableText);
+      return;
+    }
+
+    const field = target === 'subject' ? subjectInputRef.current : smsRef.current;
+    const limit = target === 'subject' ? TEMPLATE_SUBJECT_LIMIT : EVENT_PHOTO_SMS_LIMIT;
+    const { value, caret } = insertAtCaret(field, target === 'subject' ? formData.subject : smsBody, variableText);
+
+    if (value.length > limit) {
+      setToast({ message: `The ${TEMPLATE_FIELD_LABELS[target]} can be up to ${limit} characters.`, type: 'error' });
+      return;
+    }
+
+    if (target === 'subject') {
+      setFormData(prev => ({ ...prev, subject: value }));
+    } else {
+      setSmsBody(value);
+    }
+
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(caret, caret);
     });
-  };
-
-  const formatGroupName = (name: string) => {
-    return name.charAt(0).toUpperCase() + name.slice(1) + ' Variables';
   };
 
   const handlePreview = async () => {
@@ -197,11 +231,14 @@ const CreateEmailTemplate: React.FC = () => {
       return;
     }
 
+    const previewLocationId = isCompanyLevel ? templatePreviewLocationId(locationsValue, locations) : undefined;
+
     try {
       setPreviewLoading(true);
       const response = await emailCampaignService.previewContent({
         subject: formData.subject,
-        body: formData.body
+        body: formData.body,
+        ...(previewLocationId ? { location_id: previewLocationId } : {})
       });
       
       if (response.success) {
@@ -210,7 +247,7 @@ const CreateEmailTemplate: React.FC = () => {
       }
     } catch (error) {
       console.error('Error previewing template:', error);
-      setToast({ message: 'Failed to preview template', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to preview template'), type: 'error' });
     } finally {
       setPreviewLoading(false);
     }
@@ -230,23 +267,37 @@ const CreateEmailTemplate: React.FC = () => {
       return;
     }
 
+    const locationIds = templateLocationIds(locationsValue);
+    if (isCompanyLevel && !locationsValue.allLocations && locationIds.length === 0) {
+      setLocationError('Tick at least one location, or choose Every location.');
+      setToast({ message: 'Choose which locations use this template', type: 'error' });
+      return;
+    }
+    setLocationError(null);
+
     try {
       setLoading(true);
       const response = await emailCampaignService.createTemplate({
-        ...formData,
-        status
+        name: formData.name,
+        subject: formData.subject,
+        body: formData.body,
+        category: formData.category,
+        status,
+        ...(isCompanyLevel ? { location_ids: locationIds } : {}),
+        ...(isEventPhotos ? { attach_photos: attachPhotos, sms_body: smsBody.trim() === '' ? null : smsBody } : {})
       });
 
       if (response.success) {
         setToast({ message: `Template ${status === 'active' ? 'created and activated' : 'saved as draft'}!`, type: 'success' });
-        setTimeout(() => {
-          navigate('/admin/email/templates');
-        }, 1500);
+        doneTimer.current = window.setTimeout(() => navigate('/admin/email/templates'), 1500);
+        return;
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error saving template:', error);
-      setToast({ message: 'Failed to save template', type: 'error' });
-    } finally {
+      const fieldError = (error as { response?: { data?: { errors?: Record<string, string[]> } } })?.response?.data?.errors?.location_ids?.[0];
+      if (fieldError) setLocationError(fieldError);
+      setToast({ message: requestErrorMessage(error, 'Failed to save template'), type: 'error' });
       setLoading(false);
     }
   };
@@ -293,12 +344,10 @@ const CreateEmailTemplate: React.FC = () => {
       const response = await emailCampaignService.uploadImage(pendingImageFile);
       
       if (response.success) {
-        if (bodyEditorRef.current) {
-          bodyEditorRef.current.focus();
-          const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
-          document.execCommand('insertHTML', false, imgHtml);
-          handleBodyChange();
-        }
+        insertIntoBody(
+          'insertHTML',
+          `<img src="${escapeHtml(response.data.url)}" alt="${escapeHtml(response.data.original_name)}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`
+        );
         setToast({ message: 'Image uploaded and inserted!', type: 'success' });
       }
     } catch (error) {
@@ -327,15 +376,13 @@ const CreateEmailTemplate: React.FC = () => {
       return;
     }
     
-    const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
+    const url = linkHref(linkUrl);
     const text = linkText.trim() || url;
     
-    if (bodyEditorRef.current) {
-      bodyEditorRef.current.focus();
-      const linkHtml = `<a href="${url}" target="_blank" style="color: #3182ce; text-decoration: underline;">${text}</a>`;
-      document.execCommand('insertHTML', false, linkHtml);
-      handleBodyChange();
-    }
+    insertIntoBody(
+      'insertHTML',
+      `<a href="${escapeHtml(url)}" target="_blank" style="color: #3182ce; text-decoration: underline;">${escapeHtml(text)}</a>`
+    );
     
     setShowLinkModal(false);
     setLinkUrl('');
@@ -378,7 +425,7 @@ const CreateEmailTemplate: React.FC = () => {
                 <p className="text-sm text-gray-500">Design a reusable email template with dynamic variables</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <StandardButton
                 variant="secondary"
                 icon={Eye}
@@ -446,24 +493,33 @@ const CreateEmailTemplate: React.FC = () => {
                 </div>
               </div>
 
-              {isCompanyAdmin && locations.length > 0 && (
+              {isCompanyLevel && locations.length > 0 && (
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Location (Optional)
-                  </label>
-                  <select
-                    name="location_id"
-                    value={formData.location_id || ''}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Locations</option>
-                    {locations.map(loc => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">Leave empty to make this template available for all locations</p>
+                  <TemplateLocationsPicker
+                    locations={locations}
+                    value={locationsValue}
+                    onChange={(value) => {
+                      setLocationsValue(value);
+                      setLocationError(null);
+                    }}
+                    error={locationError ?? undefined}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {isEventPhotos
+                      ? 'People who registered for an event at these locations get this email with their photos.'
+                      : 'Staff at these locations can use this template.'}
+                  </p>
                 </div>
+              )}
+
+              {!isCompanyLevel && (
+                <p className="flex items-start gap-2 text-sm text-gray-600">
+                  <MapPin className="w-4 h-4 mt-0.5 text-gray-400 flex-shrink-0" />
+                  <span>
+                    For {currentUser?.location_name ? locationShortName(currentUser.location_name) : 'your location'} only. A company admin can
+                    share a template with other locations.
+                  </span>
+                </p>
               )}
             </div>
 
@@ -475,10 +531,13 @@ const CreateEmailTemplate: React.FC = () => {
                   Subject Line <span className="text-red-500">*</span>
                 </label>
                 <input
+                  ref={subjectInputRef}
                   type="text"
                   name="subject"
                   value={formData.subject}
                   onChange={handleInputChange}
+                  onFocus={() => setActiveField('subject')}
+                  maxLength={TEMPLATE_SUBJECT_LIMIT}
                   placeholder="e.g., Welcome to {{ company_name }}, {{ recipient_first_name }}!"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -720,6 +779,7 @@ const CreateEmailTemplate: React.FC = () => {
                     suppressContentEditableWarning
                     onInput={handleBodyChange}
                     onFocus={(e) => {
+                      setActiveField('body');
                       e.currentTarget.classList.add('ring-2', 'ring-blue-500', 'border-blue-500');
                     }}
                     onBlur={(e) => {
@@ -742,84 +802,27 @@ const CreateEmailTemplate: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {isEventPhotos && (
+              <EventPhotoEmailSettings
+                attachPhotos={attachPhotos}
+                onAttachPhotosChange={setAttachPhotos}
+                smsBody={smsBody}
+                onSmsBodyChange={setSmsBody}
+                smsRef={smsRef}
+                onSmsFocus={() => setActiveField('sms')}
+              />
+            )}
           </div>
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-24">
-              <div className="flex items-center gap-2 mb-4">
-                <Code className={`w-5 h-5 text-${fullColor}`} />
-                <h2 className="text-lg font-semibold text-gray-900">Template Variables</h2>
-              </div>
-              <p className="text-sm text-gray-500 mb-4">
-                Click to insert or copy variables that will be replaced with actual data when sent.
-              </p>
-
-              <div className="space-y-3">
-                {variableGroups.map(group => (
-                  <div key={group.name} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(group.name)}
-                      className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <span className="font-medium text-gray-700">{formatGroupName(group.name)}</span>
-                      {expandedGroups[group.name] ? (
-                        <ChevronUp className="w-4 h-4 text-gray-500" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-gray-500" />
-                      )}
-                    </button>
-                    {expandedGroups[group.name] && (
-                      <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
-                        {group.variables.map(variable => (
-                          <div
-                            key={variable.name}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 group"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => insertVariable(variable.name)}
-                                className="text-sm font-mono text-blue-600 hover:underline block truncate"
-                              >
-                                {'{{ ' + variable.name + ' }}'}
-                              </button>
-                              <p className="text-xs text-gray-500 truncate" title={variable.sampleValue}>
-                                Sample: {variable.sampleValue}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => copyVariable(variable.name)}
-                              className="ml-2 p-1.5 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Copy to clipboard"
-                            >
-                              {copiedVariable === variable.name ? (
-                                <span className="text-xs text-green-600">Copied!</span>
-                              ) : (
-                                <Copy className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                        {group.variables.length === 0 && (
-                          <p className="text-sm text-gray-400 text-center py-2">No variables available</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-blue-700">
-                    Variables are automatically replaced with recipient-specific data when emails are sent. Use them to personalize your emails.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <TemplateVariablesPanel
+              key={isEventPhotos ? 'event' : 'general'}
+              groups={templateVariableGroups(variablesData, isEventPhotos)}
+              targetLabel={TEMPLATE_FIELD_LABELS[insertTarget]}
+              onInsert={insertVariable}
+              iconClassName={`text-${fullColor}`}
+            />
           </div>
         </div>
       </div>
@@ -953,13 +956,31 @@ const CreateEmailTemplate: React.FC = () => {
                   URL <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://example.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   autoFocus
                 />
+                {linkShortcuts.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Or link to:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {linkShortcuts.map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setLinkUrl(`{{ ${name} }}`)}
+                          className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-xs font-mono text-blue-700"
+                        >
+                          {name === 'photo_link' ? 'their photos' : name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

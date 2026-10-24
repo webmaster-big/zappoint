@@ -19,6 +19,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
+import { requestErrorMessage } from '../../../utils/requestError';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
@@ -45,6 +46,7 @@ const RECIPIENT_TYPE_LABELS: Record<RecipientType, string> = {
   company_admin: 'Company Admins',
   location_managers: 'Location Managers',
   custom: 'Custom Emails',
+  event_registrants: 'Event Registrants',
 };
 
 const EmailCampaigns = () => {
@@ -127,7 +129,7 @@ const EmailCampaigns = () => {
       }
     } catch (error) {
       console.error('Error deleting campaign:', error);
-      setToast({ message: 'Failed to delete campaign', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to delete campaign'), type: 'error' });
     } finally {
       setDeleteConfirm(null);
     }
@@ -143,7 +145,7 @@ const EmailCampaigns = () => {
       }
     } catch (error) {
       console.error('Error cancelling campaign:', error);
-      setToast({ message: 'Failed to cancel campaign', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to cancel campaign'), type: 'error' });
     } finally {
       setCancelConfirm(null);
     }

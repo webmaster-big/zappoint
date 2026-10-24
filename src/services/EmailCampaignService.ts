@@ -180,7 +180,14 @@ export const createEmailCampaign = async (
   
   if (data.recipient_filters) {
     Object.entries(data.recipient_filters).forEach(([key, value]) => {
-      if (value !== undefined) {
+      if (value === undefined || value === null) return;
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => {
+          formData.append(`recipient_filters[${key}][${index}]`, String(item));
+        });
+      } else if (typeof value === 'boolean') {
+        formData.append(`recipient_filters[${key}]`, value ? '1' : '0');
+      } else {
         formData.append(`recipient_filters[${key}]`, String(value));
       }
     });

@@ -428,20 +428,41 @@ const RegistrationEventDetailsPage = ({ eventId }: { eventId: number }) => {
         <div className="flex items-start gap-2 text-sm text-gray-600 -mt-2">
           <Mail className={`h-4 w-4 mt-0.5 flex-shrink-0 ${theme.icon}`} aria-hidden="true" />
           <p className="min-w-0">
-            {event.photo_email_active === false ? (
+            {event.photo_email ? (
               <>
-                The <span className="font-medium text-gray-800">Event registration photos</span> email is switched off, so people who
-                registered get the usual photo email.{' '}
+                Photos sent to people who registered use the <span className="font-medium text-gray-800">{event.photo_email.name}</span>{' '}
+                email.{' '}
+                {event.photo_email.can_manage === false ? (
+                  event.photo_email.all_locations === false ? (
+                    <>
+                      It is shared with other locations, so only a company admin can change it. Ask one if you need your own.{' '}
+                      <Link to={`/admin/email/templates/edit/${event.photo_email.id}`} className={theme.link}>
+                        View it
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      It is shared with every location, so only a company admin can change it.{' '}
+                      <Link to={`/admin/email/templates/edit/${event.photo_email.id}`} className={theme.link}>
+                        View it
+                      </Link>{' '}
+                      to duplicate it for your location.
+                    </>
+                  )
+                ) : (
+                  <Link to={`/admin/email/templates/edit/${event.photo_email.id}`} className={theme.link}>
+                    Edit its wording
+                  </Link>
+                )}
               </>
             ) : (
               <>
-                Photos sent to people who registered use the <span className="font-medium text-gray-800">Event registration photos</span>{' '}
-                email.{' '}
+                No event photo email covers this location, so people who registered get the usual photo email.{' '}
+                <Link to={`/admin/email/templates/create?category=event_photos&location=${event.location_id}`} className={theme.link}>
+                  Create one
+                </Link>
               </>
             )}
-            <Link to={`/photos/settings?location=${event.location_id}#registration-email`} className={theme.link}>
-              {event.photo_email_active === false ? 'Turn it on or edit it' : 'Edit its wording'}
-            </Link>
           </p>
         </div>
       )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -39,18 +39,25 @@ import {
   Highlighter,
   Check,
   Undo2,
-  Redo2
+  Redo2,
+  CalendarDays,
+  AlertTriangle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { useTemplateFieldInsert } from '../../../hooks/useTemplateFieldInsert';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import EmailInput from '../../../components/ui/EmailInput';
+import EventRecipientPicker from '../../../components/admin/email/EventRecipientPicker';
 import { getStoredUser } from '../../../utils/storage';
+import { requestErrorMessage } from '../../../utils/requestError';
+import { canManageEventPhotoEmails, EVENT_PHOTOS_CATEGORY, escapeHtml, linkHref, templateLocationSummary } from '../../../utils/emailTemplateOptions';
 import type { 
   CreateEmailCampaignData, 
   RecipientType, 
+  RecipientFilters,
   EmailTemplate,
   PreviewRecipientsResponse
 } from '../../../types/EmailCampaign.types';
@@ -65,11 +72,28 @@ interface VariableGroup {
   variables: VariableItem[];
 }
 
+const PHOTO_LINK_PATTERN = /\{\{\s*photo_link\s*\}\}/;
+
+const BREAKDOWN_LABELS: Record<string, string> = {
+  customer: 'Customers',
+  attendant: 'Attendants',
+  company_admin: 'Company Admins',
+  location_manager: 'Location Managers',
+  custom: 'Custom Emails',
+  event_registrant: 'Event Registrants'
+};
+
 const CreateEmailCampaign: React.FC = () => {
   const navigate = useNavigate();
+  const doneTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (doneTimer.current !== null) window.clearTimeout(doneTimer.current);
+  }, []);
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const canEmailRegistrants = canManageEventPhotoEmails(currentUser?.role);
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +129,12 @@ const CreateEmailCampaign: React.FC = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [recipientPreview, setRecipientPreview] = useState<PreviewRecipientsResponse['data'] | null>(null);
   const [recipientPreviewLoading, setRecipientPreviewLoading] = useState(false);
+  const [recipientPreviewError, setRecipientPreviewError] = useState<string | null>(null);
+  const previewRequest = useRef(0);
+  const previewPending = useRef(false);
+  const [eventFormIds, setEventFormIds] = useState<number[]>([]);
+  const [photosChoice, setPhotosChoice] = useState<boolean | null>(null);
+  const [eventVariables, setEventVariables] = useState<VariableItem[]>([]);
 
   const [showTestEmailModal, setShowTestEmailModal] = useState(false);
   const [testEmail, setTestEmail] = useState('');
@@ -116,17 +146,55 @@ const CreateEmailCampaign: React.FC = () => {
     customer: false,
     user: false
   });
-  const [copiedVariable, setCopiedVariable] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<{ name: string; ok: boolean } | null>(null);
+  const copyTimer = useRef<number | null>(null);
   const [showVariables, setShowVariables] = useState(false);
+
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+  }, []);
 
   const recipientTypeConfig: Record<RecipientType, { label: string; icon: React.ElementType; description: string }> = {
     customers: { label: 'Customers', icon: Users, description: 'All active customers' },
     attendants: { label: 'Attendants', icon: UserCheck, description: 'Staff members at location' },
     company_admin: { label: 'Company Admins', icon: Building2, description: 'Company administrators' },
     location_managers: { label: 'Location Managers', icon: MapPin, description: 'Location managers' },
-    custom: { label: 'Custom Emails', icon: Mail, description: 'Add specific email addresses' }
+    custom: { label: 'Custom Emails', icon: Mail, description: 'Add specific email addresses' },
+    event_registrants: { label: 'Event Registrants', icon: CalendarDays, description: 'People who registered for the events you pick' }
   };
   const pausedRecipientTypes: RecipientType[] = ['customers'];
+  const cardRecipientTypes = (Object.keys(recipientTypeConfig) as RecipientType[])
+    .filter(type => type !== 'custom' && (type !== 'event_registrants' || canEmailRegistrants));
+
+  const sendsToEvents = formData.recipient_types.includes('event_registrants');
+  const usesPhotoLink = PHOTO_LINK_PATTERN.test(`${formData.subject} ${formData.body}`);
+  const onlyWithPhotos = photosChoice ?? usesPhotoLink;
+
+  const recipientFilters = useMemo<RecipientFilters>(() => (
+    sendsToEvents
+      ? { ...formData.recipient_filters, registration_event_ids: eventFormIds, only_with_photos: onlyWithPhotos }
+      : { ...formData.recipient_filters }
+  ), [formData.recipient_filters, sendsToEvents, eventFormIds, onlyWithPhotos]);
+
+  const offeredTemplates = canEmailRegistrants
+    ? templates
+    : templates.filter(template => template.category !== EVENT_PHOTOS_CATEGORY);
+  const eventPhotoTemplates = offeredTemplates.filter(template => template.category === EVENT_PHOTOS_CATEGORY);
+  const otherTemplates = offeredTemplates.filter(template => template.category !== EVENT_PHOTOS_CATEGORY);
+  const chosenTemplate = offeredTemplates.find(template => template.id === selectedTemplate);
+  const shownVariableGroups = sendsToEvents && eventVariables.length > 0
+    ? [{ name: 'event', variables: eventVariables }, ...variableGroups]
+    : variableGroups;
+  const linkShortcuts = sendsToEvents
+    ? eventVariables.map(variable => variable.name).filter(name => name === 'photo_link' || name.startsWith('link_'))
+    : [];
+  const registrantCount = recipientPreview?.by_type.event_registrant ?? 0;
+  const registrantsWithPhotos = recipientPreview?.with_photos ?? 0;
+  const totalRecipients = recipientPreview?.total_recipients ?? 0;
+  const registrantGap = onlyWithPhotos
+    ? 'Nobody from these events has photos ready yet. If people did register, untick “Only people whose photos are ready” to email them anyway.'
+    : 'Nobody who registered for these events can get this email: no one gave an email address, or they unsubscribed. Pick other events.';
+  const noRegistrantsMessage = totalRecipients > 0 ? `${registrantGap} The other people you picked will still get it.` : registrantGap;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -138,10 +206,17 @@ const CreateEmailCampaign: React.FC = () => {
           }
         }
 
-        const templateResponse = await emailCampaignService.getTemplates({ status: 'active', per_page: 100 });
-        if (templateResponse.success) {
-          setTemplates(templateResponse.data.data);
-        }
+        let activeTemplates: EmailTemplate[] = [];
+        let page = 1;
+        let lastPage = 1;
+        do {
+          const templateResponse = await emailCampaignService.getTemplates({ status: 'active', per_page: 100, page });
+          if (!templateResponse.success) break;
+          activeTemplates = activeTemplates.concat(templateResponse.data.data);
+          lastPage = templateResponse.data.last_page;
+          page++;
+        } while (page <= lastPage);
+        setTemplates(activeTemplates);
 
         const varResponse = await emailCampaignService.getTemplateVariables();
         if (varResponse.success && varResponse.data) {
@@ -159,6 +234,7 @@ const CreateEmailCampaign: React.FC = () => {
             { name: 'user', variables: parseVariables(varResponse.data.user) }
           ];
           setVariableGroups(groups.filter(g => g.variables.length > 0));
+          setEventVariables(parseVariables(varResponse.data.event));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -168,8 +244,15 @@ const CreateEmailCampaign: React.FC = () => {
   }, [isCompanyAdmin]);
 
   const previewRecipients = useCallback(async () => {
-    if (formData.recipient_types.length === 0 && (!formData.custom_emails || formData.custom_emails.length === 0)) {
+    const request = ++previewRequest.current;
+
+    if (
+      (formData.recipient_types.length === 0 && (!formData.custom_emails || formData.custom_emails.length === 0)) ||
+      (formData.recipient_types.includes('event_registrants') && (recipientFilters.registration_event_ids ?? []).length === 0)
+    ) {
       setRecipientPreview(null);
+      setRecipientPreviewError(null);
+      setRecipientPreviewLoading(false);
       return;
     }
 
@@ -178,22 +261,31 @@ const CreateEmailCampaign: React.FC = () => {
       const response = await emailCampaignService.previewRecipients({
         recipient_types: formData.recipient_types,
         custom_emails: formData.custom_emails,
-        recipient_filters: formData.recipient_filters,
+        recipient_filters: recipientFilters,
         location_id: formData.location_id
       });
       
+      if (request !== previewRequest.current) return;
       if (response.success) {
         setRecipientPreview(response.data);
+        setRecipientPreviewError(null);
       }
     } catch (error) {
+      if (request !== previewRequest.current) return;
       console.error('Error previewing recipients:', error);
+      setRecipientPreview(null);
+      setRecipientPreviewError(requestErrorMessage(error, 'Could not count the recipients. Please try again.'));
     } finally {
-      setRecipientPreviewLoading(false);
+      if (request === previewRequest.current) {
+        setRecipientPreviewLoading(false);
+      }
     }
-  }, [formData.recipient_types, formData.custom_emails, formData.recipient_filters, formData.location_id]);
+  }, [formData.recipient_types, formData.custom_emails, recipientFilters, formData.location_id]);
 
   useEffect(() => {
+    previewPending.current = true;
     const debounce = setTimeout(() => {
+      previewPending.current = false;
       previewRecipients();
     }, 500);
     return () => clearTimeout(debounce);
@@ -207,24 +299,6 @@ const CreateEmailCampaign: React.FC = () => {
     }));
   };
 
-  const handleTemplateSelect = (templateId: number | null) => {
-    setSelectedTemplate(templateId);
-    if (templateId) {
-      const template = templates.find(t => t.id === templateId);
-      if (template) {
-        setFormData(prev => ({
-          ...prev,
-          subject: template.subject,
-          body: template.body,
-          email_template_id: templateId
-        }));
-        if (bodyEditorRef.current) {
-          bodyEditorRef.current.innerHTML = template.body;
-        }
-      }
-    }
-  };
-
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({
@@ -234,7 +308,36 @@ const CreateEmailCampaign: React.FC = () => {
     }
   };
 
+  const { insertIntoBody, resetSelection } = useTemplateFieldInsert(bodyEditorRef, handleBodyChange);
+
+  const handleTemplateSelect = (templateId: number | null) => {
+    setSelectedTemplate(templateId);
+    if (templateId) {
+      const template = offeredTemplates.find(t => t.id === templateId);
+      if (template) {
+        setFormData(prev => ({
+          ...prev,
+          subject: template.subject,
+          body: template.body,
+          email_template_id: templateId
+        }));
+        if (bodyEditorRef.current) {
+          bodyEditorRef.current.innerHTML = template.body;
+          resetSelection();
+        }
+      }
+    }
+  };
+
   const toggleRecipientType = (type: RecipientType) => {
+    if (type === 'event_registrants') {
+      if (formData.recipient_types.includes(type)) {
+        setExpandedGroups(prev => (prev.event ? { default: true } : prev));
+      } else {
+        setShowVariables(true);
+        setExpandedGroups({ event: true });
+      }
+    }
     setFormData(prev => {
       const types = prev.recipient_types.includes(type)
         ? prev.recipient_types.filter(t => t !== type)
@@ -283,31 +386,24 @@ const CreateEmailCampaign: React.FC = () => {
   };
 
   const insertVariable = (variable: string) => {
-    const variableText = `{{ ${variable} }}`;
-    
-    if (bodyEditorRef.current) {
-      bodyEditorRef.current.focus();
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const textNode = document.createTextNode(variableText);
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      } else {
-        bodyEditorRef.current.innerHTML += variableText;
-      }
-      handleBodyChange();
-    }
+    insertIntoBody('insertText', `{{ ${variable} }}`);
+  };
+
+  const showCopyState = (name: string, ok: boolean) => {
+    setCopyState({ name, ok });
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => setCopyState(null), 2000);
   };
 
   const copyVariable = (variable: string) => {
-    const variableText = `{{ ${variable} }}`;
-    navigator.clipboard.writeText(variableText);
-    setCopiedVariable(variable);
-    setTimeout(() => setCopiedVariable(null), 2000);
+    const writing = navigator.clipboard?.writeText(`{{ ${variable} }}`);
+
+    if (!writing) {
+      showCopyState(variable, false);
+      return;
+    }
+
+    writing.then(() => showCopyState(variable, true), () => showCopyState(variable, false));
   };
 
   const toggleGroup = (groupName: string) => {
@@ -332,7 +428,8 @@ const CreateEmailCampaign: React.FC = () => {
       setPreviewLoading(true);
       const response = await emailCampaignService.previewContent({
         subject: formData.subject,
-        body: formData.body
+        body: formData.body,
+        ...(formData.location_id ? { location_id: formData.location_id } : {})
       });
       
       if (response.success) {
@@ -341,7 +438,7 @@ const CreateEmailCampaign: React.FC = () => {
       }
     } catch (error) {
       console.error('Error previewing email:', error);
-      setToast({ message: 'Failed to preview email', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to preview email'), type: 'error' });
     } finally {
       setPreviewLoading(false);
     }
@@ -372,7 +469,7 @@ const CreateEmailCampaign: React.FC = () => {
       }
     } catch (error) {
       console.error('Error sending test email:', error);
-      setToast({ message: 'Failed to send test email', type: 'error' });
+      setToast({ message: requestErrorMessage(error, 'Failed to send test email'), type: 'error' });
     } finally {
       setSendingTest(false);
     }
@@ -399,24 +496,56 @@ const CreateEmailCampaign: React.FC = () => {
       setToast({ message: 'Please add at least one custom email address', type: 'error' });
       return;
     }
+    if (sendsToEvents && eventFormIds.length === 0) {
+      setToast({ message: 'Pick at least one event to send to', type: 'error' });
+      return;
+    }
+    if (sendsToEvents) {
+      let total = totalRecipients;
+
+      if (!recipientPreview || recipientPreviewLoading || previewPending.current || recipientPreviewError) {
+        try {
+          const fresh = await emailCampaignService.previewRecipients({
+            recipient_types: formData.recipient_types,
+            custom_emails: formData.custom_emails,
+            recipient_filters: recipientFilters,
+            location_id: formData.location_id
+          });
+          total = fresh.data.total_recipients;
+        } catch (error) {
+          setToast({ message: requestErrorMessage(error, 'Could not check who gets this email. Please try again.'), type: 'error' });
+          return;
+        }
+      }
+
+      if (total === 0) {
+        setToast({ message: registrantGap, type: 'error' });
+        return;
+      }
+    }
 
     try {
       setLoading(true);
       const response = await emailCampaignService.createCampaign({
         ...formData,
+        recipient_filters: recipientFilters,
         send_now: true
       });
 
       if (response.success) {
-        setToast({ message: `Campaign sent to ${response.data.total_recipients} recipients!`, type: 'success' });
-        setTimeout(() => {
-          navigate('/admin/email/campaigns');
-        }, 1500);
+        setToast({
+          message: response.data.status === 'sending' && response.message
+            ? response.message
+            : `Campaign sent to ${response.data.total_recipients} recipients!`,
+          type: 'success'
+        });
+        doneTimer.current = window.setTimeout(() => navigate('/admin/email/campaigns'), 1500);
+        return;
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error sending campaign:', error);
-      setToast({ message: 'Failed to send campaign', type: 'error' });
-    } finally {
+      setToast({ message: requestErrorMessage(error, 'Failed to send campaign'), type: 'error' });
       setLoading(false);
     }
   };
@@ -463,12 +592,10 @@ const CreateEmailCampaign: React.FC = () => {
       const response = await emailCampaignService.uploadImage(pendingImageFile);
       
       if (response.success) {
-        if (bodyEditorRef.current) {
-          bodyEditorRef.current.focus();
-          const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
-          document.execCommand('insertHTML', false, imgHtml);
-          handleBodyChange();
-        }
+        insertIntoBody(
+          'insertHTML',
+          `<img src="${escapeHtml(response.data.url)}" alt="${escapeHtml(response.data.original_name)}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`
+        );
         setToast({ message: 'Image uploaded and inserted!', type: 'success' });
       }
     } catch (error) {
@@ -543,15 +670,13 @@ const CreateEmailCampaign: React.FC = () => {
       return;
     }
     
-    const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
+    const url = linkHref(linkUrl);
     const text = linkText.trim() || url;
     
-    if (bodyEditorRef.current) {
-      bodyEditorRef.current.focus();
-      const linkHtml = `<a href="${url}" target="_blank" style="color: #3182ce; text-decoration: underline;">${text}</a>`;
-      document.execCommand('insertHTML', false, linkHtml);
-      handleBodyChange();
-    }
+    insertIntoBody(
+      'insertHTML',
+      `<a href="${escapeHtml(url)}" target="_blank" style="color: #3182ce; text-decoration: underline;">${escapeHtml(text)}</a>`
+    );
     
     setShowLinkModal(false);
     setLinkUrl('');
@@ -594,7 +719,7 @@ const CreateEmailCampaign: React.FC = () => {
                 <p className="text-sm text-gray-500">Send bulk emails to selected recipients</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <StandardButton
                 variant="secondary"
                 icon={TestTube}
@@ -664,7 +789,7 @@ const CreateEmailCampaign: React.FC = () => {
                 )}
               </div>
 
-              {templates.length > 0 && (
+              {offeredTemplates.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Use Template (Optional)
@@ -675,9 +800,28 @@ const CreateEmailCampaign: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Start from scratch</option>
-                    {templates.map(template => (
-                      <option key={template.id} value={template.id}>{template.name}</option>
-                    ))}
+                    {eventPhotoTemplates.length > 0 ? (
+                      <>
+                        <optgroup label="Event photo emails">
+                          {eventPhotoTemplates.map(template => (
+                            <option key={template.id} value={template.id}>
+                              {template.name} · {templateLocationSummary(template)}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {otherTemplates.length > 0 && (
+                          <optgroup label="Other templates">
+                            {otherTemplates.map(template => (
+                              <option key={template.id} value={template.id}>{template.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    ) : (
+                      offeredTemplates.map(template => (
+                        <option key={template.id} value={template.id}>{template.name}</option>
+                      ))
+                    )}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
                     Select a template to pre-fill the subject and body, or{' '}
@@ -685,6 +829,18 @@ const CreateEmailCampaign: React.FC = () => {
                       create a new template
                     </Link>
                   </p>
+                  {chosenTemplate?.category === EVENT_PHOTOS_CATEGORY && canEmailRegistrants && !sendsToEvents && (
+                    <p className="text-xs text-gray-600 mt-2">
+                      This is an event photo email.{' '}
+                      <button
+                        type="button"
+                        onClick={() => toggleRecipientType('event_registrants')}
+                        className={`font-medium text-${fullColor} hover:underline`}
+                      >
+                        Send it to event registrants
+                      </button>
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -704,7 +860,7 @@ const CreateEmailCampaign: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                {(Object.keys(recipientTypeConfig) as RecipientType[]).filter(type => type !== 'custom').map(type => {
+                {cardRecipientTypes.map(type => {
                   const config = recipientTypeConfig[type];
                   const Icon = config.icon;
                   const isSelected = formData.recipient_types.includes(type);
@@ -737,6 +893,66 @@ const CreateEmailCampaign: React.FC = () => {
                   );
                 })}
               </div>
+
+              {sendsToEvents && (
+                <div className="mb-4 rounded-lg border border-gray-200 p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Which events?</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Everyone who registered for the events you pick gets one email, even if they registered more than once.
+                      An Unsubscribe link is added at the bottom of these emails automatically. Hidden registrations, and people who
+                      unsubscribed, are skipped.
+                    </p>
+                  </div>
+
+                  <EventRecipientPicker
+                    selectedIds={eventFormIds}
+                    onChange={setEventFormIds}
+                    themeColor={themeColor}
+                    fullColor={fullColor}
+                    disabled={loading}
+                  />
+
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={onlyWithPhotos}
+                      onChange={(e) => setPhotosChoice(e.target.checked)}
+                      disabled={loading}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-gray-800">Only people whose photos are ready</span>
+                      <span className="block text-xs text-gray-500">Skips anyone who has no photos ready to view yet.</span>
+                    </span>
+                  </label>
+
+                  {usesPhotoLink && !onlyWithPhotos && (
+                    <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
+                      <span>This email uses {'{{ photo_link }}'}. People whose photos are not ready still get it, but with no photo link.</span>
+                    </p>
+                  )}
+
+                  {recipientPreview && eventFormIds.length > 0 && (
+                    registrantCount === 0 ? (
+                      <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
+                        <span>{noRegistrantsMessage}</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-700">
+                        {registrantCount} {registrantCount === 1 ? 'person' : 'people'} from these events will get this email.{' '}
+                        {registrantsWithPhotos} of them {registrantsWithPhotos === 1 ? 'has' : 'have'} their own photo link.
+                      </p>
+                    )
+                  )}
+
+                  <p className="text-xs text-gray-500">
+                    Each person gets their own photo link, if they have one, and the details and links of the location they registered at. Photos are not attached to campaign emails.
+                  </p>
+                </div>
+              )}
 
               <div className="border-t border-gray-200 pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -782,12 +998,20 @@ const CreateEmailCampaign: React.FC = () => {
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(recipientPreview.by_type).map(([type, count]) => (
                       <div key={type} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 capitalize">{type.replace('_', ' ')}</span>
+                        <span className="text-gray-600 capitalize">{BREAKDOWN_LABELS[type] ?? type.replace(/_/g, ' ')}</span>
                         <span className="font-medium text-gray-900">{count}</span>
                       </div>
                     ))}
                   </div>
                 </div>
+              )}
+
+              {recipientPreviewError && (
+                <p className="mt-4 text-sm text-red-600">{recipientPreviewError}</p>
+              )}
+
+              {sendsToEvents && eventFormIds.length === 0 && (
+                <p className="mt-4 text-sm text-gray-500">Pick at least one event to see who gets this email.</p>
               )}
             </div>
 
@@ -1127,11 +1351,12 @@ const CreateEmailCampaign: React.FC = () => {
                 </p>
 
                 <div className="space-y-3">
-                  {variableGroups.map(group => (
+                  {shownVariableGroups.map(group => (
                     <div key={group.name} className="border border-gray-200 rounded-lg overflow-hidden">
                       <button
                         type="button"
                         onClick={() => toggleGroup(group.name)}
+                        aria-expanded={Boolean(expandedGroups[group.name])}
                         className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                       >
                         <span className="font-medium text-gray-700">{formatGroupName(group.name)}</span>
@@ -1166,8 +1391,8 @@ const CreateEmailCampaign: React.FC = () => {
                                 className="ml-2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Copy"
                               >
-                                {copiedVariable === variable.name ? (
-                                  <span className="text-xs text-green-600">✓</span>
+                                {copyState?.name === variable.name ? (
+                                  <span className={`text-xs ${copyState.ok ? 'text-green-600' : 'text-red-600'}`}>{copyState.ok ? '✓' : 'Copy failed'}</span>
                                 ) : (
                                   <Copy className="w-3 h-3" />
                                 )}
@@ -1380,13 +1605,31 @@ const CreateEmailCampaign: React.FC = () => {
                   URL <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://example.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   autoFocus
                 />
+                {linkShortcuts.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Or link to:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {linkShortcuts.map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setLinkUrl(`{{ ${name} }}`)}
+                          className="px-2 py-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-xs font-mono text-blue-700"
+                        >
+                          {name === 'photo_link' ? 'their photos' : name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
