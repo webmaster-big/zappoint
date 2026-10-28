@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, ComponentType } from 'react';
-import DOMPurify from 'dompurify';
+import { safeHtml } from '../../../utils/safeHtml';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -967,7 +967,7 @@ const WaiverDetailModal = ({ data, onClose, onCheckIn, onUndoCheckIn, canPrint =
               </div>
               <div
                 className="px-4 py-3 h-64 overflow-y-auto text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.rendered_body) }}
+                dangerouslySetInnerHTML={{ __html: safeHtml(data.rendered_body) }}
               />
             </div>
           </DetailSection>

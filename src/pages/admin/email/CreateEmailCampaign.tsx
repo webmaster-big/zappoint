@@ -895,6 +895,7 @@ const CreateEmailCampaign: React.FC = () => {
                     <h3 className="text-sm font-semibold text-gray-900">Which events?</h3>
                     <p className="text-xs text-gray-500 mt-0.5">
                       Everyone who registered for the events you pick gets one email, even if they registered more than once.
+                      Someone with photos from more than one session gets one email for each, each with its own photo link.
                       An Unsubscribe link is added at the bottom of these emails automatically. Hidden registrations, and people who
                       unsubscribed, are skipped.
                     </p>
@@ -937,8 +938,8 @@ const CreateEmailCampaign: React.FC = () => {
                       </p>
                     ) : (
                       <p className="text-sm text-gray-700">
-                        {registrantCount} {registrantCount === 1 ? 'person' : 'people'} from these events will get this email.{' '}
-                        {registrantsWithPhotos} of them {registrantsWithPhotos === 1 ? 'has' : 'have'} their own photo link.
+                        {registrantCount} {registrantCount === 1 ? 'email goes' : 'emails go'} to people from these events.{' '}
+                        {registrantsWithPhotos} of them {registrantsWithPhotos === 1 ? 'carries' : 'carry'} a photo link.
                       </p>
                     )
                   )}

@@ -205,7 +205,7 @@ export interface EmailCampaignLog {
   recipient_email: string;
   recipient_type: string;
   recipient_id?: number;
-  status: 'pending' | 'sent' | 'failed';
+  status: 'pending' | 'sending' | 'sent' | 'failed' | 'cancelled' | 'bounced' | 'opened' | 'clicked';
   error_message?: string;
   sent_at?: string;
   created_at: string;

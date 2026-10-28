@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import DOMPurify from 'dompurify';
+import { safeHtml } from '../../utils/safeHtml';
 import type {
   WaiverFormContext,
   WaiverSubmission,
@@ -470,7 +470,7 @@ const WaiverFormBody = ({
           <div className="max-h-[42vh] overflow-y-auto">
             <div
               className="px-5 py-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(context.body) }}
+              dangerouslySetInnerHTML={{ __html: safeHtml(context.body) }}
             />
             {tpl?.photo_video_release_enabled && tpl?.photo_video_release_text && (
               <div className="px-5 py-4 border-t border-gray-100">

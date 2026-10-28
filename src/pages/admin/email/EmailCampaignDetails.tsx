@@ -361,6 +361,16 @@ const EmailCampaignDetails: React.FC = () => {
                                 <XCircle className="w-3.5 h-3.5" />
                                 Failed
                               </span>
+                            ) : log.status === 'cancelled' ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-gray-500" title={log.error_message}>
+                                <Ban className="w-3.5 h-3.5" />
+                                Cancelled
+                              </span>
+                            ) : log.status === 'sending' ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+                                <Send className="w-3.5 h-3.5" />
+                                Sending
+                              </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-xs text-yellow-600">
                                 <Clock className="w-3.5 h-3.5" />
