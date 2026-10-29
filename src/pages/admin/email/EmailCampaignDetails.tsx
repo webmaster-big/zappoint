@@ -137,6 +137,7 @@ const EmailCampaignDetails: React.FC = () => {
     } catch (error) {
       console.error('Error cancelling campaign:', error);
       setToast({ message: requestErrorMessage(error, 'Failed to cancel campaign'), type: 'error' });
+      fetchCampaign();
     } finally {
       setActionLoading(false);
       setShowCancelConfirm(false);
@@ -208,6 +209,8 @@ const EmailCampaignDetails: React.FC = () => {
   }
 
   const StatusIcon = statusConfig[campaign.status]?.icon || Clock;
+  const scheduledOnly = campaign.status === 'pending' && !!campaign.scheduled_at;
+  const statusLabel = scheduledOnly ? 'Scheduled' : statusConfig[campaign.status]?.label;
   const successRate = campaign.total_recipients > 0 
     ? Math.round((campaign.sent_count / campaign.total_recipients) * 100) 
     : 0;
@@ -272,8 +275,9 @@ const EmailCampaignDetails: React.FC = () => {
             <p className="text-sm text-gray-500 mb-1">Status</p>
             <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${statusConfig[campaign.status]?.bgColor} ${statusConfig[campaign.status]?.color}`}>
               <StatusIcon className="w-4 h-4" />
-              <span className="font-medium">{statusConfig[campaign.status]?.label}</span>
+              <span className="font-medium">{statusLabel}</span>
             </div>
+            {scheduledOnly && <p className="mt-2 text-xs text-gray-500">for {formatDate(campaign.scheduled_at)}</p>}
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <p className="text-sm text-gray-500 mb-1">Total Recipients</p>
@@ -415,6 +419,16 @@ const EmailCampaignDetails: React.FC = () => {
                     <p className="text-sm text-gray-500">{formatDate(campaign.created_at)}</p>
                   </div>
                 </div>
+
+                {campaign.scheduled_at && (
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Scheduled For</p>
+                      <p className="text-sm text-gray-500">{formatDate(campaign.scheduled_at)}</p>
+                    </div>
+                  </div>
+                )}
 
                 {campaign.sent_at && (
                   <div className="flex items-start gap-3">
@@ -586,15 +600,17 @@ const EmailCampaignDetails: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Cancel Campaign</h3>
-                <p className="text-sm text-gray-500">Stop sending remaining emails</p>
+                <p className="text-sm text-gray-500">{scheduledOnly ? 'Nothing has gone out yet' : 'Stop sending remaining emails'}</p>
               </div>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to cancel this campaign? Emails already sent will not be affected.
+              {scheduledOnly
+                ? 'Are you sure you want to cancel this scheduled campaign? Nobody will get it.'
+                : 'Are you sure you want to cancel this campaign? Emails already sent will not be affected.'}
             </p>
             <div className="flex items-center gap-3 justify-end">
               <StandardButton variant="secondary" onClick={() => setShowCancelConfirm(false)}>
-                Keep Sending
+                {scheduledOnly ? 'Keep It Scheduled' : 'Keep Sending'}
               </StandardButton>
               <StandardButton
                 variant="danger"

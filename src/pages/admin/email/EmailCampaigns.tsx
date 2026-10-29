@@ -68,6 +68,8 @@ const EmailCampaigns = () => {
     failed: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Failed' },
     cancelled: { color: 'bg-gray-100 text-gray-600', icon: Ban, label: 'Cancelled' }
   };
+  const statusLabel = (c: EmailCampaign) => (c.status === 'pending' && c.scheduled_at ? 'Scheduled' : statusConfig[c.status]?.label || c.status);
+  const notStarted = campaigns.some((c) => c.id === cancelConfirm && c.status === 'pending' && !!c.scheduled_at);
 
   const loadCampaigns = useCallback(async () => {
     try {
@@ -146,6 +148,7 @@ const EmailCampaigns = () => {
     } catch (error) {
       console.error('Error cancelling campaign:', error);
       setToast({ message: requestErrorMessage(error, 'Failed to cancel campaign'), type: 'error' });
+      loadCampaigns();
     } finally {
       setCancelConfirm(null);
     }
@@ -275,13 +278,13 @@ const EmailCampaigns = () => {
       group: 'Status',
       sortable: true,
       sortValue: c => c.status,
-      exportValue: c => statusConfig[c.status]?.label || c.status,
+      exportValue: c => statusLabel(c),
       render: c => {
         const StatusIcon = statusConfig[c.status]?.icon || Clock;
         return (
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[c.status]?.color || 'bg-gray-100 text-gray-700'}`}>
             <StatusIcon className="w-3.5 h-3.5" />
-            {statusConfig[c.status]?.label || c.status}
+            {statusLabel(c)}
           </span>
         );
       },
@@ -461,7 +464,7 @@ const EmailCampaigns = () => {
         { value: 'unsent', label: 'Not Sent' },
       ],
       predicate: (c, value) => {
-        if (value === 'scheduled') return !!c.scheduled_at && !c.sent_at;
+        if (value === 'scheduled') return c.status === 'pending' && !!c.scheduled_at;
         if (value === 'sent') return !!c.sent_at;
         return !c.sent_at;
       },
@@ -737,7 +740,7 @@ const EmailCampaigns = () => {
                       </div>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[campaign.status]?.color || 'bg-gray-100 text-gray-700'}`}>
                         <StatusIcon className="w-3 h-3" />
-                        {statusConfig[campaign.status]?.label || campaign.status}
+                        {statusLabel(campaign)}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
@@ -752,7 +755,11 @@ const EmailCampaigns = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">
-                        {campaign.sent_at ? formatDate(campaign.sent_at) : 'Not sent yet'}
+                        {campaign.sent_at
+                          ? formatDate(campaign.sent_at)
+                          : campaign.status === 'pending' && campaign.scheduled_at
+                            ? `Scheduled for ${formatDate(campaign.scheduled_at)}`
+                            : 'Not sent yet'}
                       </span>
                       <div className="flex items-center gap-1">
                         <Link
@@ -827,15 +834,17 @@ const EmailCampaigns = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Cancel Campaign</h3>
-                <p className="text-sm text-gray-500">Stop sending remaining emails</p>
+                <p className="text-sm text-gray-500">{notStarted ? 'Nothing has gone out yet' : 'Stop sending remaining emails'}</p>
               </div>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to cancel this campaign? Emails that have already been sent will not be affected, but remaining emails will not be sent.
+              {notStarted
+                ? 'Are you sure you want to cancel this scheduled campaign? Nobody will get it.'
+                : 'Are you sure you want to cancel this campaign? Emails that have already been sent will not be affected, but remaining emails will not be sent.'}
             </p>
             <div className="flex items-center gap-3 justify-end">
               <StandardButton variant="secondary" onClick={() => setCancelConfirm(null)}>
-                Keep Sending
+                {notStarted ? 'Keep It Scheduled' : 'Keep Sending'}
               </StandardButton>
               <StandardButton variant="danger" onClick={() => handleCancel(cancelConfirm)}>
                 Cancel Campaign

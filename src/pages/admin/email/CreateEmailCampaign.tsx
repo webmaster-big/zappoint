@@ -41,6 +41,7 @@ import {
   Undo2,
   Redo2,
   CalendarDays,
+  Clock,
   AlertTriangle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -74,6 +75,10 @@ interface VariableGroup {
 }
 
 const PHOTO_LINK_PATTERN = /\{\{\s*photo_link\s*\}\}/;
+
+const SCHEDULE_LIMIT_MS = 364 * 24 * 60 * 60 * 1000;
+
+const toLocalInputValue = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
 const BREAKDOWN_LABELS: Record<string, string> = {
   customer: 'Customers',
@@ -111,6 +116,8 @@ const CreateEmailCampaign: React.FC = () => {
     attachments: []
   });
   const [customEmailInput, setCustomEmailInput] = useState('');
+  const [sendLater, setSendLater] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState('');
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
@@ -167,6 +174,7 @@ const CreateEmailCampaign: React.FC = () => {
     .filter(type => type !== 'custom' && (type !== 'event_registrants' || canEmailRegistrants));
 
   const sendsToEvents = formData.recipient_types.includes('event_registrants');
+  const scheduling = sendLater && !sendsToEvents;
   const usesPhotoLink = PHOTO_LINK_PATTERN.test(`${formData.subject} ${formData.body}`);
   const onlyWithPhotos = photosChoice ?? usesPhotoLink;
 
@@ -492,6 +500,15 @@ const CreateEmailCampaign: React.FC = () => {
       setToast({ message: 'Please select at least one recipient type', type: 'error' });
       return;
     }
+    const scheduledAt = scheduling && scheduledFor ? new Date(scheduledFor) : null;
+    if (scheduling && (!scheduledAt || Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now())) {
+      setToast({ message: 'Pick a date and time in the future to schedule this campaign', type: 'error' });
+      return;
+    }
+    if (scheduledAt && scheduledAt.getTime() >= Date.now() + SCHEDULE_LIMIT_MS) {
+      setToast({ message: 'Pick a date and time within the next year', type: 'error' });
+      return;
+    }
     if (formData.recipient_types.includes('custom') && (!formData.custom_emails || formData.custom_emails.length === 0)) {
       setToast({ message: 'Please add at least one custom email address', type: 'error' });
       return;
@@ -529,14 +546,17 @@ const CreateEmailCampaign: React.FC = () => {
       const response = await emailCampaignService.createCampaign({
         ...formData,
         recipient_filters: recipientFilters,
-        send_now: true
+        send_now: !scheduledAt,
+        scheduled_at: scheduledAt ? scheduledAt.toISOString() : undefined
       });
 
       if (response.success) {
         setToast({
-          message: response.data.status === 'sending' && response.message
-            ? response.message
-            : `Campaign sent to ${response.data.total_recipients} recipients!`,
+          message: scheduledAt
+            ? `Campaign scheduled for ${scheduledAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`
+            : response.data.status === 'sending' && response.message
+              ? response.message
+              : `Campaign sent to ${response.data.total_recipients} recipients!`,
           type: 'success'
         });
         doneTimer.current = window.setTimeout(() => navigate('/admin/email/campaigns'), 1500);
@@ -737,12 +757,12 @@ const CreateEmailCampaign: React.FC = () => {
               </StandardButton>
               <StandardButton
                 variant="primary"
-                icon={Send}
+                icon={scheduling ? Clock : Send}
                 onClick={handleSend}
                 disabled={loading}
                 loading={loading}
               >
-                Send Campaign
+                {scheduling ? 'Schedule Campaign' : 'Send Campaign'}
               </StandardButton>
             </div>
           </div>
@@ -785,6 +805,54 @@ const CreateEmailCampaign: React.FC = () => {
                         <option key={loc.id} value={loc.id}>{loc.name}</option>
                       ))}
                     </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <span id="campaign-when-label" className="block text-sm font-medium text-gray-700 mb-1">When to send</span>
+                <div role="group" aria-labelledby="campaign-when-label" className="flex flex-wrap gap-2">
+                  {[
+                    { later: false, label: 'Send now', icon: Send },
+                    { later: true, label: 'Schedule for later', icon: Clock },
+                  ].map(({ later, label, icon: Icon }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setSendLater(later)}
+                      disabled={later && sendsToEvents}
+                      aria-pressed={scheduling === later}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        scheduling === later
+                          ? `border-${themeColor}-500 bg-${themeColor}-50 text-${fullColor}`
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {sendsToEvents && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Emails to event registrants go out right away, so everyone who registered is included.
+                  </p>
+                )}
+                {scheduling && (
+                  <div className="mt-3">
+                    <input
+                      type="datetime-local"
+                      aria-label="Send on"
+                      aria-describedby="campaign-when-help"
+                      value={scheduledFor}
+                      min={toLocalInputValue(new Date())}
+                      max={toLocalInputValue(new Date(Date.now() + SCHEDULE_LIMIT_MS))}
+                      onChange={(e) => setScheduledFor(e.target.value)}
+                      className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p id="campaign-when-help" className="mt-1 text-xs text-gray-500">
+                      Who gets it is settled now. Unsubscribes are checked again when it goes out.
+                    </p>
                   </div>
                 )}
               </div>
