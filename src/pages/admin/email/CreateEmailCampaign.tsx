@@ -551,15 +551,16 @@ const CreateEmailCampaign: React.FC = () => {
       });
 
       if (response.success) {
+        const failed = response.data.status === 'failed';
         setToast({
           message: scheduledAt
             ? `Campaign scheduled for ${scheduledAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`
-            : response.data.status === 'sending' && response.message
+            : (failed || response.data.status === 'sending') && response.message
               ? response.message
               : `Campaign sent to ${response.data.total_recipients} recipients!`,
-          type: 'success'
+          type: failed ? 'error' : 'success'
         });
-        doneTimer.current = window.setTimeout(() => navigate('/admin/email/campaigns'), 1500);
+        doneTimer.current = window.setTimeout(() => navigate('/admin/email/campaigns'), failed ? 6000 : 1500);
         return;
       }
       setLoading(false);

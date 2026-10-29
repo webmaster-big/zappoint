@@ -151,7 +151,7 @@ const EmailCampaignDetails: React.FC = () => {
       setActionLoading(true);
       const response = await emailCampaignService.resendCampaign(campaign.id, type);
       if (response.success) {
-        setToast({ message: response.message || `Resending to ${type === 'failed' ? 'failed recipients' : 'all recipients'}...`, type: 'success' });
+        setToast({ message: response.message || `Resending to ${type === 'failed' ? 'failed recipients' : 'all recipients'}...`, type: response.data?.status === 'failed' ? 'error' : 'success' });
         fetchCampaign();
       }
     } catch (error) {
