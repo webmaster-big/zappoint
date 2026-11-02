@@ -212,6 +212,7 @@ function App() {
         <Route path="/waiver/kiosk/:id" element={<><PageViewBeacon pageType="waiver_kiosk" /><WaiverKiosk /></>} />
         <Route path="/waiver/kiosk-session/:token" element={<><PageViewBeacon pageType="waiver_kiosk_session" /><WaiverKioskSession /></>} />
         <Route path="/waiver/bulk/:manageToken" element={<><PageViewBeacon pageType="waiver_bulk" /><WaiverBulk /></>} />
+        <Route path="/waiver/group/:token" element={<><PageViewBeacon pageType="waiver_sign" /><WaiverForm group /></>} />
         <Route path="/waiver/escape-room/:locationId" element={<><PageViewBeacon pageType="waiver_escape_room" /><EscapeRoomWaiverKiosk /></>} />
         <Route path="/waiver/:token" element={<><PageViewBeacon pageType="waiver_sign" /><WaiverForm /></>} />
 

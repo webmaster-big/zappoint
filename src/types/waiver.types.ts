@@ -181,6 +181,7 @@ export interface WaiverFormContext {
   }>;
   selected_date?: string;
   kiosk?: boolean;
+  group?: { chaperone_name: string } | null;
   escape_room?: {
     room_name?: string | null;
     date?: string | null;
@@ -370,6 +371,8 @@ export interface WaiverProfileDependentPayload {
 export interface BulkRecipientView {
   id: number;
   name: string | null;
+  email?: string | null;
+  phone?: string | null;
   status: RecipientStatus;
   complete: boolean;
   resent_count: number;
@@ -379,8 +382,9 @@ export interface BulkChaperoneView {
   chaperone_name: string;
   selected_date: string;
   allow_shareable_link: boolean;
+  shareable_token: string | null;
   recipients: BulkRecipientView[];
-  summary: { total: number; complete: number };
+  summary: { total: number; complete: number; failed: number };
 }
 
 export interface AvailableActivities {

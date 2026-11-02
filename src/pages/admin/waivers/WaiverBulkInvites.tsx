@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Send, Users, X, Link2, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Plus, Send, Users, X, Link2, RefreshCcw, ListChecks, Share2 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import waiverService from '../../../services/waiverService';
 import type { WaiverTemplate } from '../../../types/waiver.types';
@@ -11,6 +11,7 @@ import WaiverPageTour from '../../../components/waiver/tour/WaiverPageTour';
 import { WAIVER_BULK_STEPS } from '../../../components/waiver/tour/tourSteps';
 import { formatDateLong } from '../../../utils/timeFormat';
 import { fetchAllPages } from '../../../utils/fetchAllPages';
+import { formatPhoneForDisplay } from '../../../utils/bookingSearch';
 
 interface BulkInvite {
   id: number;
@@ -20,11 +21,32 @@ interface BulkInvite {
   selected_date: string;
   manage_token: string;
   allow_shareable_link: boolean;
+  shareable_token?: string | null;
   status: string;
   template?: { id: number; title: string };
   location?: { id: number; name: string };
   recipients_count?: number;
+  complete_count?: number;
+  failed_count?: number;
 }
+
+interface InviteRecipient {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  resent_count: number;
+  last_sent_at: string | null;
+}
+
+const recipientStatus: Record<string, { label: string; cls: string }> = {
+  complete: { label: 'Signed', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  sent: { label: 'Invite sent', cls: 'bg-blue-50 text-blue-700 border-blue-100' },
+  not_sent: { label: 'Not sent yet', cls: 'bg-gray-50 text-gray-500 border-gray-200' },
+  not_complete: { label: 'Not signed', cls: 'bg-gray-100 text-gray-700 border-gray-200' },
+  failed: { label: 'Not delivered', cls: 'bg-white text-red-700 border-red-300' },
+};
 
 const todayStr = () => {
   const d = new Date();
@@ -38,6 +60,7 @@ const WaiverBulkInvites = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [viewing, setViewing] = useState<BulkInvite | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -55,10 +78,14 @@ const WaiverBulkInvites = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const copyManageLink = (token: string) => {
-    const url = `${window.location.origin}/waiver/bulk/${token}`;
-    navigator.clipboard?.writeText(url).then(
-      () => setToast({ message: 'Chaperone link copied', type: 'success' }),
+  const copyLink = (path: string, copiedMessage: string) => {
+    const url = `${window.location.origin}${path}`;
+    if (!navigator.clipboard) {
+      setToast({ message: url, type: 'info' });
+      return;
+    }
+    navigator.clipboard.writeText(url).then(
+      () => setToast({ message: copiedMessage, type: 'success' }),
       () => setToast({ message: url, type: 'info' }),
     );
   };
@@ -67,8 +94,9 @@ const WaiverBulkInvites = () => {
     try {
       await waiverService.resendBulkInvite(id);
       setToast({ message: 'Chaperone invite resent', type: 'success' });
-    } catch {
-      setToast({ message: 'Failed to resend', type: 'error' });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setToast({ message: e.response?.data?.message || 'Failed to resend', type: 'error' });
     }
   };
 
@@ -96,7 +124,7 @@ const WaiverBulkInvites = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Chaperone', 'Template', 'Date', 'Contacts', 'Shareable', ''].map((h) => (
+                {['Chaperone', 'Template', 'Date', 'Signed', 'Group link', ''].map((h) => (
                   <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -115,11 +143,27 @@ const WaiverBulkInvites = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{inv.template?.title || '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{formatDateLong(inv.selected_date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{inv.recipients_count ?? 0}</td>
-                    <td className="px-4 py-3">{inv.allow_shareable_link ? <span className="text-xs text-emerald-600 font-medium">Enabled</span> : <span className="text-xs text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      <span className="font-medium text-gray-900">{inv.complete_count ?? 0}</span> of {inv.recipients_count ?? 0}
+                      {(inv.failed_count ?? 0) > 0 && (
+                        <div className="text-xs text-red-600">{inv.failed_count} not delivered</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {inv.allow_shareable_link && inv.shareable_token ? (
+                        <button onClick={() => copyLink(`/waiver/group/${inv.shareable_token}`, 'Group link copied')} className={`inline-flex items-center gap-1 text-xs font-medium text-${themeColor}-600 hover:underline`} title="Copy the link parents use to sign">
+                          <Share2 className="w-3.5 h-3.5" /> Copy
+                        </button>
+                      ) : inv.allow_shareable_link ? (
+                        <span className="text-xs text-emerald-600 font-medium">Enabled</span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div data-tour="bulk-row-actions" className="flex items-center justify-end gap-1">
-                        <button onClick={() => copyManageLink(inv.manage_token)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Copy chaperone link"><Link2 className="w-4 h-4" /></button>
+                        <button onClick={() => setViewing(inv)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="See who has signed"><ListChecks className="w-4 h-4" /></button>
+                        <button onClick={() => copyLink(`/waiver/bulk/${inv.manage_token}`, 'Chaperone link copied')} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Copy chaperone link"><Link2 className="w-4 h-4" /></button>
                         <button onClick={() => resend(inv.id)} className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} title="Resend to chaperone"><Send className="w-4 h-4" /></button>
                       </div>
                     </td>
@@ -136,15 +180,74 @@ const WaiverBulkInvites = () => {
           themeColor={themeColor}
           fullColor={fullColor}
           onClose={() => setShowCreate(false)}
-          onSaved={() => { setShowCreate(false); load(); setToast({ message: 'Group invite created & chaperone notified', type: 'success' }); }}
+          onSaved={(message, notified) => { setShowCreate(false); load(); setToast({ message, type: notified ? 'success' : 'info' }); }}
         />
       )}
+      {viewing && <InviteRecipientsModal invite={viewing} onClose={() => setViewing(null)} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };
 
-const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClose: () => void; onSaved: () => void; themeColor: string; fullColor: string }) => {
+const InviteRecipientsModal = ({ invite, onClose }: { invite: BulkInvite; onClose: () => void }) => {
+  const [recipients, setRecipients] = useState<InviteRecipient[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    waiverService.getBulkInvite(invite.id)
+      .then((r) => setRecipients((r?.data?.recipients as InviteRecipient[]) || []))
+      .catch(() => setError('Could not load this group.'));
+  }, [invite.id]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const signed = recipients?.filter((r) => r.status === 'complete').length ?? 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-labelledby="invite-recipients-title" className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="invite-recipients-title" className="text-lg font-bold text-gray-900 truncate">{invite.chaperone_name}'s group</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {formatDateLong(invite.selected_date)}
+              {recipients && ` · ${signed} of ${recipients.length} signed`}
+            </p>
+          </div>
+          <button onClick={onClose} aria-label="Close" autoFocus className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg shrink-0"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="overflow-y-auto">
+          {error ? (
+            <p className="px-6 py-8 text-sm text-red-600 text-center">{error}</p>
+          ) : recipients === null ? (
+            <p className="px-6 py-8 text-sm text-gray-400 text-center">Loading…</p>
+          ) : recipients.length === 0 ? (
+            <p className="px-6 py-8 text-sm text-gray-400 text-center">The chaperone hasn't added any parents yet.</p>
+          ) : (
+            recipients.map((r) => {
+              const status = recipientStatus[r.status] || { label: r.status, cls: 'bg-gray-50 text-gray-500 border-gray-200' };
+              return (
+                <div key={r.id} className="px-6 py-3 flex items-center justify-between gap-3 border-t border-gray-100 first:border-t-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{r.name || 'Unnamed contact'}</p>
+                    <p className="text-xs text-gray-400 truncate">{[r.email, formatPhoneForDisplay(r.phone) || r.phone].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.cls}`}>{status.label}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClose: () => void; onSaved: (message: string, notified: boolean) => void; themeColor: string; fullColor: string }) => {
   const [templates, setTemplates] = useState<WaiverTemplate[]>([]);
   const [form, setForm] = useState({ waiver_template_id: 0, selected_date: todayStr(), chaperone_name: '', chaperone_email: '', chaperone_phone: '', allow_shareable_link: false });
   const [saving, setSaving] = useState(false);
@@ -162,7 +265,7 @@ const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClos
     setSaving(true);
     setError(null);
     try {
-      await waiverService.createBulkInvite({
+      const res = await waiverService.createBulkInvite({
         waiver_template_id: form.waiver_template_id,
         selected_date: form.selected_date,
         chaperone_name: form.chaperone_name.trim(),
@@ -170,7 +273,7 @@ const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClos
         chaperone_phone: form.chaperone_phone || undefined,
         allow_shareable_link: form.allow_shareable_link,
       });
-      onSaved();
+      onSaved(res?.message || 'Group invite created', res?.data?.chaperone_notified !== false);
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { message?: string } } };
       setError(e2.response?.data?.message || 'Failed to create invite');

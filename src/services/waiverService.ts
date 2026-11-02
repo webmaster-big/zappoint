@@ -132,6 +132,18 @@ const waiverService = {
   resendBulkRecipient: async (manageToken: string, recipientId: number) =>
     (await publicApi.post(`/waivers/bulk/${manageToken}/recipients/${recipientId}/resend`, {})).data,
 
+  updateBulkRecipient: async (
+    manageToken: string,
+    recipientId: number,
+    contact: { name?: string; email?: string; phone?: string },
+  ) => (await publicApi.patch(`/waivers/bulk/${manageToken}/recipients/${recipientId}`, contact)).data,
+
+  getGroupForm: async (shareableToken: string): Promise<WaiverFormContext> =>
+    (await publicApi.get<ApiResponse<WaiverFormContext>>(`/waivers/group/${shareableToken}`)).data.data,
+
+  submitGroup: async (shareableToken: string, data: WaiverSubmission & { waiver_template_version?: number | null }) =>
+    (await publicApi.post(`/waivers/group/${shareableToken}/submit`, data)).data,
+
   // ---- staff: search / view records ----
   list: async (filters: WaiverSearchFilters = {}): Promise<Paginated<Waiver>> =>
     (await api.get('/waivers', { params: filters })).data,

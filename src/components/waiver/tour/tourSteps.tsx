@@ -429,8 +429,8 @@ export const WAIVER_BULK_STEPS: Step[] = [
           {row('Chaperone', 'name and contact info for the group leader')}
           {row('Template', 'which waiver form is being collected')}
           {row('Date', 'the group\'s scheduled visit date')}
-          {row('Contacts', 'number of participants who have been added so far')}
-          {row('Shareable', 'whether the chaperone\'s link can be forwarded')}
+          {row('Signed', 'how many of the parents added so far have signed, and any invites that could not be delivered')}
+          {row('Group link', 'copies the one link parents can use to sign, when it was allowed')}
         </div>
       </>
     ),
@@ -443,6 +443,7 @@ export const WAIVER_BULK_STEPS: Step[] = [
     content: (
       <>
         <div>
+          {row('List icon', 'shows each parent and whether they have signed')}
           {row('Link icon', 'copies the chaperone\'s management URL to your clipboard')}
           {row('Send icon', 'resends the email / SMS invite to the chaperone')}
         </div>

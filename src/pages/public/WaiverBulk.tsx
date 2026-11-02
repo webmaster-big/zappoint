@@ -4,6 +4,8 @@ import type { BulkChaperoneView } from '../../types/waiver.types';
 import waiverService from '../../services/waiverService';
 import { WaiverLoading, WaiverError } from '../../components/waiver/WaiverStates';
 import EmailInput from '../../components/ui/EmailInput';
+import { formatDateLong } from '../../utils/timeFormat';
+import { formatPhoneForDisplay } from '../../utils/bookingSearch';
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50/50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition';
@@ -50,6 +52,10 @@ const WaiverBulk = () => {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [resendingId, setResendingId] = useState<number | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editRow, setEditRow] = useState<NewRow>(emptyRow());
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const reload = useCallback(async () => {
     if (!manageToken) return;
@@ -134,7 +140,7 @@ const WaiverBulk = () => {
     setSending(true);
     try {
       const res = await waiverService.sendBulk(manageToken);
-      flash('success', res.message || 'Invites sent.');
+      flash(res.data?.failed > 0 ? 'error' : 'success', res.message || 'Invites sent.');
       await reload();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -150,12 +156,41 @@ const WaiverBulk = () => {
     try {
       await waiverService.resendBulkRecipient(manageToken, recipientId);
       flash('success', 'Invite resent.');
-      await reload();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       flash('error', e.response?.data?.message || 'Failed to resend invite.');
     } finally {
       setResendingId(null);
+      await reload();
+    }
+  };
+
+  const startEdit = (r: BulkChaperoneView['recipients'][number]) => {
+    setEditingId(r.id);
+    setEditRow({ name: r.name || '', email: r.email || '', phone: formatPhoneForDisplay(r.phone) || r.phone || '' });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!manageToken || editingId === null) return;
+    if (!editRow.email.trim() && !editRow.phone.trim()) {
+      flash('error', 'Add an email address or a phone number.');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await waiverService.updateBulkRecipient(manageToken, editingId, {
+        name: editRow.name.trim() || undefined,
+        email: editRow.email.trim() || undefined,
+        phone: editRow.phone.trim() || undefined,
+      });
+      flash(res.success ? 'success' : 'error', res.message || 'Saved.');
+      setEditingId(null);
+      await reload();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      flash('error', e.response?.data?.message || 'Could not save these details.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -164,6 +199,23 @@ const WaiverBulk = () => {
   if (!view) return null;
 
   const pending = view.summary.total - view.summary.complete;
+  const failed = view.summary.failed ?? 0;
+  const groupLink = view.shareable_token ? `${window.location.origin}/waiver/group/${view.shareable_token}` : null;
+
+  const copyGroupLink = () => {
+    if (!groupLink) return;
+    if (!navigator.clipboard) {
+      flash('error', 'Copying is not available in this browser. Press and hold the link to copy it.');
+      return;
+    }
+    navigator.clipboard.writeText(groupLink).then(
+      () => {
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2500);
+      },
+      () => flash('error', 'Could not copy. Select the link and copy it yourself.'),
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -174,7 +226,7 @@ const WaiverBulk = () => {
             {view.chaperone_name}
           </h1>
           <p className="text-blue-200 text-sm">
-            Invite each parent or guardian to complete their child's waiver for {view.selected_date}.
+            Invite each parent or guardian to complete their child's waiver for {formatDateLong(view.selected_date)}.
           </p>
         </div>
 
@@ -205,6 +257,41 @@ const WaiverBulk = () => {
             </div>
           ))}
         </div>
+
+        {failed > 0 && !banner && (
+          <div className="rounded-lg px-4 py-2.5 text-xs font-medium bg-red-50 border border-red-100 text-red-700">
+            {failed} invite{failed === 1 ? '' : 's'} could not be delivered. Use Edit next to their name to fix the email or phone.
+          </div>
+        )}
+
+        {groupLink && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-gray-100">
+              <h2 className="text-sm font-bold text-gray-900">Share One Link With the Group</h2>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                Post this link in your group chat or email. Each parent or guardian who opens it signs their own waiver, and they show up in your list below.
+              </p>
+            </div>
+            <div className="p-5 flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                readOnly
+                value={groupLink}
+                onFocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
+                onClick={(e) => e.currentTarget.setSelectionRange(0, e.currentTarget.value.length)}
+                className={`${inputClass} font-mono text-xs min-w-0`}
+                aria-label="Group waiver link"
+              />
+              <button
+                type="button"
+                onClick={copyGroupLink}
+                className="shrink-0 px-4 py-2 bg-blue-700 text-white text-xs font-semibold rounded-lg hover:bg-blue-800 transition"
+              >
+                <span aria-live="polite">{linkCopied ? 'Copied!' : 'Copy Link'}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Add contacts */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -305,14 +392,22 @@ const WaiverBulk = () => {
               <p className="text-xs text-gray-400 text-center py-6">No contacts added yet.</p>
             )}
             {view.recipients.map((r) => (
-              <div key={r.id} className="px-5 py-3 flex items-center justify-between gap-3">
+              <div key={r.id} className="px-5 py-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{r.name || 'Unnamed contact'}</p>
-                  {r.resent_count > 0 && (
+                  {!r.complete && (r.email || r.phone) && (
+                    <p className="text-[11px] text-gray-500 truncate">
+                      {[r.email, formatPhoneForDisplay(r.phone) || r.phone].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                  {r.status === 'failed' ? (
+                    <p className="text-[11px] text-red-600">Not delivered. Use Edit to fix their email or phone.</p>
+                  ) : r.resent_count > 0 && (
                     <p className="text-[11px] text-gray-400">Resent {r.resent_count}×</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2.5 shrink-0">
+                <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1 shrink-0">
                   <span
                     className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
                       statusStyles[r.status] || statusStyles.not_sent
@@ -320,6 +415,15 @@ const WaiverBulk = () => {
                   >
                     {statusLabel[r.status] || r.status}
                   </span>
+                  {!r.complete && (
+                    <button
+                      type="button"
+                      onClick={() => (editingId === r.id ? setEditingId(null) : startEdit(r))}
+                      className="text-[11px] font-semibold text-blue-700 hover:text-blue-800 transition"
+                    >
+                      Edit
+                    </button>
+                  )}
                   {!r.complete && (
                     <button
                       type="button"
@@ -331,6 +435,52 @@ const WaiverBulk = () => {
                     </button>
                   )}
                 </div>
+              </div>
+              {editingId === r.id && (
+                <div className="mt-3 space-y-2">
+                  <input
+                    type="text"
+                    value={editRow.name}
+                    onChange={(e) => setEditRow((prev) => ({ ...prev, name: e.target.value }))}
+                    className={inputClass}
+                    placeholder="Name"
+                    aria-label="Name"
+                  />
+                  <EmailInput
+                    value={editRow.email}
+                    onChange={(e) => setEditRow((prev) => ({ ...prev, email: e.target.value }))}
+                    className={inputClass}
+                    placeholder="Email"
+                    aria-label="Email"
+                  />
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={editRow.phone}
+                    onChange={(e) => setEditRow((prev) => ({ ...prev, phone: e.target.value }))}
+                    className={inputClass}
+                    placeholder="Phone"
+                    aria-label="Phone"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      disabled={savingEdit}
+                      className="flex-1 py-2 bg-blue-700 text-white text-xs font-semibold rounded-lg hover:bg-blue-800 transition disabled:opacity-50"
+                    >
+                      {savingEdit ? 'Saving…' : 'Save & Send'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(null)}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               </div>
             ))}
           </div>

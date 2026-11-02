@@ -12,9 +12,10 @@ import {
 } from '../../components/waiver/WaiverStates';
 import EscapeRoomGameBanner from '../../components/waiver/EscapeRoomGameBanner';
 import { celebrate } from '../../utils/celebrate';
+import { formatDateLong } from '../../utils/timeFormat';
 
 /** Token-addressed customer waiver page: /waiver/:token (email / SMS / staff-sent link). */
-const WaiverForm = () => {
+const WaiverForm = ({ group = false }: { group?: boolean }) => {
   const { token } = useParams<{ token: string }>();
   const [context, setContext] = useState<WaiverFormContext | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,7 @@ const WaiverForm = () => {
 
   useEffect(() => {
     if (!token) return;
-    if (token === 'sample') {
+    if (token === 'sample' && !group) {
       setError('This is a sample waiver link from a test email. Guests get a link to their own waiver.');
       setLoading(false);
       return;
@@ -34,7 +35,7 @@ const WaiverForm = () => {
     (async () => {
       try {
         setLoading(true);
-        const ctx = await waiverService.getForm(token);
+        const ctx = group ? await waiverService.getGroupForm(token) : await waiverService.getForm(token);
         if (ctx.status === 'completed') {
           setAlreadyCompleted({ submitted_at: ctx.submitted_at, message: ctx.message });
         } else {
@@ -47,14 +48,18 @@ const WaiverForm = () => {
         setLoading(false);
       }
     })();
-  }, [token]);
+  }, [token, group]);
 
   const handleSubmit = async (data: WaiverSubmission) => {
     if (!token) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await waiverService.submit(token, data);
+      if (group) {
+        await waiverService.submitGroup(token, { ...data, waiver_template_version: context?.template?.version ?? null });
+      } else {
+        await waiverService.submit(token, data);
+      }
       setDone(true);
       celebrate();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -79,7 +84,14 @@ const WaiverForm = () => {
   if (!context) return null;
 
   return (
-    <WaiverShell title={context.template?.title || 'Sign Your Waiver'} subtitle="Please review and complete the waiver below">
+    <WaiverShell
+      title={context.template?.title || 'Sign Your Waiver'}
+      subtitle={
+        context.group
+          ? `For ${context.group.chaperone_name}'s group on ${formatDateLong(context.selected_date)}. Each parent or guardian signs their own.`
+          : 'Please review and complete the waiver below'
+      }
+    >
       <EscapeRoomGameBanner escapeRoom={context.escape_room} />
       <WaiverFormBody
         context={context}
