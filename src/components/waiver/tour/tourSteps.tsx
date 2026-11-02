@@ -413,7 +413,7 @@ export const WAIVER_BULK_STEPS: Step[] = [
           {row('Visit date', 'the group\'s visit date (pre-fills all participant waivers)')}
           {row('Chaperone name', 'the person responsible for collecting waivers')}
           {row('Email / Phone', 'where to send the management link')}
-          {row('Shareable link', 'lets the chaperone forward a signing link to participants')}
+          {row('Group link', 'gives the chaperone one link to share, so people can sign without being added first')}
         </div>
       </>
     ),
@@ -429,8 +429,8 @@ export const WAIVER_BULK_STEPS: Step[] = [
           {row('Chaperone', 'name and contact info for the group leader')}
           {row('Template', 'which waiver form is being collected')}
           {row('Date', 'the group\'s scheduled visit date')}
-          {row('Signed', 'how many of the parents added so far have signed, and any invites that could not be delivered')}
-          {row('Group link', 'copies the one link parents can use to sign, when it was allowed')}
+          {row('Signed', 'how many of the people added so far have signed, and any invites that could not be delivered')}
+          {row('Group link', 'copies the one link the group can use to sign, when it was turned on')}
         </div>
       </>
     ),
@@ -443,9 +443,9 @@ export const WAIVER_BULK_STEPS: Step[] = [
     content: (
       <>
         <div>
-          {row('List icon', 'shows each parent and whether they have signed')}
+          {row('List icon', 'shows everyone in the group and whether they have signed')}
           {row('Link icon', 'copies the chaperone\'s management URL to your clipboard')}
-          {row('Send icon', 'resends the email / SMS invite to the chaperone')}
+          {row('Send icon', 'resends the email / text invite to the chaperone')}
         </div>
       </>
     ),

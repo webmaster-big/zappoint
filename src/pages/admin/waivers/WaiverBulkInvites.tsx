@@ -96,7 +96,7 @@ const WaiverBulkInvites = () => {
       setToast({ message: 'Chaperone invite resent', type: 'success' });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
-      setToast({ message: e.response?.data?.message || 'Failed to resend', type: 'error' });
+      setToast({ message: e.response?.data?.message || 'Could not resend', type: 'error' });
     }
   };
 
@@ -151,7 +151,7 @@ const WaiverBulkInvites = () => {
                     </td>
                     <td className="px-4 py-3">
                       {inv.allow_shareable_link && inv.shareable_token ? (
-                        <button onClick={() => copyLink(`/waiver/group/${inv.shareable_token}`, 'Group link copied')} className={`inline-flex items-center gap-1 text-xs font-medium text-${themeColor}-600 hover:underline`} title="Copy the link parents use to sign">
+                        <button onClick={() => copyLink(`/waiver/group/${inv.shareable_token}`, 'Group link copied')} className={`inline-flex items-center gap-1 text-xs font-medium text-${themeColor}-600 hover:underline`} title="Copy the link the group uses to sign">
                           <Share2 className="w-3.5 h-3.5" /> Copy
                         </button>
                       ) : inv.allow_shareable_link ? (
@@ -226,14 +226,14 @@ const InviteRecipientsModal = ({ invite, onClose }: { invite: BulkInvite; onClos
           ) : recipients === null ? (
             <p className="px-6 py-8 text-sm text-gray-400 text-center">Loading…</p>
           ) : recipients.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-gray-400 text-center">The chaperone hasn't added any parents yet.</p>
+            <p className="px-6 py-8 text-sm text-gray-400 text-center">The chaperone hasn't added anyone yet.</p>
           ) : (
             recipients.map((r) => {
               const status = recipientStatus[r.status] || { label: r.status, cls: 'bg-gray-50 text-gray-500 border-gray-200' };
               return (
                 <div key={r.id} className="px-6 py-3 flex items-center justify-between gap-3 border-t border-gray-100 first:border-t-0">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{r.name || 'Unnamed contact'}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{r.name || 'No name given'}</p>
                     <p className="text-xs text-gray-400 truncate">{[r.email, formatPhoneForDisplay(r.phone) || r.phone].filter(Boolean).join(' · ')}</p>
                   </div>
                   <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.cls}`}>{status.label}</span>
@@ -319,7 +319,7 @@ const CreateInviteModal = ({ onClose, onSaved, themeColor, fullColor }: { onClos
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
             <input type="checkbox" checked={form.allow_shareable_link} onChange={(e) => setForm((f) => ({ ...f, allow_shareable_link: e.target.checked }))} className={`h-4 w-4 text-${fullColor} rounded border-gray-300`} />
-            Allow a shareable link the chaperone can forward
+            Give the chaperone one group link to share, so people can sign without being added first
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <StandardButton type="button" variant="secondary" onClick={onClose}>Cancel</StandardButton>

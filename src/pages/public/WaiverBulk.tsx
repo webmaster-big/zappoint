@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { BulkChaperoneView } from '../../types/waiver.types';
 import waiverService from '../../services/waiverService';
@@ -27,11 +27,11 @@ const statusStyles: Record<string, string> = {
 };
 
 const statusLabel: Record<string, string> = {
-  complete: 'Complete',
-  sent: 'Sent',
-  not_sent: 'Not sent',
-  not_complete: 'Incomplete',
-  failed: 'Failed',
+  complete: 'Signed',
+  sent: 'Invite sent',
+  not_sent: 'Not sent yet',
+  not_complete: 'Not signed',
+  failed: 'Not delivered',
 };
 
 /**
@@ -56,6 +56,7 @@ const WaiverBulk = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<NewRow>(emptyRow());
   const [savingEdit, setSavingEdit] = useState(false);
+  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
     if (!manageToken) return;
@@ -75,8 +76,9 @@ const WaiverBulk = () => {
   }, [reload]);
 
   const flash = (type: 'success' | 'error', text: string) => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
     setBanner({ type, text });
-    setTimeout(() => setBanner(null), 4000);
+    bannerTimer.current = setTimeout(() => setBanner(null), text.length > 90 ? 10000 : 4000);
   };
 
   const updateRow = (i: number, field: keyof NewRow, value: string) =>
@@ -96,7 +98,7 @@ const WaiverBulk = () => {
         const row = emptyRow();
         parts.forEach((p) => {
           if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p)) row.email = p;
-          else if (/^[+\d][\d\s()-]{6,}$/.test(p)) row.phone = p;
+          else if (/^[+\d\s().-]+$/.test(p) && p.replace(/\D/g, '').length >= 7) row.phone = p;
           else if (!row.name) row.name = p;
         });
         return row;
@@ -116,20 +118,21 @@ const WaiverBulk = () => {
       .filter((r) => r.email || r.phone);
 
     if (cleaned.length === 0) {
-      flash('error', 'Add at least one contact with an email or phone.');
+      flash('error', 'Add at least one person with an email or mobile number.');
       return;
     }
 
     setSaving(true);
     try {
       const res = await waiverService.addBulkRecipients(manageToken, cleaned);
-      flash('success', res.message || `${cleaned.length} contact(s) added.`);
+      const needsAttention = (res.data?.failed ?? 0) > 0 || (res.data?.phones_not_saved ?? 0) > 0;
+      flash(needsAttention ? 'error' : 'success', res.message || `${cleaned.length} added.`);
       setRows([emptyRow()]);
       setPasteText('');
       await reload();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
-      flash('error', e.response?.data?.message || 'Failed to add contacts.');
+      flash('error', e.response?.data?.message || 'Could not add these people. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -144,7 +147,7 @@ const WaiverBulk = () => {
       await reload();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
-      flash('error', e.response?.data?.message || 'Failed to send invites.');
+      flash('error', e.response?.data?.message || 'Could not send the invites. Please try again.');
     } finally {
       setSending(false);
     }
@@ -154,11 +157,11 @@ const WaiverBulk = () => {
     if (!manageToken) return;
     setResendingId(recipientId);
     try {
-      await waiverService.resendBulkRecipient(manageToken, recipientId);
-      flash('success', 'Invite resent.');
+      const res = await waiverService.resendBulkRecipient(manageToken, recipientId);
+      flash('success', res.message || 'Invite sent.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
-      flash('error', e.response?.data?.message || 'Failed to resend invite.');
+      flash('error', e.response?.data?.message || 'Could not send this invite. Please try again.');
     } finally {
       setResendingId(null);
       await reload();
@@ -173,7 +176,7 @@ const WaiverBulk = () => {
   const handleSaveEdit = async () => {
     if (!manageToken || editingId === null) return;
     if (!editRow.email.trim() && !editRow.phone.trim()) {
-      flash('error', 'Add an email address or a phone number.');
+      flash('error', 'Add an email address or a mobile number.');
       return;
     }
     setSavingEdit(true);
@@ -200,6 +203,7 @@ const WaiverBulk = () => {
 
   const pending = view.summary.total - view.summary.complete;
   const failed = view.summary.failed ?? 0;
+  const unsent = view.recipients.filter((r) => r.status === 'not_sent' || r.status === 'failed').length;
   const groupLink = view.shareable_token ? `${window.location.origin}/waiver/group/${view.shareable_token}` : null;
 
   const copyGroupLink = () => {
@@ -226,7 +230,7 @@ const WaiverBulk = () => {
             {view.chaperone_name}
           </h1>
           <p className="text-blue-200 text-sm">
-            Invite each parent or guardian to complete their child's waiver for {formatDateLong(view.selected_date)}.
+            Everyone in your group needs a signed waiver for {formatDateLong(view.selected_date)}. Each adult signs their own, and a parent or guardian signs for each child.
           </p>
         </div>
 
@@ -245,9 +249,9 @@ const WaiverBulk = () => {
         {/* Summary */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 grid grid-cols-3 gap-3 text-center">
           {[
-            ['Invited', view.summary.total, 'text-gray-900'],
-            ['Complete', view.summary.complete, 'text-emerald-600'],
-            ['Pending', pending, 'text-amber-600'],
+            ['Added', view.summary.total, 'text-gray-900'],
+            ['Signed', view.summary.complete, 'text-emerald-600'],
+            ['Not signed yet', pending, 'text-amber-600'],
           ].map(([label, value, color]) => (
             <div key={label as string}>
               <p className={`text-2xl font-bold ${color}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -260,7 +264,7 @@ const WaiverBulk = () => {
 
         {failed > 0 && !banner && (
           <div className="rounded-lg px-4 py-2.5 text-xs font-medium bg-red-50 border border-red-100 text-red-700">
-            {failed} invite{failed === 1 ? '' : 's'} could not be delivered. Use Edit next to their name to fix the email or phone.
+            {failed} invite{failed === 1 ? '' : 's'} could not be delivered. Use Edit next to their name to fix the email or mobile number.
           </div>
         )}
 
@@ -269,7 +273,7 @@ const WaiverBulk = () => {
             <div className="px-5 py-3.5 border-b border-gray-100">
               <h2 className="text-sm font-bold text-gray-900">Share One Link With the Group</h2>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                Post this link in your group chat or email. Each parent or guardian who opens it signs their own waiver, and they show up in your list below.
+                Post this link in your group chat or email. Each adult who opens it signs their own waiver (a parent or guardian signs for a child), and they show up in your list below.
               </p>
             </div>
             <div className="p-5 flex flex-col sm:flex-row gap-2">
@@ -296,7 +300,7 @@ const WaiverBulk = () => {
         {/* Add contacts */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900">Add Parents / Guardians</h2>
+            <h2 className="text-sm font-bold text-gray-900">Add People</h2>
             <button
               type="button"
               onClick={() => setPasteMode((v) => !v)}
@@ -316,7 +320,7 @@ const WaiverBulk = () => {
                   placeholder={'One per line:\nJane Doe, jane@email.com, 555-123-4567\nbob@email.com\n555-987-6543'}
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
-                  One contact per line. Separate name, email and phone with commas.
+                  One person per line. Separate name, email and mobile number with commas. For a child, add the parent or guardian who will sign.
                 </p>
               </div>
             ) : (
@@ -341,7 +345,7 @@ const WaiverBulk = () => {
                       value={row.phone}
                       onChange={(e) => updateRow(i, 'phone', e.target.value)}
                       className={inputClass}
-                      placeholder="Phone"
+                      placeholder="Mobile (US/Canada)"
                     />
                     <button
                       type="button"
@@ -369,40 +373,45 @@ const WaiverBulk = () => {
               disabled={saving}
               className="w-full py-2.5 bg-blue-50 text-blue-700 border border-blue-100 text-sm font-semibold rounded-lg hover:bg-blue-100 transition disabled:opacity-50"
             >
-              {saving ? 'Adding…' : 'Add Contacts'}
+              {saving ? 'Adding & sending…' : 'Add & Send Invites'}
             </button>
+            <p className="text-[11px] text-gray-400 text-center">
+              Add each adult, or the parent or guardian of each child. Everyone you add gets their invite right away; texts go to US and Canadian mobile numbers only.
+            </p>
           </div>
         </div>
 
         {/* Recipients list */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900">Recipients</h2>
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={sending || view.summary.total === 0}
-              className="px-3 py-1.5 bg-blue-700 text-white text-xs font-semibold rounded-lg hover:bg-blue-800 transition disabled:opacity-50"
-            >
-              {sending ? 'Sending…' : 'Send Invites'}
-            </button>
+            <h2 className="text-sm font-bold text-gray-900">Your Group</h2>
+            {unsent > 0 && (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending}
+                className="px-3 py-1.5 bg-blue-700 text-white text-xs font-semibold rounded-lg hover:bg-blue-800 transition disabled:opacity-50"
+              >
+                {sending ? 'Sending…' : `Send Remaining (${unsent})`}
+              </button>
+            )}
           </div>
           <div className="divide-y divide-gray-50">
             {view.recipients.length === 0 && (
-              <p className="text-xs text-gray-400 text-center py-6">No contacts added yet.</p>
+              <p className="text-xs text-gray-400 text-center py-6">No one added yet.</p>
             )}
             {view.recipients.map((r) => (
               <div key={r.id} className="px-5 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{r.name || 'Unnamed contact'}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{r.name || 'No name given'}</p>
                   {!r.complete && (r.email || r.phone) && (
                     <p className="text-[11px] text-gray-500 truncate">
                       {[r.email, formatPhoneForDisplay(r.phone) || r.phone].filter(Boolean).join(' · ')}
                     </p>
                   )}
                   {r.status === 'failed' ? (
-                    <p className="text-[11px] text-red-600">Not delivered. Use Edit to fix their email or phone.</p>
+                    <p className="text-[11px] text-red-600">Use Edit to fix their email or mobile number.</p>
                   ) : r.resent_count > 0 && (
                     <p className="text-[11px] text-gray-400">Resent {r.resent_count}×</p>
                   )}
@@ -431,7 +440,7 @@ const WaiverBulk = () => {
                       disabled={resendingId === r.id}
                       className="text-[11px] font-semibold text-blue-700 hover:text-blue-800 transition disabled:opacity-50"
                     >
-                      {resendingId === r.id ? '…' : 'Resend'}
+                      {resendingId === r.id ? '…' : r.status === 'not_sent' ? 'Send' : 'Resend'}
                     </button>
                   )}
                 </div>
@@ -459,7 +468,7 @@ const WaiverBulk = () => {
                     value={editRow.phone}
                     onChange={(e) => setEditRow((prev) => ({ ...prev, phone: e.target.value }))}
                     className={inputClass}
-                    placeholder="Phone"
+                    placeholder="Mobile (US/Canada)"
                     aria-label="Phone"
                   />
                   <div className="flex gap-2">

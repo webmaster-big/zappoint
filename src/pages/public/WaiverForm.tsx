@@ -88,7 +88,7 @@ const WaiverForm = ({ group = false }: { group?: boolean }) => {
       title={context.template?.title || 'Sign Your Waiver'}
       subtitle={
         context.group
-          ? `For ${context.group.chaperone_name}'s group on ${formatDateLong(context.selected_date)}. Each parent or guardian signs their own.`
+          ? `For ${context.group.chaperone_name}'s group on ${formatDateLong(context.selected_date)}. Each adult signs their own waiver and adds any children they are signing for.`
           : 'Please review and complete the waiver below'
       }
     >
