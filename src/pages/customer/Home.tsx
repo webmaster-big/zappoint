@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { normalizeCategory } from '../../utils/venueCategories';
-import { EVENTS_CATEGORY_LABEL, categoryAccentOf, categoryKeyOf, categoryLabelOfPackage, isUpcomingEvent, type CategoryAccent } from '../../utils/storefrontCategories';
+import { EVENTS_CATEGORY_LABEL, categoryKeyOf, categoryLabelOfPackage, isUpcomingEvent } from '../../utils/storefrontCategories';
 import { Link, useParams } from 'react-router-dom';
 import {
   MapPin,
@@ -18,7 +18,8 @@ import {
   DollarSign,
   Sparkles,
   Phone,
-  ShoppingCart
+  ShoppingCart,
+  LayoutGrid
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 import { type GroupedAttraction, type GroupedPackage, type GroupedEvent, type SpecialPricing } from '../../services/CustomerService';
@@ -94,18 +95,14 @@ interface FilterChip {
   value: StorefrontFilter;
   icon?: ReactNode;
   isCategory?: boolean;
-  accent?: CategoryAccent | null;
 }
 
-const filterChipColors = (isActive: boolean, accent?: CategoryAccent | null) => {
-  if (accent === 'escape-room') {
-    return isActive ? 'bg-red-700 text-white shadow-md ring-2 ring-inset ring-white/60' : 'bg-red-600 text-white shadow-sm hover:bg-red-700';
-  }
-  if (accent === 'rage-room') {
-    return isActive ? 'bg-green-800 text-white shadow-md ring-2 ring-inset ring-white/60' : 'bg-green-700 text-white shadow-sm hover:bg-green-800';
-  }
-  return isActive ? 'bg-blue-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
-};
+const filterChipClass = (isActive: boolean) =>
+  `px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-full border whitespace-nowrap transition-all duration-150 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-100 ${
+    isActive
+      ? 'bg-gradient-to-b from-blue-700 to-blue-900 text-white border-blue-900 shadow-md shadow-blue-900/30'
+      : 'bg-white text-gray-700 border-gray-200 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-800 hover:shadow-md'
+  }`;
 
 const CART_ENABLED = true;
 
@@ -706,7 +703,6 @@ const EntertainmentLandingPage = () => {
       label: chip.label,
       value: { kind: 'category', key: chip.key } as StorefrontFilter,
       isCategory: true,
-      accent: categoryAccentOf(chip.key),
     })),
   ];
 
@@ -1586,15 +1582,16 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              <div className="zz-filter-bar flex items-center gap-2 min-w-0">
-                <span className="hidden sm:inline text-xs font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">
-                  Show:
+              <div className="zz-filter-bar flex items-center gap-2.5 min-w-0">
+                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-800 uppercase tracking-wider flex-shrink-0">
+                  <LayoutGrid size={16} />
+                  Menu
                 </span>
-                <div className="relative min-w-0 flex-1">
+                <div className="relative min-w-0 flex-1 bg-gray-100 border border-gray-200 rounded-full shadow-inner overflow-hidden">
                 <div
                   ref={chipRailRef}
                   onScroll={measureChipRail}
-                  className="flex items-center gap-1.5 overflow-x-auto zz-chip-row -mx-1 px-1 py-0.5"
+                  className="flex items-center gap-2 overflow-x-auto zz-chip-row p-1.5"
                 >
                   {filterChips.map(chip => {
                     const isActive = chip.key === activeChipKey;
@@ -1606,7 +1603,7 @@ const EntertainmentLandingPage = () => {
                           selectFilter(chip.value); scrollToResults();
                         }}
                         aria-pressed={isActive}
-                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${filterChipColors(isActive, chip.accent)}`}
+                        className={`inline-flex items-center gap-1.5 flex-shrink-0 ${chip.isCategory ? 'capitalize' : ''} ${filterChipClass(isActive)}`}
                       >
                         {chip.icon}
                         {chip.label}
@@ -1615,8 +1612,10 @@ const EntertainmentLandingPage = () => {
                   })}
                 </div>
                 {chipsOverflowRight && (
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pl-6 pr-0.5 bg-gradient-to-l from-white via-white/90 to-transparent">
-                    <ChevronRight size={16} className="text-blue-800 animate-pulse" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pl-8 pr-1.5 bg-gradient-to-l from-gray-100 via-gray-100/90 to-transparent">
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-200 shadow-md animate-pulse">
+                      <ChevronRight size={16} className="text-blue-800" />
+                    </span>
                   </div>
                 )}
                 </div>
@@ -1646,15 +1645,18 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              <div className="zz-filter-bar flex items-center gap-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Show:</span>
-                <div className="flex flex-wrap items-center gap-1.5">
+              <div className="zz-filter-bar flex items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-800 uppercase tracking-wider flex-shrink-0">
+                  <LayoutGrid size={16} />
+                  Menu
+                </span>
+                <div className="flex flex-wrap items-center gap-2 bg-gray-100 border border-gray-200 rounded-3xl shadow-inner p-1.5">
                   {filterChips.map(chip => (
                     <button
                       key={chip.key}
                       onClick={() => { selectFilter(chip.value); scrollToResults(); }}
                       aria-pressed={chip.key === activeChipKey}
-                      className={`px-3.5 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${chip.isCategory ? 'capitalize' : ''} ${filterChipColors(chip.key === activeChipKey, chip.accent)}`}
+                      className={`${chip.isCategory ? 'capitalize' : ''} ${filterChipClass(chip.key === activeChipKey)}`}
                     >
                       {chip.label}
                     </button>
