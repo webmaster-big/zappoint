@@ -98,10 +98,10 @@ interface FilterChip {
 }
 
 const filterChipClass = (isActive: boolean) =>
-  `px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-full border whitespace-nowrap transition-all duration-150 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-100 ${
+  `px-3.5 sm:px-4 lg:px-5 py-2 text-xs sm:text-sm font-semibold rounded-full border whitespace-nowrap transition-all duration-150 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-100 lg:focus-visible:ring-offset-white ${
     isActive
-      ? 'bg-gradient-to-b from-blue-700 to-blue-900 text-white border-blue-900 shadow-md shadow-blue-900/30'
-      : 'bg-white text-gray-700 border-gray-200 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-800 hover:shadow-md'
+      ? 'bg-gradient-to-b from-blue-700 to-blue-900 text-white border-blue-900 shadow-md shadow-blue-900/30 lg:bg-none lg:bg-blue-800 lg:border-blue-800 lg:shadow-black/10'
+      : 'bg-white text-gray-700 border-gray-200 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-800 hover:shadow-md lg:text-blue-800 lg:border-blue-800 lg:hover:translate-y-0 lg:hover:border-blue-800 lg:hover:bg-blue-50 lg:hover:text-blue-900 lg:hover:shadow-sm'
   }`;
 
 const CART_ENABLED = true;
@@ -1583,15 +1583,15 @@ const EntertainmentLandingPage = () => {
               </div>
 
               <div className="zz-filter-bar flex items-center gap-2.5 min-w-0">
-                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-800 uppercase tracking-wider flex-shrink-0">
-                  <LayoutGrid size={16} />
+                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-800 uppercase tracking-wider lg:text-gray-900 lg:normal-case lg:tracking-normal flex-shrink-0">
+                  <LayoutGrid size={16} className="text-blue-800 lg:w-3.5 lg:h-3.5" />
                   Menu
                 </span>
-                <div className="relative min-w-0 flex-1 bg-gray-100 border border-gray-200 rounded-full shadow-inner overflow-hidden">
+                <div className="relative min-w-0 flex-1 bg-gray-100 border border-gray-200 rounded-full shadow-inner overflow-hidden lg:bg-transparent lg:border-transparent lg:shadow-none lg:overflow-visible">
                 <div
                   ref={chipRailRef}
                   onScroll={measureChipRail}
-                  className="flex items-center gap-2 overflow-x-auto zz-chip-row p-1.5"
+                  className="flex items-center gap-2 overflow-x-auto zz-chip-row p-1.5 lg:-mx-1 lg:px-1"
                 >
                   {filterChips.map(chip => {
                     const isActive = chip.key === activeChipKey;
@@ -1612,7 +1612,7 @@ const EntertainmentLandingPage = () => {
                   })}
                 </div>
                 {chipsOverflowRight && (
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pl-8 pr-1.5 bg-gradient-to-l from-gray-100 via-gray-100/90 to-transparent">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pl-8 pr-1.5 bg-gradient-to-l from-gray-100 via-gray-100/90 to-transparent lg:-right-1 lg:from-white lg:via-white/90">
                     <span className="flex items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-200 shadow-md animate-pulse">
                       <ChevronRight size={16} className="text-blue-800" />
                     </span>
@@ -1646,11 +1646,11 @@ const EntertainmentLandingPage = () => {
               </div>
 
               <div className="zz-filter-bar flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-800 uppercase tracking-wider flex-shrink-0">
-                  <LayoutGrid size={16} />
+                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-800 uppercase tracking-wider lg:text-gray-900 lg:normal-case lg:tracking-normal flex-shrink-0">
+                  <LayoutGrid size={16} className="text-blue-800 lg:w-3.5 lg:h-3.5" />
                   Menu
                 </span>
-                <div className="flex flex-wrap items-center gap-2 bg-gray-100 border border-gray-200 rounded-3xl shadow-inner p-1.5">
+                <div className="flex flex-wrap items-center gap-2 bg-gray-100 border border-gray-200 rounded-3xl shadow-inner p-1.5 lg:bg-transparent lg:border-transparent lg:shadow-none lg:p-0">
                   {filterChips.map(chip => (
                     <button
                       key={chip.key}
