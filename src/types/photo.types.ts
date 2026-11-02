@@ -289,7 +289,7 @@ export interface PhotoCaptureContext {
   location: { id: number; name: string; city: string | null; state: string | null; timezone: string };
   operating_day: string;
   local_time: string;
-  active_overlay: { id: number; name: string } | null;
+  active_overlay: { id: number; name: string; missing_shape?: PhotoFrameShape | null } | null;
   has_overlay: boolean;
   slideshow_queue_id: number;
   slideshow_enabled: boolean;
@@ -371,6 +371,16 @@ export interface PhotoOverlayEvent {
   never_runs: boolean;
 }
 
+export type PhotoFrameShape = 'landscape' | 'portrait' | 'square';
+
+export interface PhotoOverlayVersion {
+  slot: 'image' | 'alt_image';
+  url: string;
+  width: number | null;
+  height: number | null;
+  shape: PhotoFrameShape | null;
+}
+
 export interface PhotoOverlayRecord {
   id: number;
   location_id: number;
@@ -380,6 +390,10 @@ export interface PhotoOverlayRecord {
   event?: PhotoOverlayEvent | null;
   name: string;
   image_url: string | null;
+  alt_image_url?: string | null;
+  versions?: PhotoOverlayVersion[];
+  missing_shape?: PhotoFrameShape | null;
+  versions_supported?: boolean;
   starts_at: string | null;
   ends_at: string | null;
   is_enabled: boolean;

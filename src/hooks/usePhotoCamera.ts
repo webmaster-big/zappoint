@@ -349,10 +349,6 @@ export const usePhotoCamera = ({ facingMode = 'user', autoStart = false, followD
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    if (facingMode === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
     if (quarter === 90) {
       ctx.translate(0, canvas.height);
       ctx.rotate(-Math.PI / 2);
@@ -363,7 +359,7 @@ export const usePhotoCamera = ({ facingMode = 'user', autoStart = false, followD
     ctx.drawImage(video, 0, 0, width, height);
 
     return canvas.toDataURL('image/jpeg', quality);
-  }, [facingMode, turnFor]);
+  }, [turnFor]);
 
   const savedSize = frame
     ? turn === 0

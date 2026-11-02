@@ -363,7 +363,7 @@ const PhotoLibrary = () => {
                           <img
                             src={photo.thumbnail_url}
                             alt={`Photo ${photo.id}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         ) : (
                           <span className="flex items-center justify-center h-full text-xs text-gray-400">
@@ -570,7 +570,7 @@ const PhotoLibrary = () => {
                       key={photo.id}
                       src={photo.thumbnail_url ?? ''}
                       alt=""
-                      className="h-12 w-12 rounded object-cover bg-gray-100"
+                      className="h-12 w-12 rounded object-contain bg-gray-100"
                     />
                   ))}
                   {confirmDelete.photos.length > 8 && (

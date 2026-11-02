@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Camera, CheckCircle2, Info, Lock, RefreshCcw, ShieldAlert } from 'lucide-react';
@@ -58,6 +59,7 @@ const PhotoKiosk = () => {
   const camera = usePhotoCamera({ facingMode: 'user' });
   const { start: startCamera, stop: stopCamera, capture: capturePhoto } = camera;
   const cameraIsLive = camera.isLive;
+  const kioskFrame = camera.frame ?? { width: 4, height: 3 };
   const idleTimer = useRef<number | null>(null);
   const countdownTimer = useRef<number | null>(null);
   const handleRef = useRef<KioskSessionHandle | null>(null);
@@ -436,33 +438,38 @@ const PhotoKiosk = () => {
 
           {screen === 'camera' && (
             <div className="w-full max-w-3xl">
-              <div className="relative rounded-3xl overflow-hidden bg-black aspect-[4/3]">
-                <video
-                  ref={camera.videoRef}
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
-                />
-                {countdown !== null && countdown > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <span className="text-[9rem] sm:text-[12rem] font-black text-yellow-400 leading-none">
-                      {countdown}
-                    </span>
-                  </div>
-                )}
-                {(camera.state === 'denied' || camera.state === 'unavailable' || camera.state === 'lost') && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/95 p-8 text-center">
-                    <div>
-                      <ShieldAlert className="w-10 h-10 mx-auto text-amber-400 mb-3" />
-                      <p className="text-lg font-semibold mb-2">The camera is not available</p>
-                      <p className="text-sm text-zinc-400 max-w-sm">{camera.error}</p>
-                      <p className="text-sm text-zinc-400 mt-3">
-                        Please ask a team member — they can take the photo for you at the counter.
-                      </p>
+              <div className="flex justify-center">
+                <div
+                  className="relative w-full rounded-3xl overflow-hidden bg-black max-w-[calc(70vh*var(--frame-ratio))] supports-[height:1svh]:max-w-[calc(70svh*var(--frame-ratio))]"
+                  style={{ aspectRatio: `${kioskFrame.width} / ${kioskFrame.height}`, '--frame-ratio': kioskFrame.width / kioskFrame.height } as CSSProperties}
+                >
+                  <video
+                    ref={camera.videoRef}
+                    playsInline
+                    muted
+                    className="w-full h-full object-contain"
+                    style={{ transform: 'scaleX(-1)' }}
+                  />
+                  {countdown !== null && countdown > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <span className="text-[9rem] sm:text-[12rem] font-black text-yellow-400 leading-none">
+                        {countdown}
+                      </span>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {(camera.state === 'denied' || camera.state === 'unavailable' || camera.state === 'lost') && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/95 p-8 text-center">
+                      <div>
+                        <ShieldAlert className="w-10 h-10 mx-auto text-amber-400 mb-3" />
+                        <p className="text-lg font-semibold mb-2">The camera is not available</p>
+                        <p className="text-sm text-zinc-400 max-w-sm">{camera.error}</p>
+                        <p className="text-sm text-zinc-400 mt-3">
+                          Please ask a team member — they can take the photo for you at the counter.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-6 flex flex-col items-center gap-3">
@@ -494,8 +501,12 @@ const PhotoKiosk = () => {
           {screen === 'preview' && previewUrl && (
             <div className="w-full max-w-3xl">
               <h1 className="text-3xl font-bold text-center mb-5">How does this look?</h1>
-              <div className="rounded-3xl overflow-hidden bg-black">
-                <img src={previewUrl} alt="Your photo" className="w-full block" />
+              <div className="flex justify-center rounded-3xl overflow-hidden bg-black">
+                <img
+                  src={previewUrl}
+                  alt="Your photo"
+                  className="block max-w-full max-h-[70vh] supports-[height:1svh]:max-h-[70svh] w-auto"
+                />
               </div>
 
               <label

@@ -105,6 +105,24 @@ const PhotoCapture = () => {
     };
   }, [applyContext, effectiveLocationId]);
 
+  const missingFrameShape = context?.active_overlay?.missing_shape ?? null;
+  const shotSize = camera.isLive ? camera.savedSize : null;
+  const shotShape = shotSize
+    ? shotSize.height > shotSize.width
+      ? 'portrait'
+      : shotSize.width > shotSize.height
+        ? 'landscape'
+        : 'square'
+    : null;
+  const cameraUnavailable = camera.state === 'denied' || camera.state === 'unavailable' || camera.state === 'lost';
+  const tipApplies = camera.isLive ? shotShape !== null && shotShape === missingFrameShape : cameraUnavailable;
+  const frameShapeTip =
+    missingFrameShape === null || !tipApplies
+      ? null
+      : missingFrameShape === 'portrait'
+        ? 'Today’s frame has no portrait version yet, so photos taken upright cut off its sides. Hold the device sideways to get the whole frame. A manager can add a portrait version in Photo overlays.'
+        : 'Today’s frame has no landscape version yet, so photos taken sideways cut off its top and bottom. Hold the device upright to get the whole frame. A manager can add a landscape version in Photo overlays.';
+
   const { requestMotionAccess } = camera;
   const startSession = useCallback(async () => {
     if (!effectiveLocationId || !consent) return;
@@ -364,6 +382,13 @@ const PhotoCapture = () => {
                   </div>
                 )}
               </CameraViewfinder>
+
+              {frameShapeTip && (
+                <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 amber-tone bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{frameShapeTip}</span>
+                </p>
+              )}
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <StandardButton onClick={() => void takePhoto()} disabled={!camera.isLive || atCap || busy} icon={Camera}>

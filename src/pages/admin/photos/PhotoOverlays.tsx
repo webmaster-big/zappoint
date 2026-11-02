@@ -23,9 +23,11 @@ import { dateKey, parseLocalDate } from '../../../utils/timeFormat';
 import { locationShortName } from '../../../utils/locationName';
 import type {
   PhotoEventDay,
+  PhotoFrameShape,
   PhotoOverlayCopies,
   PhotoOverlayRecord,
   PhotoOverlayResponse,
+  PhotoOverlayVersion,
 } from '../../../types/photo.types';
 import type { EscapeRoomOption } from '../../../types/escapeRoom.types';
 
@@ -37,6 +39,64 @@ const STATUS_STYLES: Record<PhotoOverlayRecord['status'], string> = {
   scheduled: 'bg-blue-100 text-blue-800',
   expired: 'bg-gray-200 text-gray-700',
   disabled: 'bg-gray-100 text-gray-500',
+};
+
+type FrameShape = 'landscape' | 'portrait';
+
+const FRAME_SHAPES: FrameShape[] = ['landscape', 'portrait'];
+
+const SHAPE_NAMES: Record<FrameShape, string> = { landscape: 'Landscape', portrait: 'Portrait' };
+
+const SHAPE_HINTS: Record<FrameShape, string> = {
+  landscape: 'wide, for example 1920 × 1080; used for photos taken sideways',
+  portrait: 'tall, for example 1080 × 1920; used for photos taken upright',
+};
+
+const FRAME_FILE_TYPES = 'image/png,image/webp';
+
+interface ImageSize {
+  width: number;
+  height: number;
+}
+
+const readImageSize = (file: File): Promise<ImageSize | null> =>
+  new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image.naturalWidth > 0 ? { width: image.naturalWidth, height: image.naturalHeight } : null);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    image.src = url;
+  });
+
+const sizeShape = (size: ImageSize): PhotoFrameShape =>
+  size.width === size.height ? 'square' : size.width > size.height ? 'landscape' : 'portrait';
+
+const fitsShape = (shape: FrameShape, size: ImageSize): boolean =>
+  shape === 'portrait' ? size.height > size.width : size.width >= size.height;
+
+const wrongShapeMessage = (shape: FrameShape, size: ImageSize): string => {
+  const actual = sizeShape(size);
+  const described = actual === 'square' ? 'square' : actual === 'landscape' ? 'wide' : 'tall';
+  return `This image is ${described} (${size.width} × ${size.height}), so it can't be the ${shape} version.`;
+};
+
+const versionFor = (versions: PhotoOverlayVersion[], shape: FrameShape): PhotoOverlayVersion | undefined =>
+  versions.find((version) => (shape === 'portrait' ? version.shape === 'portrait' : version.shape === 'landscape' || version.shape === 'square'));
+
+const missingShapeNote = (shape: PhotoFrameShape | null | undefined): string | null => {
+  if (shape === 'portrait') {
+    return 'No portrait version yet, so photos taken upright cut off this frame’s sides. Add a portrait version.';
+  }
+  if (shape === 'landscape') {
+    return 'No landscape version yet, so photos taken sideways cut off this frame’s top and bottom. Add a landscape version.';
+  }
+  return null;
 };
 
 const NO_EVENT_FRAMES = "This server can't save event frames yet. Nothing was saved.";
@@ -152,7 +212,9 @@ const PhotoOverlays = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [frameFiles, setFrameFiles] = useState<Record<FrameShape, File | null>>({ landscape: null, portrait: null });
+  const [frameFileErrors, setFrameFileErrors] = useState<Record<FrameShape, string | null>>({ landscape: null, portrait: null });
+  const frameFileChecks = useRef<Record<FrameShape, number>>({ landscape: 0, portrait: 0 });
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [priority, setPriority] = useState(0);
@@ -339,7 +401,8 @@ const PhotoOverlays = () => {
   );
 
   const create = useCallback(async () => {
-    if (!effectiveLocationId || !file || name.trim().length === 0) return;
+    const firstFile = frameFiles.landscape ?? frameFiles.portrait;
+    if (!effectiveLocationId || !firstFile || name.trim().length === 0) return;
     const eventId = appliesTo.startsWith('event:') ? Number(appliesTo.slice('event:'.length)) : null;
     const roomId = appliesTo.startsWith('room:') ? appliesTo.slice('room:'.length) : '';
     const withHours = eventId === null || limitHours;
@@ -353,7 +416,8 @@ const PhotoOverlays = () => {
       const form = new FormData();
       form.append('location_id', String(effectiveLocationId));
       form.append('name', name.trim());
-      form.append('image', file);
+      form.append('image', firstFile);
+      if (frameFiles.landscape && frameFiles.portrait) form.append('alt_image', frameFiles.portrait);
       if (withHours && startsAt) form.append('starts_at', startsAt);
       if (withHours && endsAt) form.append('ends_at', endsAt);
       form.append('priority', String(priority));
@@ -361,6 +425,7 @@ const PhotoOverlays = () => {
       if (eventId !== null) form.append('registration_event_id', String(eventId));
       if (copyFrame) form.append('also_other_locations', '1');
       const { overlay, copies } = await photoService.createOverlay(form);
+      const portraitDropped = Boolean(frameFiles.landscape && frameFiles.portrait) && !overlay?.alt_image_url;
       if (eventId !== null && Number(overlay?.registration_event_id ?? 0) !== eventId) {
         const removed = overlay?.id
           ? await photoService.deleteOverlay(overlay.id).then(
@@ -378,13 +443,22 @@ const PhotoOverlays = () => {
         return;
       }
       const summary = copiesSummary(copies);
-      setToast({
-        message: summary ? `Overlay uploaded. ${summary}` : 'Overlay uploaded.',
-        type: copies.skipped.length > 0 ? 'info' : 'success',
-      });
+      setToast(
+        portraitDropped
+          ? {
+              message:
+                'Overlay uploaded with its landscape version only, because the server could not keep the portrait version yet. Add it from the frame’s card in a few minutes.',
+              type: 'error',
+            }
+          : {
+              message: summary ? `Overlay uploaded. ${summary}` : 'Overlay uploaded.',
+              type: copies.skipped.length > 0 ? 'info' : 'success',
+            },
+      );
       setShowForm(false);
       setName('');
-      setFile(null);
+      setFrameFiles({ landscape: null, portrait: null });
+      setFrameFileErrors({ landscape: null, portrait: null });
       setStartsAt('');
       setEndsAt('');
       setPriority(0);
@@ -405,7 +479,7 @@ const PhotoOverlays = () => {
     copyToSiblings,
     effectiveLocationId,
     endsAt,
-    file,
+    frameFiles,
     limitHours,
     load,
     loadEventDays,
@@ -424,6 +498,78 @@ const PhotoOverlays = () => {
         await load();
       } catch (e) {
         setToast({ message: errorMessage(e, 'That change could not be saved.'), type: 'error' });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load],
+  );
+
+  const closeForm = useCallback(() => {
+    frameFileChecks.current = { landscape: frameFileChecks.current.landscape + 1, portrait: frameFileChecks.current.portrait + 1 };
+    setFrameFiles({ landscape: null, portrait: null });
+    setFrameFileErrors({ landscape: null, portrait: null });
+    setShowForm(false);
+  }, []);
+
+  const chooseFrameFile = useCallback(async (shape: FrameShape, chosen: File | null, input: HTMLInputElement) => {
+    const check = frameFileChecks.current[shape] + 1;
+    frameFileChecks.current = { ...frameFileChecks.current, [shape]: check };
+    if (!chosen) {
+      setFrameFiles((current) => ({ ...current, [shape]: null }));
+      setFrameFileErrors((current) => ({ ...current, [shape]: null }));
+      return;
+    }
+    const size = await readImageSize(chosen);
+    if (frameFileChecks.current[shape] !== check) return;
+    if (size && !fitsShape(shape, size)) {
+      input.value = '';
+      setFrameFiles((current) => ({ ...current, [shape]: null }));
+      setFrameFileErrors((current) => ({ ...current, [shape]: wrongShapeMessage(shape, size) }));
+      return;
+    }
+    setFrameFiles((current) => ({ ...current, [shape]: chosen }));
+    setFrameFileErrors((current) => ({ ...current, [shape]: null }));
+  }, []);
+
+  const saveVersion = useCallback(
+    async (overlay: PhotoOverlayRecord, slot: PhotoOverlayVersion['slot'], shape: FrameShape, chosen: File) => {
+      const size = await readImageSize(chosen);
+      if (size && !fitsShape(shape, size)) {
+        setToast({ message: wrongShapeMessage(shape, size), type: 'error' });
+        return;
+      }
+      setBusy(true);
+      try {
+        const form = new FormData();
+        form.append(slot, chosen);
+        await photoService.updateOverlay(overlay.id, form);
+        setToast({
+          message: `${SHAPE_NAMES[shape]} version saved. New photos taken ${shape === 'portrait' ? 'upright' : 'sideways'} use it.`,
+          type: 'success',
+        });
+        await load();
+      } catch (e) {
+        setToast({ message: errorMessage(e, 'That version could not be saved.'), type: 'error' });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load],
+  );
+
+  const removeVersion = useCallback(
+    async (overlay: PhotoOverlayRecord, shape: FrameShape) => {
+      if (!window.confirm(`Remove the ${shape} version of “${overlay.name}”? Photos already taken keep it.`)) return;
+      setBusy(true);
+      try {
+        const form = new FormData();
+        form.append('remove_alt_image', '1');
+        await photoService.updateOverlay(overlay.id, form);
+        setToast({ message: `${SHAPE_NAMES[shape]} version removed.`, type: 'info' });
+        await load();
+      } catch (e) {
+        setToast({ message: errorMessage(e, 'That version could not be removed.'), type: 'error' });
       } finally {
         setBusy(false);
       }
@@ -501,14 +647,25 @@ const PhotoOverlays = () => {
   const showHours = !chosenEvent || limitHours;
 
   const renderCard = (overlay: PhotoOverlayRecord) => {
+    const versions: PhotoOverlayVersion[] =
+      overlay.versions ?? (overlay.image_url ? [{ slot: 'image', url: overlay.image_url, width: null, height: null, shape: null }] : []);
+    const versionsKnown = Boolean(overlay.versions) && versions.every((version) => version.shape !== null);
+    const shapeNote = missingShapeNote(overlay.missing_shape);
     const event = overlay.event ?? null;
     const eventFrame = isEventFrame(overlay);
     const schedule = scheduleLine(overlay);
     return (
       <div key={overlay.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-        <div className="bg-[repeating-conic-gradient(#f3f4f6_0%_25%,white_0%_50%)] bg-[length:16px_16px] aspect-video flex items-center justify-center">
-          {overlay.image_url ? (
-            <img src={overlay.image_url} alt={overlay.name} className="max-h-full max-w-full object-contain" />
+        <div className="bg-[repeating-conic-gradient(#f3f4f6_0%_25%,white_0%_50%)] bg-[length:16px_16px] aspect-video flex items-center justify-center gap-3 p-3">
+          {versions.length > 0 ? (
+            versions.map((version) => (
+              <img
+                key={version.slot}
+                src={version.url}
+                alt={`${overlay.name}${version.shape ? ` (${version.shape})` : ''}`}
+                className="h-full min-w-0 flex-1 object-contain"
+              />
+            ))
           ) : (
             <span className="text-xs text-gray-400">No image</span>
           )}
@@ -589,6 +746,61 @@ const PhotoOverlays = () => {
                   <option value={String(overlay.package_id)}>{overlay.room_name ?? 'Escape room'}</option>
                 )}
               </select>
+            </div>
+          )}
+
+          {versionsKnown && (
+            <div className="mt-3 space-y-1.5">
+              {FRAME_SHAPES.map((shape) => {
+                const version = versionFor(versions, shape);
+                const canAdd = !version && overlay.versions_supported !== false && versions.length < 2;
+                const slot: PhotoOverlayVersion['slot'] = version ? version.slot : 'alt_image';
+                return (
+                  <div key={shape} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="w-20 shrink-0 text-gray-500">{SHAPE_NAMES[shape]}</span>
+                    <span className={`min-w-0 flex-1 ${version ? 'text-gray-800' : 'text-amber-700'}`}>
+                      {version
+                        ? `${version.width} × ${version.height}${version.shape === 'square' ? ' (square)' : ''}`
+                        : 'Missing'}
+                    </span>
+                    {(version || canAdd) && (version?.slot !== 'alt_image' || overlay.versions_supported !== false) && (
+                      <label
+                        className={`cursor-pointer rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-100 ${busy ? 'pointer-events-none opacity-40' : ''}`}
+                      >
+                        {version ? 'Replace' : 'Add'}
+                        <input
+                          type="file"
+                          accept={FRAME_FILE_TYPES}
+                          className="sr-only"
+                          disabled={busy}
+                          aria-label={`${version ? 'Replace' : 'Add'} the ${shape} version of ${overlay.name}`}
+                          onChange={(e) => {
+                            const chosen = e.target.files?.[0];
+                            e.target.value = '';
+                            if (chosen) void saveVersion(overlay, slot, shape, chosen);
+                          }}
+                        />
+                      </label>
+                    )}
+                    {version?.slot === 'alt_image' && overlay.versions_supported !== false && (
+                      <button
+                        type="button"
+                        onClick={() => void removeVersion(overlay, shape)}
+                        disabled={busy}
+                        className="rounded-md border border-gray-200 px-2 py-1 text-red-700 hover:bg-red-50 disabled:opacity-40"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {shapeNote && (
+                <p className="flex items-start gap-1.5 rounded-lg border border-amber-200 amber-tone bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{shapeNote}</span>
+                </p>
+              )}
             </div>
           )}
 
@@ -697,16 +909,16 @@ const PhotoOverlays = () => {
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">Upload an overlay</h2>
-              <button type="button" onClick={() => setShowForm(false)} aria-label="Close">
+              <button type="button" onClick={closeForm} aria-label="Close">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
               <p className="text-sm text-gray-600">
-                Use a transparent PNG designed wide at 16:9, for example 1920 × 1080, so its edges line up with landscape
-                group photos. A frame of another shape is scaled to cover the picture and its edges may be cut off. The
-                capture date is drawn on top.
+                Use a PNG with a see-through middle. Give the frame a landscape version and a portrait version: each photo
+                gets the version that matches its shape, so the whole frame shows. With only one version, photos of the
+                other shape cut off part of the frame. The capture date is drawn on top.
               </p>
 
               <div>
@@ -716,18 +928,21 @@ const PhotoOverlays = () => {
                 <input id="ov-name" value={name} onChange={(e) => setName(e.target.value)} className={fieldCls} />
               </div>
 
-              <div>
-                <label htmlFor="ov-file" className="block text-sm text-gray-700 mb-1">
-                  Overlay image
-                </label>
-                <input
-                  id="ov-file"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm"
-                />
-              </div>
+              {FRAME_SHAPES.map((shape) => (
+                <div key={shape}>
+                  <label htmlFor={`ov-file-${shape}`} className="block text-sm text-gray-700 mb-1">
+                    {SHAPE_NAMES[shape]} version <span className="text-gray-500">({SHAPE_HINTS[shape]})</span>
+                  </label>
+                  <input
+                    id={`ov-file-${shape}`}
+                    type="file"
+                    accept={FRAME_FILE_TYPES}
+                    onChange={(e) => void chooseFrameFile(shape, e.target.files?.[0] ?? null, e.currentTarget)}
+                    className="block w-full text-sm"
+                  />
+                  {frameFileErrors[shape] && <p className="mt-1 text-xs text-red-700">{frameFileErrors[shape]}</p>}
+                </div>
+              ))}
 
               <div>
                 <label htmlFor="ov-room" className="block text-sm text-gray-700 mb-1">
@@ -881,7 +1096,7 @@ const PhotoOverlays = () => {
                 fullWidth
                 onClick={() => void create()}
                 loading={busy}
-                disabled={!file || name.trim().length === 0}
+                disabled={!(frameFiles.landscape || frameFiles.portrait) || name.trim().length === 0}
               >
                 Save overlay
               </StandardButton>

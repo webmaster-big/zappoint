@@ -356,7 +356,7 @@ const SlideshowQueuePage = () => {
                             <img
                               src={photo.thumbnail_url}
                               alt={`Photo ${photo.id}`}
-                              className="h-20 w-20 rounded-lg object-cover bg-gray-100"
+                              className="h-20 w-20 rounded-lg object-contain bg-gray-100"
                             />
                           </a>
                         ) : (
@@ -414,7 +414,7 @@ const SlideshowQueuePage = () => {
                         <img
                           src={photo.thumbnail_url}
                           alt={`Photo ${photo.id}`}
-                          className="h-14 w-14 rounded-lg object-cover bg-gray-100"
+                          className="h-14 w-14 rounded-lg object-contain bg-gray-100"
                         />
                       ) : (
                         <div className="h-14 w-14 rounded-lg bg-gray-100" />
