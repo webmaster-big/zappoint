@@ -98,10 +98,10 @@ interface FilterChip {
 }
 
 const filterChipClass = (isActive: boolean) =>
-  `px-3.5 sm:px-4 lg:px-5 py-2 text-xs sm:text-sm font-semibold rounded-full border whitespace-nowrap transition-all duration-150 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-100 lg:focus-visible:ring-offset-white ${
+  `px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold rounded-full border border-blue-800 whitespace-nowrap transition-all duration-100 active:translate-y-[3px] active:shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:ring-offset-2 ${
     isActive
-      ? 'bg-gradient-to-b from-blue-700 to-blue-900 text-white border-blue-900 shadow-md shadow-blue-900/30 lg:bg-none lg:bg-blue-800 lg:border-blue-800 lg:shadow-black/10'
-      : 'bg-white text-gray-700 border-gray-200 shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-800 hover:shadow-md lg:text-blue-800 lg:border-blue-800 lg:hover:translate-y-0 lg:hover:border-blue-800 lg:hover:bg-blue-50 lg:hover:text-blue-900 lg:hover:shadow-sm'
+      ? 'bg-blue-800 text-white shadow-[0_3px_0_0_var(--color-blue-950),0_4px_8px_-4px_rgb(23_37_84/0.5)]'
+      : 'bg-white text-blue-800 shadow-[0_3px_0_0_var(--color-blue-800),0_4px_8px_-4px_rgb(30_64_175/0.3)] hover:bg-blue-50 hover:text-blue-900'
   }`;
 
 const CART_ENABLED = true;
@@ -350,6 +350,12 @@ const EntertainmentLandingPage = () => {
     const rail = chipRailRef.current;
     if (!rail) return;
     setChipsOverflowRight(rail.scrollWidth - rail.clientWidth - rail.scrollLeft > 8);
+  }, []);
+
+  const scrollChipRail = useCallback(() => {
+    const rail = chipRailRef.current;
+    if (!rail) return;
+    rail.scrollBy({ left: rail.clientWidth * 0.7, behavior: 'smooth' });
   }, []);
 
   const scrollToResults = useCallback(() => {
@@ -1583,15 +1589,15 @@ const EntertainmentLandingPage = () => {
               </div>
 
               <div className="zz-filter-bar flex items-center gap-2.5 min-w-0">
-                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-800 uppercase tracking-wider lg:text-gray-900 lg:normal-case lg:tracking-normal flex-shrink-0">
-                  <LayoutGrid size={16} className="text-blue-800 lg:w-3.5 lg:h-3.5" />
+                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900 flex-shrink-0">
+                  <LayoutGrid size={14} className="text-blue-800" />
                   Menu
                 </span>
-                <div className="relative min-w-0 flex-1 bg-gray-100 border border-gray-200 rounded-full shadow-inner overflow-hidden lg:bg-transparent lg:border-transparent lg:shadow-none lg:overflow-visible">
+                <div className="relative min-w-0 flex-1">
                 <div
                   ref={chipRailRef}
                   onScroll={measureChipRail}
-                  className="flex items-center gap-2 overflow-x-auto zz-chip-row p-1.5 lg:-mx-1 lg:px-1"
+                  className="flex items-center gap-2 overflow-x-auto zz-chip-row -mx-1 px-1 pt-1.5 pb-3"
                 >
                   {filterChips.map(chip => {
                     const isActive = chip.key === activeChipKey;
@@ -1612,10 +1618,15 @@ const EntertainmentLandingPage = () => {
                   })}
                 </div>
                 {chipsOverflowRight && (
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pl-8 pr-1.5 bg-gradient-to-l from-gray-100 via-gray-100/90 to-transparent lg:-right-1 lg:from-white lg:via-white/90">
-                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-200 shadow-md animate-pulse">
+                  <div className="pointer-events-none absolute inset-y-0 -right-1 flex items-center pl-8 pr-1.5 pb-1.5 bg-gradient-to-l from-white via-white/90 to-transparent">
+                    <button
+                      type="button"
+                      onClick={scrollChipRail}
+                      aria-label="Show more categories"
+                      className="pointer-events-auto flex items-center justify-center w-7 h-7 rounded-full bg-white border border-gray-200 shadow-md animate-pulse"
+                    >
                       <ChevronRight size={16} className="text-blue-800" />
-                    </span>
+                    </button>
                   </div>
                 )}
                 </div>
@@ -1646,11 +1657,11 @@ const EntertainmentLandingPage = () => {
               </div>
 
               <div className="zz-filter-bar flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-800 uppercase tracking-wider lg:text-gray-900 lg:normal-case lg:tracking-normal flex-shrink-0">
-                  <LayoutGrid size={16} className="text-blue-800 lg:w-3.5 lg:h-3.5" />
+                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900 flex-shrink-0">
+                  <LayoutGrid size={14} className="text-blue-800" />
                   Menu
                 </span>
-                <div className="flex flex-wrap items-center gap-2 bg-gray-100 border border-gray-200 rounded-3xl shadow-inner p-1.5 lg:bg-transparent lg:border-transparent lg:shadow-none lg:p-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-3 pb-1">
                   {filterChips.map(chip => (
                     <button
                       key={chip.key}
