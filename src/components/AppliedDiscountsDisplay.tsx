@@ -1,11 +1,14 @@
 
-import type { AppliedDiscount } from '../utils/discounts';
+import { isSpecialPricingDiscount, type AppliedDiscount } from '../utils/discounts';
 
 interface AppliedDiscountsDisplayProps {
   appliedDiscounts: AppliedDiscount[] | null;
   compact?: boolean;
   className?: string;
 }
+
+const discountName = (d: AppliedDiscount & { name?: string }) =>
+  d.discount_name || d.name || (isSpecialPricingDiscount(d) ? 'Special pricing' : 'Discount');
 
 export function AppliedDiscountsDisplay({ appliedDiscounts, compact = false, className = '' }: AppliedDiscountsDisplayProps) {
   if (!appliedDiscounts || appliedDiscounts.length === 0) return null;
@@ -15,7 +18,7 @@ export function AppliedDiscountsDisplay({ appliedDiscounts, compact = false, cla
       <span
         className={`text-xs text-green-600 cursor-help ${className}`}
         title={appliedDiscounts
-          .map(d => `${d.discount_name}: -$${d.discount_amount.toFixed(2)} (${d.discount_type})`)
+          .map(d => `${discountName(d)}: -$${Number(d.discount_amount ?? 0).toFixed(2)} (${d.discount_type})`)
           .join('\n')}
       >
         ({appliedDiscounts.length} discount{appliedDiscounts.length !== 1 ? 's' : ''})
@@ -29,11 +32,11 @@ export function AppliedDiscountsDisplay({ appliedDiscounts, compact = false, cla
       {appliedDiscounts.map((discount, idx) => (
         <div key={idx} className="flex justify-between text-sm">
           <span className="text-gray-600">
-            {discount.discount_name}
+            {discountName(discount)}
             <span className="ml-1 text-xs text-gray-400">({discount.discount_type})</span>
           </span>
           <span className="text-green-600">
-            -${discount.discount_amount.toFixed(2)}
+            -${Number(discount.discount_amount ?? 0).toFixed(2)}
           </span>
         </div>
       ))}

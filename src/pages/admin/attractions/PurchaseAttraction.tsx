@@ -64,10 +64,14 @@ import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.type
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
+import SpecialDealNote from '../../../components/SpecialDealNote';
+import SpecialCheckAlert from '../../../components/SpecialCheckAlert';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
+import { michiganTodayKey } from '../../../utils/dashboardTimeframe';
 import { buildAppliedFees } from '../../../utils/fees';
 import { useMembershipBenefits } from '../../../hooks/useMembershipBenefits';
 import type { MembershipBenefitQuoteItem } from '../../../types/Membership.types';
-import { buildAppliedDiscounts, buildMembershipDiscount } from '../../../utils/discounts';
+import { buildAppliedDiscounts, buildMembershipDiscount, perTicketLabel, perTicketOffLabel } from '../../../utils/discounts';
 import { generateTimeSlots } from '../../../utils/timeSlots';
 import { normalizeCategory } from '../../../utils/venueCategories';
 import LocationUnavailable from '../../../components/customer/LocationUnavailable';
@@ -237,6 +241,9 @@ const PurchaseAttraction = () => {
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [specialChecking, setSpecialChecking] = useState(false);
+  const [specialCheckFailed, setSpecialCheckFailed] = useState(false);
+  const [specialAttempt, setSpecialAttempt] = useState(0);
 
   const [smsConsent, setSmsConsent] = useState<boolean>(false);
 
@@ -893,33 +900,52 @@ const PurchaseAttraction = () => {
   }, [attraction, quantity, selectedAddOns]);
 
   useEffect(() => {
-    if (!attraction) {
+    if (!attraction || !scheduledDate) {
       setSpecialPricingBreakdown(null);
+      setSpecialChecking(false);
+      setSpecialCheckFailed(false);
       return;
     }
+    let cancelled = false;
+    setSpecialChecking(true);
+    setSpecialCheckFailed(false);
     const timeoutId = setTimeout(async () => {
       try {
-        const pricingDate = new Date().toISOString().split('T')[0];
-        const basePrice = calculateTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
           entity_id: Number(attraction.id),
-          base_price: basePrice,
-          date: pricingDate,
+          base_price: parseFloat(attraction.price.toString()),
+          quantity,
+          date: scheduledDate,
+          time: scheduledTime || undefined,
           location_id: attraction.locationId ? Number(attraction.locationId) : undefined,
         });
+        if (cancelled) return;
+        setSpecialChecking(false);
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
         } else {
           setSpecialPricingBreakdown(null);
         }
       } catch (error) {
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialCheckFailed(true);
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
     }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [attraction, quantity, selectedAddOns, scheduledDate]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [attraction, quantity, scheduledDate, scheduledTime, specialAttempt]);
+
+  const { deals: specialDeals, dealDates } = useSpecialDeals(
+    'attraction',
+    attraction ? Number(attraction.id) : null,
+    attraction?.locationId ? Number(attraction.locationId) : null,
+  );
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
@@ -1078,7 +1104,7 @@ const PurchaseAttraction = () => {
         method: 'authorize.net',
         payment_method: 'authorize.net' as 'in-store' | 'paylater' | 'authorize.net',
         location_id: Number(attraction.locationId),
-        purchase_date: new Date().toISOString().split('T')[0],
+        purchase_date: michiganTodayKey(),
         scheduled_date: scheduledDate || undefined,
         scheduled_time: scheduledTime || undefined,
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
@@ -1420,7 +1446,7 @@ const PurchaseAttraction = () => {
                           <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
                             <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
                             {priced.applied_discounts.map((d, di) => (
-                              <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                              <p key={di} className="text-emerald-700">− ${(d.discount_amount ?? 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${perTicketLabel(d)})` : ''}</p>
                             ))}
                             {(priced.add_ons ?? []).map((ao, ai) => (
                               <p key={`a${ai}`}>+ {ao.quantity}× {ao.name} · ${(ao.line_total ?? ao.price_at_purchase * ao.quantity).toFixed(2)}</p>
@@ -1598,6 +1624,17 @@ const PurchaseAttraction = () => {
                           if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
                         }}
                         themeColor="blue"
+                        dealDates={dealDates}
+                      />
+                    )}
+                    {!orderMode && (
+                      <SpecialDealNote
+                      checkFailed={specialCheckFailed}
+                      onRetry={() => setSpecialAttempt((n) => n + 1)}
+                        deals={specialDeals}
+                        selectedDate={scheduledDate}
+                        applied={!!specialPricingBreakdown?.has_special_pricing}
+                        className="mt-3"
                       />
                     )}
                     <div className="mt-3 pt-3 border-t border-gray-100">
@@ -1668,7 +1705,7 @@ const PurchaseAttraction = () => {
                                 </p>
                                 {priced?.applied_discounts.map((d, di) => (
                                   <p key={di} className="text-xs font-semibold text-emerald-700 mt-0.5">
-                                    {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label} off)` : ''}
+                                    {d.name ?? 'Special pricing'}{d.discount_label ? ` (${perTicketOffLabel(d)})` : ''}
                                   </p>
                                 ))}
                               </div>
@@ -2149,7 +2186,7 @@ const PurchaseAttraction = () => {
                                 <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
                                   <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
                                   {priced.applied_discounts.map((d, di) => (
-                                    <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                                    <p key={di} className="text-emerald-700">− ${(d.discount_amount ?? 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${perTicketLabel(d)})` : ''}</p>
                                   ))}
                                   {(priced.add_ons ?? []).map((a, ai) => (
                                     <p key={`a${ai}`}>+ {a.quantity}× {a.name} · ${(a.line_total ?? a.price_at_purchase * a.quantity).toFixed(2)}</p>
@@ -2343,6 +2380,7 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
 
+                  <SpecialCheckAlert failed={specialCheckFailed && !orderMode} onRetry={() => setSpecialAttempt((n) => n + 1)} className="mt-2" />
                   <div className="flex justify-between gap-2 pt-2">
                     <StandardButton
                       variant="secondary"
@@ -2356,7 +2394,7 @@ const PurchaseAttraction = () => {
                     <button
                       type="button"
                       onClick={handlePurchase}
-                      disabled={purchaseComplete || submitting || isProcessingPayment || (cardEntryRequired && (!cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber))) || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                      disabled={purchaseComplete || submitting || isProcessingPayment || (!orderMode && (specialChecking || specialCheckFailed)) || (cardEntryRequired && (!cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber))) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (
@@ -2635,7 +2673,7 @@ const PurchaseAttraction = () => {
                               <div className="mt-0.5 space-y-0.5 text-xs text-gray-600">
                                 <p>{priced.quantity} × ${priced.unit_price.toFixed(2)}</p>
                                 {priced.applied_discounts.map((d, di) => (
-                                  <p key={di} className="text-emerald-700">− ${(d.discount_amount != null ? d.discount_amount * priced.quantity : 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${d.discount_label})` : ''}</p>
+                                  <p key={di} className="text-emerald-700">− ${(d.discount_amount ?? 0).toFixed(2)} {d.name ?? 'Special pricing'}{d.discount_label ? ` (${perTicketLabel(d)})` : ''}</p>
                                 ))}
                                 {(priced.add_ons ?? []).map((ao, ai) => (
                                   <p key={`a${ai}`}>+ {ao.quantity}× {ao.name} · ${(ao.line_total ?? ao.price_at_purchase * ao.quantity).toFixed(2)}</p>

@@ -74,6 +74,7 @@ export interface Attraction {
   imageByLocation?: Record<number, string | null>;
   overridesByLocation?: Record<number, Partial<Attraction>>;
   special_pricing?: import('../services/CustomerService').SpecialPricing;
+  special_deals?: import('./SpecialPricing.types').SpecialDeal[];
 }
 
 export interface PackageBookingLink {
@@ -109,6 +110,7 @@ export interface Package {
   display_label?: string | null;
   overridesByLocation?: Record<number, Partial<Package>>;
   special_pricing?: import('../services/CustomerService').SpecialPricing;
+  special_deals?: import('./SpecialPricing.types').SpecialDeal[];
 }
 
 export type ReservationStatus = 'confirmed' | 'pending' | 'cancelled' | 'refunded';

@@ -1,3 +1,4 @@
+import type { AppliedDiscount } from '../utils/discounts';
 
 export interface BookingsPageBooking {
   id: string;
@@ -153,6 +154,7 @@ export interface BookingRepriceIntent {
   participants?: number;
   package_id?: number | null;
   booking_date?: string;
+  booking_time?: string;
   location_id?: number;
   additional_addons?: { addon_id: number; quantity: number }[];
   additional_attractions?: { attraction_id: number; quantity: number }[];
@@ -184,6 +186,7 @@ export interface BookingQuote {
   membership_discount: number;
   redeemed_credit: number;
   discount_amount: number;
+  applied_discounts?: AppliedDiscount[] | null;
   total_amount: number;
   amount_paid: number;
   remaining_balance: number;

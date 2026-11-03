@@ -23,6 +23,7 @@ import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import locationService, { type Location } from '../../../services/LocationService';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import DatePicker from '../../../components/ui/DatePicker';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
 import EmailInput from '../../../components/ui/EmailInput';
 import { formatTimeTo12Hour, getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
@@ -574,6 +575,7 @@ const EditBooking: React.FC = () => {
           participants: formData.participants,
           package_id: formData.packageId,
           booking_date: formData.date || undefined,
+          booking_time: formData.time || undefined,
           location_id: formData.locationId || undefined,
           additional_addons: buildAdditionalAddons().map(({ addon_id, quantity }) => ({ addon_id, quantity })),
           ...(packageChanged ? { additional_attractions: [] } : {}),
@@ -603,7 +605,9 @@ const EditBooking: React.FC = () => {
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [originalBooking, formData.participants, formData.packageId, formData.date, formData.locationId, buildAdditionalAddons]);
+  }, [originalBooking, formData.participants, formData.packageId, formData.date, formData.time, formData.locationId, buildAdditionalAddons]);
+
+  const { dealDates } = useSpecialDeals('package', formData.packageId || null, formData.locationId || null);
 
   const dateMinParticipants = Math.max(1, Number((availableTimeSlots[0] as { min_participants?: number } | undefined)?.min_participants ?? packageDetails?.min_participants ?? 1));
 
@@ -794,6 +798,7 @@ const EditBooking: React.FC = () => {
           total_amount: quote.total_amount,
           discount_amount: quote.discount_amount,
           applied_fees: quote.persist_fees.length > 0 ? quote.persist_fees : null,
+          ...(quote.applied_discounts && { applied_discounts: quote.applied_discounts.length > 0 ? quote.applied_discounts : null }),
         }),
         guest_of_honor_name: packageDetails?.has_guest_of_honor ? (formData.guestOfHonorName.trim() || null) : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor ? (formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : null) : undefined,
@@ -1164,6 +1169,7 @@ const EditBooking: React.FC = () => {
                       dayOffs={dayOffs}
                       dayOffsWithTime={filteredDayOffsWithTime}
                       allowBlockedDates
+                      dealDates={dealDates}
                     />
                   ) : (
                     <input

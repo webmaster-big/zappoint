@@ -71,10 +71,12 @@ const formatDiscountAmount = (sp: SpecialPricing) => {
   return `$${parseFloat(sp.discount_amount).toFixed(2)}`;
 };
 
+const dateOnly = (value: string | null | undefined) => (value ? value.split('T')[0] : null);
+
 const formatRecurrence = (sp: SpecialPricing) => {
   if (sp.recurrence_display) return sp.recurrence_display;
   if (sp.recurrence_type === 'one_time' && sp.specific_date) {
-    return new Date(sp.specific_date).toLocaleDateString();
+    return new Date(`${dateOnly(sp.specific_date)}T00:00:00`).toLocaleDateString();
   }
   if (sp.recurrence_type === 'weekly' && sp.recurrence_value !== null) {
     return `Every ${DAY_OF_WEEK[sp.recurrence_value]?.label || ''}`;
@@ -325,7 +327,7 @@ const SpecialPricings: React.FC = () => {
           )}
           {sp.recurrence_type !== 'one_time' && (sp.start_date || sp.end_date) && (
             <p className="text-[11px] text-gray-400 mt-0.5 pl-0.5">
-              📅 {sp.start_date ? new Date(sp.start_date + 'T00:00:00').toLocaleDateString() : 'No start'} – {sp.end_date ? new Date(sp.end_date + 'T00:00:00').toLocaleDateString() : 'No end'}
+              📅 {sp.start_date ? new Date(`${dateOnly(sp.start_date)}T00:00:00`).toLocaleDateString() : 'No start'} – {sp.end_date ? new Date(`${dateOnly(sp.end_date)}T00:00:00`).toLocaleDateString() : 'No end'}
             </p>
           )}
         </div>
@@ -497,7 +499,7 @@ const SpecialPricings: React.FC = () => {
       type: 'daterange',
       key: 'effective_date',
       label: 'Effective / Start Date',
-      getDate: sp => sp.recurrence_type === 'one_time' ? sp.specific_date : sp.start_date,
+      getDate: sp => dateOnly(sp.recurrence_type === 'one_time' ? sp.specific_date : sp.start_date),
     },
     {
       type: 'daterange',
@@ -574,9 +576,9 @@ const SpecialPricings: React.FC = () => {
         { label: 'Discount Amount (Raw)', value: sp => sp.discount_amount },
         { label: 'Recurrence Type', value: sp => sp.recurrence_type },
         { label: 'Recurrence Value', value: sp => sp.recurrence_value },
-        { label: 'Specific Date', value: sp => sp.specific_date },
-        { label: 'Start Date', value: sp => sp.start_date },
-        { label: 'End Date', value: sp => sp.end_date },
+        { label: 'Specific Date', value: sp => dateOnly(sp.specific_date) },
+        { label: 'Start Date', value: sp => dateOnly(sp.start_date) },
+        { label: 'End Date', value: sp => dateOnly(sp.end_date) },
         { label: 'Time Start', value: sp => sp.time_start },
         { label: 'Time End', value: sp => sp.time_end },
         { label: 'Entity IDs', value: sp => sp.entity_ids && sp.entity_ids.length > 0 ? sp.entity_ids.join('; ') : 'All' },
@@ -622,9 +624,9 @@ const SpecialPricings: React.FC = () => {
       discount_type: sp.discount_type,
       recurrence_type: sp.recurrence_type,
       recurrence_value: sp.recurrence_value,
-      specific_date: sp.specific_date,
-      start_date: sp.start_date,
-      end_date: sp.end_date,
+      specific_date: dateOnly(sp.specific_date),
+      start_date: dateOnly(sp.start_date),
+      end_date: dateOnly(sp.end_date),
       time_start: sp.time_start?.slice(0, 5) || null,
       time_end: sp.time_end?.slice(0, 5) || null,
       entity_type: sp.entity_type,
@@ -652,6 +654,7 @@ const SpecialPricings: React.FC = () => {
         ...prev,
         recurrence_value: recType === 'weekly' ? 2 : recType === 'monthly' ? 1 : null,
         specific_date: recType === 'one_time' ? '' : null,
+        ...(recType === 'one_time' ? { start_date: null, end_date: null } : {}),
       }));
     }
   };
@@ -702,7 +705,8 @@ const SpecialPricings: React.FC = () => {
       closeModal();
       loadSpecialPricings();
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : 'Failed to save special pricing';
+      const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const errMsg = serverMessage || (error instanceof Error ? error.message : 'Failed to save special pricing');
       setToast({ message: errMsg, type: 'error' });
     } finally {
       setSaving(false);
@@ -932,7 +936,7 @@ const SpecialPricings: React.FC = () => {
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Calendar className={`w-4 h-4 text-${fullColor}`} /> Schedule
                   </h4>
-                  <p className="text-xs text-gray-400 mb-4">Control when this discount is active — one-time, weekly, or monthly.</p>
+                  <p className="text-xs text-gray-400 mb-4">Control when this discount is active — one-time, weekly, or monthly. It applies to visits scheduled on these days, no matter which day the guest buys.</p>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Recurrence</label>
@@ -950,7 +954,7 @@ const SpecialPricings: React.FC = () => {
                   {form.recurrence_type === 'one_time' && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Date <span className="text-red-500">*</span>
+                        Visit Date <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="date"
@@ -1014,7 +1018,7 @@ const SpecialPricings: React.FC = () => {
                   {form.recurrence_type !== 'one_time' && (
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">First Visit Date</label>
                         <input
                           type="date"
                           value={form.start_date || ''}
@@ -1023,7 +1027,7 @@ const SpecialPricings: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Last Visit Date</label>
                         <input
                           type="date"
                           value={form.end_date || ''}
@@ -1036,7 +1040,7 @@ const SpecialPricings: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Time From</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Visit Time From</label>
                       <input
                         type="time"
                         value={form.time_start || ''}
@@ -1045,7 +1049,7 @@ const SpecialPricings: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Time To</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Visit Time To</label>
                       <input
                         type="time"
                         value={form.time_end || ''}
@@ -1054,6 +1058,7 @@ const SpecialPricings: React.FC = () => {
                       />
                     </div>
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">Leave the times empty for all day. A percentage comes off each ticket's price; a fixed amount comes off every ticket (every participant on per-person packages, once on other packages). Add-ons are not discounted.</p>
                 </div>
 
                 <div className="border-t border-gray-200 pt-5">

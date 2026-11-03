@@ -22,6 +22,7 @@ interface ScheduleCalendarProps {
   compact?: boolean; // For admin panels with less space
   allowBlockedDates?: boolean;
   blockedTimeSlots?: string[];
+  dealDates?: Record<string, string>;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -48,6 +49,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   compact = false,
   allowBlockedDates = false,
   blockedTimeSlots = [],
+  dealDates,
 }) => {
   const today = useMemo(() => {
     const d = new Date();
@@ -238,8 +240,14 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
                   : `text-gray-800 bg-${themeColor}-50/60 hover:bg-${themeColor}-100 hover:shadow-sm`
                 }
                 text-[11px]`}
-              title={day.isDayOff ? 'Blocked all day — guests cannot book; you will be asked to confirm' : day.isPartialDayOff ? 'Limited hours — some times unavailable' : day.isToday ? 'Today' : undefined}
+              title={[
+                day.isDayOff ? 'Blocked all day — guests cannot book; you will be asked to confirm' : day.isPartialDayOff ? 'Limited hours — some times unavailable' : day.isToday ? 'Today' : null,
+                dealDates?.[formatDateStr(day.date!)] ? `Special price: ${dealDates[formatDateStr(day.date!)]}` : null,
+              ].filter(Boolean).join(' · ') || undefined}
             >
+              {dealDates?.[formatDateStr(day.date!)] && (
+                <span className={`absolute top-0.5 right-0.5 text-[8px] leading-none font-bold ${day.isSelected ? 'text-white' : 'text-emerald-600'}`}>%</span>
+              )}
               {dateNum}
               {!day.isSelected && (
                 <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${day.isDayOff ? 'bg-red-500' : day.isPartialDayOff ? 'bg-amber-500' : day.isToday ? `bg-${themeColor}-600` : `bg-${themeColor}-400`}`} />
@@ -270,6 +278,12 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
           <div className="w-2 h-2 rounded-sm bg-gray-100" />
           <span className="text-[9px] text-gray-500">Unavailable</span>
         </div>
+        {dealDates && Object.keys(dealDates).length > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] leading-none font-bold text-emerald-600">%</span>
+            <span className="text-[9px] text-gray-500">Special price</span>
+          </div>
+        )}
       </div>
     </div>
   );

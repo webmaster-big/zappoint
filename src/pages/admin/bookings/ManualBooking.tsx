@@ -6,6 +6,9 @@ import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
 import DatePicker from '../../../components/ui/DatePicker';
+import SpecialDealNote from '../../../components/SpecialDealNote';
+import SpecialCheckAlert from '../../../components/SpecialCheckAlert';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
 import EmailInput from '../../../components/ui/EmailInput';
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
@@ -106,6 +109,9 @@ const ManualBooking: React.FC = () => {
   const [calculatedTotal, setCalculatedTotal] = useState(0);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [specialChecking, setSpecialChecking] = useState(false);
+  const [specialCheckFailed, setSpecialCheckFailed] = useState(false);
+  const [specialAttempt, setSpecialAttempt] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   // a booking saved on top of another needs a manager's PIN here too, not only on the onsite flow
   const overrideTokenRef = useRef<string | null>(null);
@@ -737,32 +743,44 @@ const ManualBooking: React.FC = () => {
   }, [pkg, form.participants, selectedAddOns, selectedAttractions]);
 
   useEffect(() => {
-    const fetchSpecialPricing = async () => {
-      if (!pkg || !form.bookingDate) {
-        setSpecialPricingBreakdown(null);
-        return;
-      }
+    if (!pkg || !form.bookingDate) {
+      setSpecialPricingBreakdown(null);
+      setSpecialChecking(false);
+      setSpecialCheckFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setSpecialChecking(true);
+    setSpecialCheckFailed(false);
+    const timeoutId = setTimeout(async () => {
       try {
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'package',
           entity_id: pkg.id,
           base_price: Number(pkg.price ?? 0),
+          quantity: pkg.pricing_type === 'per_person' ? Math.max(1, Number(form.participants) || 1) : 1,
           date: form.bookingDate,
           time: form.bookingTime || undefined,
           location_id: pkg.location_id || undefined,
         });
-        if (breakdown.has_special_pricing) {
-          setSpecialPricingBreakdown(breakdown);
-        } else {
-          setSpecialPricingBreakdown(null);
-        }
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialPricingBreakdown(breakdown.has_special_pricing ? breakdown : null);
       } catch (error) {
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialCheckFailed(true);
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
     };
-    fetchSpecialPricing();
-  }, [pkg, form.bookingDate, form.bookingTime]);
+  }, [pkg, form.bookingDate, form.bookingTime, form.participants, specialAttempt]);
+
+  const { deals: specialDeals, dealDates } = useSpecialDeals('package', pkg?.id ?? null, pkg?.location_id ?? null);
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
@@ -1529,6 +1547,16 @@ const ManualBooking: React.FC = () => {
                             dayOffs={dayOffs}
                             dayOffsWithTime={filteredDayOffsWithTime}
                             allowBlockedDates
+                            dealDates={dealDates}
+                          />
+                          <SpecialDealNote
+                      checkFailed={specialCheckFailed}
+                      onRetry={() => setSpecialAttempt((n) => n + 1)}
+                            deals={specialDeals}
+                            selectedDate={form.bookingDate}
+                            applied={!!specialPricingBreakdown?.has_special_pricing}
+                            unit={pkg?.pricing_type === 'per_person' ? 'person' : 'booking'}
+                            className="mt-3"
                           />
                         </div>
 
@@ -2352,11 +2380,12 @@ const ManualBooking: React.FC = () => {
                   )}
 
                   <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                    <SpecialCheckAlert failed={specialCheckFailed} onRetry={() => setSpecialAttempt((n) => n + 1)} />
                     <StandardButton
                       type="submit"
                       variant="primary"
                       icon={Save}
-                      disabled={loading || !form.packageId || !form.bookingDate || !form.bookingTime || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                      disabled={loading || specialChecking || specialCheckFailed || !form.packageId || !form.bookingDate || !form.bookingTime || firstMissingRequired(customFields, customFieldAnswers) !== null}
                       loading={loading}
                       fullWidth
                       size="md"

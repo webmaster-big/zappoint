@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { perTicketOffLabel } from '../../utils/discounts';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart,
@@ -99,7 +100,10 @@ const Cart = () => {
     [items],
   );
 
+  const quoteSeq = useRef(0);
+
   const refreshQuote = useCallback(async () => {
+    const seq = ++quoteSeq.current;
     if (items.length === 0) {
       setQuote(null);
       return;
@@ -107,12 +111,15 @@ const Cart = () => {
     setQuoting(true);
     setQuoteError(null);
     try {
-      setQuote(await ticketOrderService.quote(items));
+      const next = await ticketOrderService.quote(items);
+      if (seq === quoteSeq.current) setQuote(next);
     } catch (error) {
-      setQuote(null);
-      setQuoteError(error instanceof Error ? error.message : 'We could not price your cart.');
+      if (seq === quoteSeq.current) {
+        setQuote(null);
+        setQuoteError(error instanceof Error ? error.message : 'We could not price your cart.');
+      }
     } finally {
-      setQuoting(false);
+      if (seq === quoteSeq.current) setQuoting(false);
     }
   }, [items]);
 
@@ -217,7 +224,7 @@ const Cart = () => {
                       {priced && priced.applied_discounts.length > 0 && priced.applied_discounts.map((d, i) => (
                         <p key={i} className="text-xs font-semibold text-emerald-600 mt-0.5">
                           {d.name ?? 'Special pricing'}
-                          {d.discount_label ? ` (${d.discount_label} off)` : ''}
+                          {d.discount_label ? ` (${perTicketOffLabel(d)})` : ''}
                         </p>
                       ))}
                       {priced && (priced.add_ons ?? []).map((a, i) => (

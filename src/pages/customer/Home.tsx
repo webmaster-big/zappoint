@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 import { type GroupedAttraction, type GroupedPackage, type GroupedEvent, type SpecialPricing } from '../../services/CustomerService';
+import type { SpecialDeal } from '../../types/SpecialPricing.types';
+import { specialDealBadge, specialDealHeadline } from '../../utils/discounts';
 import { customerDataCacheService } from '../../services/CustomerDataCacheService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
@@ -76,6 +78,7 @@ interface DisplayEvent {
   max_bookings_per_slot: number | null;
   price: string;
   features: string[] | null;
+  special_deals?: SpecialDeal[];
   availableLocations: string[];
   availableLocationIds?: number[];
   locations: DisplayEventLocation[];
@@ -146,11 +149,12 @@ interface AttractionScalars {
   duration_unit?: string;
   pricing_type?: string;
   special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
 }
 
 type AttractionViewFields = Pick<
   Attraction,
-  'description' | 'price' | 'minAge' | 'capacity' | 'displayCapacityToCustomers' | 'rating' | 'category' | 'duration' | 'pricingType' | 'special_pricing'
+  'description' | 'price' | 'minAge' | 'capacity' | 'displayCapacityToCustomers' | 'rating' | 'category' | 'duration' | 'pricingType' | 'special_pricing' | 'special_deals'
 >;
 
 const attractionViewFields = (src: AttractionScalars): AttractionViewFields => ({
@@ -164,6 +168,7 @@ const attractionViewFields = (src: AttractionScalars): AttractionViewFields => (
   duration: durationText(src.duration, src.duration_unit),
   pricingType: src.pricing_type,
   special_pricing: src.special_pricing,
+  special_deals: src.special_deals,
 });
 
 const attractionOverrides = (attr: GroupedAttraction): Record<number, Partial<Attraction>> =>
@@ -186,11 +191,12 @@ interface PackageScalars {
   duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   package_type?: string;
   special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
 }
 
 type PackageViewFields = Pick<
   PackageType,
-  'description' | 'price' | 'duration' | 'participants' | 'category' | 'package_type' | 'min_participants' | 'max_guests' | 'price_per_additional' | 'pricing_type' | 'participant_label' | 'display_label' | 'special_pricing'
+  'description' | 'price' | 'duration' | 'participants' | 'category' | 'package_type' | 'min_participants' | 'max_guests' | 'price_per_additional' | 'pricing_type' | 'participant_label' | 'display_label' | 'special_pricing' | 'special_deals'
 >;
 
 const packageViewFields = (src: PackageScalars): PackageViewFields => {
@@ -216,6 +222,7 @@ const packageViewFields = (src: PackageScalars): PackageViewFields => {
     participant_label: src.participant_label,
     display_label: src.display_label,
     special_pricing: src.special_pricing,
+    special_deals: src.special_deals,
   };
 };
 
@@ -236,11 +243,12 @@ interface EventScalars {
   time_end?: string | null;
   interval_minutes?: number | null;
   max_bookings_per_slot?: number | null;
+  special_deals?: SpecialDeal[];
 }
 
 type EventViewFields = Pick<
   DisplayEvent,
-  'description' | 'price' | 'features' | 'date_type' | 'start_date' | 'end_date' | 'time_start' | 'time_end' | 'interval_minutes' | 'max_bookings_per_slot'
+  'description' | 'price' | 'features' | 'date_type' | 'start_date' | 'end_date' | 'time_start' | 'time_end' | 'interval_minutes' | 'max_bookings_per_slot' | 'special_deals'
 >;
 
 const eventViewFields = (src: EventScalars): EventViewFields => ({
@@ -254,6 +262,7 @@ const eventViewFields = (src: EventScalars): EventViewFields => ({
   time_end: src.time_end ?? null,
   interval_minutes: src.interval_minutes ?? null,
   max_bookings_per_slot: src.max_bookings_per_slot ?? null,
+  special_deals: src.special_deals,
 });
 
 const eventOverrides = (evt: GroupedEvent): Record<number, Partial<DisplayEvent>> =>
@@ -281,6 +290,23 @@ interface LocationScopedItem<T> {
 
 const onlyKept = <V,>(map: Record<number, V> | undefined, keep: (locationId: number) => boolean) =>
   map && (Object.fromEntries(Object.entries(map).filter(([locationId]) => keep(Number(locationId)))) as Record<number, V>);
+
+const visibleDeals = <T extends { special_deals?: SpecialDeal[] }>(
+  item: LocationScopedItem<T>,
+  keep: (locationId: number) => boolean,
+): SpecialDeal[] => {
+  const ids = item.availableLocationIds ?? [];
+  const keptIds = [...new Set(ids.filter(keep))];
+  const combined = new Map<number, SpecialDeal>();
+  keptIds.forEach(id => {
+    const name = item.availableLocations[ids.indexOf(id)];
+    (item.overridesByLocation?.[id]?.special_deals ?? []).forEach(deal => {
+      const previous = combined.get(deal.special_pricing_id);
+      combined.set(deal.special_pricing_id, { ...deal, location_names: [...new Set([...(previous?.location_names ?? []), ...(name ? [name] : [])])] });
+    });
+  });
+  return [...combined.values()].map(deal => ({ ...deal, applies_at_every_location: (deal.location_names?.length ?? 0) >= keptIds.length }));
+};
 
 const withoutHiddenLocations = <T extends LocationScopedItem<T>>(
   items: T[],
@@ -412,7 +438,7 @@ const EntertainmentLandingPage = () => {
     () => resolveForLocation(
       withoutHiddenLocations(rawAttractions, hiddenFromBrowse, (item, keep) => {
         const purchaseLinks = item.purchaseLinks?.filter(link => keep(link.location_id));
-        return { purchaseLinks, id: purchaseLinks?.[0]?.attraction_id ?? item.id };
+        return { purchaseLinks, id: purchaseLinks?.[0]?.attraction_id ?? item.id, special_deals: visibleDeals(item, keep) };
       }),
       viewedLocationId,
     ),
@@ -422,7 +448,7 @@ const EntertainmentLandingPage = () => {
     () => resolveForLocation(
       withoutHiddenLocations(rawPackages, hiddenFromBrowse, (item, keep) => {
         const bookingLinks = item.bookingLinks?.filter(link => keep(link.location_id));
-        return { bookingLinks, id: bookingLinks?.[0]?.package_id ?? item.id };
+        return { bookingLinks, id: bookingLinks?.[0]?.package_id ?? item.id, special_deals: visibleDeals(item, keep) };
       }),
       viewedLocationId,
     ),
@@ -436,6 +462,7 @@ const EntertainmentLandingPage = () => {
           locations: item.locations.filter(loc => keep(loc.location_id)),
           purchaseLinks,
           id: purchaseLinks[0]?.event_id ?? item.id,
+          special_deals: visibleDeals(item, keep),
         };
       }).filter(evt => hiddenFromBrowse.size === 0 || isUpcomingEvent(evt)),
       viewedLocationId,
@@ -730,8 +757,7 @@ const EntertainmentLandingPage = () => {
       flashCartNotice(key, 'Not available at this location.');
       return;
     }
-    const special = attraction.special_pricing;
-    const price = special?.has_special_pricing ? Number(special.discounted_price) : Number(attraction.price);
+    const price = Number(attraction.price);
     const result = addToCart({
       type: 'attraction',
       id: link.attraction_id,
@@ -1024,9 +1050,6 @@ const EntertainmentLandingPage = () => {
     return convertTo12Hour(time);
   };
 
-  const formatDiscountLabel = (label: string) =>
-    label.replace(/([\d.]+)(%)/g, (_, num, suffix) => parseFloat(num) + suffix);
-
   const easternTimeAbbr = (() => {
     const now = new Date();
     const abbr = now.toLocaleString('en-US', { timeZone: 'America/Detroit', timeZoneName: 'short' })
@@ -1091,16 +1114,16 @@ const EntertainmentLandingPage = () => {
             {pkg.name}
           </div>
         )}
-        {pkg.special_pricing?.has_special_pricing && pkg.special_pricing.discounts_applied.length > 0 && (
+        {(pkg.special_deals?.length ?? 0) > 0 && (
           <div className="discount-overlay">
-            {pkg.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
-              <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+            {pkg.special_deals!.slice(0, 2).map((d, i) => (
+              <span key={d.special_pricing_id} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
                 <Sparkles size={i === 0 ? 12 : 10} />
-                <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+                <span>{d.name}: {specialDealBadge(d)}</span>
               </span>
             ))}
-            {pkg.special_pricing.discounts_applied.length > 2 && (
-              <span className="discount-pill-more">+{pkg.special_pricing.discounts_applied.length - 2} more</span>
+            {pkg.special_deals!.length > 2 && (
+              <span className="discount-pill-more">+{pkg.special_deals!.length - 2} more</span>
             )}
           </div>
         )}
@@ -1142,23 +1165,10 @@ const EntertainmentLandingPage = () => {
         <div className="mt-auto">
           <div className="flex items-end justify-between gap-3 mb-3">
             <div>
-              {pkg.special_pricing?.has_special_pricing ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
-                  <span className="text-emerald-500 font-bold">→</span>
-                  <span className="text-2xl font-extrabold text-emerald-600">
-                    ${pkg.special_pricing.discounted_price}
-                  </span>
-                  <span className="text-gray-400 text-xs">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
-                </div>
-              ) : (
-                <>
-                  <span className="text-2xl font-extrabold text-gray-900">
-                    ${pkg.price}
-                  </span>
-                  <span className="text-gray-400 text-xs ml-1">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
-                </>
-              )}
+              <span className="text-2xl font-extrabold text-gray-900">
+                ${pkg.price}
+              </span>
+              <span className="text-gray-400 text-xs ml-1">{pkg.pricing_type === 'per_person' ? `/ ${(pkg.participant_label || 'player').toLowerCase()}` : '/ package'}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-stretch gap-2">
@@ -1197,16 +1207,16 @@ const EntertainmentLandingPage = () => {
             {attraction.name}
           </div>
         )}
-        {attraction.special_pricing?.has_special_pricing && attraction.special_pricing.discounts_applied.length > 0 && (
+        {(attraction.special_deals?.length ?? 0) > 0 && (
           <div className="discount-overlay">
-            {attraction.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
-              <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+            {attraction.special_deals!.slice(0, 2).map((d, i) => (
+              <span key={d.special_pricing_id} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
                 <Sparkles size={i === 0 ? 12 : 10} />
-                <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+                <span>{d.name}: {specialDealBadge(d)}</span>
               </span>
             ))}
-            {attraction.special_pricing.discounts_applied.length > 2 && (
-              <span className="discount-pill-more">+{attraction.special_pricing.discounts_applied.length - 2} more</span>
+            {attraction.special_deals!.length > 2 && (
+              <span className="discount-pill-more">+{attraction.special_deals!.length - 2} more</span>
             )}
           </div>
         )}
@@ -1228,23 +1238,10 @@ const EntertainmentLandingPage = () => {
         <div className="mt-auto">
           <div className="flex items-end justify-between gap-3 mb-3">
             <div>
-              {attraction.special_pricing?.has_special_pricing ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400 line-through font-semibold">${attraction.special_pricing.original_price}</span>
-                  <span className="text-emerald-500 font-bold">→</span>
-                  <span className="text-2xl font-extrabold text-emerald-600">
-                    ${attraction.special_pricing.discounted_price}
-                  </span>
-                  <span className="text-gray-400 text-xs">/ person</span>
-                </div>
-              ) : (
-                <>
-                  <span className="text-2xl font-extrabold text-gray-900">
-                    ${attraction.price}
-                  </span>
-                  <span className="text-gray-400 text-xs ml-1">/ person</span>
-                </>
-              )}
+              <span className="text-2xl font-extrabold text-gray-900">
+                ${attraction.price}
+              </span>
+              <span className="text-gray-400 text-xs ml-1">/ person</span>
             </div>
           </div>
           <div className="flex flex-wrap items-stretch gap-2">
@@ -1743,16 +1740,16 @@ const EntertainmentLandingPage = () => {
                             {pkg.name}
                           </div>
                         )}
-                        {pkg.special_pricing?.has_special_pricing && pkg.special_pricing.discounts_applied.length > 0 && (
+                        {(pkg.special_deals?.length ?? 0) > 0 && (
                           <div className="discount-overlay">
-                            {pkg.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
-                              <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                            {pkg.special_deals!.slice(0, 2).map((d, i) => (
+                              <span key={d.special_pricing_id} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
                                 <Sparkles size={i === 0 ? 12 : 10} />
-                                <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+                                <span>{d.name}: {specialDealBadge(d)}</span>
                               </span>
                             ))}
-                            {pkg.special_pricing.discounts_applied.length > 2 && (
-                              <span className="discount-pill-more">+{pkg.special_pricing.discounts_applied.length - 2} more</span>
+                            {pkg.special_deals!.length > 2 && (
+                              <span className="discount-pill-more">+{pkg.special_deals!.length - 2} more</span>
                             )}
                           </div>
                         )}
@@ -1787,19 +1784,9 @@ const EntertainmentLandingPage = () => {
                         
                         <div className="flex items-center justify-between">
                           <div>
-                            {pkg.special_pricing?.has_special_pricing ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-base text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
-                                <span className="text-emerald-500 text-lg font-bold">→</span>
-                                <span className="text-2xl md:text-3xl font-extrabold text-emerald-600">
-                                  ${pkg.special_pricing.discounted_price}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-2xl md:text-3xl font-extrabold text-gray-900">
-                                ${pkg.price}
-                              </span>
-                            )}
+                            <span className="text-2xl md:text-3xl font-extrabold text-gray-900">
+                              ${pkg.price}
+                            </span>
                           </div>
                           <button
                             onClick={(e) => {
@@ -2025,6 +2012,19 @@ const EntertainmentLandingPage = () => {
                           {evt.name}
                         </div>
                       )}
+                      {(evt.special_deals?.length ?? 0) > 0 && (
+                        <div className="discount-overlay">
+                          {evt.special_deals!.slice(0, 2).map((d, i) => (
+                            <span key={d.special_pricing_id} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                              <Sparkles size={i === 0 ? 12 : 10} />
+                              <span>{d.name}: {specialDealBadge(d)}</span>
+                            </span>
+                          ))}
+                          {evt.special_deals!.length > 2 && (
+                            <span className="discount-pill-more">+{evt.special_deals!.length - 2} more</span>
+                          )}
+                        </div>
+                      )}
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm">
                           Event
@@ -2125,18 +2125,8 @@ const EntertainmentLandingPage = () => {
                     <DollarSign className="text-emerald-600" size={20} />
                   </div>
                   <div>
-                    {selectedAttraction.special_pricing?.has_special_pricing ? (
-                      <>
-                        <div className="text-sm text-gray-400 line-through">${selectedAttraction.special_pricing.original_price}</div>
-                        <div className="text-xl md:text-2xl font-extrabold text-emerald-600">${selectedAttraction.special_pricing.discounted_price}</div>
-                        <div className="text-xs text-gray-400">per person</div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedAttraction.price}</div>
-                        <div className="text-xs text-gray-400">per person</div>
-                      </>
-                    )}
+                    <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedAttraction.price}</div>
+                    <div className="text-xs text-gray-400">per person</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2150,27 +2140,24 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              {selectedAttraction.special_pricing?.has_special_pricing && selectedAttraction.special_pricing.discounts_applied.length > 0 && (
+              {(selectedAttraction.special_deals?.length ?? 0) > 0 && (
                 <div className="mb-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    Active Discounts
+                    Special Prices
                   </h3>
                   <div className="space-y-1.5">
-                    {selectedAttraction.special_pricing.discounts_applied.map((d, i) => (
-                      <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                    {selectedAttraction.special_deals!.map((d) => (
+                      <div key={d.special_pricing_id} className="flex items-center justify-between gap-3 bg-white rounded-lg px-3 py-2">
                         <div>
                           <div className="text-sm font-semibold text-gray-900">{d.name}</div>
                           {d.description && <div className="text-xs text-gray-500">{d.description}</div>}
-                          {d.recurrence_display && <div className="text-[11px] text-gray-400 mt-0.5">{d.recurrence_display}</div>}
+                          <div className="text-[11px] text-gray-500 mt-0.5">{specialDealHeadline(d, 'ticket')}{d.applies_at_every_location === false && d.location_names?.length ? ` · ${d.location_names.join(', ')}` : ''}</div>
                         </div>
-                        <span className="text-sm font-bold text-emerald-600">{formatDiscountLabel(d.discount_label)}</span>
+                        <span className="text-sm font-bold text-emerald-600 whitespace-nowrap">{d.discount_label} off</span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-between text-xs">
-                    <span className="text-emerald-700 font-medium">Total Savings</span>
-                    <span className="text-emerald-700 font-bold">{Math.round(selectedAttraction.special_pricing.total_discount)}% off</span>
-                  </div>
+                  <p className="mt-2 pt-2 border-t border-emerald-200 text-xs text-emerald-700">Based on the day you visit — you can buy on any day.</p>
                 </div>
               )}
 
@@ -2353,18 +2340,8 @@ const EntertainmentLandingPage = () => {
                     <DollarSign className="text-emerald-600" size={20} />
                   </div>
                   <div>
-                    {selectedPackage.special_pricing?.has_special_pricing ? (
-                      <>
-                        <div className="text-sm text-gray-400 line-through">${selectedPackage.special_pricing.original_price}</div>
-                        <div className="text-xl md:text-2xl font-extrabold text-emerald-600">${selectedPackage.special_pricing.discounted_price}</div>
-                        <div className="text-xs text-gray-400">package</div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedPackage.price}</div>
-                        <div className="text-xs text-gray-400">package</div>
-                      </>
-                    )}
+                    <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedPackage.price}</div>
+                    <div className="text-xs text-gray-400">package</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2378,27 +2355,24 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              {selectedPackage.special_pricing?.has_special_pricing && selectedPackage.special_pricing.discounts_applied.length > 0 && (
+              {(selectedPackage.special_deals?.length ?? 0) > 0 && (
                 <div className="mb-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    Active Discounts
+                    Special Prices
                   </h3>
                   <div className="space-y-1.5">
-                    {selectedPackage.special_pricing.discounts_applied.map((d, i) => (
-                      <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                    {selectedPackage.special_deals!.map((d) => (
+                      <div key={d.special_pricing_id} className="flex items-center justify-between gap-3 bg-white rounded-lg px-3 py-2">
                         <div>
                           <div className="text-sm font-semibold text-gray-900">{d.name}</div>
                           {d.description && <div className="text-xs text-gray-500">{d.description}</div>}
-                          {d.recurrence_display && <div className="text-[11px] text-gray-400 mt-0.5">{d.recurrence_display}</div>}
+                          <div className="text-[11px] text-gray-500 mt-0.5">{specialDealHeadline(d, selectedPackage.pricing_type === 'per_person' ? 'person' : 'booking')}{d.applies_at_every_location === false && d.location_names?.length ? ` · ${d.location_names.join(', ')}` : ''}</div>
                         </div>
-                        <span className="text-sm font-bold text-emerald-600">{formatDiscountLabel(d.discount_label)}</span>
+                        <span className="text-sm font-bold text-emerald-600 whitespace-nowrap">{d.discount_label} off</span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-between text-xs">
-                    <span className="text-emerald-700 font-medium">Total Savings</span>
-                    <span className="text-emerald-700 font-bold">{Math.round(selectedPackage.special_pricing.total_discount)}% off</span>
-                  </div>
+                  <p className="mt-2 pt-2 border-t border-emerald-200 text-xs text-emerald-700">Based on the day you visit — you can buy on any day.</p>
                 </div>
               )}
 

@@ -8,6 +8,8 @@ import type {
   SpecialPricingListParams,
   SpecialPricingApiResponse,
   EntityType,
+  SpecialDealsResponse,
+  PurchaseSpecialQuote,
 } from '../types/SpecialPricing.types';
 
 const api = axios.create({
@@ -106,8 +108,31 @@ class SpecialPricingService {
     date?: string; // YYYY-MM-DD
     time?: string; // HH:mm
     location_id?: number;
+    quantity?: number;
   }): Promise<SpecialPricingBreakdown> {
     const response = await api.get<ApiResponse<SpecialPricingBreakdown>>('/special-pricings/for-entity', { params });
+    return response.data.data;
+  }
+
+  async quotePurchaseSpecial(
+    entityType: 'attraction' | 'event',
+    purchaseId: number,
+    payload: Record<string, string | number | null>
+  ): Promise<PurchaseSpecialQuote> {
+    const path = entityType === 'attraction'
+      ? `/attraction-purchases/${purchaseId}/special-quote`
+      : `/event-purchases/${purchaseId}/special-quote`;
+    const response = await api.post<ApiResponse<PurchaseSpecialQuote>>(path, payload);
+    return response.data.data;
+  }
+
+  async getDeals(params: {
+    entity_type: 'package' | 'attraction' | 'event';
+    entity_id: number;
+    location_id?: number;
+    days?: number;
+  }): Promise<SpecialDealsResponse> {
+    const response = await api.get<ApiResponse<SpecialDealsResponse>>('/special-pricings/deals', { params });
     return response.data.data;
   }
 

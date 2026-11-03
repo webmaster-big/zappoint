@@ -14,7 +14,9 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getStoredUser } from '../../../utils/storage';
 import type { EventPurchase, Event, UpdateEventPurchaseData } from '../../../types/event.types';
 import type { AppliedFee } from '../../../utils/fees';
-import type { AppliedDiscount } from '../../../utils/discounts';
+import { isSpecialPricingDiscount, type AppliedDiscount } from '../../../utils/discounts';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
+import { useSpecialRepricing } from '../../../hooks/useSpecialRepricing';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
 import BlockedPeriodList, { type BlockedPeriodSummary } from '../../../components/admin/availability/BlockedPeriodList';
@@ -83,6 +85,7 @@ const EditEventPurchase: React.FC = () => {
   const [guestPhone, setGuestPhone] = useState('');
   const [status, setStatus] = useState<EventStatus>('pending');
   const [paymentStatus, setPaymentStatus] = useState<string>('pending');
+  const [paymentStatusTouched, setPaymentStatusTouched] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('in-store');
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [notes, setNotes] = useState('');
@@ -234,7 +237,16 @@ const EditEventPurchase: React.FC = () => {
     });
   };
 
-  const baseSubtotal = eventPrice * quantity;
+  const storedUnitPrice = (originalPurchase as { unit_price?: number | string | null } | null)?.unit_price;
+  const legacyUnitPrice = useMemo(() => {
+    if (!originalPurchase || storedUnitPrice != null) return null;
+    const addOns = (originalPurchase.add_ons || []).reduce((sum, a) => sum + Number(a.pivot?.price_at_purchase ?? 0) * Number(a.pivot?.quantity ?? 0), 0);
+    const fees = (originalPurchase.applied_fees || []).filter((f) => f.fee_application_type === 'additive').reduce((sum, f) => sum + Number(f.fee_amount || 0), 0);
+    const unit = (Number(originalPurchase.total_amount ?? 0) + Number(originalPurchase.discount_amount ?? 0) - addOns - fees) / Math.max(1, Number(originalPurchase.quantity || 1));
+    return unit > 0 ? unit : null;
+  }, [originalPurchase, storedUnitPrice]);
+  const ticketUnitPrice = storedUnitPrice != null ? Number(storedUnitPrice) : legacyUnitPrice ?? eventPrice;
+  const baseSubtotal = ticketUnitPrice * quantity;
   const addOnsTotal = useMemo(() => {
     return Object.entries(selectedAddOns).reduce((sum, [addId, qty]) => {
       const addOn = availableAddOns.find((a: any) => a.id === Number(addId));
@@ -246,6 +258,12 @@ const EditEventPurchase: React.FC = () => {
   const discountCeiling = Math.max(0, baseSubtotal + addOnsTotal + additiveFeeTotal);
   const displayTotal = Math.max(0, baseSubtotal + addOnsTotal + additiveFeeTotal - discountAmount);
   const balance = displayTotal - amountPaid;
+  const moneyMoved = !!originalPurchase && (
+    Math.abs(displayTotal - Number(originalPurchase.total_amount ?? 0)) > 0.005
+    || Math.abs(amountPaid - Number(originalPurchase.amount_paid ?? 0)) > 0.005
+  );
+  const derivedPaymentStatus = balance <= 0.005 ? 'paid' : amountPaid > 0 ? 'partial' : 'pending';
+  const effectivePaymentStatus = paymentStatusTouched || !moneyMoved || ['refunded', 'voided'].includes(originalPurchase?.payment_status ?? '') ? paymentStatus : derivedPaymentStatus;
 
   const feeBreakdownForDisplay = useMemo<FeeBreakdown | null>(() => {
     if (appliedFees.length === 0) return null;
@@ -397,6 +415,37 @@ const EditEventPurchase: React.FC = () => {
     };
   }, [keptOriginalSlot, availableTimeSlots, blockedTimeSlots, closuresByDate, purchaseDate, eventFull, originalPurchase]);
 
+  const { dealDates } = useSpecialDeals('event', eventId, locationId);
+
+  const originalSpecialDiscounts = useMemo(
+    () => ((originalPurchase?.applied_discounts ?? []) as AppliedDiscount[]).filter(isSpecialPricingDiscount),
+    [originalPurchase]
+  );
+  const { notice: specialNotice, checking: specialChecking, failed: specialFailed, retry: retrySpecial } = useSpecialRepricing({
+    entityType: 'event',
+    purchaseId: originalPurchase ? Number(originalPurchase.id) : null,
+    ready: !!originalPurchase && eventPrice > 0,
+    isOrderLine,
+    original: {
+      entityId: eventId,
+      date: originalPurchaseDate,
+      time: originalPurchaseTime,
+      quantity: Number(originalPurchase?.quantity || 1),
+    },
+    current: {
+      entityId: eventId,
+      date: purchaseDate,
+      time: purchaseTime,
+      quantity,
+    },
+    originalSpecial: originalSpecialDiscounts,
+    appliedDiscounts,
+    setAppliedDiscounts,
+    discountAmount,
+    setDiscountAmount,
+    dateWord: 'date',
+  });
+
   const buildAddOns = () => {
     return Object.entries(selectedAddOns)
       .filter(([, qty]) => qty > 0)
@@ -433,7 +482,7 @@ const EditEventPurchase: React.FC = () => {
             purchase_date: purchaseDate,
             purchase_time: purchaseTime,
             ...(statusChanged ? { status } : {}),
-            payment_status: paymentStatus,
+            payment_status: effectivePaymentStatus,
             payment_method: paymentMethod,
             amount_paid: amountPaid,
             total_amount: displayTotal,
@@ -539,7 +588,7 @@ const EditEventPurchase: React.FC = () => {
                     <MapPin className="w-3 h-3" /> {eventLocationName}
                   </p>
                 )}
-                <p className="text-sm text-gray-600 mt-1">${eventPrice.toFixed(2)} per ticket</p>
+                <p className="text-sm text-gray-600 mt-1">${ticketUnitPrice.toFixed(2)} per ticket</p>
                 <p className="text-xs text-gray-400 mt-2">The event and location cannot be changed on an existing purchase.</p>
               </div>
               <div className="mt-4">
@@ -561,7 +610,7 @@ const EditEventPurchase: React.FC = () => {
                     {''}
                   </StandardButton>
                   <span className="ml-2 text-sm text-gray-500">
-                    ${eventPrice.toFixed(2)} × {quantity} = <span className="font-semibold text-gray-800">${baseSubtotal.toFixed(2)}</span>
+                    ${ticketUnitPrice.toFixed(2)} × {quantity} = <span className="font-semibold text-gray-800">${baseSubtotal.toFixed(2)}</span>
                   </span>
                 </div>
               </div>
@@ -641,7 +690,18 @@ const EditEventPurchase: React.FC = () => {
                     onDateSelect={(dateStr) => { setPurchaseDate(dateStr); setPurchaseTime(''); }}
                     onTimeSelect={(time) => setPurchaseTime(time)}
                     themeColor={themeColor}
+                    dealDates={dealDates}
                   />
+                  {specialNotice && (
+                    <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${specialFailed ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                      {specialNotice}
+                      {specialFailed && (
+                        <button type="button" onClick={retrySpecial} className="ml-2 font-semibold underline">
+                          Try again
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {purchaseDate && (blockNotes[purchaseDate]?.length ?? 0) > 0 && (
                     <div className={`mt-3 rounded-lg border px-3 py-2 ${shownSlots.blocked.includes(purchaseTime) ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
                       <p className={`text-sm font-semibold ${shownSlots.blocked.includes(purchaseTime) ? 'text-red-800' : 'text-amber-900'}`}>
@@ -918,8 +978,8 @@ const EditEventPurchase: React.FC = () => {
                 <div>
                   <label className="block font-semibold mb-2 text-base text-neutral-800">Payment Status</label>
                   <select
-                    value={paymentStatus}
-                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    value={effectivePaymentStatus}
+                    onChange={(e) => { setPaymentStatus(e.target.value); setPaymentStatusTouched(true); }}
                     className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                   >
                     <option value="paid">Paid</option>
@@ -959,6 +1019,10 @@ const EditEventPurchase: React.FC = () => {
                   {balance > 0 ? (
                     <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2">
                       <p className="text-sm font-medium text-red-700">Balance Due: <span className="font-bold">${balance.toFixed(2)}</span></p>
+                    </div>
+                  ) : balance < -0.005 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                      <p className="text-sm font-medium text-amber-800">Overpaid by <span className="font-bold">${Math.abs(balance).toFixed(2)}</span> — refund or credit due</p>
                     </div>
                   ) : (
                     <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
@@ -1001,7 +1065,7 @@ const EditEventPurchase: React.FC = () => {
               <StandardButton variant="secondary" size="lg" onClick={() => navigate(getBackPath())} disabled={submitting}>
                 Cancel
               </StandardButton>
-              <StandardButton variant="primary" size="lg" icon={Save} type="submit" disabled={submitting} loading={submitting}>
+              <StandardButton variant="primary" size="lg" icon={Save} type="submit" disabled={submitting || specialChecking || specialFailed} loading={submitting}>
                 {submitting ? 'Saving...' : 'Save Changes'}
               </StandardButton>
             </div>
@@ -1017,7 +1081,7 @@ const EditEventPurchase: React.FC = () => {
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Event</p>
               <p className="font-semibold text-gray-900">{eventName}</p>
-              <p className="text-sm text-gray-600 mt-1">${eventPrice.toFixed(2)} × {quantity}</p>
+              <p className="text-sm text-gray-600 mt-1">${ticketUnitPrice.toFixed(2)} × {quantity}</p>
             </div>
 
             <div className="pb-4 border-b border-gray-100">
@@ -1094,6 +1158,11 @@ const EditEventPurchase: React.FC = () => {
                   <div className="flex justify-between pt-2 border-t border-gray-100">
                     <span className="text-sm font-medium text-red-700">Balance Due</span>
                     <span className="font-bold text-red-600">${balance.toFixed(2)}</span>
+                  </div>
+                ) : balance < -0.005 ? (
+                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                    <span className="text-sm font-medium text-amber-700">Credit Due</span>
+                    <span className="font-bold text-amber-600">${Math.abs(balance).toFixed(2)}</span>
                   </div>
                 ) : (
                   <div className="flex justify-between pt-2 border-t border-gray-100">

@@ -32,6 +32,9 @@ import { resolveFeeBreakdown } from '../../../utils/feeTotal';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
+import SpecialDealNote from '../../../components/SpecialDealNote';
+import SpecialCheckAlert from '../../../components/SpecialCheckAlert';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { buildAppliedFees } from '../../../utils/fees';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
@@ -109,6 +112,9 @@ const OnsitePurchaseEvent = () => {
 
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [specialChecking, setSpecialChecking] = useState(false);
+  const [specialCheckFailed, setSpecialCheckFailed] = useState(false);
+  const [specialAttempt, setSpecialAttempt] = useState(0);
 
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
@@ -436,35 +442,48 @@ const OnsitePurchaseEvent = () => {
   }, [event, quantity, selectedAddOns, discount]);
 
   useEffect(() => {
-    if (!event) {
+    if (!event || !selectedDate) {
       setSpecialPricingBreakdown(null);
+      setSpecialChecking(false);
+      setSpecialCheckFailed(false);
       return;
     }
+    let cancelled = false;
+    setSpecialChecking(true);
+    setSpecialCheckFailed(false);
     const timeoutId = setTimeout(async () => {
       try {
-        const pricingDate = selectedDate || new Date().toISOString().split('T')[0];
-        const basePrice = calculateBaseTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'event',
           entity_id: event.id,
-          base_price: basePrice,
-          date: pricingDate,
+          base_price: Number(event.price),
+          quantity,
+          date: selectedDate,
           time: selectedTime || undefined,
           location_id: event.location_id || undefined,
         });
+        if (cancelled) return;
+        setSpecialChecking(false);
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
         } else {
           setSpecialPricingBreakdown(null);
         }
       } catch (error) {
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialCheckFailed(true);
         console.error('Error fetching special pricing:', error);
         setSpecialPricingBreakdown(null);
       }
     }, 500);
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event, quantity, selectedAddOns, discount, selectedDate, selectedTime]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [event, quantity, selectedDate, selectedTime, specialAttempt]);
+
+  const { deals: specialDeals, dealDates } = useSpecialDeals('event', event?.id ?? null, event?.location_id ?? null);
 
   const formatTime = (time: string) => {
     const [h, m] = time.split(':');
@@ -1019,10 +1038,19 @@ const OnsitePurchaseEvent = () => {
                           <option key={d} value={d}>
                             {new Date(d.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                             {blockedDates.includes(d) ? ' — blocked' : ''}
+                            {dealDates?.[d] ? ` — ${dealDates[d]}` : ''}
                           </option>
                         ))}
                       </select>
                     )}
+                    <SpecialDealNote
+                      checkFailed={specialCheckFailed}
+                      onRetry={() => setSpecialAttempt((n) => n + 1)}
+                      deals={specialDeals}
+                      selectedDate={selectedDate}
+                      applied={!!specialPricingBreakdown?.has_special_pricing}
+                      className="mt-3"
+                    />
                   </div>
 
                   {selectedDate && (
@@ -1405,11 +1433,12 @@ const OnsitePurchaseEvent = () => {
                   </div>
                 )}
 
+                <SpecialCheckAlert failed={specialCheckFailed} onRetry={() => setSpecialAttempt((n) => n + 1)} className="mb-2" />
                 <StandardButton
                   variant="primary"
                   size="lg"
                   onClick={handleSubmit}
-                  disabled={submitting || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                  disabled={submitting || specialChecking || specialCheckFailed || firstMissingRequired(customFields, customFieldAnswers) !== null}
                   loading={submitting}
                   icon={ShoppingCart}
                   fullWidth

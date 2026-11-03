@@ -4,6 +4,8 @@ import { API_BASE_URL, getImageUrl } from '../../utils/storage';
 import { normalizeCategory } from '../../utils/venueCategories';
 import waiverService from '../../services/waiverService';
 import type { KioskAd } from '../../types/waiver.types';
+import type { SpecialDeal } from '../../types/SpecialPricing.types';
+import { specialDealBadge } from '../../utils/discounts';
 
 /** One thing worth mentioning on the way out. */
 interface Pick {
@@ -70,18 +72,13 @@ const eventWhen = (start?: string | null, end?: string | null) => {
 
 const perPerson = (pricingType?: string | null) => (pricingType === 'per_person' ? '/person' : '');
 
-type SpecialPricing = { has_special_pricing?: boolean; original_price?: number; discounted_price?: number };
-
-/** What this venue charges today, and what it charged before any automatic discount. */
-const priceNow = (sp: SpecialPricing | undefined, fallback: unknown, pricingType?: string | null) => {
-  const suffix = perPerson(pricingType);
-  const discounted = sp?.has_special_pricing ? money(sp.discounted_price) : null;
-  const base = money(sp?.original_price ?? fallback);
-  if (discounted && base && discounted !== base) {
-    return { price: `${discounted}${suffix}`, was: base, discounted: true };
-  }
-  return { price: base ? `${base}${suffix}` : null, was: null, discounted: false };
+const regularPrice = (value: unknown, pricingType?: string | null) => {
+  const base = money(value);
+  return base ? `${base}${perPerson(pricingType)}` : null;
 };
+
+const dealLine = (deals?: SpecialDeal[]) =>
+  deals && deals.length > 0 ? specialDealBadge({ ...deals[0], applies_at_every_location: true }) : null;
 
 const shuffle = <T,>(list: T[]) => {
   const out = [...list];
@@ -119,7 +116,7 @@ interface CatalogLocation {
   location_id: number;
   package_id?: number;
   attraction_id?: number;
-  special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
   price?: number;
   pricing_type?: string;
   category?: string | null;
@@ -177,18 +174,20 @@ const loadTakeaway = async (locationId: number | null): Promise<Takeaway> => {
     const here = atLocation(pkg, locationId);
     if (!here) return;
     const label = normalizeCategory(String(here.display_label || pkg.display_label || here.category || pkg.category || '')) || 'Packages';
-    const { price, was, discounted } = priceNow(here.special_pricing ?? pkg.special_pricing, here.price ?? pkg.price, here.pricing_type ?? pkg.pricing_type);
+    const price = regularPrice(here.price ?? pkg.price, here.pricing_type ?? pkg.pricing_type);
     if (!price) return;
-    pool.push({ key: `pkg-${here.package_id}`, label, name: pkg.name, price, was, when: null, rank: discounted ? 3 : 1 });
+    const deal = dealLine(here.special_deals);
+    pool.push({ key: `pkg-${here.package_id}`, label, name: pkg.name, price, was: null, when: deal, rank: deal ? 3 : 1 });
   });
 
   list(attractionsRes).forEach((attr) => {
     const here = atLocation(attr, locationId);
     if (!here) return;
     const label = normalizeCategory(String(here.category || attr.category || '')) || 'Activities';
-    const { price, was, discounted } = priceNow(here.special_pricing ?? attr.special_pricing, here.price ?? attr.price, here.pricing_type ?? attr.pricing_type);
+    const price = regularPrice(here.price ?? attr.price, here.pricing_type ?? attr.pricing_type);
     if (!price) return;
-    pool.push({ key: `attr-${here.attraction_id}`, label, name: attr.name, price, was, when: null, rank: discounted ? 3 : 1 });
+    const deal = dealLine(here.special_deals);
+    pool.push({ key: `attr-${here.attraction_id}`, label, name: attr.name, price, was: null, when: deal, rank: deal ? 3 : 1 });
   });
 
   list(eventsRes).forEach((evt) => {

@@ -42,7 +42,11 @@ import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.type
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
-import { convertTo12Hour } from '../../../utils/timeFormat';
+import SpecialDealNote from '../../../components/SpecialDealNote';
+import SpecialCheckAlert from '../../../components/SpecialCheckAlert';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
+import { michiganTodayKey } from '../../../utils/dashboardTimeframe';
+import { convertTo12Hour, getMichiganNow } from '../../../utils/timeFormat';
 import ticketOrderService, { type CartItem, type CartQuote } from '../../../services/TicketOrderService';
 import { generateOrderQRCode } from '../../../utils/qrcode';
 import { eventService } from '../../../services/EventService';
@@ -102,6 +106,9 @@ const CreatePurchase = () => {
   const [sendEmail, setSendEmail] = useState(true);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [specialChecking, setSpecialChecking] = useState(false);
+  const [specialCheckFailed, setSpecialCheckFailed] = useState(false);
+  const [specialAttempt, setSpecialAttempt] = useState(0);
   
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
@@ -444,31 +451,52 @@ const CreatePurchase = () => {
   useEffect(() => {
     if (!selectedAttraction) {
       setSpecialPricingBreakdown(null);
+      setSpecialChecking(false);
+      setSpecialCheckFailed(false);
       return;
     }
+    let cancelled = false;
+    setSpecialChecking(true);
+    setSpecialCheckFailed(false);
     const timeoutId = setTimeout(async () => {
       try {
-        const pricingDate = scheduledDate || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
-        const basePrice = selectedAttraction.price * quantity;
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
           entity_id: Number(selectedAttraction.id),
-          base_price: basePrice,
-          date: pricingDate,
+          base_price: Number(selectedAttraction.price),
+          quantity,
+          date: scheduledDate || michiganTodayKey(),
+          time: scheduledDate
+            ? (scheduledTime || undefined)
+            : (() => { const now = getMichiganNow(); return `${String(now.hour).padStart(2, '0')}:${String(now.minute).padStart(2, '0')}`; })(),
           location_id: selectedAttraction.locationId ? Number(selectedAttraction.locationId) : undefined,
         });
+        if (cancelled) return;
+        setSpecialChecking(false);
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
         } else {
           setSpecialPricingBreakdown(null);
         }
       } catch (error) {
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialCheckFailed(true);
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
     }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [selectedAttraction, quantity, scheduledDate]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [selectedAttraction, quantity, scheduledDate, scheduledTime, specialAttempt]);
+
+  const { deals: specialDeals, dealDates } = useSpecialDeals(
+    'attraction',
+    selectedAttraction ? Number(selectedAttraction.id) : null,
+    selectedAttraction?.locationId ? Number(selectedAttraction.locationId) : null,
+  );
 
   const handleAddToCart = (attraction: CreatePurchaseAttraction) => {
     setSelectedAttraction(attraction);
@@ -850,6 +878,8 @@ const CreatePurchase = () => {
   if (!cardDetailsReady) submitBlockers.push('Complete the card details.');
   const missingCustomField = firstMissingRequired(customFields, customFieldAnswers);
   if (missingCustomField) submitBlockers.push(`Please confirm: ${missingCustomField.label}`);
+  if (!bulkMode && specialChecking) submitBlockers.push('Checking the special price for this visit…');
+  if (!bulkMode && specialCheckFailed) submitBlockers.push('The special price could not be checked.');
   const canSubmit = submitBlockers.length === 0;
 
   const handleCompletePurchase = async (e?: React.MouseEvent) => {
@@ -1046,7 +1076,7 @@ const CreatePurchase = () => {
           status: 'confirmed' as const,
         } : {}),
         location_id: Number(selectedAttraction.locationId),
-        purchase_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
+        purchase_date: michiganTodayKey(),
         scheduled_date: scheduledDate || undefined,
         scheduled_time: scheduledTime || undefined,
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
@@ -1659,6 +1689,15 @@ const CreatePurchase = () => {
                         if (left != null) setQuantity(prev => Math.min(prev, Math.max(1, left)));
                       }}
                       themeColor={themeColor}
+                      dealDates={dealDates}
+                    />
+                    <SpecialDealNote
+                      checkFailed={specialCheckFailed}
+                      onRetry={() => setSpecialAttempt((n) => n + 1)}
+                      deals={specialDeals}
+                      selectedDate={scheduledDate}
+                      applied={!!specialPricingBreakdown?.has_special_pricing}
+                      className="mt-3"
                     />
                     {scheduledDate && (blockNotes[scheduledDate]?.length ?? 0) > 0 && (
                       <div className={`mt-3 rounded-lg border px-3 py-2 ${blockedTimeSlots.includes(scheduledTime) ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
@@ -2131,6 +2170,7 @@ const CreatePurchase = () => {
                     </div>
                   )}
 
+                  <SpecialCheckAlert failed={!bulkMode && specialCheckFailed} onRetry={() => setSpecialAttempt((n) => n + 1)} className="mb-3" />
                   <StandardButton
                     variant="primary"
                     size="lg"

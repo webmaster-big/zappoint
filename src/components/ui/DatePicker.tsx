@@ -23,6 +23,7 @@ interface DatePickerProps {
   dayOffs?: Date[]; // Optional day offs (holidays, blocked dates) - full day only (legacy)
   dayOffsWithTime?: DayOffInfo[]; // Day offs with partial closure support
   allowBlockedDates?: boolean;
+  dealDates?: Record<string, string>;
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({
@@ -32,7 +33,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
   breakTimes = [],
   dayOffs = [],
   dayOffsWithTime = [],
-  allowBlockedDates = false
+  allowBlockedDates = false,
+  dealDates,
 }) => {
   const [currentMonth, setCurrentMonth] = useState<Date>(
     selectedDate ? new Date(selectedDate) : new Date()
@@ -163,6 +165,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
       const breakInfo = getBreakTimeInfo(date);
 
       const isDisabled = !available || isPast || (isFullOff && !allowBlockedDates);
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const deal = !isDisabled ? dealDates?.[dateKey] : undefined;
       
       const showFullDayOff = available && isFullOff;
       const blockedButSelectable = showFullDayOff && allowBlockedDates && !isPast;
@@ -188,7 +192,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
           type="button"
           onClick={() => !isDisabled && handleDateClick(day)}
           disabled={isDisabled}
-          title={tooltip}
+          title={[tooltip, deal ? `Special price: ${deal}` : null].filter(Boolean).join(' · ') || undefined}
           className={`aspect-square w-full min-h-[44px] rounded-lg text-xs md:text-sm font-medium transition-all flex flex-col items-center justify-center relative ${
             !available
               ? isPast
@@ -214,6 +218,9 @@ const DatePicker: React.FC<DatePickerProps> = ({
           }`}
         >
           <span>{day}</span>
+          {deal && (
+            <span className={`absolute top-0.5 right-1 text-[9px] leading-none font-bold ${selected ? 'text-white' : 'text-emerald-600'}`}>%</span>
+          )}
           {showPartialOff && !selected && (
             <AlertCircle className="w-2.5 h-2.5 absolute bottom-0.5 right-0.5 text-orange-500" />
           )}
@@ -273,6 +280,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
           <div className="w-4 h-4 bg-blue-600 rounded"></div>
           <span className="text-gray-600">Selected</span>
         </div>
+        {dealDates && Object.keys(dealDates).length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 text-center text-[11px] leading-none font-bold text-emerald-600">%</span>
+            <span className="text-gray-600">Special price</span>
+          </div>
+        )}
         {breakTimes.length > 0 && (
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 bg-amber-50 border border-amber-300 rounded relative">

@@ -7,6 +7,9 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import DatePicker from '../../../components/ui/DatePicker';
+import SpecialDealNote from '../../../components/SpecialDealNote';
+import SpecialCheckAlert from '../../../components/SpecialCheckAlert';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
 import EmailInput from '../../../components/ui/EmailInput';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { 
@@ -194,6 +197,9 @@ const OnsiteBooking: React.FC = () => {
   const [sendEmailToStaff, setSendEmailToStaff] = useState(true);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [specialChecking, setSpecialChecking] = useState(false);
+  const [specialCheckFailed, setSpecialCheckFailed] = useState(false);
+  const [specialAttempt, setSpecialAttempt] = useState(0);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [promoAppliedOn, setPromoAppliedOn] = useState<number | null>(null);
@@ -594,31 +600,46 @@ const OnsiteBooking: React.FC = () => {
   useEffect(() => {
     if (!selectedPackage || !bookingData.date) {
       setSpecialPricingBreakdown(null);
+      setSpecialChecking(false);
+      setSpecialCheckFailed(false);
       return;
     }
+    let cancelled = false;
+    setSpecialChecking(true);
+    setSpecialCheckFailed(false);
     const timeoutId = setTimeout(async () => {
       try {
-        const basePrice = selectedPackage.price;
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'package',
           entity_id: selectedPackage.id,
-          base_price: basePrice,
+          base_price: selectedPackage.price,
+          quantity: selectedPackage.pricingType === 'per_person' ? Math.max(1, bookingData.participants) : 1,
           date: bookingData.date,
           time: bookingData.time || undefined,
           location_id: selectedLocation || undefined,
         });
+        if (cancelled) return;
+        setSpecialChecking(false);
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
         } else {
           setSpecialPricingBreakdown(null);
         }
       } catch (error) {
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialCheckFailed(true);
         console.error('Error fetching special pricing:', error);
         setSpecialPricingBreakdown(null);
       }
     }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [selectedPackage, bookingData.date, bookingData.time, selectedLocation]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [selectedPackage, bookingData.date, bookingData.time, bookingData.participants, selectedLocation, specialAttempt]);
+
+  const { deals: specialDeals, dealDates } = useSpecialDeals('package', selectedPackage?.id ?? null, selectedLocation || null);
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -2614,6 +2635,16 @@ const OnsiteBooking: React.FC = () => {
               dayOffs={filteredDayOffs}
               dayOffsWithTime={filteredDayOffsWithTime}
               allowBlockedDates
+              dealDates={dealDates}
+            />
+            <SpecialDealNote
+                      checkFailed={specialCheckFailed}
+                      onRetry={() => setSpecialAttempt((n) => n + 1)}
+              deals={specialDeals}
+              selectedDate={bookingData.date}
+              applied={!!specialPricingBreakdown?.has_special_pricing}
+              unit={selectedPackage?.pricingType === 'per_person' ? 'person' : 'booking'}
+              className="mt-3"
             />
           </div>
 
@@ -3945,6 +3976,7 @@ const OnsiteBooking: React.FC = () => {
         </div>
       )}
 
+      <SpecialCheckAlert failed={specialCheckFailed} onRetry={() => setSpecialAttempt((n) => n + 1)} className="mb-3" />
       <div className="flex gap-3">
         <StandardButton
           type="button"
@@ -3958,7 +3990,7 @@ const OnsiteBooking: React.FC = () => {
           type="submit"
           variant="primary"
           icon={CreditCard}
-          disabled={!isBookingValid() || isProcessingPayment || submitting}
+          disabled={!isBookingValid() || isProcessingPayment || submitting || specialChecking || specialCheckFailed}
           loading={isProcessingPayment || submitting}
           className="flex-2"
         >

@@ -30,6 +30,9 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
+import SpecialDealNote from '../../../components/SpecialDealNote';
+import SpecialCheckAlert from '../../../components/SpecialCheckAlert';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
 import EmailInput from '../../../components/ui/EmailInput';
 import ScheduleHelpModal from '../../../components/customer/ScheduleHelpModal';
 import CallToBookPanel from '../../../components/customer/CallToBookPanel';
@@ -201,7 +204,7 @@ const BookPackage: React.FC = () => {
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [promoCode, setPromoCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; name: string; discount_amount: number } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; name: string; discount_amount: number; base: number } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<number>(pkg?.min_participants || 1);
   const [customFields, setCustomFields] = useState<ApplicableCustomField[]>([]);
@@ -292,6 +295,9 @@ const BookPackage: React.FC = () => {
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  const [specialChecking, setSpecialChecking] = useState(false);
+  const [specialCheckFailed, setSpecialCheckFailed] = useState(false);
+  const [specialAttempt, setSpecialAttempt] = useState(0);
 
   const [smsConsent, setSmsConsent] = useState<boolean>(false);
 
@@ -416,30 +422,46 @@ const BookPackage: React.FC = () => {
   useEffect(() => {
     if (!pkg || !selectedDate) {
       setSpecialPricingBreakdown(null);
+      setSpecialChecking(false);
+      setSpecialCheckFailed(false);
       return;
     }
+    let cancelled = false;
+    setSpecialChecking(true);
+    setSpecialCheckFailed(false);
     const timeoutId = setTimeout(async () => {
       try {
-        const basePrice = Number(pkg.price ?? 0);
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'package',
           entity_id: pkg.id,
-          base_price: basePrice,
+          base_price: Number(pkg.price ?? 0),
+          quantity: pkg.pricing_type === 'per_person' ? Math.max(1, participants) : 1,
           date: selectedDate,
+          time: selectedTime || undefined,
           location_id: pkg.location_id,
         });
+        if (cancelled) return;
+        setSpecialChecking(false);
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
         } else {
           setSpecialPricingBreakdown(null);
         }
       } catch (error) {
+        if (cancelled) return;
+        setSpecialChecking(false);
+        setSpecialCheckFailed(true);
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
     }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [pkg, selectedDate]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [pkg, selectedDate, selectedTime, participants, specialAttempt]);
+
+  const { deals: specialDeals, dealDates } = useSpecialDeals('package', pkg?.id ?? null, pkg?.location_id ?? null);
   
   useEffect(() => {
     const fetchCustomerData = async () => {
@@ -834,6 +856,7 @@ const BookPackage: React.FC = () => {
           code: promoCode,
           name: res.data.promo?.name || promoCode,
           discount_amount: Number(res.data.discount_amount || 0),
+          base: Math.round(base * 100) / 100,
         });
       } else {
         setAppliedPromo(null);
@@ -1040,6 +1063,39 @@ const BookPackage: React.FC = () => {
   
   const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
   const totalAfterSpecialPricing = Math.max(0, total - specialPricingDiscount);
+  const promoBase = Math.round(Math.max(0, subtotal - specialPricingDiscount - membershipDiscount) * 100) / 100;
+
+  const promoStale = !!appliedPromo && appliedPromo.base !== promoBase;
+
+  useEffect(() => {
+    if (!appliedPromo || appliedPromo.base === promoBase || !pkg) return;
+    let cancelled = false;
+    const code = appliedPromo.code;
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await promoService.validateCode(code, {
+          location_id: pkg.location_id,
+          subtotal: promoBase,
+          items: [{ type: 'package' as const, id: pkg.id }],
+        });
+        if (cancelled) return;
+        if (res.success && res.data.is_valid) {
+          setAppliedPromo({ code, name: res.data.promo?.name || code, discount_amount: Number(res.data.discount_amount || 0), base: promoBase });
+        } else {
+          setAppliedPromo(null);
+          setCodeError(res.message || 'The promo code no longer applies to this booking.');
+        }
+      } catch {
+        if (cancelled) return;
+        setAppliedPromo(null);
+        setCodeError('The total changed, so press Apply again to use the promo code.');
+      }
+    }, 500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [promoBase, appliedPromo, pkg]);
 
   // feeBreakdown.total is raw base + fees (no discounts applied).
   // Subtract all discounts to arrive at the actual amount the customer pays.
@@ -2061,6 +2117,16 @@ const BookPackage: React.FC = () => {
                         onChange={(date) => setSelectedDate(date)}
                         dayOffs={dayOffs}
                         dayOffsWithTime={filteredDayOffsWithTime}
+                        dealDates={dealDates}
+                      />
+                      <SpecialDealNote
+                      checkFailed={specialCheckFailed}
+                      onRetry={() => setSpecialAttempt((n) => n + 1)}
+                        deals={specialDeals}
+                        selectedDate={selectedDate}
+                        applied={!!specialPricingBreakdown?.has_special_pricing}
+                        unit={pkg?.pricing_type === 'per_person' ? 'person' : 'booking'}
+                        className="mt-3"
                       />
                     </div>
                     
@@ -2923,6 +2989,10 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
+                <SpecialCheckAlert failed={specialCheckFailed} onRetry={() => setSpecialAttempt((n) => n + 1)} className="mt-4" />
+                {codeError && !appliedPromo && (
+                  <p className="mt-4 text-sm text-amber-700">{codeError}</p>
+                )}
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center pt-6 gap-3">
                   <StandardButton 
                     variant="secondary"
@@ -2941,7 +3011,7 @@ const BookPackage: React.FC = () => {
                     variant="primary"
                     size="md"
                     onClick={(e) => handlePayNow(e)}
-                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                    disabled={isProcessingPayment || specialChecking || specialCheckFailed || promoStale || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || firstMissingRequired(customFields, customFieldAnswers) !== null}
                     className="flex items-center justify-center flex-1 sm:flex-initial"
                   >
                     {isProcessingPayment ? (

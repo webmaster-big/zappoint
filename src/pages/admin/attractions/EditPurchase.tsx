@@ -15,7 +15,9 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getStoredUser } from '../../../utils/storage';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import type { AppliedFee } from '../../../utils/fees';
-import type { AppliedDiscount } from '../../../utils/discounts';
+import { isSpecialPricingDiscount, type AppliedDiscount } from '../../../utils/discounts';
+import { useSpecialDeals } from '../../../hooks/useSpecialDeals';
+import { useSpecialRepricing } from '../../../hooks/useSpecialRepricing';
 import { clampAddOnQuantity, getAddOnMinQuantity } from '../../../utils/addOnQuantity';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import { generateTimeSlots, orderClockSlots } from '../../../utils/timeSlots';
@@ -155,28 +157,34 @@ const EditPurchase: React.FC = () => {
         setLoading(false);
 
         const locationId = purchase.location_id ?? purchase.attraction?.location_id;
+        const ownAttraction = purchase.attraction
+          ? ({
+              id: purchase.attraction.id,
+              location_id: purchase.attraction.location_id ?? locationId,
+              name: purchase.attraction.name,
+              description: '',
+              price: Number(purchase.attraction.price) || 0,
+              pricing_type: purchase.attraction.pricing_type || 'flat',
+              max_capacity: 0,
+              category: purchase.attraction.category || '',
+              is_active: true,
+              created_at: '',
+              updated_at: '',
+            } as Attraction)
+          : null;
         if (locationId) {
           try {
             const list = await attractionService.getAllAttractions({ location_id: locationId, is_active: true, user_id: getStoredUser()?.id });
             const hasCurrent = list.some((a) => a.id === purchase.attraction_id);
-            if (!hasCurrent && purchase.attraction) {
-              list.push({
-                id: purchase.attraction.id,
-                location_id: purchase.attraction.location_id ?? locationId,
-                name: purchase.attraction.name,
-                description: '',
-                price: Number(purchase.attraction.price) || 0,
-                pricing_type: purchase.attraction.pricing_type || 'flat',
-                max_capacity: 0,
-                category: purchase.attraction.category || '',
-                is_active: true,
-                created_at: '',
-                updated_at: '',
-              } as Attraction);
+            if (!hasCurrent && ownAttraction) {
+              list.push(ownAttraction);
             }
             setAttractions(list);
           } catch {
+            if (ownAttraction) setAttractions([ownAttraction]);
           }
+        } else if (ownAttraction) {
+          setAttractions([ownAttraction]);
         }
       } catch {
         setNotFound(true);
@@ -247,7 +255,19 @@ const EditPurchase: React.FC = () => {
     return norm(originalMap) !== norm(selectedAddOns);
   }, [originalPurchase, selectedAddOns]);
 
-  const baseSubtotal = selectedAttraction ? Number(selectedAttraction.price) * quantity : 0;
+  const storedUnitPrice = (originalPurchase as { unit_price?: number | string | null } | null)?.unit_price;
+  const legacyUnitPrice = useMemo(() => {
+    if (!originalPurchase || storedUnitPrice != null) return null;
+    const addOns = (originalPurchase.add_ons || []).reduce((sum, a) => sum + Number(a.pivot?.price_at_purchase ?? 0) * Number(a.pivot?.quantity ?? 0), 0);
+    const fees = (originalPurchase.applied_fees || []).filter((f) => f.fee_application_type === 'additive').reduce((sum, f) => sum + Number(f.fee_amount || 0), 0);
+    const unit = (Number(originalPurchase.total_amount ?? 0) + Number((originalPurchase as { discount_amount?: number | string | null }).discount_amount ?? 0) - addOns - fees) / Math.max(1, Number(originalPurchase.quantity || 1));
+    return unit > 0 ? unit : null;
+  }, [originalPurchase, storedUnitPrice]);
+  const ticketUnitPrice = selectedAttraction && originalPurchase
+    && Number(selectedAttraction.id) === Number(originalPurchase.attraction_id)
+    ? (storedUnitPrice != null ? Number(storedUnitPrice) : legacyUnitPrice ?? Number(selectedAttraction.price))
+    : Number(selectedAttraction?.price ?? 0);
+  const baseSubtotal = selectedAttraction ? ticketUnitPrice * quantity : 0;
   const addOnsTotal = useMemo(() => {
     return Object.entries(selectedAddOns).reduce((sum, [addId, qty]) => {
       const addOn = availableAddOns.find((a: any) => a.id === Number(addId));
@@ -392,6 +412,37 @@ const EditPurchase: React.FC = () => {
     setAvailableTimeSlots(slots);
     setBlockedTimeSlots(blockedSlots);
   }, [scheduledDate, selectedAttraction, getAttractionAvailability, originalScheduledDate, originalScheduledTime, partialDayOffs, dayOffDates]);
+
+  const { dealDates } = useSpecialDeals('attraction', attractionId, locationId);
+
+  const originalSpecialDiscounts = useMemo(
+    () => ((originalPurchase?.applied_discounts ?? []) as AppliedDiscount[]).filter(isSpecialPricingDiscount),
+    [originalPurchase]
+  );
+  const { notice: specialNotice, checking: specialChecking, failed: specialFailed, retry: retrySpecial } = useSpecialRepricing({
+    entityType: 'attraction',
+    purchaseId: originalPurchase ? Number(originalPurchase.id) : null,
+    ready: !!originalPurchase && !!selectedAttraction,
+    isOrderLine,
+    original: {
+      entityId: originalPurchase ? Number(originalPurchase.attraction_id) : null,
+      date: originalScheduledDate,
+      time: originalScheduledTime,
+      quantity: Number(originalPurchase?.quantity || 1),
+    },
+    current: {
+      entityId: selectedAttraction ? Number(selectedAttraction.id) : null,
+      date: scheduledDate,
+      time: scheduledTime,
+      quantity,
+    },
+    originalSpecial: originalSpecialDiscounts,
+    appliedDiscounts,
+    setAppliedDiscounts,
+    discountAmount,
+    setDiscountAmount,
+    dateWord: 'visit date',
+  });
 
   const buildAdditionalAddons = () => {
     return Object.entries(selectedAddOns)
@@ -569,7 +620,7 @@ const EditPurchase: React.FC = () => {
                     </StandardButton>
                     {selectedAttraction && (
                       <span className="ml-2 text-sm text-gray-500">
-                        ${Number(selectedAttraction.price).toFixed(2)} × {quantity} = <span className="font-semibold text-gray-800">${baseSubtotal.toFixed(2)}</span>
+                        ${ticketUnitPrice.toFixed(2)} × {quantity} = <span className="font-semibold text-gray-800">${baseSubtotal.toFixed(2)}</span>
                       </span>
                     )}
                   </div>
@@ -645,7 +696,18 @@ const EditPurchase: React.FC = () => {
                     onDateSelect={(dateStr) => { setScheduledDate(dateStr); setScheduledTime(''); }}
                     onTimeSelect={(time) => setScheduledTime(time)}
                     themeColor={themeColor}
+                    dealDates={dealDates}
                   />
+                  {specialNotice && (
+                    <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${specialFailed ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                      {specialNotice}
+                      {specialFailed && (
+                        <button type="button" onClick={retrySpecial} className="ml-2 font-semibold underline">
+                          Try again
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {scheduledDate && (blockNotes[scheduledDate]?.length ?? 0) > 0 && (
                     <div className={`mt-3 rounded-lg border px-3 py-2 ${blockedTimeSlots.includes(scheduledTime) ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
                       <p className={`text-sm font-semibold ${blockedTimeSlots.includes(scheduledTime) ? 'text-red-800' : 'text-amber-900'}`}>
@@ -952,6 +1014,10 @@ const EditPurchase: React.FC = () => {
                     <div className="w-full bg-red-50 border border-red-200 rounded-lg px-4 py-2">
                       <p className="text-sm font-medium text-red-700">Balance Due: <span className="font-bold">${balance.toFixed(2)}</span></p>
                     </div>
+                  ) : balance < -0.005 ? (
+                    <div className="w-full bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                      <p className="text-sm font-medium text-amber-800">Overpaid by <span className="font-bold">${Math.abs(balance).toFixed(2)}</span> — refund or credit due</p>
+                    </div>
                   ) : (
                     <div className="w-full bg-green-50 border border-green-200 rounded-lg px-4 py-2">
                       <p className="text-sm font-medium text-green-700">Fully Paid</p>
@@ -1008,7 +1074,7 @@ const EditPurchase: React.FC = () => {
               <StandardButton variant="secondary" size="lg" onClick={() => navigate(getBackPath())} disabled={submitting}>
                 Cancel
               </StandardButton>
-              <StandardButton variant="primary" size="lg" icon={Save} type="submit" disabled={submitting} loading={submitting}>
+              <StandardButton variant="primary" size="lg" icon={Save} type="submit" disabled={submitting || specialChecking || specialFailed || (!isOrderLine && !selectedAttraction)} loading={submitting}>
                 {submitting ? 'Saving...' : 'Save Changes'}
               </StandardButton>
             </div>
@@ -1025,7 +1091,7 @@ const EditPurchase: React.FC = () => {
               <div className="pb-4 border-b border-gray-100">
                 <p className="text-sm text-gray-500 mb-1">Attraction</p>
                 <p className="font-semibold text-gray-900">{selectedAttraction.name}</p>
-                <p className="text-sm text-gray-600 mt-1">${Number(selectedAttraction.price).toFixed(2)} × {quantity}</p>
+                <p className="text-sm text-gray-600 mt-1">${ticketUnitPrice.toFixed(2)} × {quantity}</p>
               </div>
             )}
 
@@ -1103,6 +1169,11 @@ const EditPurchase: React.FC = () => {
                   <div className="flex justify-between pt-2 border-t border-gray-100">
                     <span className="text-sm font-medium text-red-700">Balance Due</span>
                     <span className="font-bold text-red-600">${balance.toFixed(2)}</span>
+                  </div>
+                ) : balance < -0.005 ? (
+                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                    <span className="text-sm font-medium text-amber-700">Credit Due</span>
+                    <span className="font-bold text-amber-600">${Math.abs(balance).toFixed(2)}</span>
                   </div>
                 ) : (
                   <div className="flex justify-between pt-2 border-t border-gray-100">

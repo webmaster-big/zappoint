@@ -1,4 +1,6 @@
 
+import type { AppliedDiscount } from '../utils/discounts';
+
 export type DiscountType = 'fixed' | 'percentage';
 export type RecurrenceType = 'one_time' | 'weekly' | 'monthly';
 export type EntityType = 'package' | 'attraction' | 'event' | 'all';
@@ -33,11 +35,14 @@ export interface SpecialPricing {
 
 export interface DiscountApplied {
   special_pricing_id: number;
+  source?: 'special_pricing';
   name: string;
   description: string | null;
   discount_label: string; // e.g., "10%" or "$15.00"
   discount_type: DiscountType;
   discount_amount: number;
+  unit_discount_amount?: number;
+  quantity?: number;
   is_stackable: boolean;
   recurrence_display: string;
 }
@@ -46,8 +51,47 @@ export interface SpecialPricingBreakdown {
   original_price: number;
   discounted_price: number;
   total_discount: number;
+  unit_price?: number;
+  unit_discount?: number;
+  unit_discounted_price?: number;
+  quantity?: number;
   discounts_applied: DiscountApplied[];
   has_special_pricing: boolean;
+}
+
+export interface SpecialDeal {
+  special_pricing_id: number;
+  name: string;
+  description: string | null;
+  discount_type: DiscountType;
+  discount_amount: number;
+  discount_label: string;
+  recurrence_type: RecurrenceType;
+  recurrence_value: number | null;
+  recurrence_display: string;
+  specific_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  time_start: string | null;
+  time_end: string | null;
+  next_dates: string[];
+  location_names?: string[];
+  applies_at_every_location?: boolean;
+}
+
+export interface SpecialDealsResponse {
+  deals: SpecialDeal[];
+  dates: Record<string, Array<{ special_pricing_id: number; name: string; discount_label: string }>>;
+}
+
+export interface PurchaseSpecialQuote {
+  changed: boolean;
+  special_discounts: AppliedDiscount[];
+  special_pricing_discount: number;
+  given_special: number;
+  proposed_special: number;
+  proposed_discounts: AppliedDiscount[];
+  delta: number;
 }
 
 export interface CreateSpecialPricingData {

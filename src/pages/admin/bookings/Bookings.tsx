@@ -42,7 +42,8 @@ import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
 import { cardFromPayments } from '../../../utils/cardLabel';
 import { resolvePaymentState, statusAfterPayment, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
-import type { BookingRepriceIntent } from '../../../types/Bookings.types';
+import type { BookingQuote, BookingRepriceIntent } from '../../../types/Bookings.types';
+import { isSpecialPricingDiscount } from '../../../utils/discounts';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
 import { fetchAllPages } from '../../../utils/fetchAllPages';
@@ -408,6 +409,7 @@ const Bookings: React.FC = () => {
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [dateValue, setDateValue] = useState<string>('');
   const [timeValue, setTimeValue] = useState<string>('');
+  const [moveQuote, setMoveQuote] = useState<{ loading: boolean; quote: BookingQuote | null } | null>(null);
   const [savingDate, setSavingDate] = useState(false);
   const [savingTime, setSavingTime] = useState(false);
 
@@ -1212,7 +1214,7 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, packageName: pkg.name, activity: normalizeCategory(pkg.category) || 'Package Booking', category: normalizeCategory(pkg.display_label || pkg.category) }
+              ? withSavedMoney({ ...b, packageName: pkg.name, activity: normalizeCategory(pkg.category) || 'Package Booking', category: normalizeCategory(pkg.display_label || pkg.category) }, response.data)
               : b
           )
         );
@@ -1379,6 +1381,77 @@ const Bookings: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const booking = selectedBookingForEdit;
+    const intent: BookingRepriceIntent | null = !booking
+      ? null
+      : showDateModal && dateValue && dateValue !== booking.date
+        ? { booking_date: dateValue }
+        : showTimeModal && timeValue && timeValue.slice(0, 5) !== (booking.time || '').slice(0, 5)
+          ? { booking_time: timeValue }
+          : null;
+
+    if (!booking || !intent) {
+      setMoveQuote(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMoveQuote({ loading: true, quote: null });
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await bookingService.repriceBooking(Number(booking.id), intent);
+        if (!cancelled) setMoveQuote({ loading: false, quote: res.success && res.data ? res.data : null });
+      } catch {
+        if (!cancelled) setMoveQuote({ loading: false, quote: null });
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [showDateModal, showTimeModal, selectedBookingForEdit, dateValue, timeValue]);
+
+  const withSavedMoney = (row: BookingsPageBooking, saved: Booking | undefined): BookingsPageBooking => saved
+    ? {
+        ...row,
+        totalAmount: Number(saved.total_amount ?? row.totalAmount),
+        amountPaid: Number(saved.amount_paid ?? row.amountPaid),
+        paymentStatus: resolvePaymentState(saved).state,
+      }
+    : row;
+
+  const renderMovePreview = (booking: BookingsPageBooking) => {
+    if (!moveQuote) return null;
+    if (moveQuote.loading) {
+      return <p className="text-sm text-gray-500">Checking the price for this change…</p>;
+    }
+    const quote = moveQuote.quote;
+    if (!quote) {
+      return (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Could not preview the price for this change.
+        </div>
+      );
+    }
+    const specials = quote.applied_discounts ? quote.applied_discounts.filter(isSpecialPricingDiscount) : null;
+    const totalChanged = Math.abs(quote.total_amount - booking.totalAmount) > 0.005;
+    return (
+      <div className={`rounded-lg border px-3 py-2 text-sm space-y-1 ${totalChanged ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+        <p>
+          New total: <span className="font-semibold">${quote.total_amount.toFixed(2)}</span>
+          {totalChanged && <> (now ${booking.totalAmount.toFixed(2)})</>}
+        </p>
+        {specials && (specials.length > 0
+          ? <p>{specials.map((d) => d.discount_name).join(', ')} applies: ${quote.special_pricing_discount.toFixed(2)} off.</p>
+          : <p>The special price no longer applies.</p>)}
+        {quote.remaining_balance > 0.005 && <p>Balance due after this change: ${quote.remaining_balance.toFixed(2)}</p>}
+        {quote.remaining_balance < -0.005 && <p>Credit due after this change: ${Math.abs(quote.remaining_balance).toFixed(2)}</p>}
+      </div>
+    );
+  };
+
   const handleOpenDateModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
     setDateValue(booking.date);
@@ -1424,7 +1497,7 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, date: dateValue }
+              ? withSavedMoney({ ...b, date: dateValue }, response.data)
               : b
           )
         );
@@ -1474,7 +1547,7 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, time: timeValue }
+              ? withSavedMoney({ ...b, time: timeValue }, response.data)
               : b
           )
         );
@@ -1880,6 +1953,7 @@ const Bookings: React.FC = () => {
         total_amount: res.data.total_amount,
         discount_amount: res.data.discount_amount,
         applied_fees: res.data.persist_fees.length > 0 ? res.data.persist_fees : null,
+        ...(res.data.applied_discounts && { applied_discounts: res.data.applied_discounts.length > 0 ? res.data.applied_discounts : null }),
       };
     } catch {
       return null;
@@ -1936,6 +2010,9 @@ const Bookings: React.FC = () => {
         payload.total_amount = quoteRes.data.total_amount;
         payload.discount_amount = quoteRes.data.discount_amount;
         payload.applied_fees = quoteRes.data.persist_fees.length > 0 ? quoteRes.data.persist_fees : null;
+        if (quoteRes.data.applied_discounts) {
+          payload.applied_discounts = quoteRes.data.applied_discounts.length > 0 ? quoteRes.data.applied_discounts : null;
+        }
       }
 
       const response = await bookingService.updateBooking(Number(editingCell.bookingId), payload);
@@ -4562,6 +4639,7 @@ const Bookings: React.FC = () => {
                 <p className="text-sm text-gray-500">
                   Current: {selectedBookingForEdit.date ? parseLocalDate(selectedBookingForEdit.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set'}
                 </p>
+                {renderMovePreview(selectedBookingForEdit)}
               </div>
 
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
@@ -4577,7 +4655,7 @@ const Bookings: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={handleSaveDate}
-                  disabled={savingDate || !dateValue}
+                  disabled={savingDate || !dateValue || (moveQuote !== null && moveQuote.loading)}
                   loading={savingDate}
                 >
                   {savingDate ? 'Saving...' : 'Save Date'}
@@ -4612,6 +4690,7 @@ const Bookings: React.FC = () => {
                 <p className="text-sm text-gray-500">
                   Current: {selectedBookingForEdit.time ? formatTime12Hour(selectedBookingForEdit.time) : 'Not set'}
                 </p>
+                {renderMovePreview(selectedBookingForEdit)}
               </div>
 
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
@@ -4627,7 +4706,7 @@ const Bookings: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={handleSaveTime}
-                  disabled={savingTime || !timeValue}
+                  disabled={savingTime || !timeValue || (moveQuote !== null && moveQuote.loading)}
                   loading={savingTime}
                 >
                   {savingTime ? 'Saving...' : 'Save Time'}

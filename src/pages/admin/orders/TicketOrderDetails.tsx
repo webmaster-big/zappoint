@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { perTicketOffLabel } from '../../../utils/discounts';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -349,7 +350,7 @@ const TicketOrderDetails = () => {
                       {(line.applied_discounts ?? []).map((d, i) => (
                         <p key={i} className="text-sm text-green-600">
                           {(d.name ?? d.discount_name) ?? 'Special pricing'}
-                          {d.discount_label ? ` (${d.discount_label} off)` : ''}
+                          {d.discount_label ? ` (${perTicketOffLabel(d)})` : ''}
                         </p>
                       ))}
                       {(line.add_ons ?? []).map((a, i) => (

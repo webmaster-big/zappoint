@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import type { SpecialDeal } from '../types/SpecialPricing.types';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -93,6 +94,7 @@ export interface GroupedAttractionLocation {
   phone: string;
   availability?: AttractionAvailabilitySchedule[] | null;
   special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
   description?: string;
   price?: number;
   pricing_type?: string;
@@ -130,6 +132,7 @@ export interface SpecialPricingDiscount {
   recurrence_display?: string;
 }
 
+
 export interface SpecialPricing {
   original_price: number;
   discounted_price: number;
@@ -156,6 +159,7 @@ export interface GroupedAttraction {
   availability?: AttractionAvailabilitySchedule[];
   display_order?: number;
   special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
 }
 
 export interface GroupedPackageLocation {
@@ -170,6 +174,7 @@ export interface GroupedPackageLocation {
   phone: string;
   availability_schedules?: PackageAvailabilitySchedule[];
   special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
   description?: string;
   price?: number;
   category?: string;
@@ -239,6 +244,7 @@ export interface GroupedPackage {
   package_type?: string;
   display_order?: number;
   special_pricing?: SpecialPricing;
+  special_deals?: SpecialDeal[];
 }
 
 export interface GroupedEventLocation {
@@ -269,6 +275,7 @@ export interface GroupedEventLocation {
     description?: string;
     image?: string;
   }>;
+  special_deals?: SpecialDeal[];
 }
 
 export interface EventPurchaseLink {
@@ -291,6 +298,7 @@ export interface GroupedEvent {
   max_bookings_per_slot: number | null;
   price: string;
   features: string[] | null;
+  special_deals?: SpecialDeal[];
   locations: GroupedEventLocation[];
   purchase_links: EventPurchaseLink[];
 }

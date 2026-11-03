@@ -204,6 +204,9 @@ const CheckIn: React.FC = () => {
     };
   }, [effectiveLocationId]);
   const [scannedTicket, setScannedTicket] = useState<AttractionPurchase | null>(null);
+  const ticketBalance = scannedTicket && scannedTicket.amount_paid != null && scannedTicket.amount_paid !== ''
+    ? Math.round((Number(scannedTicket.total_amount ?? 0) - Number(scannedTicket.amount_paid)) * 100) / 100
+    : 0;
   const [scannedOrder, setScannedOrder] = useState<TicketOrder | null>(null);
   const [scannedMembership, setScannedMembership] = useState<MembershipScanResponse | null>(null);
   const [scannedEvent, setScannedEvent] = useState<ScannedEventTicket | null>(null);
@@ -3111,6 +3114,15 @@ const CheckIn: React.FC = () => {
                       <Detail icon={Smartphone} label="Phone" value={scannedTicket.guest_phone || '—'} />
                     </div>
                   </div>
+                  {scannedTicket.status === 'confirmed' && ticketBalance > 0.005 && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-amber-800">
+                        <span className="font-semibold">Balance due: ${ticketBalance.toFixed(2)}.</span> The ticket total changed after
+                        it was paid. Collect the balance before checking in.
+                      </p>
+                    </div>
+                  )}
                   <WaiverConnectionPanel type="attraction_purchase" id={scannedTicket.id} title="Waivers" onChanged={() => void loadWaivers()} />
                 </>
               )}
