@@ -33,6 +33,38 @@ const CONFIDENT_OFF_DEGREES = 35;
 const SETTLE_MS = 200;
 const MOTION_PROMPT_WAIT_MS = 15000;
 const NO_READING: SensorReading = { settled: null, nearest: null, confident: false };
+const SHARP_VIDEO: MediaTrackConstraints = { width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16 / 9 } };
+const STANDARD_VIDEO: MediaTrackConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+const WIDE_RATIO = 16 / 9;
+const WIDE_TOLERANCE = 0.03;
+const CAMERA_REOPEN_WAIT_MS = 500;
+
+const keepsWideShape = (stream: MediaStream): boolean => {
+  const { width, height } = stream.getVideoTracks()[0]?.getSettings() ?? {};
+  if (!width || !height) return true;
+  return Math.abs(Math.max(width, height) / Math.min(width, height) - WIDE_RATIO) / WIDE_RATIO <= WIDE_TOLERANCE;
+};
+
+const openCamera = async (facingMode: 'user' | 'environment'): Promise<MediaStream> => {
+  const standard = () => navigator.mediaDevices.getUserMedia({ video: { facingMode, ...STANDARD_VIDEO }, audio: false });
+
+  try {
+    const sharp = await navigator.mediaDevices.getUserMedia({ video: { facingMode, ...SHARP_VIDEO }, audio: false });
+    if (keepsWideShape(sharp)) return sharp;
+    sharp.getTracks().forEach((track) => track.stop());
+  } catch (e) {
+    const name = (e as { name?: string })?.name;
+    if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'NotFoundError') throw e;
+    return standard();
+  }
+
+  try {
+    return await standard();
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, CAMERA_REOPEN_WAIT_MS));
+    return standard();
+  }
+};
 
 const normalizeAngle = (degrees: number): number => ((Math.round(degrees) % 360) + 360) % 360;
 
@@ -143,10 +175,7 @@ export const usePhotoCamera = ({ facingMode = 'user', autoStart = false, followD
         await Promise.race([pendingMotion, new Promise((resolve) => setTimeout(resolve, MOTION_PROMPT_WAIT_MS))]);
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
+      const stream = await openCamera(facingMode);
 
       streamRef.current = stream;
 
@@ -325,7 +354,7 @@ export const usePhotoCamera = ({ facingMode = 'user', autoStart = false, followD
 
   const turn = frame ? turnFor(reading, uiAngle, frame.width, frame.height) : 0;
 
-  const capture = useCallback((quality = 0.92): string | null => {
+  const capture = useCallback((quality = 0.95): string | null => {
     const video = videoRef.current;
 
     if (!video || !streamRef.current || video.videoWidth === 0) {
