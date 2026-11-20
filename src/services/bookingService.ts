@@ -9,6 +9,7 @@ import { installBlockedPeriodRetry } from '../utils/blockedPeriodPrompt';
 import { fetchAllPages } from '../utils/fetchAllPages';
 import { rememberCheckoutToken, checkoutTokenBody } from '../utils/checkoutTokens';
 import type { VisitFollowUpSummary } from '../types/visitFollowUp.types';
+import type { CustomPackagePayload, CustomPackageTermsJson } from '../utils/customBooking';
 
 const getBestToken = (): string | null => {
   const adminToken = getStoredUser()?.token;
@@ -153,7 +154,8 @@ export interface CreateBookingData {
   guest_email?: string;
   guest_phone?: string;
   
-  package_id?: number;
+  package_id?: number | null;
+  custom_package?: CustomPackagePayload;
   location_id: number;
   room_id?: number;
   created_by?: number;
@@ -197,6 +199,9 @@ export interface CreateBookingData {
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
+    fee_label?: string | null;
+    fee_calculation_type?: 'fixed' | 'percentage' | null;
+    fee_support_id?: number | null;
   }> | null;
 
   applied_discounts?: Array<{
@@ -273,7 +278,8 @@ export interface UpdateBookingData {
   guest_name?: string;
   guest_email?: string;
   guest_phone?: string;
-  package_id?: number;
+  package_id?: number | null;
+  custom_package?: CustomPackagePayload;
   location_id?: number;
   room_id?: number | null;
   booking_date?: string;
@@ -310,6 +316,9 @@ export interface UpdateBookingData {
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
+    fee_label?: string | null;
+    fee_calculation_type?: 'fixed' | 'percentage' | null;
+    fee_support_id?: number | null;
   }> | null;
 
   applied_discounts?: Array<{
@@ -436,8 +445,15 @@ export interface Booking {
   waiver_status?: string | null;
   created_at: string;
   updated_at: string;
+  is_custom_package?: boolean | number | null;
+  custom_package_name?: string | null;
+  custom_package_category?: string | null;
+  custom_package_terms?: CustomPackageTermsJson | null;
+  package_price_at_booking?: string | number | null;
+  price_per_additional_at_booking?: string | number | null;
+  package_pricing_type_at_booking?: string | null;
   customer?: unknown;
-  package?: BookPackagePackage;
+  package?: BookPackagePackage | null;
   location?: unknown;
   room?: unknown;
   creator?: unknown;
@@ -470,6 +486,9 @@ export interface Booking {
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
+    fee_label?: string | null;
+    fee_calculation_type?: 'fixed' | 'percentage' | null;
+    fee_support_id?: number | null;
   }> | null;
 }
 

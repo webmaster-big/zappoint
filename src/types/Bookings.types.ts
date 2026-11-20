@@ -1,4 +1,5 @@
 import type { AppliedDiscount } from '../utils/discounts';
+import type { CustomTerms, OneTimeAddOnLine } from '../utils/customBooking';
 
 export interface BookingsPageBooking {
   id: string;
@@ -52,7 +53,12 @@ export interface BookingsPageBooking {
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
+    fee_label?: string | null;
+    fee_calculation_type?: 'fixed' | 'percentage' | null;
   }> | null;
+  isCustom?: boolean;
+  customTerms?: CustomTerms | null;
+  oneTimeAddOns?: OneTimeAddOnLine[];
 }
 
 export interface BookingsPageFilterOptions {
@@ -193,6 +199,7 @@ export interface BookingQuote {
   payment_status: string;
   delta?: number;
   pricing_consistent?: boolean;
+  participants_error?: string | null;
 }
 
 export type PaymentState = 'paid' | 'partial' | 'pending' | 'refunded' | 'voided';

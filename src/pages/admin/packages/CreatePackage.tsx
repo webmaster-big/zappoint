@@ -680,7 +680,7 @@ const CreatePackage: React.FC = () => {
             }
 
             if (canChangeOnlineAvailability && !form.availableOnline && packageResponse.data?.available_online !== false) {
-                showToast("The package was created, but it is on the booking site: the server has not been updated for Front-End Availability yet, so it could not be made backend only.", "error");
+                showToast("The package was created, but it could not be hidden from the booking site because the server has not been updated yet.", "error");
             } else {
                 showToast("Package created successfully!", "success");
             }
@@ -970,7 +970,7 @@ const CreatePackage: React.FC = () => {
                                                 maxLength={50}
                                                 placeholder="Participant, Player, Guest..."
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">What one person is called on the customer page.</p>
+                                            <p className="text-xs text-gray-500 mt-1">What one person is called on the booking site.</p>
                                         </div>
                                         <div>
                                             <label className="block font-semibold mb-2 text-base text-neutral-800">Shown to customers as</label>
@@ -983,7 +983,7 @@ const CreatePackage: React.FC = () => {
                                                 maxLength={100}
                                                 placeholder="Escape Room, Party Package..."
                                             />
-                                            <p className="text-xs text-gray-500 mt-1">Storefront section and badge. Blank keeps "Package".</p>
+                                            <p className="text-xs text-gray-500 mt-1">Booking site section and badge. Blank keeps "Package".</p>
                                         </div>
                                         <div>
                                             <label className="block font-semibold mb-2 text-base text-neutral-800">Max tickets per time slot</label>
@@ -1837,7 +1837,7 @@ const CreatePackage: React.FC = () => {
                                     Advance Booking Time
                                     <span className="text-gray-400 font-normal text-sm ml-2">(optional)</span>
                                 </label>
-                                <p className="text-sm text-gray-500 mb-3">Set how far in advance customers must book. For example, setting 48 hours means if a customer visits on Monday at 2:00 PM, the earliest available time slot would be Wednesday at 2:00 PM. This only affects customer-facing bookings — staff can still book freely.</p>
+                                <p className="text-sm text-gray-500 mb-3">Set how far in advance customers must book. For example, setting 48 hours means if a customer visits on Monday at 2:00 PM, the earliest available time slot would be Wednesday at 2:00 PM. This only affects online bookings — staff can still book freely.</p>
                                 
                                 <div className="flex flex-wrap gap-2 mb-3">
                                     {[

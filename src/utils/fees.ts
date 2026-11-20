@@ -5,6 +5,8 @@ export interface AppliedFee {
   fee_name: string;
   fee_amount: number;
   fee_application_type: 'additive' | 'inclusive';
+  fee_label?: string | null;
+  fee_calculation_type?: 'fixed' | 'percentage' | null;
 }
 
 export function buildAppliedFees(feeBreakdown: FeeBreakdown | null): AppliedFee[] {

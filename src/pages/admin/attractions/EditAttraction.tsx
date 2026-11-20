@@ -992,7 +992,7 @@ const EditAttraction = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="0"
                 />
-                <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the store page.</p>
+                <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the booking site.</p>
               </div>
             </div>
 

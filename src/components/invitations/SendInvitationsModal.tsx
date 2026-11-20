@@ -6,6 +6,7 @@ import invitationService from '../../services/invitationService';
 import EmailInput from '../ui/EmailInput';
 import { convertTo12Hour } from '../../utils/timeFormat';
 import { safeHtml } from '../../utils/safeHtml';
+import { bookingDisplayName } from '../../utils/customBooking';
 
 interface Props {
   booking: Booking;
@@ -175,7 +176,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
             <div>
               <h3 className="text-base font-semibold" style={{ color: '#ffffff' }}>Send Party Invitations</h3>
               <p className="text-sm mt-0.5" style={{ color: 'rgba(191,219,254,0.8)' }}>
-                {pkg?.name} — {new Date(booking.booking_date.split('T')[0] + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} at {convertTo12Hour(booking.booking_time)}
+                {bookingDisplayName(booking, '')} — {new Date(booking.booking_date.split('T')[0] + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} at {convertTo12Hour(booking.booking_time)}
               </p>
             </div>
             <button onClick={onClose} className="p-1.5 hover:bg-white/15 rounded-lg transition text-white">

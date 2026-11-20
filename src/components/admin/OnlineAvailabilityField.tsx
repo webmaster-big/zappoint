@@ -12,7 +12,7 @@ const OnlineAvailabilityField = ({ checked, canChange, themeColor, isActive = tr
   <div>
     <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
       {checked ? <Globe className="w-5 h-5 text-primary" /> : <EyeOff className="w-5 h-5 text-amber-700" />}
-      Front-End Availability
+      Online Booking
     </h3>
     <label
       className={`flex items-start gap-3 rounded-md border px-4 py-3 ${
@@ -38,8 +38,8 @@ const OnlineAvailabilityField = ({ checked, canChange, themeColor, isActive = tr
               ? 'On: the package shows on the booking site and customers can book it there. Staff can always book it here.'
               : 'On: once the package is switched on, it shows on the booking site and customers can book it there.'
             : isActive
-              ? 'Off (backend only): the package is hidden from the booking site and cannot be booked online, even from a saved link. Staff can still book it here, and its schedule and existing bookings stay as they are.'
-              : 'Off (backend only): the package is hidden from the booking site and cannot be booked online, even from a saved link. Staff can book it here once it is switched on. Its schedule and existing bookings stay as they are.'}
+              ? 'Off: the package is hidden from the booking site and cannot be booked online, even from a saved link. Staff can still book it here, and its schedule and existing bookings stay as they are.'
+              : 'Off: the package is hidden from the booking site and cannot be booked online, even from a saved link. Staff can book it here once it is switched on. Its schedule and existing bookings stay as they are.'}
         </span>
         {!canChange && (
           <span className={`block text-xs mt-1 ${checked ? 'text-gray-500' : 'text-amber-800'}`}>

@@ -71,7 +71,8 @@ import { MICHIGAN_TZ } from '../../../utils/timeFormat';
 import type { PaymentsPagePayment, PaymentsMetrics } from '../../../types/Payments.types';
 import { formatCardLabel } from '../../../utils/cardLabel';
 import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
-import type { PaymentPayableType } from '../../../types/Payment.types';
+import type { PaymentBooking, PaymentPayableType } from '../../../types/Payment.types';
+import { CUSTOM_PACKAGE_LABEL, isCustomBooking, type CustomBookingSource } from '../../../utils/customBooking';
 
 const normalizePayableType = (type?: string | null): PaymentPayableType | undefined => {
   if (!type) return undefined;
@@ -86,7 +87,7 @@ const normalizePayableType = (type?: string | null): PaymentPayableType | undefi
 const transformPayment = (payment: Payment): PaymentsPagePayment => {
   const payableType = normalizePayableType(payment.payable_type as string);
 
-  const booking = payment.booking;
+  const booking = payment.booking as (PaymentBooking & CustomBookingSource) | null | undefined;
   const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
   const eventPurchase = payment.eventPurchase || payment.event_purchase;
   const ticketOrder = payment.ticketOrder || payment.ticket_order;
@@ -116,7 +117,7 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
 
   if (payableType === PAYMENT_TYPE.BOOKING && booking) {
     payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
-    payableDescription = `Package Booking • ${booking.participants || 0} guests`;
+    payableDescription = `${isCustomBooking(booking) ? CUSTOM_PACKAGE_LABEL : 'Package Booking'} • ${booking.participants || 0} guests`;
   } else if (payableType === PAYMENT_TYPE.BOOKING) {
     payableReference = `Booking #${payment.payable_id}`;
     payableDescription = 'Package Booking';

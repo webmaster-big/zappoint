@@ -16,9 +16,9 @@ const CallToBookNotice = ({
       <div className="flex items-start gap-2.5">
         <EyeOff size={16} className="text-amber-700 mt-0.5 shrink-0" />
         <div className="text-xs text-amber-900 leading-relaxed">
-          <p className="font-bold text-sm">Backend only — not on the booking site</p>
+          <p className="font-bold text-sm">Hidden from booking site</p>
           <p className="mt-1">
-            Front-End Availability is off, so customers cannot see this {itemLabel} or book it online.{' '}
+            Online booking is off, so customers cannot see this {itemLabel} or book it online.{' '}
             {switchedOff
               ? 'It is switched off right now, so staff can book it from the admin booking pages once it is switched on.'
               : 'Staff can still book it from the admin booking pages.'}
@@ -39,7 +39,7 @@ const CallToBookNotice = ({
           <p className="font-bold text-sm">No schedule — customers will see "Call to Book"</p>
           <p className="mt-1">
             Because this {itemLabel} has no availability schedule, customers cannot pick a date or time
-            online. On the customer site the usual booking button is replaced with a{' '}
+            online. On the booking site the usual booking button is replaced with a{' '}
             <span className="font-semibold">Call to Book</span> button that shows your venue's name and
             phone number, lets guests call with one tap, or leave their name, number and a message
             asking to be called back.
@@ -60,7 +60,7 @@ const CallToBookNotice = ({
           <p className="font-bold text-sm">Bookable online</p>
           <p className="mt-1">
             This {itemLabel} has a schedule, so customers can pick a date and time and pay online. If you
-            remove every schedule, the customer site shows a{' '}
+            remove every schedule, the booking site shows a{' '}
             <span className="font-semibold">Call to Book</span> button instead — guests are asked to call
             the venue or request a call back, and nothing can be booked or paid online.
           </p>

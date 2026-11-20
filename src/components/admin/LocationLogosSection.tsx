@@ -50,7 +50,7 @@ const LocationLogosSection = () => {
           Location Logos
         </h2>
         <p className="text-sm text-gray-600 mt-1">
-          Each location shows its own logo across the admin area and the customer storefront.
+          Each location shows its own logo across the admin app and the booking site.
           A location with no logo of its own falls back to the company logo.
         </p>
       </div>

@@ -26,6 +26,8 @@ import {
 } from '../../../utils/scheduleGeometry';
 import BlockedPeriodBanner from '../availability/BlockedPeriodBanner';
 import { blockBookingPath } from '../../../utils/blockBookingPath';
+import { CUSTOM_BADGE_TEXT, bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
+import CustomPackageBadge from '../CustomPackageBadge';
 
 const MINUTES_PER_DAY = 24 * 60;
 const WALK_IN_STEP_MINUTES = 5;
@@ -1326,7 +1328,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                           }}
                           aria-label={[
                             customerNameOf(item.booking),
-                            item.booking.package?.name ?? 'No package',
+                            bookingDisplayName(item.booking, 'No package'),
+                            isCustomBooking(item.booking) ? CUSTOM_BADGE_TEXT : null,
                             formatRange(item.startMinutes, item.endMinutes),
                             clashing ? `${doubleBooked ? 'OVERLAPS' : 'NO TURNAROUND'}: ${overlapLabel}` : null,
                             noteSummary,
@@ -1369,7 +1372,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                                 </span>
                                 {height >= 26 && (
                                   <span className="truncate text-[10px] leading-tight text-gray-600">
-                                    {item.booking.package?.name || 'No package'}
+                                    {bookingDisplayName(item.booking, 'No package')}
                                   </span>
                                 )}
                               </>
@@ -1382,6 +1385,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                                     {formatCompactRange(item.startMinutes, item.endMinutes)}
                                   </span>
                                   <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                                    {isCustomBooking(item.booking) && (
+                                      <CustomPackageBadge className="px-1! py-px! text-[8px]!" />
+                                    )}
                                     {late ? (
                                       <span className="rounded bg-red-600 px-1 text-[8px] font-bold uppercase leading-tight text-white">
                                         Late
@@ -1405,7 +1411,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                                 </span>
 
                                 <span className="truncate text-[9px] leading-tight text-gray-600">
-                                  {item.booking.package?.name || 'No package'}
+                                  {bookingDisplayName(item.booking, 'No package')}
                                 </span>
 
                                 {/* how many, and what is still owed — the two numbers the desk acts on */}
@@ -1490,7 +1496,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
             anchor={hoverCard.rect}
             guestName={customerNameOf(hovered)}
             timeLabel={formatRange(item.startMinutes, item.endMinutes)}
-            packageName={hovered.package?.name || 'No package'}
+            packageName={bookingDisplayName(hovered, 'No package')}
             participants={hovered.participants}
             amount={parseFloat(String(hovered.total_amount || 0))}
             paymentLabel={payment.label}
@@ -1581,7 +1587,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     <dt className="text-amber-800">Their booking</dt>
                     <dd className="font-medium text-amber-900">
                       {formatSlotLabel(startMinutesOf(walkInPrompt.clash))} ·{' '}
-                      {walkInPrompt.clash.package?.name || 'No package'}
+                      {bookingDisplayName(walkInPrompt.clash, 'No package')}
                     </dd>
                   </div>
                 </dl>

@@ -52,6 +52,11 @@ import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPa
 import { isCheckInEligible } from '../../../utils/bookingCheckIn';
 import BlockedPeriodList from '../../../components/admin/availability/BlockedPeriodList';
 import { dayOffService, type AvailabilityBlock } from '../../../services/DayOffService';
+import { CUSTOM_PACKAGE_LABEL, bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import { CustomPackageSection, OneTimeAddOnsSection } from '../../../components/admin/bookings/CustomPackageDetails';
+
+const CUSTOM_PACKAGE_FILTER = '__custom_package__';
 
 const michiganToday = (): Date => {
   const now = getMichiganNow();
@@ -299,8 +304,10 @@ const CalendarView: React.FC = () => {
     }
 
     if (filters.packages.length > 0) {
-      result = result.filter(booking => 
-        booking.package?.name && filters.packages.includes(booking.package.name)
+      result = result.filter(booking =>
+        isCustomBooking(booking)
+          ? filters.packages.includes(CUSTOM_PACKAGE_FILTER)
+          : booking.package?.name && filters.packages.includes(booking.package.name)
       );
     }
 
@@ -612,11 +619,12 @@ const CalendarView: React.FC = () => {
       .map(booking => booking.package?.name)
       .filter((pkg): pkg is string => !!pkg);
     
-    return [...new Set(packages)];
+    const unique = [...new Set(packages)];
+    return bookings.some(booking => isCustomBooking(booking)) ? [CUSTOM_PACKAGE_FILTER, ...unique] : unique;
   };
 
   const getBookingTitle = (booking: Booking) => {
-    return booking.package?.name || 'Package Booking';
+    return bookingDisplayName(booking, 'Package Booking');
   };
 
   const packageColors = [
@@ -646,7 +654,7 @@ const CalendarView: React.FC = () => {
   };
 
   const getPackageColor = (booking: Booking) => {
-    const packageName = booking.package?.name || '';
+    const packageName = isCustomBooking(booking) ? bookingDisplayName(booking, '') : booking.package?.name || '';
     const colorIndex = getPackageNameHash(packageName) % packageColors.length;
     const color = packageColors[colorIndex];
     return `${color.bg} ${color.text}`;
@@ -667,6 +675,11 @@ const CalendarView: React.FC = () => {
     });
     return Array.from(packagesMap.values());
   };
+
+  const customPackageNames = useMemo(
+    () => [...new Set(bookings.filter(booking => isCustomBooking(booking)).map(booking => bookingDisplayName(booking, '')))],
+    [bookings]
+  );
 
   const renderDateBreakdown = (date: Date, compact = false) => {
     const summary = getDateSummary(date);
@@ -770,7 +783,10 @@ const CalendarView: React.FC = () => {
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
-                          <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
+                          <p className="text-sm text-gray-500">
+                            {getBookingTitle(booking)}
+                            {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 align-middle" />}
+                          </p>
                           <p className="text-sm text-gray-500">{formatTime12Hour(booking.booking_time)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
@@ -778,7 +794,7 @@ const CalendarView: React.FC = () => {
                             {booking.status}
                           </span>
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
-                            {booking.package?.name || 'Package'}
+                            {bookingDisplayName(booking, 'Package')}
                           </span>
                         </div>
                       </div>
@@ -1233,7 +1249,7 @@ const CalendarView: React.FC = () => {
                       <PackageIcon className={`w-4 h-4 text-${fullColor}`} />
                       <h4 className="font-semibold text-gray-900 text-sm">Package Colors</h4>
                     </div>
-                    {getPackagesWithColors().length === 0 ? (
+                    {getPackagesWithColors().length === 0 && customPackageNames.length === 0 ? (
                       <p className="text-sm text-gray-500 italic">No packages in current view</p>
                     ) : (
                       <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -1241,6 +1257,15 @@ const CalendarView: React.FC = () => {
                           <div key={pkg.id} className="flex items-center gap-2">
                             <span className={`w-4 h-4 rounded ${getPackageColorByPackage(pkg.id, pkg.name)}`}></span>
                             <span className="text-sm text-gray-700 truncate">{pkg.name}</span>
+                          </div>
+                        ))}
+                        {customPackageNames.length > 0 && (
+                          <p className="pt-1 text-xs font-semibold text-gray-500">{CUSTOM_PACKAGE_LABEL}</p>
+                        )}
+                        {customPackageNames.map(name => (
+                          <div key={`custom-${name}`} className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded shrink-0 ${getPackageColorByPackage(0, name)}`}></span>
+                            <span className="text-sm text-gray-700 truncate">{name}</span>
                           </div>
                         ))}
                       </div>
@@ -1309,7 +1334,7 @@ const CalendarView: React.FC = () => {
                     size="sm"
                     onClick={() => handlePackageToggle(pkg)}
                   >
-                    {pkg}
+                    {pkg === CUSTOM_PACKAGE_FILTER ? CUSTOM_PACKAGE_LABEL : pkg}
                   </StandardButton>
                 ))}
               </div>
@@ -1469,7 +1494,8 @@ const CalendarView: React.FC = () => {
                                     </div>
                                     <div className="flex items-center text-gray-600">
                                       <PackageIcon className="h-4 w-4 text-gray-400 mr-2" />
-                                      <span className="truncate">{booking.package?.name || 'N/A'}</span>
+                                      <span className="truncate">{bookingDisplayName(booking, 'N/A')}</span>
+                                      {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 shrink-0" />}
                                     </div>
                                     {booking.location ? (
                                       <div className="flex items-center text-gray-600">
@@ -1668,23 +1694,27 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
-                        <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                {isCustomBooking(selectedBooking) ? (
+                  <CustomPackageSection booking={selectedBooking} />
+                ) : (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
+                          <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                        </div>
+                        {selectedBooking.package?.price && (
+                          <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                        )}
                       </div>
-                      {selectedBooking.package?.price && (
-                        <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                      {selectedBooking.package?.description && (
+                        <p className="text-sm text-gray-600 mt-2 ml-7">{selectedBooking.package.description}</p>
                       )}
                     </div>
-                    {selectedBooking.package?.description && (
-                      <p className="text-sm text-gray-600 mt-2 ml-7">{selectedBooking.package.description}</p>
-                    )}
                   </div>
-                </div>
+                )}
 
                 {selectedBooking.location ? (
                   <div className="mb-6">
@@ -1763,6 +1793,8 @@ const CalendarView: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                <OneTimeAddOnsSection booking={selectedBooking} />
 
                 {(selectedBooking as any).guest_of_honor_name && (
                   <div className="mb-6">
@@ -1850,10 +1882,10 @@ const CalendarView: React.FC = () => {
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-gray-500">Fees</p>
-                        {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string }, i: number) => (
+                        {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string; fee_label?: string | null }, i: number) => (
                           <div key={i} className="flex justify-between items-center">
-                            <span className="text-xs text-gray-600">{fee.fee_name} <span className="text-gray-400">({fee.fee_application_type})</span></span>
-                            <span className="text-xs text-gray-900">${fee.fee_amount.toFixed(2)}</span>
+                            <span className="text-xs text-gray-600">{fee.fee_name} <span className="text-gray-400">({isCustomBooking(selectedBooking) && fee.fee_label ? fee.fee_label : fee.fee_application_type})</span></span>
+                            <span className="text-xs text-gray-900">${(Number(fee.fee_amount) || 0).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>

@@ -11,6 +11,8 @@ import {
   rankBookingSearchResults,
 } from '../../../utils/bookingSearch';
 import { convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
+import { bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
+import CustomPackageBadge from '../CustomPackageBadge';
 
 const MIN_TERM_LENGTH = 2;
 
@@ -250,7 +252,8 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({
                         )}
                       </div>
                       <div className="mt-0.5 truncate text-xs text-gray-500">
-                        <span className="font-mono">#{booking.id}</span> · {booking.reference_number} · {booking.package?.name || 'No package'}
+                        <span className="font-mono">#{booking.id}</span> · {booking.reference_number} · {bookingDisplayName(booking, 'No package')}
+                        {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 align-middle" />}
                       </div>
                     </button>
                   </li>

@@ -25,6 +25,8 @@ import eventPurchaseService from '../../../services/EventPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
 import { getStoredUser } from '../../../utils/storage';
 import type { Booking } from '../../../services/bookingService';
+import { bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
+import CustomPackageBadge from '../CustomPackageBadge';
 
 interface BucketStyle {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
@@ -192,7 +194,8 @@ const BookingRow: React.FC<{
       <span className="flex items-start justify-between gap-3">
         <span className="block min-w-0">
           <span className="block text-sm font-semibold text-gray-900 truncate">
-            {booking.package?.name || 'Package booking'}
+            {bookingDisplayName(booking, 'Package booking')}
+            {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 align-middle" />}
           </span>
           <span className="block text-xs text-gray-500 truncate">{guestNameOf(booking)}</span>
         </span>
@@ -289,8 +292,8 @@ const BucketDetail: React.FC<{
                 What made up the {bucket.primaryUnit}
               </p>
               <div className="space-y-1.5">
-                {bucket.sources.map(source => (
-                  <div key={source.label} className="flex items-center justify-between gap-3 text-sm">
+                {bucket.sources.map((source, index) => (
+                  <div key={`${index}-${source.label}`} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-gray-700 truncate">
                       {source.label}
                       <span className="ml-2 text-xs text-gray-400">{source.category}</span>

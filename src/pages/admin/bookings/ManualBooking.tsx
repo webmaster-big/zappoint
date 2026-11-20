@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OverlapOverrideDialog from '../../../components/admin/bookings/OverlapOverrideDialog';
-import { ArrowLeft, Save, Plus, Minus, Calendar, Clock, CreditCard, DollarSign, EyeOff } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Minus, Calendar, Clock, CreditCard, DollarSign, EyeOff, Package } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
@@ -20,14 +20,18 @@ import { isSlotBlockedByClosure } from '../../../utils/dayOffClosure';
 import { orderByClockStart } from '../../../utils/timeSlots';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import StandardButton from '../../../components/ui/StandardButton';
-import roomService from '../../../services/RoomService';
+import roomService, { type Room } from '../../../services/RoomService';
+import { roomCacheService } from '../../../services/RoomCacheService';
+import addOnService, { type AddOn } from '../../../services/AddOnService';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
+import { categoryService, type Category } from '../../../services/CategoryService';
 import { loadAcceptJS, processCardPayment, validateCardNumber, getCardType, formatCardNumber, createPayment, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser, getImageUrl, formatTimeTo12Hour } from '../../../utils/storage';
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { dateKey, formatDurationDisplay, michiganToday } from '../../../utils/timeFormat';
 import { derivePaymentStatus } from '../../../types/Bookings.types';
 import { feeSupportService } from '../../../services/FeeSupportService';
 import { resolveFeeBreakdown } from '../../../utils/feeTotal';
@@ -48,6 +52,36 @@ import customFieldService, {
 import { normalizeCategory } from '../../../utils/venueCategories';
 import { scheduleMatchesDate } from '../../../utils/packageSchedule';
 import { requestErrorMessage } from '../../../utils/requestError';
+import {
+  CUSTOM_PACKAGE_LABEL,
+  CUSTOM_PACKAGE_LIMITS,
+  CUSTOM_PACKAGE_MESSAGES,
+  capacityText,
+  catalogErrorKey,
+  centsToDollars,
+  customGuestRange,
+  customPackagePayload,
+  customQuoteFromInput,
+  durationText,
+  emptyCustomFeeInput,
+  emptyCustomTermsInput,
+  emptyOneTimeAddOnInput,
+  endTimeText,
+  feeErrorKey,
+  feeLineLabel,
+  formatMoney,
+  oneTimeAddOnErrorKey,
+  packageLineLabel,
+  participantsHint,
+  priceFieldLabel,
+  pricingTypeLabel,
+  toAppliedFees,
+  toCents,
+  validateCustomTerms,
+  type CustomFeeInput,
+  type CustomTermsInput,
+  type OneTimeAddOnInput,
+} from '../../../utils/customBooking';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
@@ -88,11 +122,36 @@ const sortRoomsNumerically = (rooms: any[]): any[] => {
   });
 };
 
+type CustomFeeRow = CustomFeeInput & { rowKey: number };
+type OneTimeAddOnRow = OneTimeAddOnInput & { rowKey: number };
+
+interface CustomTermsDraft extends CustomTermsInput {
+  fees: CustomFeeRow[];
+  oneTimeAddOns: OneTimeAddOnRow[];
+}
+
+type CustomLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+const emptyCustomTermsDraft = (): CustomTermsDraft => ({ ...emptyCustomTermsInput(), fees: [], oneTimeAddOns: [] });
+
+const usableCustomAddOns = (addOns: AddOn[], locationId: number): AddOn[] => addOns.filter(addOn =>
+  Number(addOn.location_id) === locationId
+  && addOn.is_active !== false
+  && addOn.price !== null
+  && addOn.price !== undefined
+  && String(addOn.price).trim() !== ''
+  && Number.isFinite(Number(addOn.price))
+);
+
+const blurOnWheel = (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur();
+
+const CUSTOM_PAST_DATE_MESSAGE = 'Choose today or a future date.';
+
 const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
-  const { effectiveLocationId } = useLocationScope();
+  const { effectiveLocationId, locations, workLocations } = useLocationScope();
 
   const [bookingMode, setBookingMode] = useState<'flexible' | 'standard'>('standard');
   
@@ -190,6 +249,51 @@ const ManualBooking: React.FC = () => {
     guestCountry: ''
   });
 
+  const [isCustom, setIsCustom] = useState(false);
+  const [customLocationId, setCustomLocationId] = useState<number | null>(null);
+  const [customTerms, setCustomTerms] = useState<CustomTermsDraft>(emptyCustomTermsDraft);
+  const [customParticipants, setCustomParticipants] = useState('');
+  const [customAddOnQuantities, setCustomAddOnQuantities] = useState<Record<number, number>>({});
+  const [customShowErrors, setCustomShowErrors] = useState(false);
+  const [customRooms, setCustomRooms] = useState<Room[]>([]);
+  const [customRoomsStatus, setCustomRoomsStatus] = useState<CustomLoadStatus>('idle');
+  const [customRoomsAttempt, setCustomRoomsAttempt] = useState(0);
+  const [customAddOns, setCustomAddOns] = useState<AddOn[]>([]);
+  const [customAddOnsStatus, setCustomAddOnsStatus] = useState<CustomLoadStatus>('idle');
+  const [customAddOnsAttempt, setCustomAddOnsAttempt] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesStatus, setCategoriesStatus] = useState<CustomLoadStatus>('idle');
+  const [categoriesAttempt, setCategoriesAttempt] = useState(0);
+  const [newSpaceName, setNewSpaceName] = useState('');
+  const customRowKeyRef = useRef(0);
+  const customLocationRef = useRef<number | null>(null);
+
+  const canPickCustomLocation = currentUser?.role === 'company_admin' || currentUser?.role === 'admin';
+  const hasSelection = !!form.packageId || isCustom;
+  const bookingLocationId: number | null = isCustom
+    ? (canPickCustomLocation ? customLocationId : effectiveLocationId)
+    : (pkg?.location_id || effectiveLocationId || currentUser?.location_id || null);
+  const customPackageAvailable = canPickCustomLocation
+    ? locations.length > 0 || effectiveLocationId !== null
+    : effectiveLocationId !== null;
+
+  const seededCustomLocationId = (): number | null =>
+    effectiveLocationId ?? (locations.length === 1 ? Number(locations[0].id) : null);
+
+  const customLocationName = (id: number | null): string => {
+    if (id === null) return '';
+    const listed = locations.find(location => Number(location.id) === id)
+      ?? workLocations.find(location => Number(location.id) === id);
+    if (listed) return listed.name;
+    if (Number(currentUser?.location_id) === id && currentUser?.location_name) return currentUser.location_name;
+    return `Location #${id}`;
+  };
+
+  const customLocationOptions = locations.map(location => ({ id: Number(location.id), name: location.name }));
+  if (customLocationId !== null && !customLocationOptions.some(option => option.id === customLocationId)) {
+    customLocationOptions.push({ id: customLocationId, name: customLocationName(customLocationId) });
+  }
+
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string, roomId?: number | null): boolean => {
     if (!form.bookingDate || dayOffsWithTime.length === 0 || !pkg) return false;
 
@@ -238,6 +342,34 @@ const ManualBooking: React.FC = () => {
     return 'This time is inside a blocked period. Guests cannot book it online; you will be asked to confirm when you save.';
   }, [bookingMode, form.bookingDate, form.bookingTime, form.roomId, pkg, dayOffsWithTime]);
 
+  const customClosureWarning = React.useMemo(() => {
+    if (!isCustom || !form.bookingDate || !form.bookingTime) return null;
+    const [h, m] = form.bookingTime.split(':').map(Number);
+    if (Number.isNaN(h)) return null;
+    const selectedDate = parseLocalDate(form.bookingDate);
+    const isSelectedDay = (date: Date) => date.getFullYear() === selectedDate.getFullYear()
+      && date.getMonth() === selectedDate.getMonth()
+      && date.getDate() === selectedDate.getDate();
+    const minutes = Number(customTerms.durationMinutes);
+    let end: string | null = null;
+    if (customTerms.durationMinutes.trim() !== '' && Number.isInteger(minutes) && minutes > 0) {
+      const endTotal = (h * 60 + (m || 0) + minutes) % (24 * 60);
+      end = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`;
+    }
+    const roomId = form.roomId ? Number(form.roomId) : null;
+    const closures = dayOffsWithTime.filter(dayOff => {
+      if (!isSelectedDay(dayOff.date)) return false;
+      const targetsPackages = !!dayOff.package_ids?.length;
+      const targetsRooms = !!dayOff.room_ids?.length;
+      if (!targetsPackages && !targetsRooms) return true;
+      return targetsRooms && roomId != null && Number.isFinite(roomId) && dayOff.room_ids!.includes(roomId);
+    });
+    const blocked = dayOffs.some(isSelectedDay)
+      || (closures.length > 0 && isSlotBlockedByClosure(form.bookingTime, end, closures));
+    if (!blocked) return null;
+    return 'This time is inside a blocked period. Guests cannot book it online; you will be asked to confirm when you save.';
+  }, [isCustom, form.bookingDate, form.bookingTime, form.roomId, customTerms.durationMinutes, dayOffs, dayOffsWithTime]);
+
   const filteredDayOffsWithTime = pkg
     ? dayOffsWithTime.filter(d => (d.package_ids && d.package_ids.length > 0) ? d.package_ids.includes(pkg.id) : !(d.room_ids && d.room_ids.length > 0))
     : dayOffsWithTime;
@@ -248,7 +380,7 @@ const ManualBooking: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const locationId = pkg?.location_id || effectiveLocationId || currentUser?.location_id || null;
+    const locationId = bookingLocationId;
 
     const loadAuthorizeNetSettings = async () => {
       setAuthorizeApiLoginId('');
@@ -282,7 +414,127 @@ const ManualBooking: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [pkg?.location_id, effectiveLocationId, currentUser?.location_id]);
+  }, [bookingLocationId]);
+
+  useEffect(() => {
+    overrideTokenRef.current = null;
+  }, [bookingLocationId]);
+
+  useEffect(() => {
+    if (!isCustom || !canPickCustomLocation) return;
+    setCustomLocationId(seededCustomLocationId());
+  }, [effectiveLocationId]);
+
+  useEffect(() => {
+    customLocationRef.current = isCustom ? bookingLocationId : null;
+    if (!isCustom) return;
+    setForm(prev => (prev.roomId ? { ...prev, roomId: '' } : prev));
+    setCustomAddOnQuantities(prev => (Object.keys(prev).length > 0 ? {} : prev));
+  }, [isCustom, bookingLocationId]);
+
+  useEffect(() => {
+    if (!isCustom || !bookingLocationId) {
+      setCustomRooms(prev => (prev.length > 0 ? [] : prev));
+      setCustomRoomsStatus('idle');
+      return;
+    }
+    let cancelled = false;
+    const locationId = bookingLocationId;
+    setCustomRooms(prev => (prev.length > 0 ? [] : prev));
+    setCustomRoomsStatus('loading');
+    (async () => {
+      try {
+        const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId, is_available: true });
+        let rooms = cachedRooms;
+        if (cachedRooms.length > 0) {
+          roomCacheService.syncInBackground();
+        } else {
+          rooms = await roomService.getAllRooms({ location_id: locationId, is_available: true });
+        }
+        if (cancelled) return;
+        setCustomRooms(rooms.filter(room => Number(room.location_id) === locationId));
+        setCustomRoomsStatus('ready');
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error loading spaces:', error);
+        setCustomRoomsStatus('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isCustom, bookingLocationId, customRoomsAttempt]);
+
+  useEffect(() => {
+    if (!isCustom || !bookingLocationId) {
+      setCustomAddOns(prev => (prev.length > 0 ? [] : prev));
+      setCustomAddOnsStatus('idle');
+      return;
+    }
+    let cancelled = false;
+    const locationId = bookingLocationId;
+    setCustomAddOns(prev => (prev.length > 0 ? [] : prev));
+    setCustomAddOnsStatus('loading');
+    (async () => {
+      try {
+        const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache({ location_id: locationId, is_active: true });
+        let addOns = cachedAddOns;
+        if (cachedAddOns.length > 0) {
+          addOnCacheService.syncInBackground();
+        } else {
+          addOns = await addOnService.getAllAddOns({ location_id: locationId, is_active: true });
+        }
+        if (cancelled) return;
+        setCustomAddOns(usableCustomAddOns(addOns, locationId));
+        setCustomAddOnsStatus('ready');
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error loading add-ons:', error);
+        setCustomAddOnsStatus('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isCustom, bookingLocationId, customAddOnsAttempt]);
+
+  const refreshCustomAddOns = async (): Promise<boolean> => {
+    const locationId = bookingLocationId;
+    if (!isCustom || !locationId) return false;
+    try {
+      const fresh = await addOnService.getAllAddOns({ location_id: locationId, is_active: true });
+      if (customLocationRef.current !== locationId) return false;
+      setCustomAddOns(usableCustomAddOns(fresh, locationId));
+      setCustomAddOnsStatus('ready');
+      return true;
+    } catch (error) {
+      console.error('Error refreshing add-ons:', error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (!isCustom) return;
+    let cancelled = false;
+    setCategoriesStatus('loading');
+    categoryService.getCategories()
+      .then((response: { data?: Category[] }) => {
+        if (cancelled) return;
+        setCategories(Array.isArray(response?.data) ? response.data : []);
+        setCategoriesStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('Error loading categories:', error);
+        setCategoriesStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCustom, categoriesAttempt]);
+
+  const packageRequestRef = useRef(0);
+  const dayOffsLocationRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -299,6 +551,7 @@ const ManualBooking: React.FC = () => {
         });
       loadPackageDetails(parseInt(form.packageId));
     } else {
+      packageRequestRef.current += 1;
       setPkg(null);
       setCustomFields([]);
       setCustomFieldAnswers({});
@@ -348,12 +601,12 @@ const ManualBooking: React.FC = () => {
       packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       
       if (pkgs.length === 0) {
-        setShowEmptyModal(true);
+        setShowEmptyModal(!customPackageAvailable);
       }
     } catch (error) {
       console.error('Error loading packages:', error);
       setPackages([]);
-      setShowEmptyModal(true);
+      setShowEmptyModal(!customPackageAvailable);
       setToast({ message: 'Failed to load packages', type: 'error' });
     } finally {
       setLoadingPackages(false);
@@ -361,8 +614,10 @@ const ManualBooking: React.FC = () => {
   };
 
   const loadPackageDetails = async (packageId: number) => {
+    const request = ++packageRequestRef.current;
     try {
       const response = await bookingService.getPackageById(packageId);
+      if (request !== packageRequestRef.current) return;
       console.log('📦 Package data received:', response.data);
       setPkg(response.data);
       const forced = seedForcedAddOns(response.data);
@@ -391,6 +646,7 @@ const ManualBooking: React.FC = () => {
         setSelectedRoomId(null);
       }
     } catch (error) {
+      if (request !== packageRequestRef.current) return;
       console.error('Error loading package details:', error);
       setToast({ message: 'Failed to load package details', type: 'error' });
     }
@@ -437,14 +693,23 @@ const ManualBooking: React.FC = () => {
   }, [pkg, bookingMode]);
 
   useEffect(() => {
-    if (bookingMode !== 'standard') return;
-    
+    const loadedFor = dayOffsLocationRef.current;
+    const needsThisLocation = !!bookingLocationId && loadedFor !== bookingLocationId;
+    if (bookingMode !== 'standard' && !isCustom && !needsThisLocation) return;
+    let cancelled = false;
+    if (isCustom || (needsThisLocation && loadedFor !== null)) {
+      setDayOffs([]);
+      setDayOffsWithTime([]);
+      dayOffsLocationRef.current = null;
+    }
+
     const fetchDayOffs = async () => {
-      const locationId = pkg?.location_id || effectiveLocationId || currentUser?.location_id;
+      const locationId = bookingLocationId;
       if (!locationId) return;
 
       try {
         const response = await dayOffService.getDayOffsByLocation(locationId);
+        if (cancelled) return;
         if (response.success && response.data) {
           const allDayOffs: DayOffWithTime[] = [];
           const today = new Date();
@@ -490,6 +755,7 @@ const ManualBooking: React.FC = () => {
           
           setDayOffs(fullDayOffDates);
           setDayOffsWithTime(partialOrSpecificDayOffs);
+          dayOffsLocationRef.current = locationId;
         }
       } catch (error) {
         console.error('Error fetching day offs:', error);
@@ -497,7 +763,11 @@ const ManualBooking: React.FC = () => {
     };
     
     fetchDayOffs();
-  }, [pkg?.location_id, effectiveLocationId, currentUser?.location_id, bookingMode]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingLocationId, bookingMode, isCustom]);
 
   useEffect(() => {
     if (bookingMode !== 'standard' || !pkg || !form.bookingDate) {
@@ -611,6 +881,44 @@ const ManualBooking: React.FC = () => {
 
   const handleCreateRoom = async (roomName: string) => {
     if (!roomName.trim()) return;
+
+    if (isCustom) {
+      const name = roomName.trim();
+      const listed = customRooms.find(room => room.name.trim().toLowerCase() === name.toLowerCase());
+      if (listed) {
+        setForm(prev => ({ ...prev, roomId: listed.id.toString() }));
+        setNewSpaceName('');
+        return;
+      }
+      const locationAtStart = bookingLocationId;
+      if (!locationAtStart) {
+        setToast({ message: CUSTOM_PACKAGE_MESSAGES.locationRequired, type: 'error' });
+        return;
+      }
+      try {
+        setCreatingRoom(true);
+        const response = await roomService.createRoom({
+          location_id: locationAtStart,
+          name,
+          is_available: true
+        });
+        if (response.success && response.data) {
+          const room = response.data;
+          roomCacheService.addRoomToCache(room).catch(cacheError => console.error('Error caching the new space:', cacheError));
+          if (customLocationRef.current !== locationAtStart) return;
+          setCustomRooms(prev => (prev.some(existing => existing.id === room.id) ? prev : [...prev, room]));
+          setForm(prev => ({ ...prev, roomId: room.id.toString() }));
+          setNewSpaceName('');
+        }
+      } catch (error: any) {
+        console.error('Error creating Space:', error);
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to create Space';
+        setToast({ message: errorMsg, type: 'error' });
+      } finally {
+        setCreatingRoom(false);
+      }
+      return;
+    }
     
     try {
       setCreatingRoom(true);
@@ -782,6 +1090,157 @@ const ManualBooking: React.FC = () => {
 
   const { deals: specialDeals, dealDates } = useSpecialDeals('package', pkg?.id ?? null, pkg?.location_id ?? null);
 
+  const customCatalogLines = customAddOns
+    .filter(addOn => (customAddOnQuantities[addOn.id] || 0) > 0)
+    .map(addOn => ({ addOn, quantity: customAddOnQuantities[addOn.id] }));
+  const customQuote = customQuoteFromInput(
+    customTerms,
+    customParticipants,
+    customCatalogLines.map(line => ({ unitPrice: Number(line.addOn.price), quantity: line.quantity })),
+  );
+  const customTotal = centsToDollars(customQuote.totalCents);
+  const customErrors: Record<string, string> = isCustom
+    ? validateCustomTerms(customTerms, {
+        participants: customParticipants,
+        locationId: bookingLocationId,
+        roomId: form.roomId || null,
+        catalog: customCatalogLines.map(line => ({
+          id: line.addOn.id,
+          name: line.addOn.name,
+          quantity: line.quantity,
+          minQuantity: line.addOn.min_quantity ?? null,
+          maxQuantity: line.addOn.max_quantity ?? null,
+        })),
+        amountPaid: form.paymentMethod === 'paylater' ? null : form.amountPaid,
+        totalCents: customQuote.totalCents,
+      })
+    : {};
+  const customTodayKey = dateKey(michiganToday());
+  const customDateError = isCustom && bookingMode === 'standard' && form.bookingDate !== '' && form.bookingDate < customTodayKey
+    ? CUSTOM_PAST_DATE_MESSAGE
+    : null;
+  const customErrorText = (key: string, value?: string): string | undefined => {
+    const message = customErrors[key];
+    if (!message) return undefined;
+    return customShowErrors || (value !== undefined && value.trim() !== '') ? message : undefined;
+  };
+  const customRange = customGuestRange(customTerms.minGuests, customTerms.maxGuests);
+  const customParticipantCount = Number(customParticipants);
+  const customHasPackagePrice = customTerms.price.trim() !== ''
+    && Number.isFinite(Number(customTerms.price))
+    && (customTerms.pricingType !== 'per_guest'
+      || (customParticipants.trim() !== '' && Number.isInteger(customParticipantCount) && customParticipantCount > 0));
+  const customHasAddOnLines = customCatalogLines.length > 0 || customTerms.oneTimeAddOns.length > 0;
+  const customHasEstimate = customHasPackagePrice || customHasAddOnLines || customTerms.fees.length > 0;
+  const customSummaryName = customTerms.name.trim() || CUSTOM_PACKAGE_LABEL;
+  const customDurationText = durationText(customTerms.durationMinutes);
+  const customCapacityText = capacityText(customTerms.minGuests, customTerms.maxGuests);
+  const customEndText = endTimeText(form.bookingDate, form.bookingTime, customTerms.durationMinutes);
+  const customLocationError = customErrorText('location');
+  const customNameError = customErrorText('name', customTerms.name);
+  const customCategoryError = customErrorText('category');
+  const customDurationError = customErrorText('durationMinutes', customTerms.durationMinutes);
+  const customMinGuestsError = customErrorText('minGuests', customTerms.minGuests);
+  const customMaxGuestsError = customErrorText('maxGuests', customTerms.maxGuests);
+  const customParticipantsError = customErrorText('participants', customParticipants);
+  const customRoomError = customErrorText('room');
+  const customPriceError = customErrorText('price', customTerms.price);
+  const customTotalError = customErrorText('total');
+  const customAmountPaidError = customErrorText('amountPaid', form.amountPaid);
+  const customFieldClass = (invalid: boolean, padding = 'px-3') =>
+    `w-full ${padding} py-2 text-sm border ${invalid ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`;
+  const customRemoveButtonClass = 'inline-flex items-center justify-center w-9 h-9 flex-shrink-0 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 text-base leading-none';
+
+  const nextCustomRowKey = () => {
+    customRowKeyRef.current += 1;
+    return customRowKeyRef.current;
+  };
+
+  const updateCustomTerms = (patch: Partial<CustomTermsDraft>) => {
+    setCustomTerms(prev => ({ ...prev, ...patch }));
+  };
+
+  const addCustomFee = () => {
+    const rowKey = nextCustomRowKey();
+    setCustomTerms(prev => (prev.fees.length >= CUSTOM_PACKAGE_LIMITS.feesMax
+      ? prev
+      : { ...prev, fees: [...prev.fees, { ...emptyCustomFeeInput(), rowKey }] }));
+  };
+
+  const updateCustomFee = (rowKey: number, patch: Partial<CustomFeeInput>) => {
+    setCustomTerms(prev => ({
+      ...prev,
+      fees: prev.fees.map(fee => (fee.rowKey === rowKey ? { ...fee, ...patch } : fee)),
+    }));
+  };
+
+  const removeCustomFee = (rowKey: number) => {
+    setCustomTerms(prev => ({ ...prev, fees: prev.fees.filter(fee => fee.rowKey !== rowKey) }));
+  };
+
+  const addOneTimeAddOn = () => {
+    const rowKey = nextCustomRowKey();
+    setCustomTerms(prev => (prev.oneTimeAddOns.length >= CUSTOM_PACKAGE_LIMITS.oneTimeAddOnsMax
+      ? prev
+      : { ...prev, oneTimeAddOns: [...prev.oneTimeAddOns, { ...emptyOneTimeAddOnInput(), rowKey }] }));
+  };
+
+  const updateOneTimeAddOn = (rowKey: number, patch: Partial<OneTimeAddOnInput>) => {
+    setCustomTerms(prev => ({
+      ...prev,
+      oneTimeAddOns: prev.oneTimeAddOns.map(line => (line.rowKey === rowKey ? { ...line, ...patch } : line)),
+    }));
+  };
+
+  const removeOneTimeAddOn = (rowKey: number) => {
+    setCustomTerms(prev => ({ ...prev, oneTimeAddOns: prev.oneTimeAddOns.filter(line => line.rowKey !== rowKey) }));
+  };
+
+  const changeCustomAddOnQuantity = (addOn: AddOn, quantityFrom: (current: number) => number) => {
+    setCustomAddOnQuantities(prev => {
+      const current = prev[addOn.id] || 0;
+      const next = clampAddOnQuantity(addOn, null, current, quantityFrom(current));
+      if (next <= 0) {
+        const { [addOn.id]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [addOn.id]: next };
+    });
+  };
+
+  const toggleCustomRoom = (roomId: number) => {
+    setForm(prev => ({ ...prev, roomId: prev.roomId === roomId.toString() ? '' : roomId.toString() }));
+  };
+
+  const startCustomPackage = () => {
+    packageRequestRef.current += 1;
+    setPkg(null);
+    setIsCustom(true);
+    setCustomLocationId(canPickCustomLocation ? seededCustomLocationId() : null);
+    setCustomTerms(emptyCustomTermsDraft());
+    setCustomParticipants('');
+    setCustomAddOnQuantities({});
+    setCustomShowErrors(false);
+    setNewSpaceName('');
+    setForm(prev => ({ ...prev, packageId: '', roomId: '' }));
+    setSelectedRoomId(null);
+    setSelectedAddOns({});
+    setSelectedAttractions({});
+    setCustomFieldAnswers({});
+    setCustomFieldsUnavailable(false);
+  };
+
+  const leaveCustomPackage = () => {
+    setIsCustom(false);
+    setCustomLocationId(null);
+    setCustomTerms(emptyCustomTermsDraft());
+    setCustomParticipants('');
+    setCustomAddOnQuantities({});
+    setCustomShowErrors(false);
+    setNewSpaceName('');
+    setForm(prev => ({ ...prev, roomId: '' }));
+  };
+
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
@@ -797,22 +1256,33 @@ const ManualBooking: React.FC = () => {
 
     isSubmittingRef.current = true;
 
-    if (!form.customerName || !form.email || !form.packageId || !form.bookingDate || !form.bookingTime) {
+    if (!form.customerName || !form.email || (!isCustom && !form.packageId) || !form.bookingDate || !form.bookingTime) {
       setToast({ message: 'Please fill in all required fields', type: 'error' });
       isSubmittingRef.current = false;
       return;
     }
 
-    if (!pkg) {
+    if (!isCustom && !pkg) {
       setToast({ message: 'Please select a valid package', type: 'error' });
       isSubmittingRef.current = false;
       return;
     }
 
-    if (pkg.rooms && pkg.rooms.length > 0 && !form.roomId) {
+    if (!isCustom && pkg.rooms && pkg.rooms.length > 0 && !form.roomId) {
       setToast({ message: 'Please select a space for this booking', type: 'error' });
       isSubmittingRef.current = false;
       return;
+    }
+
+    if (isCustom) {
+      const pastDate = bookingMode === 'standard' && form.bookingDate < dateKey(michiganToday());
+      const customProblem = Object.values(customErrors)[0] ?? (pastDate ? CUSTOM_PAST_DATE_MESSAGE : null);
+      if (customProblem) {
+        setCustomShowErrors(true);
+        setToast({ message: customProblem, type: 'error' });
+        isSubmittingRef.current = false;
+        return;
+      }
     }
 
     lastSubmitTimeRef.current = now;
@@ -827,7 +1297,7 @@ const ManualBooking: React.FC = () => {
         : null;
       const submitBreakdown = freshBreakdown ?? feeBreakdown;
       const feeTotal = Math.max(0, (submitBreakdown ? submitBreakdown.total : calculatedTotal) - (specialPricingBreakdown?.total_discount || 0));
-      const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : feeTotal;
+      const finalTotalAmount = isCustom ? customTotal : (form.totalAmount ? Number(form.totalAmount) : feeTotal);
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
       
       const derivedPaymentStatus = derivePaymentStatus(finalAmountPaid, finalTotalAmount);
@@ -839,7 +1309,13 @@ const ManualBooking: React.FC = () => {
         pkgAddOns: pkg?.add_ons
       });
       
-      const additionalAddons = Object.entries(selectedAddOns)
+      const additionalAddons = isCustom
+        ? customCatalogLines.map(line => ({
+            addon_id: line.addOn.id,
+            quantity: line.quantity,
+            price_at_booking: Number(line.addOn.price),
+          }))
+        : Object.entries(selectedAddOns)
         .filter(([, quantity]) => quantity > 0)
         .map(([id, quantity]) => {
           const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
@@ -861,7 +1337,9 @@ const ManualBooking: React.FC = () => {
         })
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
 
-      const additionalAttractions = Object.entries(selectedAttractions)
+      const additionalAttractions = isCustom
+        ? []
+        : Object.entries(selectedAttractions)
         .filter(([, quantity]) => quantity > 0)
         .map(([id, quantity]) => {
           const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
@@ -883,8 +1361,8 @@ const ManualBooking: React.FC = () => {
         })
         .filter((item): item is { attraction_id: number; quantity: number; price_at_booking: number } => item !== null);
       
-      const durationValue = pkg.duration ? Number(pkg.duration) : 2;
-      const durationUnitRaw = pkg.duration_unit || 'hours';
+      const durationValue = isCustom ? Number(customTerms.durationMinutes) : (pkg.duration ? Number(pkg.duration) : 2);
+      const durationUnitRaw = isCustom ? 'minutes' : (pkg.duration_unit || 'hours');
       let finalDuration = durationValue;
       let finalDurationUnit: 'minutes' | 'hours' | 'hours and minutes' = 'hours';
       
@@ -902,7 +1380,7 @@ const ManualBooking: React.FC = () => {
         finalDurationUnit = 'hours';
       }
       
-      const locationId = pkg?.location_id || effectiveLocationId || user?.location_id || null;
+      const locationId = bookingLocationId;
 
       if (!locationId) {
         setToast({ message: 'Please select a location before creating this booking.', type: 'error' });
@@ -932,13 +1410,53 @@ const ManualBooking: React.FC = () => {
         }
       }
 
-      const attempt = JSON.stringify([form.packageId, form.bookingDate, form.bookingTime, form.roomId, form.participants]);
+      const customPackage = customPackagePayload(customTerms);
+      const customAppliedFees = toAppliedFees(customQuote);
+      const attempt = isCustom
+        ? JSON.stringify(['custom', locationId, form.bookingDate, form.bookingTime, form.roomId, customParticipants, customPackage, additionalAddons])
+        : JSON.stringify([form.packageId, form.bookingDate, form.bookingTime, form.roomId, form.participants]);
       if (checkoutAttemptRef.current !== null && checkoutAttemptRef.current !== attempt) {
         checkoutKeyRef.current = newCheckoutKey();
       }
       checkoutAttemptRef.current = attempt;
 
-      const bookingData: ExtendedBookingData = {
+      const bookingData: ExtendedBookingData = isCustom ? {
+        overlap_override_token: overrideTokenRef.current || undefined,
+        checkout_key: checkoutKeyRef.current,
+        guest_name: form.customerName,
+        guest_email: form.email,
+        guest_phone: form.phone,
+        package_id: null,
+        custom_package: customPackage,
+        room_id: form.roomId ? parseInt(form.roomId) : undefined,
+        type: 'package' as const,
+        booking_date: form.bookingDate,
+        booking_time: form.bookingTime,
+        participants: Number(customParticipants),
+        duration: finalDuration,
+        duration_unit: finalDurationUnit,
+        total_amount: finalTotalAmount,
+        amount_paid: finalAmountPaid,
+        payment_method: form.paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
+        payment_status: derivedPaymentStatus,
+        status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
+        notes: form.notes || undefined,
+        location_id: locationId,
+        created_by: user?.id,
+        additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
+        guest_of_honor_name: form.guestOfHonorName || undefined,
+        guest_of_honor_age: form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
+        guest_of_honor_gender: form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        guest_address: form.guestAddress || undefined,
+        guest_city: form.guestCity || undefined,
+        guest_state: form.guestState || undefined,
+        guest_zip: form.guestZip || undefined,
+        guest_country: form.guestCountry || undefined,
+        sent_email_to_staff: sendEmailToStaff,
+        skip_date_validation: bookingMode === 'flexible',
+        is_manual_entry: true,
+        applied_fees: customAppliedFees.length > 0 ? customAppliedFees : null,
+      } : {
         overlap_override_token: overrideTokenRef.current || undefined,
         checkout_key: checkoutKeyRef.current,
         custom_fields: toCustomFieldPayload(customFieldAnswers),
@@ -1056,8 +1574,8 @@ const ManualBooking: React.FC = () => {
             {
               location_id: locationId,
               amount: chargeAmount,
-              order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
-              description: `Manual Booking: ${pkg.name}`,
+              order_id: isCustom ? `C${locationId}-${Date.now().toString().slice(-8)}` : `P${pkg.id}-${Date.now().toString().slice(-8)}`,
+              description: isCustom ? `Manual Booking: ${customTerms.name.trim()}` : `Manual Booking: ${pkg.name}`,
               customer_id: createdCustomerId || undefined,
               payable_id: bookingId,
               payable_type: PAYMENT_TYPE.BOOKING,
@@ -1185,7 +1703,7 @@ const ManualBooking: React.FC = () => {
       console.error('❌ Error creating booking:', error);
 
       const refused = (error as {
-        response?: { status?: number; data?: { code?: string; requires_override?: boolean; conflicts?: string[] } };
+        response?: { status?: number; data?: { code?: string; message?: string; requires_override?: boolean; conflicts?: string[] } };
       })?.response;
 
       // the space is taken: show what it clashes with and ask a manager to approve it
@@ -1202,6 +1720,24 @@ const ManualBooking: React.FC = () => {
 
       if (refused?.status === 422 && refused.data?.code === 'PACKAGE_NOT_BOOKABLE_ONLINE') {
         setToast({ message: 'Your staff login was not accepted, so this was handled as an online booking and refused. Nothing new was booked or charged. Please sign in again and try once more.', type: 'error' });
+        setLoading(false);
+        return;
+      }
+
+      if (refused?.status === 422 && refused.data?.code === 'CUSTOM_PACKAGE_STAFF_ONLY') {
+        setToast({ message: 'Custom packages can only be booked by staff. Please sign in again and try once more.', type: 'error' });
+        setLoading(false);
+        return;
+      }
+
+      if (refused?.status === 422 && refused.data?.code === 'CUSTOM_PRICE_MISMATCH') {
+        const refreshed = await refreshCustomAddOns();
+        setToast({
+          message: refreshed
+            ? 'The price changed since this page was opened, so the latest add-on prices were loaded. Please check the total and try again.'
+            : refused.data.message || 'The total for this custom package changed. Please check the price and try again.',
+          type: 'error',
+        });
         setLoading(false);
         return;
       }
@@ -1316,15 +1852,162 @@ const ManualBooking: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 py-4">
         <div className={`grid gap-4 transition-all duration-500 ${
-          form.packageId 
+          hasSelection 
             ? 'grid-cols-1 lg:grid-cols-3' 
             : 'grid-cols-1'
         }`}>
           
           <div className={`space-y-4 transition-all duration-500 ${
-            form.packageId ? 'lg:col-span-2 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:pr-2' : 'col-span-1'
+            hasSelection ? 'lg:col-span-2 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto lg:pr-2' : 'col-span-1'
           }`}>
             
+            {isCustom ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">{CUSTOM_PACKAGE_LABEL}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Set up a one-time package for this booking</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={leaveCustomPackage}
+                  className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Change
+                </button>
+              </div>
+
+              <div className="mb-3">
+                {canPickCustomLocation ? (
+                  <>
+                    <label htmlFor="custom-package-location" className="block text-xs font-medium text-gray-600 mb-1">Location *</label>
+                    <select
+                      id="custom-package-location"
+                      value={customLocationId ?? ''}
+                      onChange={(e) => setCustomLocationId(e.target.value ? Number(e.target.value) : null)}
+                      required
+                      aria-invalid={customLocationError ? true : undefined}
+                      className={customFieldClass(!!customLocationError)}
+                    >
+                      <option value="" disabled>Select a location</option>
+                      {customLocationOptions.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                    {customLocationError && <p className="text-xs text-red-700 mt-1">{customLocationError}</p>}
+                  </>
+                ) : bookingLocationId ? (
+                  <p className="text-xs text-gray-600">
+                    Location: <span className="font-medium text-gray-900">{customLocationName(bookingLocationId)}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-700">{CUSTOM_PACKAGE_MESSAGES.locationRequired}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                <div className="sm:col-span-3 min-w-0">
+                  <label htmlFor="custom-package-name" className="block text-xs font-medium text-gray-600 mb-1">Booking Name *</label>
+                  <input
+                    id="custom-package-name"
+                    type="text"
+                    value={customTerms.name}
+                    onChange={(e) => updateCustomTerms({ name: e.target.value })}
+                    maxLength={CUSTOM_PACKAGE_LIMITS.nameMaxLength}
+                    placeholder="e.g. Team Outing"
+                    required
+                    aria-invalid={customNameError ? true : undefined}
+                    className={customFieldClass(!!customNameError)}
+                  />
+                  {customNameError && <p className="text-xs text-red-700 mt-1">{customNameError}</p>}
+                </div>
+                <div className="sm:col-span-3 min-w-0">
+                  <label htmlFor="custom-package-category" className="block text-xs font-medium text-gray-600 mb-1">
+                    Category * {categoriesStatus === 'loading' && <span className="text-gray-400">(Loading...)</span>}
+                  </label>
+                  <select
+                    id="custom-package-category"
+                    value={customTerms.category}
+                    onChange={(e) => updateCustomTerms({ category: e.target.value })}
+                    required
+                    aria-invalid={customCategoryError ? true : undefined}
+                    className={customFieldClass(!!customCategoryError)}
+                  >
+                    <option value="" disabled>Select a category</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.name}>{category.name}</option>
+                    ))}
+                  </select>
+                  {categoriesStatus === 'error' && (
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-red-700">{CUSTOM_PACKAGE_MESSAGES.categoriesFailed}</p>
+                      <StandardButton type="button" variant="secondary" size="sm" onClick={() => setCategoriesAttempt(n => n + 1)}>
+                        Retry
+                      </StandardButton>
+                    </div>
+                  )}
+                  {categoriesStatus === 'ready' && categories.length === 0 && (
+                    <p className="text-xs text-amber-700 mt-1">{CUSTOM_PACKAGE_MESSAGES.noCategories}</p>
+                  )}
+                  {customCategoryError && <p className="text-xs text-red-700 mt-1">{customCategoryError}</p>}
+                </div>
+                <div className="sm:col-span-2 min-w-0">
+                  <label htmlFor="custom-package-duration" className="block text-xs font-medium text-gray-600 mb-1">Duration (min) *</label>
+                  <input
+                    id="custom-package-duration"
+                    type="number"
+                    value={customTerms.durationMinutes}
+                    onChange={(e) => updateCustomTerms({ durationMinutes: e.target.value })}
+                    onWheel={blurOnWheel}
+                    min={1}
+                    max={CUSTOM_PACKAGE_LIMITS.durationMaxMinutes}
+                    step={1}
+                    placeholder="e.g. 90"
+                    required
+                    aria-invalid={customDurationError ? true : undefined}
+                    className={customFieldClass(!!customDurationError)}
+                  />
+                  {customDurationError && <p className="text-xs text-red-700 mt-1">{customDurationError}</p>}
+                </div>
+                <div className="sm:col-span-2 min-w-0">
+                  <label htmlFor="custom-package-min-guests" className="block text-xs font-medium text-gray-600 mb-1">Min. Guests</label>
+                  <input
+                    id="custom-package-min-guests"
+                    type="number"
+                    value={customTerms.minGuests}
+                    onChange={(e) => updateCustomTerms({ minGuests: e.target.value })}
+                    onWheel={blurOnWheel}
+                    min={1}
+                    max={CUSTOM_PACKAGE_LIMITS.guestsMax}
+                    step={1}
+                    placeholder="Optional"
+                    aria-invalid={customMinGuestsError ? true : undefined}
+                    className={customFieldClass(!!customMinGuestsError)}
+                  />
+                  {customMinGuestsError && <p className="text-xs text-red-700 mt-1">{customMinGuestsError}</p>}
+                </div>
+                <div className="sm:col-span-2 min-w-0">
+                  <label htmlFor="custom-package-max-guests" className="block text-xs font-medium text-gray-600 mb-1">Max. Guests *</label>
+                  <input
+                    id="custom-package-max-guests"
+                    type="number"
+                    value={customTerms.maxGuests}
+                    onChange={(e) => updateCustomTerms({ maxGuests: e.target.value })}
+                    onWheel={blurOnWheel}
+                    min={1}
+                    max={CUSTOM_PACKAGE_LIMITS.guestsMax}
+                    step={1}
+                    placeholder="e.g. 30"
+                    required
+                    aria-invalid={customMaxGuestsError ? true : undefined}
+                    className={customFieldClass(!!customMaxGuestsError)}
+                  />
+                  {customMaxGuestsError && <p className="text-xs text-red-700 mt-1">{customMaxGuestsError}</p>}
+                </div>
+              </div>
+            </div>
+            ) : (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="mb-4 flex items-center justify-between">
                 <div>
@@ -1352,6 +2035,17 @@ const ManualBooking: React.FC = () => {
                 )}
               </div>
               
+              {!form.packageId && (
+                <button
+                  type="button"
+                  onClick={startCustomPackage}
+                  className="mb-3 w-full text-left border border-gray-200 rounded-lg p-3 transition-all hover:border-gray-300 hover:bg-gray-100 cursor-pointer"
+                >
+                  <span className="block text-sm font-semibold text-gray-900 uppercase">{CUSTOM_PACKAGE_LABEL}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">Create a custom booking package</span>
+                </button>
+              )}
+
               {loadingPackages ? (
                 <div className="flex flex-col items-center justify-center py-8">
                   <div className={`animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-${themeColor}-600`}></div>
@@ -1405,7 +2099,7 @@ const ManualBooking: React.FC = () => {
                               title="Customers cannot see or book this package online. Staff can still book it."
                             >
                               <EyeOff className="w-2.5 h-2.5" aria-hidden="true" />
-                              Backend only
+                              Hidden from booking site
                             </span>
                           )}
                         </div>
@@ -1420,8 +2114,9 @@ const ManualBooking: React.FC = () => {
               </div>
               )}
             </div>
+            )}
 
-            {pkg && (
+            {(pkg || isCustom) && (
               <>
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <div className="mb-4">
@@ -1529,7 +2224,84 @@ const ManualBooking: React.FC = () => {
 
                     <div className="border-t border-gray-100 my-3"></div>
 
-                    {bookingMode === 'standard' ? (
+                    {isCustom ? (
+                      <div>
+                        <h3 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                          Booking Schedule
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="custom-booking-date" className="block text-xs font-medium text-gray-600 mb-1">Date *</label>
+                            <input
+                              id="custom-booking-date"
+                              type="date"
+                              name="bookingDate"
+                              value={form.bookingDate}
+                              onChange={handleInputChange}
+                              min={bookingMode === 'standard' ? customTodayKey : undefined}
+                              required
+                              aria-invalid={customDateError ? true : undefined}
+                              className={customFieldClass(!!customDateError)}
+                            />
+                            <p className={`text-[10px] mt-0.5 ${customDateError ? 'text-red-700' : 'text-gray-500'}`}>
+                              {bookingMode === 'standard' ? 'Today or a future date' : 'Past dates allowed'}
+                            </p>
+                          </div>
+                          <div>
+                            <label htmlFor="custom-booking-time" className="block text-xs font-medium text-gray-600 mb-1">Time *</label>
+                            <input
+                              id="custom-booking-time"
+                              type="time"
+                              name="bookingTime"
+                              value={form.bookingTime}
+                              onChange={handleInputChange}
+                              required
+                              className={customFieldClass(false)}
+                            />
+                            {customClosureWarning && (
+                              <p className="text-[10px] text-amber-700 mt-0.5">{customClosureWarning}</p>
+                            )}
+                          </div>
+                          <div>
+                            <label htmlFor="custom-participants" className="block text-xs font-medium text-gray-600 mb-1">Participants *</label>
+                            <input
+                              id="custom-participants"
+                              type="number"
+                              name="participants"
+                              value={customParticipants}
+                              onChange={(e) => setCustomParticipants(e.target.value)}
+                              onWheel={blurOnWheel}
+                              min={customRange?.min ?? 1}
+                              max={customRange?.max}
+                              step={1}
+                              required
+                              aria-invalid={customParticipantsError ? true : undefined}
+                              className={customFieldClass(!!customParticipantsError)}
+                            />
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {participantsHint(customTerms.minGuests, customTerms.maxGuests)}
+                            </p>
+                            {customParticipantsError && <p className="text-xs text-red-700 mt-1">{customParticipantsError}</p>}
+                          </div>
+                          <div>
+                            <label htmlFor="custom-booking-status" className="block text-xs font-medium text-gray-600 mb-1">Status *</label>
+                            <select
+                              id="custom-booking-status"
+                              name="status"
+                              value={form.status}
+                              onChange={handleInputChange}
+                              className={customFieldClass(false)}
+                            >
+                              <option value="confirmed">Confirmed</option>
+                              <option value="completed">Completed</option>
+                              <option value="checked-in">Checked In</option>
+                              <option value="cancelled">Cancelled</option>
+                              <option value="pending">Pending</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ) : bookingMode === 'standard' ? (
                       <div className="space-y-4">
                         <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
                           Select Date & Time
@@ -1749,7 +2521,78 @@ const ManualBooking: React.FC = () => {
                       </div>
                     )}
 
-                    {bookingMode === 'flexible' && pkg.rooms && pkg.rooms.length > 0 && (
+                    {isCustom && (
+                      <>
+                        <div className="border-t border-gray-100 my-3"></div>
+                        <div>
+                          <h3 className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
+                            Space Selection *
+                          </h3>
+                          {!bookingLocationId ? (
+                            <p className="text-xs text-amber-700">{CUSTOM_PACKAGE_MESSAGES.locationRequired}</p>
+                          ) : customRoomsStatus === 'error' ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-xs text-red-700">Spaces could not be loaded.</p>
+                              <StandardButton type="button" variant="secondary" size="sm" onClick={() => setCustomRoomsAttempt(n => n + 1)}>
+                                Retry
+                              </StandardButton>
+                            </div>
+                          ) : (
+                            <>
+                              {customRoomsStatus === 'loading' && (
+                                <p className="text-xs text-gray-500 mb-2">Loading spaces...</p>
+                              )}
+                              {customRoomsStatus === 'ready' && customRooms.length === 0 && (
+                                <p className="text-xs text-gray-500 mb-2">{CUSTOM_PACKAGE_MESSAGES.noSpaces}</p>
+                              )}
+                              <div className="flex flex-wrap gap-1.5">
+                                {sortRoomsNumerically(customRooms).map((room: Room) => (
+                                  <StandardButton
+                                    type="button"
+                                    key={room.id}
+                                    variant={form.roomId === room.id.toString() ? 'primary' : 'secondary'}
+                                    size="sm"
+                                    onClick={() => toggleCustomRoom(room.id)}
+                                  >
+                                    {room.name}
+                                  </StandardButton>
+                                ))}
+                                <input
+                                  type="text"
+                                  value={newSpaceName}
+                                  onChange={(e) => setNewSpaceName(e.target.value)}
+                                  placeholder="Type new Space name"
+                                  aria-label="New space name"
+                                  disabled={customRoomsStatus !== 'ready'}
+                                  className={`rounded-lg border border-gray-300 px-4 py-2 text-sm bg-white transition-all placeholder:text-gray-400 focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      if (!creatingRoom) handleCreateRoom(newSpaceName);
+                                    }
+                                  }}
+                                />
+                                <StandardButton
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  icon={Plus}
+                                  title="Add a space"
+                                  disabled={creatingRoom || customRoomsStatus !== 'ready'}
+                                  loading={creatingRoom}
+                                  onClick={() => handleCreateRoom(newSpaceName)}
+                                >
+                                  {''}
+                                </StandardButton>
+                              </div>
+                            </>
+                          )}
+                          {customRoomError && <p className="text-xs text-red-700 mt-2">{customRoomError}</p>}
+                        </div>
+                      </>
+                    )}
+
+                    {!isCustom && bookingMode === 'flexible' && pkg.rooms && pkg.rooms.length > 0 && (
                       <>
                         <div className="border-t border-gray-100 my-3"></div>
                         <div>
@@ -1811,7 +2654,200 @@ const ManualBooking: React.FC = () => {
                   </div>
                 </div>
 
-                {((pkg.add_ons && pkg.add_ons.length > 0) || (pkg.attractions && pkg.attractions.length > 0)) && (
+                {isCustom && (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h2 className="text-base font-semibold text-gray-900">Add-ons & Attractions</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Optional extras</p>
+                      </div>
+                      <StandardButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={addOneTimeAddOn}
+                        disabled={customTerms.oneTimeAddOns.length >= CUSTOM_PACKAGE_LIMITS.oneTimeAddOnsMax}
+                      >
+                        + Add One-Time Add-on
+                      </StandardButton>
+                    </div>
+
+                    {customTerms.oneTimeAddOns.length > 0 && (
+                      <div className="mb-3 p-2 rounded-lg border border-gray-200 bg-gray-50">
+                        <p className="text-xs text-gray-500 mb-2">These add-ons apply only to this booking.</p>
+                        <div className="space-y-2">
+                          {customTerms.oneTimeAddOns.map((line, index) => {
+                            const nameError = customErrorText(oneTimeAddOnErrorKey(index, 'name'), line.name);
+                            const quantityError = customErrorText(oneTimeAddOnErrorKey(index, 'quantity'), line.quantity);
+                            const unitPriceError = customErrorText(oneTimeAddOnErrorKey(index, 'unitPrice'), line.unitPrice);
+                            const lineErrors = [nameError, quantityError, unitPriceError].filter((message): message is string => !!message);
+                            return (
+                              <div key={line.rowKey}>
+                                <div className="grid grid-cols-12 items-end gap-2">
+                                  <label className="col-span-12 sm:col-span-6 min-w-0">
+                                    <span className="block text-xs font-medium text-gray-600 mb-1">Add-on Name</span>
+                                    <input
+                                      type="text"
+                                      value={line.name}
+                                      onChange={(e) => updateOneTimeAddOn(line.rowKey, { name: e.target.value })}
+                                      maxLength={CUSTOM_PACKAGE_LIMITS.lineNameMaxLength}
+                                      placeholder="e.g. Glow Bracelets"
+                                      required
+                                      aria-invalid={nameError ? true : undefined}
+                                      className={customFieldClass(!!nameError)}
+                                    />
+                                  </label>
+                                  <label className="col-span-4 sm:col-span-2 min-w-0">
+                                    <span className="block text-xs font-medium text-gray-600 mb-1">Qty.</span>
+                                    <input
+                                      type="number"
+                                      value={line.quantity}
+                                      onChange={(e) => updateOneTimeAddOn(line.rowKey, { quantity: e.target.value })}
+                                      onWheel={blurOnWheel}
+                                      min={1}
+                                      max={CUSTOM_PACKAGE_LIMITS.oneTimeQuantityMax}
+                                      step={1}
+                                      required
+                                      aria-invalid={quantityError ? true : undefined}
+                                      className={customFieldClass(!!quantityError)}
+                                    />
+                                  </label>
+                                  <label className="col-span-6 sm:col-span-3 min-w-0">
+                                    <span className="block text-xs font-medium text-gray-600 mb-1">Unit Price</span>
+                                    <span className="relative block">
+                                      <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={line.unitPrice}
+                                        onChange={(e) => updateOneTimeAddOn(line.rowKey, { unitPrice: e.target.value })}
+                                        onWheel={blurOnWheel}
+                                        min={0}
+                                        max={CUSTOM_PACKAGE_LIMITS.priceMax}
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        required
+                                        aria-invalid={unitPriceError ? true : undefined}
+                                        className={customFieldClass(!!unitPriceError, 'pl-7 pr-3')}
+                                      />
+                                    </span>
+                                  </label>
+                                  <div className="col-span-2 sm:col-span-1 flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeOneTimeAddOn(line.rowKey)}
+                                      title="Remove add-on"
+                                      aria-label="Remove add-on"
+                                      className={customRemoveButtonClass}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                </div>
+                                {lineErrors.length > 0 && (
+                                  <p className="text-xs text-red-700 mt-1">{lineErrors.join(' ')}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {customAddOnsStatus === 'loading' && (
+                      <p className="text-xs text-gray-500">Loading add-ons...</p>
+                    )}
+                    {customAddOnsStatus === 'error' && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs text-red-700">Add-ons could not be loaded.</p>
+                        <StandardButton type="button" variant="secondary" size="sm" onClick={() => setCustomAddOnsAttempt(n => n + 1)}>
+                          Retry
+                        </StandardButton>
+                      </div>
+                    )}
+                    {customAddOnsStatus === 'ready' && customAddOns.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {customAddOns.map((addOn) => {
+                          const quantity = customAddOnQuantities[addOn.id] || 0;
+                          const isSelected = quantity > 0;
+                          const maxQty = addOn.max_quantity ?? CUSTOM_PACKAGE_LIMITS.catalogQuantityMax;
+                          const minQty = getAddOnMinQuantity(addOn, null);
+                          const quantityError = customErrors[catalogErrorKey(addOn.id)];
+
+                          return (
+                            <div
+                              key={addOn.id}
+                              className={`rounded-lg overflow-hidden border transition-all ${
+                                isSelected
+                                  ? `border-${themeColor}-500 bg-${themeColor}-50`
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              {addOn.image && (
+                                <img
+                                  src={getImageUrl(addOn.image)}
+                                  alt={addOn.name}
+                                  className="w-full h-16 object-cover"
+                                />
+                              )}
+                              <div className="p-2">
+                                <h4 className="font-medium text-xs text-gray-900 line-clamp-1">{addOn.name}</h4>
+                                <div className="flex items-baseline gap-1">
+                                  <span className={`text-sm font-bold text-${themeColor}-600`}>{formatMoney(toCents(addOn.price))}</span>
+                                  <span className="text-[10px] text-gray-500">/unit</span>
+                                </div>
+                                {minQty > 1 && (
+                                  <p className="text-[10px] mb-1 text-gray-400">Min {minQty}</p>
+                                )}
+
+                                <div className="flex items-center gap-1">
+                                  <StandardButton
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={Minus}
+                                    onClick={() => changeCustomAddOnQuantity(addOn, current => current - 1)}
+                                    disabled={!isSelected}
+                                  >
+                                    {''}
+                                  </StandardButton>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={maxQty}
+                                    value={quantity}
+                                    onChange={(e) => {
+                                      const requested = parseInt(e.target.value) || 0;
+                                      changeCustomAddOnQuantity(addOn, () => requested);
+                                    }}
+                                    onWheel={blurOnWheel}
+                                    aria-label={`Quantity for ${addOn.name}`}
+                                    className="w-14 text-center font-bold text-sm text-gray-900 border border-gray-300 rounded px-1 py-1"
+                                  />
+                                  <StandardButton
+                                    type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    icon={Plus}
+                                    onClick={() => changeCustomAddOnQuantity(addOn, current => current + 1)}
+                                    disabled={quantity >= maxQty}
+                                  >
+                                    {''}
+                                  </StandardButton>
+                                </div>
+                                {quantityError && (
+                                  <p className="text-[10px] text-red-700 mt-1">{quantityError}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isCustom && ((pkg.add_ons && pkg.add_ons.length > 0) || (pkg.attractions && pkg.attractions.length > 0)) && (
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                     <div className="mb-3">
                       <h2 className="text-base font-semibold text-gray-900">Add-ons & Attractions</h2>
@@ -1987,9 +3023,31 @@ const ManualBooking: React.FC = () => {
             )}
           </div>
 
-          {form.packageId && (
+          {hasSelection && (
             <div className="lg:col-span-1 transition-all duration-500 lg:sticky lg:top-20 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
               <div className="space-y-4">
+
+              {isCustom && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg border bg-${themeColor}-50 border-${themeColor}-200 text-${themeColor}-600`}
+                      aria-hidden="true"
+                    >
+                      <Package className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm text-gray-900 truncate" title={customSummaryName}>{customSummaryName}</h3>
+                      <div className="flex flex-col gap-1 mt-2">
+                        <span className="text-sm text-gray-500">{customTerms.category || 'Choose a category'}</span>
+                        {customDurationText && <span className="text-sm text-gray-500">{customDurationText}</span>}
+                        {customCapacityText && <span className="text-sm text-gray-500">{customCapacityText}</span>}
+                        {customEndText && <span className="text-sm text-gray-500">{customEndText}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {pkg && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -2006,7 +3064,7 @@ const ManualBooking: React.FC = () => {
                       {pkg.available_online === false && (
                         <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium amber-tone bg-amber-100 text-amber-800">
                           <EyeOff className="w-2.5 h-2.5" aria-hidden="true" />
-                          Backend only
+                          Hidden from booking site
                         </span>
                       )}
                       <div className="flex flex-col gap-1 mt-2">
@@ -2018,10 +3076,179 @@ const ManualBooking: React.FC = () => {
                 </div>
               )}
 
-              {pkg && (
+              {(pkg || isCustom) && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4">Payment Details</h3>
                   <div className="space-y-4">
+                    {isCustom ? (
+                    <>
+                    <div className="space-y-3">
+                      <div>
+                        <label htmlFor="custom-package-pricing" className="block text-xs font-medium text-gray-600 mb-1">Pricing</label>
+                        <select
+                          id="custom-package-pricing"
+                          value={customTerms.pricingType}
+                          onChange={(e) => updateCustomTerms({ pricingType: e.target.value === 'per_guest' ? 'per_guest' : 'per_booking' })}
+                          className={customFieldClass(false)}
+                        >
+                          <option value="per_booking">{pricingTypeLabel('per_booking')}</option>
+                          <option value="per_guest">{pricingTypeLabel('per_guest')}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="custom-package-price" className="block text-xs font-medium text-gray-600 mb-1">
+                          {priceFieldLabel(customTerms.pricingType)} *
+                        </label>
+                        <div className="relative">
+                          <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                          <input
+                            id="custom-package-price"
+                            type="number"
+                            inputMode="decimal"
+                            value={customTerms.price}
+                            onChange={(e) => updateCustomTerms({ price: e.target.value })}
+                            onWheel={blurOnWheel}
+                            min={0}
+                            max={CUSTOM_PACKAGE_LIMITS.priceMax}
+                            step="0.01"
+                            placeholder="0.00"
+                            required
+                            aria-invalid={customPriceError ? true : undefined}
+                            className={customFieldClass(!!customPriceError, 'pl-7 pr-3')}
+                          />
+                        </div>
+                        {customTerms.pricingType === 'per_guest' && (
+                          <p className="text-xs text-gray-500 mt-1">Uses the participant count.</p>
+                        )}
+                        {customPriceError && <p className="text-xs text-red-700 mt-1">{customPriceError}</p>}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-gray-700">Fees</span>
+                        <StandardButton
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={addCustomFee}
+                          disabled={customTerms.fees.length >= CUSTOM_PACKAGE_LIMITS.feesMax}
+                        >
+                          + Add Fee
+                        </StandardButton>
+                      </div>
+                      {customTerms.fees.map((fee, index) => {
+                        const isPercent = fee.type === 'percent';
+                        const nameError = customErrorText(feeErrorKey(index, 'name'), fee.name);
+                        const amountError = customErrorText(feeErrorKey(index, 'amount'), fee.amount);
+                        const feeErrors = [nameError, amountError].filter((message): message is string => !!message);
+                        return (
+                          <div key={fee.rowKey} className="p-2 rounded-lg border border-gray-200 bg-gray-50 space-y-2">
+                            <div className="flex items-end gap-2">
+                              <label className="flex-1 min-w-0">
+                                <span className="block text-xs font-medium text-gray-600 mb-1">Fee Name</span>
+                                <input
+                                  type="text"
+                                  value={fee.name}
+                                  onChange={(e) => updateCustomFee(fee.rowKey, { name: e.target.value })}
+                                  maxLength={CUSTOM_PACKAGE_LIMITS.lineNameMaxLength}
+                                  placeholder="e.g. Venue Fee"
+                                  required
+                                  aria-invalid={nameError ? true : undefined}
+                                  className={customFieldClass(!!nameError)}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => removeCustomFee(fee.rowKey)}
+                                title="Remove fee"
+                                aria-label="Remove fee"
+                                className={customRemoveButtonClass}
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="min-w-0">
+                                <span className="block text-xs font-medium text-gray-600 mb-1">Fee Type</span>
+                                <select
+                                  value={fee.type}
+                                  onChange={(e) => updateCustomFee(fee.rowKey, { type: e.target.value === 'percent' ? 'percent' : 'flat' })}
+                                  className={customFieldClass(false)}
+                                >
+                                  <option value="flat">Flat fee</option>
+                                  <option value="percent">Percent</option>
+                                </select>
+                              </label>
+                              <label className="min-w-0">
+                                <span className="block text-xs font-medium text-gray-600 mb-1">{isPercent ? 'Rate (%)' : 'Amount'}</span>
+                                <span className="relative block">
+                                  <span
+                                    aria-hidden="true"
+                                    className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm text-gray-500 ${isPercent ? 'right-3' : 'left-3'}`}
+                                  >
+                                    {isPercent ? '%' : '$'}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={fee.amount}
+                                    onChange={(e) => updateCustomFee(fee.rowKey, { amount: e.target.value })}
+                                    onWheel={blurOnWheel}
+                                    min={0}
+                                    max={isPercent ? CUSTOM_PACKAGE_LIMITS.percentMax : CUSTOM_PACKAGE_LIMITS.priceMax}
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    required
+                                    aria-invalid={amountError ? true : undefined}
+                                    className={customFieldClass(!!amountError, isPercent ? 'pl-3 pr-7' : 'pl-7 pr-3')}
+                                  />
+                                </span>
+                              </label>
+                            </div>
+                            {feeErrors.length > 0 && (
+                              <p className="text-xs text-red-700">{feeErrors.join(' ')}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {customTerms.fees.length > 0 && (
+                        <p className="text-xs text-gray-500">Percentage fees use the package and add-ons subtotal.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between gap-2 text-gray-700">
+                        <span>{customHasPackagePrice ? packageLineLabel(customTerms.pricingType, customParticipants, customTerms.price) : 'Package'}</span>
+                        <span className="font-medium whitespace-nowrap">{customHasPackagePrice ? formatMoney(customQuote.packageCents) : '—'}</span>
+                      </div>
+                      {customHasAddOnLines && (
+                        <div className="flex justify-between gap-2 text-gray-700">
+                          <span>Add-ons</span>
+                          <span className="font-medium whitespace-nowrap">{formatMoney(customQuote.catalogCents + customQuote.oneTimeCents)}</span>
+                        </div>
+                      )}
+                      {customQuote.fees.map((fee, index) => {
+                        const source = customTerms.fees[index];
+                        if (!source || source.amount.trim() === '') return null;
+                        return (
+                          <div key={source.rowKey} className="flex justify-between gap-2 text-gray-500">
+                            <span>{feeLineLabel(fee) || 'Fee'}</span>
+                            <span className="whitespace-nowrap">+{formatMoney(fee.cents)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-3`}>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">Total</span>
+                        <span className={`text-xl font-bold text-${fullColor}`}>
+                          {customHasEstimate ? formatMoney(customQuote.totalCents) : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    {customTotalError && <p className="text-xs text-red-700">{customTotalError}</p>}
+                    </>
+                    ) : (
+                    <>
                     <div className="space-y-1.5 text-xs">
                       {pkg.pricing_type === 'per_person' ? (
                         <div className="flex justify-between text-gray-600">
@@ -2107,6 +3334,8 @@ const ManualBooking: React.FC = () => {
                         ).toFixed(2)}</span>
                       </div>
                     </div>
+                    </>
+                    )}
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-2">Payment Method</label>
@@ -2140,7 +3369,9 @@ const ManualBooking: React.FC = () => {
 
                     {form.paymentMethod === 'authorize.net' && (
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        {!authorizeApiLoginId ? (
+                        {isCustom && !bookingLocationId ? (
+                          <p className="text-xs text-amber-700">{CUSTOM_PACKAGE_MESSAGES.locationRequired}</p>
+                        ) : !authorizeApiLoginId ? (
                           <p className="text-xs text-red-700">
                             Card payments are not configured for this location. Connect an Authorize.Net account in Settings, or choose another payment method.
                           </p>
@@ -2221,6 +3452,18 @@ const ManualBooking: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Total Amount</label>
+                        {isCustom ? (
+                        <input
+                          type="number"
+                          name="totalAmount"
+                          value={customHasEstimate ? customTotal.toFixed(2) : ''}
+                          readOnly
+                          aria-readonly="true"
+                          onWheel={blurOnWheel}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:border-transparent"
+                        />
+                        ) : (
                         <input
                           type="number"
                           name="totalAmount"
@@ -2236,6 +3479,7 @@ const ManualBooking: React.FC = () => {
                           ).toFixed(2)}`}
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                         />
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Amount Paid</label>
@@ -2250,6 +3494,9 @@ const ManualBooking: React.FC = () => {
                           placeholder="Auto"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                         />
+                        {isCustom && customAmountPaidError && (
+                          <p className="text-xs text-red-700 mt-1">{customAmountPaidError}</p>
+                        )}
                       </div>
                     </div>
 
@@ -2260,7 +3507,7 @@ const ManualBooking: React.FC = () => {
                           const feeTotalForStatus = feeBreakdown 
                             ? feeBreakdown.total - (specialPricingBreakdown?.total_discount || 0)
                             : (form.totalAmount ? Number(form.totalAmount) : calculateTotal() - (specialPricingBreakdown?.total_discount || 0));
-                          const calculatedTotal = form.totalAmount ? Number(form.totalAmount) : feeTotalForStatus;
+                          const calculatedTotal = isCustom ? customTotal : (form.totalAmount ? Number(form.totalAmount) : feeTotalForStatus);
                           const amountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : calculatedTotal);
                           const status = derivePaymentStatus(amountPaid, calculatedTotal);
                           const statusColors: Record<string, string> = {
@@ -2289,7 +3536,7 @@ const ManualBooking: React.FC = () => {
                       />
                     </div>
 
-                    {pkg?.has_guest_of_honor && (
+                    {(isCustom || pkg?.has_guest_of_honor) && (
                       <div className="border-t border-gray-100 pt-4">
                         <h4 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Guest of Honor</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2338,7 +3585,7 @@ const ManualBooking: React.FC = () => {
                 </div>
               )}
 
-              {pkg && (
+              {(pkg || isCustom) && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <h4 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Notifications</h4>
                   <div className="space-y-3">
@@ -2362,7 +3609,7 @@ const ManualBooking: React.FC = () => {
                     </label>
                   </div>
                   
-                  {(customFields.length > 0 || customFieldsUnavailable) && (
+                  {!isCustom && (customFields.length > 0 || customFieldsUnavailable) && (
                     <div className="mt-4 p-3 border border-gray-200 rounded-lg">
                       <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Before you continue</p>
                       <CustomFieldChecks
@@ -2385,7 +3632,9 @@ const ManualBooking: React.FC = () => {
                       type="submit"
                       variant="primary"
                       icon={Save}
-                      disabled={loading || specialChecking || specialCheckFailed || !form.packageId || !form.bookingDate || !form.bookingTime || firstMissingRequired(customFields, customFieldAnswers) !== null}
+                      disabled={loading || (isCustom
+                        ? (!bookingLocationId || !form.bookingDate || !form.bookingTime)
+                        : (specialChecking || specialCheckFailed || !form.packageId || !form.bookingDate || !form.bookingTime || firstMissingRequired(customFields, customFieldAnswers) !== null))}
                       loading={loading}
                       fullWidth
                       size="md"
@@ -2429,7 +3678,7 @@ const ManualBooking: React.FC = () => {
         <OverlapOverrideDialog
           conflicts={overrideGate.conflicts}
           onlineSlotsLost={overrideGate.onlineSlotsLost}
-          locationId={pkg?.location_id ?? effectiveLocationId ?? null}
+          locationId={bookingLocationId}
           onCancel={() => setOverrideGate(null)}
           onConfirm={() => setOverrideGate(null)}
           onApproved={(token, approvedBy) => {

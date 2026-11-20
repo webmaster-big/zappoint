@@ -66,6 +66,20 @@ import { toCsv } from '../../../components/admin/table';
 import InternalNotesLog from '../../../components/admin/bookings/InternalNotesLog';
 import Toast from '../../../components/ui/Toast';
 import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import {
+  CUSTOM_PACKAGE_LABEL,
+  CUSTOM_PACKAGE_LIMITS,
+  CUSTOM_PACKAGE_MESSAGES,
+  bookingCategoryOf,
+  bookingDisplayName,
+  customTermsOf,
+  formatMoney,
+  isCustomBooking,
+  oneTimeAddOnsOf,
+  toCents,
+  type CustomBookingSource,
+} from '../../../utils/customBooking';
 
 const formatTime12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -90,6 +104,22 @@ const columnKeyAtPointFromDom = (x: number, y: number): string | null => {
 
 const BOOKINGS_VIEW_STATE_KEY = 'bookings_view_state';
 
+const CUSTOM_PACKAGE_FILTER = 'custom';
+const CUSTOM_REPORT_PACKAGE_ID = -1;
+
+const customRowFields = (booking: CustomBookingSource): Pick<BookingsPageBooking, 'isCustom' | 'customTerms' | 'oneTimeAddOns'> =>
+  isCustomBooking(booking)
+    ? { isCustom: true, customTerms: customTermsOf(booking), oneTimeAddOns: oneTimeAddOnsOf(booking) }
+    : {};
+
+const storedDurationMinutes = (duration: unknown, unit: unknown): number => {
+  const value = Number(duration);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (unit === 'minutes') return Math.round(value);
+  if (unit === 'hours') return Math.round(value * 60);
+  return Math.floor(value) * 60 + Math.round((value % 1) * 60);
+};
+
 const filterSignature = (value: BookingsPageFilterOptions): string =>
   JSON.stringify([value.status, value.payment, value.packageId, value.roomId, value.customerId, value.category, value.search, value.dateRange?.start, value.dateRange?.end]);
 
@@ -103,7 +133,7 @@ const Bookings: React.FC = () => {
     return {
       id: booking.id.toString(),
       type: 'package',
-      packageName: booking.package?.name || 'N/A',
+      packageName: bookingDisplayName(booking, 'N/A'),
       packageId: booking.package_id,
       room: booking.room?.name || 'N/A',
       roomId: booking.room_id,
@@ -134,8 +164,8 @@ const Bookings: React.FC = () => {
       duration: booking.duration && booking.duration_unit
         ? formatDurationDisplay(booking.duration, booking.duration_unit)
         : '2 hours',
-      activity: normalizeCategory(booking.package?.category) || 'Package Booking',
-      category: normalizeCategory(booking.package?.display_label || booking.package?.category),
+      activity: (isCustomBooking(booking) ? bookingCategoryOf(booking) : normalizeCategory(booking.package?.category)) || 'Package Booking',
+      category: isCustomBooking(booking) ? bookingCategoryOf(booking) : normalizeCategory(booking.package?.display_label || booking.package?.category),
       notes: booking.notes,
       specialRequests: booking.special_requests,
       referenceNumber: booking.reference_number,
@@ -153,6 +183,7 @@ const Bookings: React.FC = () => {
       guestCountry: booking.guest_country || booking.customer?.country,
       internal_notes: booking.internal_notes,
       appliedFees: booking.applied_fees || null,
+      ...customRowFields(booking),
     };
   };
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
@@ -731,6 +762,11 @@ const Bookings: React.FC = () => {
     }
   }, [filters, currentPage]);
 
+  const matchesPackageFilter = (booking: BookingsPageBooking): boolean =>
+    filters.packageId === CUSTOM_PACKAGE_FILTER
+      ? booking.isCustom === true
+      : booking.packageId?.toString() === filters.packageId;
+
   const applyFilters = async () => {
     const currentVersion = ++filterVersionRef.current;
 
@@ -746,7 +782,7 @@ const Bookings: React.FC = () => {
             return {
               id: booking.id.toString(),
               type: 'package' as const,
-              packageName: booking.package?.name || 'N/A',
+              packageName: bookingDisplayName(booking, 'N/A'),
               packageId: booking.package_id,
               room: booking.room?.name || 'N/A',
               roomId: booking.room_id,
@@ -779,14 +815,15 @@ const Bookings: React.FC = () => {
               duration: booking.duration && booking.duration_unit 
                 ? formatDurationDisplay(booking.duration, booking.duration_unit)
                 : '2 hours',
-              activity: normalizeCategory(booking.package?.category) || 'Package Booking',
-              category: normalizeCategory(booking.package?.display_label || booking.package?.category),
+              activity: (isCustomBooking(booking) ? bookingCategoryOf(booking) : normalizeCategory(booking.package?.category)) || 'Package Booking',
+              category: isCustomBooking(booking) ? bookingCategoryOf(booking) : normalizeCategory(booking.package?.display_label || booking.package?.category),
               notes: booking.notes,
               referenceNumber: booking.reference_number,
               location: booking.location?.name || 'N/A',
               locationId: booking.location_id,
               internal_notes: booking.internal_notes,
               appliedFees: booking.applied_fees || null,
+              ...customRowFields(booking),
             };
           });
           
@@ -799,7 +836,7 @@ const Bookings: React.FC = () => {
             result = result.filter(booking => booking.paymentMethod === filters.payment);
           }
           if (filters.packageId !== 'all') {
-            result = result.filter(booking => booking.packageId?.toString() === filters.packageId);
+            result = result.filter(matchesPackageFilter);
           }
           if (filters.roomId !== 'all') {
             result = result.filter(booking => booking.roomId?.toString() === filters.roomId);
@@ -858,7 +895,7 @@ const Bookings: React.FC = () => {
     }
     
     if (filters.packageId !== 'all') {
-      result = result.filter(booking => booking.packageId?.toString() === filters.packageId);
+      result = result.filter(matchesPackageFilter);
     }
     
     if (filters.roomId !== 'all') {
@@ -969,8 +1006,8 @@ const Bookings: React.FC = () => {
         case 'totalAmount':
           return (a.totalAmount - b.totalAmount) * dir;
         case 'fees':
-          const aFees = (a.appliedFees || []).reduce((s, f) => s + f.fee_amount, 0);
-          const bFees = (b.appliedFees || []).reduce((s, f) => s + f.fee_amount, 0);
+          const aFees = (a.appliedFees || []).reduce((s, f) => s + (Number(f.fee_amount) || 0), 0);
+          const bFees = (b.appliedFees || []).reduce((s, f) => s + (Number(f.fee_amount) || 0), 0);
           return (aFees - bFees) * dir;
         case 'createdAt':
           return (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()) * dir;
@@ -992,6 +1029,8 @@ const Bookings: React.FC = () => {
       .sort((a, b) => (a[0] === 'Uncategorized' ? 1 : b[0] === 'Uncategorized' ? -1 : a[0].localeCompare(b[0])))
       .map(([value, count]) => ({ value, label: value, count }));
   }, [bookings]);
+
+  const hasCustomBookings = useMemo(() => bookings.some(booking => booking.isCustom === true), [bookings]);
 
   const handleFilterChange = (key: keyof BookingsPageFilterOptions, value: string) => {
     setFilters(prev => ({
@@ -1131,6 +1170,10 @@ const Bookings: React.FC = () => {
   };
 
   const handleOpenPackageModal = async (booking: BookingsPageBooking) => {
+    if (booking.isCustom) {
+      navigate(`/bookings/edit/${booking.id}?from=bookings`);
+      return;
+    }
     setSelectedBookingForEdit(booking);
     setShowPackageModal(true);
     setLoadingPackages(true);
@@ -1185,7 +1228,7 @@ const Bookings: React.FC = () => {
   };
 
   const handleSelectPackage = async (pkg: PackageType) => {
-    if (!selectedBookingForEdit) return;
+    if (!selectedBookingForEdit || selectedBookingForEdit.isCustom) return;
     
     setSavingPackage(true);
     try {
@@ -1321,10 +1364,23 @@ const Bookings: React.FC = () => {
     }
   };
 
-  const handleOpenDurationModal = (booking: BookingsPageBooking) => {
+  const handleOpenDurationModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForEdit(booking);
+    let storedMinutes = booking.customTerms?.durationMinutes ?? 0;
+    if (storedMinutes <= 0) {
+      try {
+        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+        storedMinutes = cachedBooking ? storedDurationMinutes(cachedBooking.duration, cachedBooking.duration_unit) : 0;
+      } catch {
+        storedMinutes = 0;
+      }
+    }
     const durationMatch = booking.duration?.match(/(\d+)\s*(hour|minute|hr|min)/i);
-    if (durationMatch) {
+    if (storedMinutes > 0) {
+      const wholeHours = storedMinutes % 60 === 0;
+      setDurationValue(wholeHours ? storedMinutes / 60 : storedMinutes);
+      setDurationUnit(wholeHours ? 'hours' : 'minutes');
+    } else if (durationMatch) {
       setDurationValue(parseInt(durationMatch[1], 10));
       setDurationUnit(durationMatch[2].toLowerCase().startsWith('min') ? 'minutes' : 'hours');
     } else {
@@ -1343,13 +1399,24 @@ const Bookings: React.FC = () => {
 
   const handleSaveDuration = async () => {
     if (!selectedBookingForEdit) return;
+
+    const customMinutes = durationUnit === 'hours' ? durationValue * 60 : durationValue;
+    if (
+      selectedBookingForEdit.isCustom &&
+      (!Number.isInteger(customMinutes) || customMinutes < 1 || customMinutes > CUSTOM_PACKAGE_LIMITS.durationMaxMinutes)
+    ) {
+      alert(CUSTOM_PACKAGE_MESSAGES.durationInvalid);
+      return;
+    }
     
     setSavingDuration(true);
     try {
-      const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
-        duration: durationValue,
-        duration_unit: durationUnit
-      });
+      const response = await bookingService.updateBooking(
+        Number(selectedBookingForEdit.id),
+        selectedBookingForEdit.isCustom
+          ? { duration: customMinutes, duration_unit: 'minutes' }
+          : { duration: durationValue, duration_unit: durationUnit }
+      );
       
       if (response.success || response.data) {
         if (response.data) {
@@ -1366,7 +1433,11 @@ const Bookings: React.FC = () => {
         setBookings(prev =>
           prev.map(b => 
             b.id === selectedBookingForEdit.id 
-              ? { ...b, duration: formattedDuration }
+              ? {
+                  ...b,
+                  duration: formattedDuration,
+                  ...(b.customTerms ? { customTerms: { ...b.customTerms, durationMinutes: customMinutes } } : {}),
+                }
               : b
           )
         );
@@ -1730,7 +1801,7 @@ const Bookings: React.FC = () => {
         setLocationConflicts(axiosError.response.data?.conflicts || []);
       } else {
         console.error('Error updating location:', error);
-        alert('Failed to update location. Please try again.');
+        alert(bookingUpdateError(error, 'Failed to update location. Please try again.'));
       }
     } finally {
       setSavingLocation(false);
@@ -1784,7 +1855,7 @@ const Bookings: React.FC = () => {
       const params = new URLSearchParams();
       
       if (Array.isArray(reportFilters.packageIds)) {
-        params.append('package_ids', reportFilters.packageIds.join(','));
+        params.append('package_ids', reportFilters.packageIds.map(id => (id === CUSTOM_REPORT_PACKAGE_ID ? CUSTOM_PACKAGE_FILTER : String(id))).join(','));
       } else {
         params.append('package_ids', reportFilters.packageIds);
       }
@@ -1883,9 +1954,14 @@ const Bookings: React.FC = () => {
     return months[month - 1] || '';
   };
 
+  const reportPackageOptions = [
+    ...reportPackages.map(pkg => ({ id: pkg.id, name: pkg.name })),
+    { id: CUSTOM_REPORT_PACKAGE_ID, name: CUSTOM_PACKAGE_LABEL },
+  ];
+
   const toggleReportPackage = (packageId: number) => {
     if (reportFilters.packageIds === 'all') {
-      const allOtherIds = reportPackages.filter(pkg => pkg.id !== packageId).map(pkg => pkg.id);
+      const allOtherIds = reportPackageOptions.filter(pkg => pkg.id !== packageId).map(pkg => pkg.id);
       setReportFilters(prev => ({ 
         ...prev, 
         packageIds: allOtherIds.length === 0 ? 'all' : allOtherIds 
@@ -1899,7 +1975,7 @@ const Bookings: React.FC = () => {
         }));
       } else {
         const newIds = [...reportFilters.packageIds, packageId];
-        const allSelected = reportPackages.every(pkg => newIds.includes(pkg.id));
+        const allSelected = reportPackageOptions.every(pkg => newIds.includes(pkg.id));
         setReportFilters(prev => ({ 
           ...prev, 
           packageIds: allSelected ? 'all' : newIds 
@@ -2001,6 +2077,13 @@ const Bookings: React.FC = () => {
         });
         if (!quoteRes.success || !quoteRes.data) {
           alert('Could not reprice this booking. The participant count was not changed.');
+          setSavingCell(null);
+          setEditingCell(null);
+          setEditValue('');
+          return;
+        }
+        if (quoteRes.data.participants_error) {
+          alert(quoteRes.data.participants_error);
           setSavingCell(null);
           setEditingCell(null);
           setEditValue('');
@@ -2223,10 +2306,11 @@ const Bookings: React.FC = () => {
               <div 
                 className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
                 onClick={() => handleOpenPackageModal(booking)}
-                title="Click to change package"
+                title={booking.isCustom ? 'Click to edit this custom package' : 'Click to change package'}
               >
                 <Package className="w-3 h-3 text-gray-400 mr-1" />
                 <span>{booking.packageName}</span>
+                {booking.isCustom && <CustomPackageBadge className="flex-shrink-0" />}
                 <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
               </div>
             )}
@@ -2360,9 +2444,9 @@ const Bookings: React.FC = () => {
             </td>
           );
         }
-        const feesTotal = fees.reduce((sum, f) => sum + f.fee_amount, 0);
+        const feesTotal = fees.reduce((sum, f) => sum + (Number(f.fee_amount) || 0), 0);
         return (
-          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900" title={fees.map(f => `${f.fee_name}: $${f.fee_amount.toFixed(2)} (${f.fee_application_type})`).join(', ')}>
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900" title={fees.map(f => `${f.fee_name}: $${(Number(f.fee_amount) || 0).toFixed(2)} (${booking.isCustom && f.fee_label ? f.fee_label : f.fee_application_type})`).join(', ')}>
             <span className="underline decoration-dotted cursor-help">${feesTotal.toFixed(2)}</span>
           </td>
         );
@@ -2870,7 +2954,7 @@ const Bookings: React.FC = () => {
       booking.guest_state || '',
       booking.guest_zip || '',
       booking.guest_country || '',
-      booking.package?.name || '',
+      bookingDisplayName(booking, ''),
       booking.room?.name || '',
       booking.location?.name || '',
       formatDateCell(booking.booking_date),
@@ -2888,7 +2972,10 @@ const Bookings: React.FC = () => {
       (Array.isArray(booking.applied_fees) ? booking.applied_fees : [])
         .map((f: any) => `${f.fee_name}: ${f.fee_amount}`).join('; '),
       booking.attractions?.map((a: any) => `${a.name} (${a.pivot?.quantity || 1})`).join('; ') || '',
-      booking.add_ons?.map((a: any) => `${a.name} (${a.pivot?.quantity || 1})`).join('; ') || '',
+      [
+        ...(booking.add_ons?.map((a: any) => `${a.name} (${a.pivot?.quantity || 1})`) || []),
+        ...oneTimeAddOnsOf(booking).map(line => `${line.name} (${line.quantity} × ${formatMoney(toCents(line.unitPrice))})`),
+      ].join('; '),
       booking.guest_of_honor_name || '',
       booking.guest_of_honor_age ?? '',
       booking.guest_of_honor_gender || '',
@@ -3243,7 +3330,8 @@ const Bookings: React.FC = () => {
             if (filters.category !== 'all') chips.push({ label: `Category: ${normalizeCategory(filters.category)}`, onClear: () => handleFilterChange('category', 'all') });
             if (filters.packageId !== 'all') {
               const pkg = filterPackages.find(p => p.id.toString() === filters.packageId);
-              chips.push({ label: `Package: ${pkg?.name || filters.packageId}`, onClear: () => handleFilterChange('packageId', 'all') });
+              const packageLabel = filters.packageId === CUSTOM_PACKAGE_FILTER ? CUSTOM_PACKAGE_LABEL : pkg?.name || filters.packageId;
+              chips.push({ label: `Package: ${packageLabel}`, onClear: () => handleFilterChange('packageId', 'all') });
             }
             if (filters.roomId !== 'all') {
               const room = filterRooms.find(r => r.id.toString() === filters.roomId);
@@ -3336,6 +3424,9 @@ const Bookings: React.FC = () => {
                     className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   >
                     <option value="">All Packages</option>
+                    {(hasCustomBookings || filters.packageId === CUSTOM_PACKAGE_FILTER) && (
+                      <option value={CUSTOM_PACKAGE_FILTER}>{CUSTOM_PACKAGE_LABEL}</option>
+                    )}
                     {filterPackages.map(pkg => (
                       <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
                     ))}
@@ -3690,6 +3781,7 @@ const Bookings: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-gray-900">
                               {booking.packageName}
+                              {booking.isCustom && <CustomPackageBadge className="ml-1.5 align-middle" />}
                             </td>
                             <td className="px-4 py-3 text-gray-900">
                               {booking.date ? parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
@@ -4222,7 +4314,7 @@ const Bookings: React.FC = () => {
                             <div className="text-xs text-gray-500">{normalizeCategory(pkg.category)}</div>
                             {pkg.available_online === false && (
                               <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium amber-tone bg-amber-100 text-amber-800">
-                                Backend only
+                                Hidden from booking site
                               </span>
                             )}
                           </div>
@@ -4429,7 +4521,10 @@ const Bookings: React.FC = () => {
                               <Clock className="w-3 h-3 text-gray-400" />
                               {formatTime12Hour(b.booking_time)}
                             </span>
-                            <span className="truncate flex-1 text-center">{b.package?.name || 'Package'}</span>
+                            <span className="truncate flex-1 text-center">
+                              {bookingDisplayName(b, 'Package')}
+                              {isCustomBooking(b) && <CustomPackageBadge className="ml-1 align-middle" />}
+                            </span>
                             {bRoom && <span className="text-gray-500 flex-shrink-0">{bRoom}</span>}
                           </div>
                         );
@@ -4735,7 +4830,7 @@ const Bookings: React.FC = () => {
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={reportFilters.packageIds === 'all' || (Array.isArray(reportFilters.packageIds) && reportFilters.packageIds.length === reportPackages.length && reportPackages.length > 0)}
+                        checked={reportFilters.packageIds === 'all' || (Array.isArray(reportFilters.packageIds) && reportFilters.packageIds.length === reportPackageOptions.length)}
                         onChange={toggleAllPackages}
                         className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                       />
@@ -4749,7 +4844,7 @@ const Bookings: React.FC = () => {
                       </div>
                     ) : (
                       <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                        {reportPackages.map(pkg => (
+                        {reportPackageOptions.map(pkg => (
                           <label key={pkg.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                             <input
                               type="checkbox"
@@ -4765,9 +4860,6 @@ const Bookings: React.FC = () => {
                             </span>
                           </label>
                         ))}
-                        {reportPackages.length === 0 && (
-                          <p className="text-sm text-gray-500 py-2 text-center">No packages available</p>
-                        )}
                       </div>
                     )}
                   </div>

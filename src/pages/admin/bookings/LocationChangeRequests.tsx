@@ -5,6 +5,8 @@ import { getStoredUser } from '../../../utils/storage';
 import { formatDateLong, formatDateTimeET } from '../../../utils/timeFormat';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import { bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
 import locationChangeRequestService, {
   type LocationChangeRequest,
   type LocationChangeRequestStatus,
@@ -159,7 +161,14 @@ const LocationChangeRequests = () => {
                       {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                     </span>
                   </div>
-                  {r.booking?.package?.name && <p className="text-xs text-gray-500 mt-0.5">{r.booking.package.name}</p>}
+                  {isCustomBooking(r.booking) ? (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {bookingDisplayName(r.booking, '')}
+                      <CustomPackageBadge className="ml-1.5 align-middle" />
+                    </p>
+                  ) : (
+                    r.booking?.package?.name && <p className="text-xs text-gray-500 mt-0.5">{r.booking.package.name}</p>
+                  )}
                 </div>
                 {r.booking?.booking_date && (
                   <div className="text-xs text-gray-500 text-right shrink-0 flex items-center gap-1">

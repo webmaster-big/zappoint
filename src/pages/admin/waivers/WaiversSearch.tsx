@@ -33,6 +33,7 @@ import { escapeRoomGameLabel, formatDateLong, formatDateTimeET } from '../../../
 import { countLabel, participantsCoveredLabel, peopleOnForm } from '../../../utils/waiverCoverage';
 import waiverService from '../../../services/waiverService';
 import { digitsOnly } from '../../../utils/bookingSearch';
+import { bookingDisplayName } from '../../../utils/customBooking';
 import waiverCacheService from '../../../services/WaiverCacheService';
 import bookingService from '../../../services/bookingService';
 import type { Booking } from '../../../services/bookingService';
@@ -1159,9 +1160,10 @@ const AssignWaiverModal = ({ onClose, onSaved, themeColor }: { onClose: () => vo
 
   const resultLabel = (r: LinkResult): { name: string; sub: string } => {
     if (r.kind === 'booking') {
+      const activity = bookingDisplayName(r.data, '');
       return {
         name: r.data.guest_name || r.data.guest_email || '—',
-        sub: `${r.data.reference_number} · ${r.data.booking_date}${r.data.package?.name ? ` · ${r.data.package.name}` : ''}`,
+        sub: `${r.data.reference_number} · ${r.data.booking_date}${activity ? ` · ${activity}` : ''}`,
       };
     }
     if (r.kind === 'attraction_purchase') {

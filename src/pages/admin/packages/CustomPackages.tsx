@@ -205,8 +205,8 @@ const CustomPackages: React.FC = () => {
     const makeBackendOnly = pkg.available_online !== false;
     const question = makeBackendOnly
       ? pkg.is_active === false
-        ? `Make "${pkg.name}" backend only?\n\nIt is switched off right now, so nobody can book it yet. Once it is switched on, customers will not see it or book it online, and staff can book it here.`
-        : `Make "${pkg.name}" backend only?\n\nCustomers will no longer see it or book it online. Staff can still book it here, and existing bookings are not affected.`
+        ? `Hide "${pkg.name}" from the booking site?\n\nIt is switched off right now, so nobody can book it yet. Once it is switched on, customers will not see it or book it online, and staff can book it here.`
+        : `Hide "${pkg.name}" from the booking site?\n\nCustomers will no longer see it or book it online. Staff can still book it here, and existing bookings are not affected.`
       : pkg.is_active === false
         ? `Let customers book "${pkg.name}" online?\n\nIt is switched off right now, so it will appear on the booking site once it is switched on.`
         : `Show "${pkg.name}" on the booking site again?\n\nCustomers will be able to see it and book it online.`;
@@ -219,7 +219,7 @@ const CustomPackages: React.FC = () => {
       const saved = response.data?.available_online;
 
       if (saved !== !makeBackendOnly) {
-        setToast({ message: 'Front-End Availability could not be changed yet because the server has not been updated for it. Please try again later.', type: 'error' });
+        setToast({ message: 'The Online Booking setting could not be changed yet because the server has not been updated for it. Please try again later.', type: 'error' });
         return;
       }
 
@@ -227,7 +227,7 @@ const CustomPackages: React.FC = () => {
       await packageCacheService.patchPackageInCache(pkg.id, { available_online: saved });
       setToast({
         message: !saved
-          ? `"${pkg.name}" is now backend only.`
+          ? `"${pkg.name}" is now hidden from the booking site.`
           : pkg.is_active === false
             ? `"${pkg.name}" can be booked online once it is switched on.`
             : `"${pkg.name}" is on the booking site again.`,
@@ -235,7 +235,7 @@ const CustomPackages: React.FC = () => {
       });
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setToast({ message: message || 'Failed to update Front-End Availability. Please try again.', type: 'error' });
+      setToast({ message: message || 'Failed to update the Online Booking setting. Please try again.', type: 'error' });
     } finally {
       setOnlineTogglingId(null);
     }
@@ -458,7 +458,7 @@ const CustomPackages: React.FC = () => {
                             title={pkg.is_active === false ? 'Customers cannot see or book this package online. Staff can book it once it is switched on.' : 'Customers cannot see or book this package online. Staff can still book it.'}
                           >
                             <EyeOff className="w-3 h-3" />
-                            Backend only
+                            Hidden from booking site
                           </span>
                         )}
                         {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
@@ -507,11 +507,11 @@ const CustomPackages: React.FC = () => {
                                 : `text-${fullColor} hover:bg-${themeColor}-100`
                             }`}
                             title={pkg.available_online === false
-                              ? 'Backend only - click to let customers book it online'
+                              ? 'Hidden from booking site - click to let customers book it online'
                               : pkg.is_active === false
-                                ? 'Online booking is on for when this package is switched on - click to make it backend only'
-                                : 'On the booking site - click to make it backend only'}
-                            aria-label={pkg.available_online === false ? `Show ${pkg.name} on the booking site` : `Make ${pkg.name} backend only`}
+                                ? 'Online booking is on for when this package is switched on - click to hide it from the booking site'
+                                : 'On the booking site - click to hide it from the booking site'}
+                            aria-label={pkg.available_online === false ? `Show ${pkg.name} on the booking site` : `Hide ${pkg.name} from the booking site`}
                             disabled={onlineTogglingId === pkg.id}
                           >
                             {pkg.available_online === false ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}

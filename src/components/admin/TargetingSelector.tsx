@@ -388,7 +388,7 @@ function AxisSection({
                         className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium amber-tone bg-amber-100 text-amber-800 align-middle"
                         title="Customers cannot see or book this package online. Staff can still book it."
                       >
-                        Backend only
+                        Hidden from booking site
                       </span>
                     )}
                     {locName && <span className="block text-xs text-gray-400">{locName}</span>}

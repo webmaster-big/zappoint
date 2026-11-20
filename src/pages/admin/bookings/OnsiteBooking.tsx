@@ -2181,7 +2181,7 @@ const OnsiteBooking: React.FC = () => {
                       title="Customers cannot see or book this package online. Staff can still book it."
                     >
                       <EyeOff className="w-3 h-3" aria-hidden="true" />
-                      Backend only
+                      Hidden from booking site
                     </span>
                   )}
                   <p className={`text-lg font-bold text-gray-900 mt-1`}>${selectedPackage.price}</p>
@@ -2565,7 +2565,7 @@ const OnsiteBooking: React.FC = () => {
                           title="Customers cannot see or book this package online. Staff can still book it."
                         >
                           <EyeOff className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
-                          Backend only
+                          Hidden from booking site
                         </span>
                       )}
                     </div>
@@ -3413,7 +3413,7 @@ const OnsiteBooking: React.FC = () => {
                     {selectedPackage.availableOnline === false && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium amber-tone bg-amber-100 text-amber-800">
                         <EyeOff className="w-3 h-3 mr-1" aria-hidden="true" />
-                        Backend only
+                        Hidden from booking site
                       </span>
                     )}
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">

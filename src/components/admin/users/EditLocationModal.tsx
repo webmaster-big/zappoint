@@ -82,7 +82,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
 
   const pinNote = (() => {
     if (form.latitude === null || form.longitude === null || form.latitude === undefined || form.longitude === undefined) {
-      return 'No map pin yet, so this location is left off the storefront map.';
+      return 'No map pin yet, so this location is left off the map on the booking site.';
     }
     switch (location?.geocode_precision) {
       case 'address':
@@ -376,7 +376,7 @@ const EditLocationModal = ({ isOpen, onClose, location, onUpdated, onLogoChanged
             </label>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Storefront URL</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Booking site URL</label>
               <div className="flex items-center">
                 <span className="px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg whitespace-nowrap">
                   /

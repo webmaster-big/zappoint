@@ -144,7 +144,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Account Activity Log': 'View user activity history',
     'Analytics & Reports': 'Business intelligence and reporting',
     'Performance Analytics': 'Business intelligence and performance metrics',
-    'Page Analytics': 'Visitor traffic, engagement and on-site conversions',
+    'Page Analytics': 'Visitor traffic, engagement and conversions',
     'Accounting & Analytics': 'Financial reporting and sales breakdown',
     'Activity Logs': 'System-wide activity tracking',
     'Day Offs': 'Manage blocked dates and holidays',
@@ -508,7 +508,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const { locations: storefrontLocations } = useStorefrontLocations();
   const storefrontLocation = findLocationById(storefrontLocations, effectiveLocationId);
   const storefrontUrl = storefrontLocation ? `${window.location.origin}/${storefrontLocation.slug}` : null;
-  const storefrontTitle = storefrontLocation ? `Open the ${storefrontLocation.name} store page` : '';
+  const storefrontTitle = storefrontLocation ? `Open the ${storefrontLocation.name} page on the booking site` : '';
 
   useEffect(() => {
     if (!locationMenuOpen) return;
@@ -1375,7 +1375,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   <MapPin className="w-4 h-4" />
                 </span>
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Store page</span>
+                  <span className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none">Booking site</span>
                   <span className="block text-sm font-semibold text-gray-800 truncate leading-tight mt-1">{storefrontLocation?.name}</span>
                 </span>
                 <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0 group-hover:text-gray-600 transition-colors" />

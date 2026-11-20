@@ -7,6 +7,7 @@ import locationService from '../../services/LocationService';
 import type { Location as LocationOption } from '../../services/LocationService';
 import { useLocationScope } from '../../contexts/LocationContext';
 import { getStoredUser } from '../../utils/storage';
+import { bookingDisplayName } from '../../utils/customBooking';
 import attractionPurchaseService from '../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../services/EventPurchaseService';
 import { packageCacheService } from '../../services/PackageCacheService';
@@ -186,7 +187,7 @@ export default function KioskSessionModal({
   const getResultDisplay = (r: SearchResult) => {
     if (r.kind === 'booking') {
       const name = r.data.guest_name || r.data.guest_email || '—';
-      const sub = [r.data.reference_number, r.data.booking_date, r.data.package?.name].filter(Boolean).join(' · ');
+      const sub = [r.data.reference_number, r.data.booking_date, bookingDisplayName(r.data, '')].filter(Boolean).join(' · ');
       return { name, sub, badge: 'Booking', badgeColor: 'bg-blue-100 text-blue-700' };
     }
     if (r.kind === 'attraction_purchase') {

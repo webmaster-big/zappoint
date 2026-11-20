@@ -14,7 +14,7 @@ const StaffPreviewBanner = ({ name, city, packageName }: StaffPreviewBannerProps
       {packageName ? (
         <p>
           <span className="font-semibold">Staff preview.</span>{' '}
-          {packageName} is backend only, so guests see a "can't be booked online" page here and cannot book it. You can
+          {packageName} is hidden from the booking site, so guests see a "can't be booked online" page here and cannot book it. You can
           book it because you are logged in as staff.
         </p>
       ) : (

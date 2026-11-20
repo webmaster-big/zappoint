@@ -75,6 +75,9 @@ import { isCheckInEligible, outstandingBalanceOf } from '../../utils/bookingChec
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
 import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
 import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
+import { CUSTOM_PACKAGE_LABEL, bookingDisplayName, isCustomBooking } from '../../utils/customBooking';
+import CustomPackageBadge from '../../components/admin/CustomPackageBadge';
+import { CustomPackageSection, OneTimeAddOnsSection } from '../../components/admin/bookings/CustomPackageDetails';
 
 const AttendantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -584,7 +587,7 @@ const AttendantDashboard: React.FC = () => {
      const statusLabel = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
      newBookingStatusCounts.set(statusLabel, (newBookingStatusCounts.get(statusLabel) ?? 0) + 1);
 
-     const packageLabel = booking.package?.name || booking.package_name || 'Other';
+     const packageLabel = isCustomBooking(booking) ? CUSTOM_PACKAGE_LABEL : booking.package?.name || booking.package_name || 'Other';
      newBookingPackageCounts.set(packageLabel, (newBookingPackageCounts.get(packageLabel) ?? 0) + 1);
    });
 
@@ -1160,7 +1163,8 @@ const AttendantDashboard: React.FC = () => {
                                        {bookingsForCell[0].guest_name || (bookingsForCell[0].customer ? `${bookingsForCell[0].customer.first_name} ${bookingsForCell[0].customer.last_name}` : 'Guest')}
                                      </div>
                                      <div className="text-gray-600 truncate">
-                                       {bookingsForCell[0].package?.name || 'Package'}
+                                       {bookingDisplayName(bookingsForCell[0], 'Package')}
+                                       {isCustomBooking(bookingsForCell[0]) && <CustomPackageBadge className="ml-1 align-middle" />}
                                      </div>
                                      <div className="flex items-center gap-1 text-gray-500">
                                        <Users size={10} />
@@ -1332,7 +1336,8 @@ const AttendantDashboard: React.FC = () => {
                          </div>
                        </td>
                        <td className="px-4 py-3">
-                         <span className="text-gray-900">{booking.package?.name || 'N/A'}</span>
+                         <span className="text-gray-900">{bookingDisplayName(booking, 'N/A')}</span>
+                         {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 align-middle" />}
                        </td>
                        <td className="px-4 py-3">
                          <div className="text-gray-900">
@@ -1452,7 +1457,8 @@ const AttendantDashboard: React.FC = () => {
                                  </span>
                                </div>
                                <p className="text-sm text-gray-600 mt-1">
-                                 {booking.package?.name || 'Package'}
+                                 {bookingDisplayName(booking, 'Package')}
+                                 {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 align-middle" />}
                                </p>
                                <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                                  <span className="flex items-center gap-1">
@@ -1616,20 +1622,24 @@ const AttendantDashboard: React.FC = () => {
                    </div>
                  </div>
 
-                 <div className="mb-6">
-                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
-                   <div className="bg-gray-50 rounded-lg p-4">
-                     <div className="flex items-center justify-between">
-                       <div className="flex items-center">
-                         <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
-                         <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                 {isCustomBooking(selectedBooking) ? (
+                   <CustomPackageSection booking={selectedBooking} />
+                 ) : (
+                   <div className="mb-6">
+                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
+                     <div className="bg-gray-50 rounded-lg p-4">
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center">
+                           <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
+                           <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                         </div>
+                         {selectedBooking.package?.price && (
+                           <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                         )}
                        </div>
-                       {selectedBooking.package?.price && (
-                         <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
-                       )}
                      </div>
                    </div>
-                 </div>
+                 )}
 
                  {selectedBooking.room && (
                    <div className="mb-6">
@@ -1659,6 +1669,8 @@ const AttendantDashboard: React.FC = () => {
                    </div>
                  )}
 
+                 <OneTimeAddOnsSection booking={selectedBooking} />
+
                  <div className="mb-6">
                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment</h4>
                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -1687,10 +1699,10 @@ const AttendantDashboard: React.FC = () => {
                      {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                        <div className="pt-2 border-t border-gray-100">
                          <p className="text-xs text-gray-500 mb-1">Applied Fees</p>
-                         {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string }, i: number) => (
+                         {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string; fee_label?: string | null }, i: number) => (
                            <div key={i} className="flex justify-between text-xs">
-                             <span className="text-gray-600">{fee.fee_name} <span className="text-gray-400">({fee.fee_application_type})</span></span>
-                             <span className="text-gray-900">${fee.fee_amount.toFixed(2)}</span>
+                             <span className="text-gray-600">{fee.fee_name} <span className="text-gray-400">({isCustomBooking(selectedBooking) && fee.fee_label ? fee.fee_label : fee.fee_application_type})</span></span>
+                             <span className="text-gray-900">${(Number(fee.fee_amount) || 0).toFixed(2)}</span>
                            </div>
                          ))}
                        </div>

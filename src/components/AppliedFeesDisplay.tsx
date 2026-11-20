@@ -15,7 +15,7 @@ export function AppliedFeesDisplay({ appliedFees, compact = false, className = '
       <span
         className={`text-xs text-gray-400 cursor-help ${className}`}
         title={appliedFees
-          .map(f => `${f.fee_name}: $${f.fee_amount.toFixed(2)} (${f.fee_application_type})`)
+          .map(f => `${f.fee_name}: $${(Number(f.fee_amount) || 0).toFixed(2)} (${f.fee_label || f.fee_application_type})`)
           .join('\n')}
       >
         ({appliedFees.length} fee{appliedFees.length !== 1 ? 's' : ''})
@@ -30,10 +30,10 @@ export function AppliedFeesDisplay({ appliedFees, compact = false, className = '
         <div key={idx} className="flex justify-between text-sm">
           <span className="text-gray-600">
             {fee.fee_name}
-            <span className="ml-1 text-xs text-gray-400">({fee.fee_application_type})</span>
+            <span className="ml-1 text-xs text-gray-400">({fee.fee_label || fee.fee_application_type})</span>
           </span>
           <span className={fee.fee_application_type === 'additive' ? 'text-red-600' : 'text-gray-500'}>
-            {fee.fee_application_type === 'additive' ? '+' : ''}${fee.fee_amount.toFixed(2)}
+            {fee.fee_application_type === 'additive' ? '+' : ''}${(Number(fee.fee_amount) || 0).toFixed(2)}
           </span>
         </div>
       ))}

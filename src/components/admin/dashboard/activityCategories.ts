@@ -2,6 +2,7 @@ import type { Booking } from '../../../services/bookingService';
 import type { AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import type { EventPurchase } from '../../../types/event.types';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { CUSTOM_PACKAGE_LABEL, bookingCategoryOf, isCustomBooking } from '../../../utils/customBooking';
 
 export type ActivityBucketKey =
   | 'party_packages'
@@ -45,8 +46,13 @@ export const bucketForCategory = (
   return source === 'attraction' ? 'attractions' : 'party_packages';
 };
 
-export const bucketForBooking = (booking: Pick<Booking, 'package'>): ActivityBucketKey => {
-  const byCategory = bucketForCategory(booking.package?.category, 'booking');
+type BucketedBooking = Pick<Booking, 'package' | 'is_custom_package' | 'custom_package_category'>;
+
+const bookingCategory = (booking: BucketedBooking): string | null | undefined =>
+  isCustomBooking(booking) ? bookingCategoryOf(booking) : booking.package?.category;
+
+export const bucketForBooking = (booking: BucketedBooking): ActivityBucketKey => {
+  const byCategory = bucketForCategory(bookingCategory(booking), 'booking');
   if (byCategory !== 'party_packages') return byCategory;
   return booking.package?.is_escape_room ? 'escape_rooms' : byCategory;
 };
@@ -166,15 +172,15 @@ export const buildActivityBuckets = (input: ActivityInput): ActivityBucket[] => 
     sourceRows.set(definition.key, new Map());
   }
 
-  const addSource = (key: ActivityBucketKey, label: string, category: string, count: number) => {
+  const addSource = (key: ActivityBucketKey, label: string, category: string, count: number, rowKey: string = label) => {
     const rows = sourceRows.get(key);
     if (!rows) return;
-    const existing = rows.get(label);
+    const existing = rows.get(rowKey);
     if (existing) {
       existing.count += count;
       return;
     }
-    rows.set(label, { label, category, count });
+    rows.set(rowKey, { label, category, count });
   };
 
   const noteCategory = (bucket: ActivityBucket, category: string) => {
@@ -190,12 +196,16 @@ export const buildActivityBuckets = (input: ActivityInput): ActivityBucket[] => 
       bucket.cancelled += 1;
       continue;
     }
-    const category = dashboardCategory(booking.package?.category) || 'No category';
+    const category = dashboardCategory(bookingCategory(booking)) || 'No category';
     bucket.bookings.push(booking);
     bucket.primary += 1;
     bucket.secondary += Number(booking.participants) || 0;
     noteCategory(bucket, category);
-    addSource(bucket.key, booking.package?.name || 'Other package', category, 1);
+    if (isCustomBooking(booking)) {
+      addSource(bucket.key, CUSTOM_PACKAGE_LABEL, category, 1, `${CUSTOM_PACKAGE_LABEL}\u0000${category}`);
+    } else {
+      addSource(bucket.key, booking.package?.name || 'Other package', category, 1);
+    }
   }
 
   for (const purchase of input.purchases ?? []) {

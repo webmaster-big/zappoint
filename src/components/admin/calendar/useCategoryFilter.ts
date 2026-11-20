@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { normalizeCategory } from '../../../utils/venueCategories';
+import { bookingCategoryOf, type CustomBookingSource } from '../../../utils/customBooking';
 
 export type CategorySource = 'booking' | 'attraction' | 'event';
 
@@ -13,7 +14,7 @@ export interface CalendarCategory {
   sources: CategorySource[];
 }
 
-export interface CategorisedBooking {
+export interface CategorisedBooking extends CustomBookingSource {
   package?: { category?: string | null } | null;
 }
 
@@ -37,6 +38,9 @@ export const categoryKeyOf = (value?: string | null): string => {
   const normalized = normalizeCategory(value);
   return normalized === '' ? UNCATEGORISED_CATEGORY_KEY : normalized;
 };
+
+const bookingCategoryKeyOf = (booking: CategorisedBooking): string =>
+  categoryKeyOf(bookingCategoryOf(booking, booking.package?.category ?? null));
 
 export const categoryLabelOf = (key: string): string => {
   if (key === EVENTS_CATEGORY_KEY) return 'Events';
@@ -67,7 +71,7 @@ export const buildCalendarCategories = (input: {
     found.set(key, { key, label: categoryLabelOf(key), count: 1, sources: [source] });
   };
 
-  (input.bookings ?? []).forEach((booking) => add(categoryKeyOf(booking.package?.category), 'booking'));
+  (input.bookings ?? []).forEach((booking) => add(bookingCategoryKeyOf(booking), 'booking'));
   (input.attractions ?? []).forEach((purchase) => add(categoryKeyOf(purchase.attraction?.category), 'attraction'));
   (input.events ?? []).forEach(() => add(EVENTS_CATEGORY_KEY, 'event'));
 
@@ -106,7 +110,7 @@ export const useCategoryFilter = (
     selected,
     isAll,
     shows,
-    showsBooking: (booking) => shows(categoryKeyOf(booking.package?.category)),
+    showsBooking: (booking) => shows(bookingCategoryKeyOf(booking)),
     showsAttraction: (purchase) => shows(categoryKeyOf(purchase.attraction?.category)),
     showsEvents: () => shows(EVENTS_CATEGORY_KEY),
     toggle: (key) =>

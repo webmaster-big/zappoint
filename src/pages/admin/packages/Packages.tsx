@@ -425,7 +425,7 @@ const Packages: React.FC = () => {
       const importedRows = packagesForImport.filter((_, index) => !failedRows.has(index));
       const stayedOnline = (response.data.imported || []).filter((pkg, index) => importedRows[index]?.available_online === false && pkg.available_online !== false).length;
       if (stayedOnline > 0) {
-        alert(`${stayedOnline} imported package(s) meant to be backend only are on the booking site, because the server has not been updated for Front-End Availability yet.`);
+        alert(`${stayedOnline} imported package(s) could not be hidden from the booking site because the server has not been updated yet.`);
       }
       
       if (failedCount > 0) {
@@ -492,8 +492,8 @@ const Packages: React.FC = () => {
     const makeBackendOnly = pkg.available_online !== false;
     const question = makeBackendOnly
       ? pkg.is_active === false
-        ? `Make "${pkg.name}" backend only?\n\nIt is switched off right now, so nobody can book it yet. Once it is switched on, customers will not see it or book it online, and staff can book it here.`
-        : `Make "${pkg.name}" backend only?\n\nCustomers will no longer see it or book it online. Staff can still book it here, and existing bookings are not affected.`
+        ? `Hide "${pkg.name}" from the booking site?\n\nIt is switched off right now, so nobody can book it yet. Once it is switched on, customers will not see it or book it online, and staff can book it here.`
+        : `Hide "${pkg.name}" from the booking site?\n\nCustomers will no longer see it or book it online. Staff can still book it here, and existing bookings are not affected.`
       : pkg.is_active === false
         ? `Let customers book "${pkg.name}" online?\n\nIt is switched off right now, so it will appear on the booking site once it is switched on.`
         : `Show "${pkg.name}" on the booking site again?\n\nCustomers will be able to see it and book it online.`;
@@ -506,7 +506,7 @@ const Packages: React.FC = () => {
       const saved = response.data?.available_online;
 
       if (saved !== !makeBackendOnly) {
-        alert('Front-End Availability could not be changed yet because the server has not been updated for it. Please try again later.');
+        alert('The Online Booking setting could not be changed yet because the server has not been updated for it. Please try again later.');
         return;
       }
 
@@ -514,7 +514,7 @@ const Packages: React.FC = () => {
       await packageCacheService.patchPackageInCache(pkg.id, { available_online: saved });
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      alert(message || 'Failed to update Front-End Availability. Please try again.');
+      alert(message || 'Failed to update the Online Booking setting. Please try again.');
     } finally {
       setOnlineTogglingId(null);
     }
@@ -587,7 +587,7 @@ const Packages: React.FC = () => {
         alert(
           `"${original.name}" duplicated successfully${targetName ? ` to ${targetName}` : ''}!` +
           (sameLocation ? '' : '\n\nSpaces, add-ons and attractions were not copied - they belong to the original location. Pick that location\u2019s own ones on the copy.') +
-          (copyStayedOnline ? '\n\nThe copy could not be made backend only because the server has not been updated for Front-End Availability yet.' : '')
+          (copyStayedOnline ? '\n\nThe copy could not be hidden from the booking site because the server has not been updated yet.' : '')
         );
       }
     } catch (error) {
@@ -838,7 +838,7 @@ const Packages: React.FC = () => {
                   className="rounded-full"
                   title="Packages customers cannot see or book online. Staff can still book them."
                 >
-                  Backend only ({backendOnlyCount})
+                  Hidden from booking site ({backendOnlyCount})
                 </StandardButton>
               )}
             </div>
@@ -952,7 +952,7 @@ const Packages: React.FC = () => {
                           title={pkg.is_active === false ? 'Customers cannot see or book this package online. Staff can book it once it is switched on.' : 'Customers cannot see or book this package online. Staff can still book it.'}
                         >
                           <EyeOff className="w-3 h-3" />
-                          Backend only
+                          Hidden from booking site
                         </span>
                       )}
                       {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
@@ -998,11 +998,11 @@ const Packages: React.FC = () => {
                               : `text-${fullColor} hover:bg-${themeColor}-100`
                           }`}
                           title={pkg.available_online === false
-                            ? 'Backend only - click to let customers book it online'
+                            ? 'Hidden from booking site - click to let customers book it online'
                             : pkg.is_active === false
-                              ? 'Online booking is on for when this package is switched on - click to make it backend only'
-                              : 'On the booking site - click to make it backend only'}
-                          aria-label={pkg.available_online === false ? `Show ${pkg.name} on the booking site` : `Make ${pkg.name} backend only`}
+                              ? 'Online booking is on for when this package is switched on - click to hide it from the booking site'
+                              : 'On the booking site - click to hide it from the booking site'}
+                          aria-label={pkg.available_online === false ? `Show ${pkg.name} on the booking site` : `Hide ${pkg.name} from the booking site`}
                           disabled={onlineTogglingId === pkg.id}
                         >
                           {pkg.available_online === false ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
@@ -1046,7 +1046,7 @@ const Packages: React.FC = () => {
               {searchTerm
                 ? `No packages match "${searchTerm}"`
                 : filterCategory !== "all"
-                  ? `No ${escapeFilterOn ? "escape rooms" : backendOnlyFilterOn ? "backend-only packages" : "packages"} in the "${filterCategory}" category`
+                  ? `No ${escapeFilterOn ? "escape rooms" : backendOnlyFilterOn ? "packages hidden from the booking site" : "packages"} in the "${filterCategory}" category`
                   : escapeFilterOn || backendOnlyFilterOn
                     ? "No packages match these filters"
                     : "Create your first package to get started"
@@ -1444,8 +1444,8 @@ const Packages: React.FC = () => {
               {packageToDuplicate.available_online === false && (
                 <p className="mt-3 rounded-md border border-amber-200 amber-tone bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   {canChangeOnlineAvailability
-                    ? 'This package is backend only, so the copy will be backend only too.'
-                    : 'This package is backend only. The copy will be on the booking site once it is switched on. Only a location manager or an admin can make it backend only.'}
+                    ? 'This package is hidden from the booking site, so the copy will be hidden too.'
+                    : 'This package is hidden from the booking site. The copy will be on the booking site once it is switched on. Only a location manager or an admin can hide it from the booking site.'}
                 </p>
               )}
               {duplicateTargetLocationId !== null

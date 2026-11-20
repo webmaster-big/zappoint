@@ -26,7 +26,6 @@ import AddToCalendarButton from '../../components/customer/AddToCalendarButton';
 import { bookingDurationMinutes } from '../../utils/calendarInvite';
 import type { SortBy, SortOrder } from '../../types/customer';
 import bookingService, { type Booking } from '../../services/bookingService';
-import type { BookPackagePackage } from '../../types/BookPackage.types';
 import { formatDurationDisplay, convertTo12Hour } from '../../utils/timeFormat';
 import SendInvitationsModal from '../../components/invitations/SendInvitationsModal';
 import InvitationTracker from '../../components/invitations/InvitationTracker';
@@ -37,6 +36,7 @@ import { AppliedDiscountsDisplay } from '../../components/AppliedDiscountsDispla
 import { resolvePaymentState } from '../../types/Bookings.types';
 import { cardFromPayments } from '../../utils/cardLabel';
 import customerBookingWaiverService, { type CustomerBookingWaiver } from '../../services/CustomerBookingWaiverService';
+import { bookingDisplayName, isCustomBooking, oneTimeAddOnsOf } from '../../utils/customBooking';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -201,10 +201,7 @@ const CustomerReservations = () => {
     return location?.name || 'N/A';
   };
 
-  const getPackageName = (booking: Booking): string => {
-    const pkg = booking.package as BookPackagePackage | undefined;
-    return pkg?.name || 'N/A';
-  };
+  const getPackageName = (booking: Booking): string => bookingDisplayName(booking, 'N/A');
 
   return (
     <>
@@ -535,7 +532,7 @@ const CustomerReservations = () => {
                             <Eye size={14} />
                             View
                           </button>
-                          {(booking.status === 'confirmed' || booking.status === 'pending') && booking.package && (
+                          {(booking.status === 'confirmed' || booking.status === 'pending') && (booking.package || isCustomBooking(booking)) && (
                             <button
                               onClick={() => handleSendInvitations(booking)}
                               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition"
@@ -610,7 +607,7 @@ const CustomerReservations = () => {
                           </div>
                         </div>
 
-                        {booking.package && (booking.status === 'confirmed' || booking.status === 'pending') && (
+                        {(booking.package || isCustomBooking(booking)) && (booking.status === 'confirmed' || booking.status === 'pending') && (
                           <div className="mt-4">
                             <InvitationTracker bookingId={booking.id} participants={booking.participants} onToast={showToast} />
                           </div>
@@ -676,7 +673,7 @@ const CustomerReservations = () => {
                   </div>
                 </div>
 
-                {selectedBooking.package && (
+                {(selectedBooking.package || isCustomBooking(selectedBooking)) && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Package</h4>
                     <div className="bg-gray-50 p-4 rounded-xl space-y-2.5 text-sm">
@@ -732,14 +729,20 @@ const CustomerReservations = () => {
                   </div>
                 )}
 
-                {selectedBooking.add_ons && (selectedBooking.add_ons as any[]).length > 0 && (
+                {((selectedBooking.add_ons && (selectedBooking.add_ons as any[]).length > 0) || oneTimeAddOnsOf(selectedBooking).length > 0) && (
                   <div>
                     <h4 className="text-xs font-semibold text-gray-800 mb-2 uppercase tracking-wide">Add-ons</h4>
                     <div className="flex flex-wrap gap-2">
-                      {(selectedBooking.add_ons as any[]).map((addon, index) => (
+                      {((selectedBooking.add_ons ?? []) as any[]).map((addon, index) => (
                         <span key={index} className="inline-flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50 px-3 py-1.5 rounded-full">
                           <CheckCircle size={12} className="text-blue-500 shrink-0" />
                           {addon.name}
+                        </span>
+                      ))}
+                      {oneTimeAddOnsOf(selectedBooking).map((line, index) => (
+                        <span key={`one-time-${index}`} className="inline-flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50 px-3 py-1.5 rounded-full">
+                          <CheckCircle size={12} className="text-blue-500 shrink-0" />
+                          {line.name}
                         </span>
                       ))}
                     </div>

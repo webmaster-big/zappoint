@@ -196,7 +196,7 @@ const PackageDetails = () => {
                   title={packageData.is_active === false ? 'Customers cannot see or book this package online. Staff can book it once it is switched on.' : 'Customers cannot see or book this package online. Staff can still book it.'}
                 >
                   <EyeOff className="w-4 h-4" aria-hidden="true" />
-                  Backend only
+                  Hidden from booking site
                 </span>
               )}
               <StandardButton

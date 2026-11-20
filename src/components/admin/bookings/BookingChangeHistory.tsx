@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { History, Loader2, MessageSquare, RotateCw, ShieldCheck, User } from 'lucide-react';
 import bookingService, { type BookingChangeLogEntry } from '../../../services/bookingService';
 import { formatLocalDateTime } from '../../../utils/timeFormat';
+import { capacityText, customTermsOf, feeLabel, formatMoney, toCents, type CustomBookingSource } from '../../../utils/customBooking';
 
 const FIELD_LABELS: Record<string, string> = {
   booking_date: 'Date',
@@ -27,6 +28,16 @@ const FIELD_LABELS: Record<string, string> = {
   addons: 'Add-ons',
   attractions: 'Attractions',
   guest_of_honor_name: 'Guest of honour',
+  custom_package_name: 'Custom package name',
+  custom_package_category: 'Custom package category',
+  custom_package_terms: 'Custom package terms',
+  package_price_at_booking: 'Package price',
+  package_pricing_type_at_booking: 'Pricing',
+};
+
+const PRICING_TYPE_LABELS: Record<string, string> = {
+  base: 'Per booking',
+  per_person: 'Per guest',
 };
 
 const labelFor = (field: string): string =>
@@ -59,6 +70,36 @@ const renderValue = (value: unknown): string => {
   }
   if (typeof value === 'object') return describeObject(value as Record<string, unknown>);
   return String(value);
+};
+
+const describeCustomTerms = (value: unknown): string => {
+  const terms = customTermsOf({
+    is_custom_package: true,
+    custom_package_terms: value as CustomBookingSource['custom_package_terms'],
+  });
+  if (!terms) return renderValue(value);
+  const parts = [
+    capacityText(terms.minGuests, terms.maxGuests),
+    terms.fees.length > 0
+      ? `Fees: ${terms.fees.map(fee => `${fee.name} ${feeLabel(fee.type, fee.amount)}`).join(', ')}`
+      : '',
+    terms.oneTimeAddOns.length > 0
+      ? `One-time add-ons: ${terms.oneTimeAddOns
+          .map(line => `${line.name} ×${line.quantity} at ${formatMoney(toCents(line.unitPrice))}`)
+          .join(', ')}`
+      : '',
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : '—';
+};
+
+const renderFieldValue = (field: string, value: unknown): string => {
+  if (field === 'custom_package_terms' && value !== null && value !== undefined && value !== '') {
+    return describeCustomTerms(value);
+  }
+  if (field === 'package_pricing_type_at_booking' && typeof value === 'string' && PRICING_TYPE_LABELS[value]) {
+    return PRICING_TYPE_LABELS[value];
+  }
+  return renderValue(value);
 };
 
 interface BookingChangeHistoryProps {
@@ -210,9 +251,9 @@ const BookingChangeHistory: React.FC<BookingChangeHistoryProps> = ({
                             <tr key={field} className="border-t border-gray-100 align-top">
                               <td className="py-1 pr-2 font-medium text-gray-700">{labelFor(field)}</td>
                               <td className="py-1 pr-2 text-red-700 line-through decoration-red-300">
-                                {renderValue(change?.from)}
+                                {renderFieldValue(field, change?.from)}
                               </td>
-                              <td className="py-1 font-medium text-green-700">{renderValue(change?.to)}</td>
+                              <td className="py-1 font-medium text-green-700">{renderFieldValue(field, change?.to)}</td>
                             </tr>
                             );
                           })}

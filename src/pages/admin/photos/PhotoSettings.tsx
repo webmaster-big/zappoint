@@ -945,7 +945,7 @@ const PhotoSettings = () => {
 
                 <div>
                   <label htmlFor="ps-retention" className="block text-sm text-gray-700 mb-1">
-                    Backend retention (days)
+                    Library retention (days)
                   </label>
                   <input
                     id="ps-retention"

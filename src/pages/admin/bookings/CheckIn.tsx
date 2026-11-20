@@ -59,6 +59,20 @@ import { resolvePaymentState, statusAfterPayment } from '../../../types/Bookings
 import { cardFromPayments } from '../../../utils/cardLabel';
 import { matchesBookingSearch, digitsOnly } from '../../../utils/bookingSearch';
 import axios from 'axios';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import {
+  CUSTOM_PACKAGE_LABEL,
+  ONE_TIME_ADD_ONS_LABEL,
+  bookingCategoryOf,
+  bookingDisplayName,
+  capacityText,
+  customTermsOf,
+  formatMoney,
+  isCustomBooking,
+  oneTimeAddOnsOf,
+  pricingTypeLabel,
+  toCents,
+} from '../../../utils/customBooking';
 
 const LIST_TAB_KEY = 'zapzone_checkin_list_tab';
 const WAIVER_PAGE_SIZE = 200;
@@ -128,6 +142,59 @@ const Detail: React.FC<DetailProps> = ({ icon: Icon, label, value, wide = false 
     </div>
   </div>
 );
+
+interface CustomBookingDetailProps {
+  booking: Booking;
+  themeColor: string;
+  fullColor: string;
+}
+
+const CustomPackageDetail: React.FC<CustomBookingDetailProps> = ({ booking, themeColor, fullColor }) => {
+  const terms = customTermsOf(booking);
+  const facts = [
+    bookingCategoryOf(booking),
+    terms ? capacityText(terms.minGuests, terms.maxGuests) : '',
+    terms ? `${formatMoney(toCents(terms.price))} ${pricingTypeLabel(terms.pricingType).toLowerCase()}` : '',
+  ].filter(Boolean);
+  return (
+    <div className="flex items-center gap-3 col-span-full">
+      <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+        <PackageIcon className={`h-5 w-5 text-${fullColor}`} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-gray-500">{CUSTOM_PACKAGE_LABEL}</p>
+        <p className="font-medium text-gray-800 text-lg break-words">
+          {bookingDisplayName(booking, CUSTOM_PACKAGE_LABEL)}
+          <CustomPackageBadge className="ml-2 align-middle" />
+        </p>
+        {facts.length > 0 && <p className="text-sm text-gray-600">{facts.join(' · ')}</p>}
+      </div>
+    </div>
+  );
+};
+
+const OneTimeAddOnsDetail: React.FC<CustomBookingDetailProps> = ({ booking, themeColor, fullColor }) => {
+  const lines = oneTimeAddOnsOf(booking);
+  if (lines.length === 0) return null;
+  return (
+    <div className="flex items-start gap-3 col-span-full">
+      <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+        <PackageIcon className={`h-5 w-5 text-${fullColor}`} />
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">{ONE_TIME_ADD_ONS_LABEL} ({lines.length})</p>
+        <div className="space-y-1 mt-1">
+          {lines.map((line, index) => (
+            <p key={index} className="font-medium text-gray-800">
+              • {line.name} - {formatMoney(toCents(line.unitPrice))}
+              {line.quantity > 1 && ` (x${line.quantity})`}
+            </p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CheckIn: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -1961,7 +2028,10 @@ const CheckIn: React.FC = () => {
                           <div className="text-xs text-gray-500">Phone: {booking.guest_phone || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{booking.package?.name || 'N/A'}</div>
+                          <div className="text-sm text-gray-900">
+                            {bookingDisplayName(booking, 'N/A')}
+                            {isCustomBooking(booking) && <CustomPackageBadge className="ml-1.5 align-middle" />}
+                          </div>
                           <div className="text-xs text-gray-500">
                             ${Number(booking.total_amount).toFixed(2)}
                           </div>
@@ -2133,6 +2203,10 @@ const CheckIn: React.FC = () => {
                         <p className="font-medium text-gray-800">{verifiedBooking.guest_name || 'Guest'}</p>
                       </div>
                     </div>
+
+                    {isCustomBooking(verifiedBooking) && (
+                      <CustomPackageDetail booking={verifiedBooking} themeColor={themeColor} fullColor={fullColor} />
+                    )}
 
                     {verifiedBooking.package && (
                       <div className="flex items-center gap-3 col-span-full">
@@ -2401,6 +2475,8 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
+                    <OneTimeAddOnsDetail booking={verifiedBooking} themeColor={themeColor} fullColor={fullColor} />
+
                     {verifiedBooking.special_requests && (
                       <div className="flex items-start gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -2604,6 +2680,10 @@ const CheckIn: React.FC = () => {
                         <p className="font-medium text-gray-800">{selectedBooking.guest_name || 'Guest'}</p>
                       </div>
                     </div>
+
+                    {isCustomBooking(selectedBooking) && (
+                      <CustomPackageDetail booking={selectedBooking} themeColor={themeColor} fullColor={fullColor} />
+                    )}
 
                     {selectedBooking.package && (
                       <div className="flex items-center gap-3 col-span-full">
@@ -2853,6 +2933,8 @@ const CheckIn: React.FC = () => {
                         </div>
                       </div>
                     )}
+
+                    <OneTimeAddOnsDetail booking={selectedBooking} themeColor={themeColor} fullColor={fullColor} />
 
                     {selectedBooking.special_requests && (
                       <div className="flex items-start gap-3 col-span-full">

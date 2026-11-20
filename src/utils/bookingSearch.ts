@@ -1,4 +1,5 @@
 import type { Booking } from '../services/bookingService';
+import { isCustomBooking } from './customBooking';
 
 interface CustomerRef {
   first_name?: string | null;
@@ -76,6 +77,7 @@ const textHaystack = (booking: SearchableBooking): string => {
     customer?.email,
     customer?.phone,
     booking.package?.name,
+    isCustomBooking(booking) ? booking.custom_package_name : '',
     nameOfRelation(booking.room),
     nameOfRelation(booking.location),
   ]

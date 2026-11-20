@@ -36,6 +36,9 @@ import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPa
 import { isCheckInEligible, outstandingBalanceOf } from '../../../utils/bookingCheckIn';
 import BlockedPeriodBanner from '../../../components/admin/availability/BlockedPeriodBanner';
 import { blockBookingPath } from '../../../utils/blockBookingPath';
+import { bookingCategoryOf, bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import { CustomPackageSection, OneTimeAddOnsSection } from '../../../components/admin/bookings/CustomPackageDetails';
 
 const WALK_IN_STEP_MINUTES = 5;
 
@@ -166,6 +169,9 @@ const PACKAGE_COLORS = [
   { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-300' },
   { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-300' },
 ];
+
+const categoryOfBooking = (booking: Booking): string =>
+  normalizeCategory(bookingCategoryOf(booking, booking.package?.category ?? null)) || UNCATEGORISED_LABEL;
 
 const packageColorFor = (packageName: string) => {
   let hash = 0;
@@ -619,7 +625,7 @@ const SpaceSchedule = () => {
   const categoryOptions = useMemo(() => {
     const counts = new Map<string, number>();
     for (const b of activeBookings) {
-      const key = normalizeCategory(b.package?.category) || UNCATEGORISED_LABEL;
+      const key = categoryOfBooking(b);
       counts.set(key, (counts.get(key) || 0) + 1);
     }
     return [...counts.entries()]
@@ -635,7 +641,7 @@ const SpaceSchedule = () => {
   const filteredBookings = useMemo(() => {
     const term = searchInput.trim().toLowerCase();
     return activeBookings.filter(b => {
-      if (effectiveCategory !== 'all' && (normalizeCategory(b.package?.category) || UNCATEGORISED_LABEL) !== effectiveCategory) return false;
+      if (effectiveCategory !== 'all' && categoryOfBooking(b) !== effectiveCategory) return false;
       if (statusFilter !== 'all' && b.status !== statusFilter) return false;
       if (term && !matchesBookingSearch(b, term)) return false;
       return true;
@@ -1244,7 +1250,7 @@ const SpaceSchedule = () => {
 
   const renderBookingBlock = (item: PositionedBooking) => {
     const { booking } = item;
-    const color = packageColorFor(booking.package?.name || '');
+    const color = packageColorFor(isCustomBooking(booking) ? bookingDisplayName(booking, '') : booking.package?.name || '');
     const laneWidth = 100 / item.laneCount;
     // below one line of text there is no room for a label, so show the block alone
     const tiny = item.height < 30;
@@ -1361,6 +1367,7 @@ const SpaceSchedule = () => {
                   {compactTimeLabel}
                 </span>
                 <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                  {isCustomBooking(booking) && <CustomPackageBadge className="px-1! py-px! text-[8px]!" />}
                   {late ? (
                     <span className="flex items-center gap-0.5 rounded bg-red-600 px-1 text-[8px] font-bold uppercase leading-tight text-white">
                       <AlertCircle className="h-2 w-2 shrink-0" />
@@ -1383,7 +1390,7 @@ const SpaceSchedule = () => {
               <div className={`truncate text-xs font-semibold leading-tight ${color.text}`}>{guestLabel}</div>
 
               <div className={`truncate text-[9px] leading-tight ${color.text} opacity-80`}>
-                {booking.package?.name || 'No package'}
+                {bookingDisplayName(booking, 'No package')}
               </div>
 
               {/* how many, and what is still owed — the two numbers the desk acts on */}
@@ -2534,7 +2541,7 @@ const SpaceSchedule = () => {
             timeLabel={`${formatTime12Hour(hovered.booking_time)} – ${formatTime12Hour(
               calculateEndTime(hovered.booking_time, hovered.duration, hovered.duration_unit)
             )}`}
-            packageName={hovered.package?.name || 'No package'}
+            packageName={bookingDisplayName(hovered, 'No package')}
             participants={hovered.participants}
             amount={Number(hovered.total_amount || 0)}
             paymentLabel={payment.label}
@@ -2629,7 +2636,7 @@ const SpaceSchedule = () => {
                     <dt className="text-amber-800">Their booking</dt>
                     <dd className="font-medium text-amber-900">
                       {formatTime12Hour(walkInPrompt.clash.booking_time)} ·{' '}
-                      {walkInPrompt.clash.package?.name || 'No package'}
+                      {bookingDisplayName(walkInPrompt.clash, 'No package')}
                     </dd>
                   </div>
                 </dl>
@@ -2787,23 +2794,27 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
-                      <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+              {isCustomBooking(selectedBooking) ? (
+                <CustomPackageSection booking={selectedBooking} />
+              ) : (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
+                        <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                      </div>
+                      {selectedBooking.package?.price && (
+                        <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                      )}
                     </div>
-                    {selectedBooking.package?.price && (
-                      <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                    {selectedBooking.package?.description && (
+                      <p className="text-sm text-gray-600 mt-2 ml-7">{selectedBooking.package.description}</p>
                     )}
                   </div>
-                  {selectedBooking.package?.description && (
-                    <p className="text-sm text-gray-600 mt-2 ml-7">{selectedBooking.package.description}</p>
-                  )}
                 </div>
-              </div>
+              )}
 
               {Array.isArray(selectedBooking.add_ons) && selectedBooking.add_ons.length > 0 && (
                 <div className="mb-6">
@@ -2820,6 +2831,8 @@ const SpaceSchedule = () => {
                   </div>
                 </div>
               )}
+
+              <OneTimeAddOnsSection booking={selectedBooking} />
 
               {(selectedBooking as any).guest_of_honor_name && (
                 <div className="mb-6">
@@ -2912,10 +2925,10 @@ const SpaceSchedule = () => {
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-gray-100">
                         <p className="text-xs text-gray-500 mb-1">Fees</p>
-                        {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string }, i: number) => (
+                        {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string; fee_label?: string | null }, i: number) => (
                           <div key={i} className="flex justify-between text-xs">
-                            <span className="text-gray-600">{fee.fee_name} <span className="text-gray-400">({fee.fee_application_type})</span></span>
-                            <span className="text-gray-900">${fee.fee_amount.toFixed(2)}</span>
+                            <span className="text-gray-600">{fee.fee_name} <span className="text-gray-400">({isCustomBooking(selectedBooking) && fee.fee_label ? fee.fee_label : fee.fee_application_type})</span></span>
+                            <span className="text-gray-900">${(Number(fee.fee_amount) || 0).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>

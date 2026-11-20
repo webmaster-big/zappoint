@@ -30,11 +30,95 @@ import type { AppliedFee } from '../../../utils/fees';
 import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns } from '../../../utils/addOnQuantity';
 import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
 import { scheduleMatchesDate } from '../../../utils/packageSchedule';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import { categoryService, type Category } from '../../../services/CategoryService';
+import addOnService, { type AddOn } from '../../../services/AddOnService';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
+import {
+  CUSTOM_PACKAGE_LABEL,
+  CUSTOM_PACKAGE_LIMITS,
+  CUSTOM_PACKAGE_MESSAGES,
+  ONE_TIME_ADD_ONS_LABEL,
+  capacityText,
+  catalogErrorKey,
+  centsToDollars,
+  customPackagePayload,
+  customQuoteFromInput,
+  customTermsInputFrom,
+  customTermsOf,
+  durationText,
+  emptyCustomFeeInput,
+  emptyOneTimeAddOnInput,
+  endTimeText,
+  feeErrorKey,
+  feeLineLabel,
+  formatMoney,
+  isCustomBooking,
+  oneTimeAddOnErrorKey,
+  packageLineLabel,
+  participantsHint,
+  priceFieldLabel,
+  pricingTypeLabel,
+  toAppliedFees,
+  toCents,
+  validateCustomTerms,
+  type CustomFeeInput,
+  type CustomTermsInput,
+  type OneTimeAddOnInput,
+} from '../../../utils/customBooking';
 
 const parseLocalDate = (isoDateString: string): Date => {
   const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
   return new Date(year, month - 1, day);
 };
+
+type CustomFeeRow = CustomFeeInput & { rowKey: number };
+type OneTimeAddOnRow = OneTimeAddOnInput & { rowKey: number };
+type CustomEditorInput = Omit<CustomTermsInput, 'fees' | 'oneTimeAddOns'> & {
+  fees: CustomFeeRow[];
+  oneTimeAddOns: OneTimeAddOnRow[];
+};
+
+interface CustomCatalogAddOn {
+  id: number;
+  name: string;
+  price: number | string | null;
+  image?: string;
+  min_quantity?: number | null;
+  max_quantity?: number | null;
+}
+
+const fetchRoomsForLocation = async (locationId: number): Promise<Array<{ id: number; name: string }>> => {
+  const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
+  if (cachedRooms && cachedRooms.length > 0) {
+    roomCacheService.syncInBackground();
+    return cachedRooms.map(room => ({ id: room.id, name: room.name }));
+  }
+  const rooms = await roomService.getAllRooms({ location_id: locationId });
+  return rooms.map((room) => ({ id: room.id, name: room.name }));
+};
+
+const fetchLocationAddOns = async (locationId: number): Promise<AddOn[]> => {
+  const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache({ location_id: locationId, is_active: true });
+  if (cachedAddOns.length > 0) {
+    addOnCacheService.syncInBackground({ user_id: getStoredUser()?.id });
+    return cachedAddOns;
+  }
+  return addOnService.getAllAddOns({ location_id: locationId, is_active: true });
+};
+
+const catalogQuantityRange = (addOn: { min_quantity?: number | null; max_quantity?: number | null } | null | undefined) => {
+  const max = Number(addOn?.max_quantity);
+  return {
+    min: Math.max(1, Math.floor(Number(addOn?.min_quantity) || 0)),
+    max: Number.isInteger(max) && max >= 1 ? max : CUSTOM_PACKAGE_LIMITS.catalogQuantityMax,
+  };
+};
+
+const customInputClass = (themeColor: string) =>
+  `w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`;
+
+const NO_CUSTOM_ADD_ONS: CustomCatalogAddOn[] = [];
 
 interface DayOffWithTime {
   date: Date;
@@ -119,6 +203,29 @@ const EditBooking: React.FC = () => {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
+  const [customInput, setCustomInput] = useState<CustomEditorInput | null>(null);
+  const [customTermsUnavailable, setCustomTermsUnavailable] = useState(false);
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  const [categoriesStatus, setCategoriesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [locationAddOns, setLocationAddOns] = useState<AddOn[]>([]);
+  const [customAddOnsNotice, setCustomAddOnsNotice] = useState<string | null>(null);
+  const [customSubmitAttempted, setCustomSubmitAttempted] = useState(false);
+  const [customTouched, setCustomTouched] = useState<Record<string, true>>({});
+  const customLocationRequestRef = useRef(0);
+  const customRowKeyRef = useRef(0);
+  const isCustom = isCustomBooking(originalBooking);
+  const showGuestOfHonor = isCustom || !!packageDetails?.has_guest_of_honor;
+
+  const nextCustomRowKey = () => {
+    customRowKeyRef.current += 1;
+    return customRowKeyRef.current;
+  };
+
+  const withCustomRowKeys = (input: CustomTermsInput): CustomEditorInput => ({
+    ...input,
+    fees: input.fees.map((fee) => ({ ...fee, rowKey: nextCustomRowKey() })),
+    oneTimeAddOns: input.oneTimeAddOns.map((line) => ({ ...line, rowKey: nextCustomRowKey() })),
+  });
 
   const loadPackagesAndRoomsForLocation = useCallback(async (locationId: number) => {
     const [packagesResult, roomsResult] = await Promise.all([
@@ -131,19 +238,41 @@ const EditBooking: React.FC = () => {
         return packageService.getAllPackages({ location_id: locationId });
       })(),
 
-      (async () => {
-        const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
-        if (cachedRooms && cachedRooms.length > 0) {
-          roomCacheService.syncInBackground();
-          return cachedRooms.map(room => ({ id: room.id, name: room.name }));
-        }
-        const rooms = await roomService.getAllRooms({ location_id: locationId });
-        return rooms.map((room) => ({ id: room.id, name: room.name }));
-      })()
+      fetchRoomsForLocation(locationId)
     ]);
 
     setAvailablePackages(packagesResult);
     setAvailableRooms(roomsResult);
+  }, []);
+
+  const loadCustomLocationData = useCallback(async (locationId: number) => {
+    const request = ++customLocationRequestRef.current;
+    const [roomsResult, addOnsResult] = await Promise.all([
+      fetchRoomsForLocation(locationId),
+      fetchLocationAddOns(locationId).catch((error) => {
+        console.error('Error loading add-ons for location:', error);
+        return [] as AddOn[];
+      }),
+    ]);
+    if (request !== customLocationRequestRef.current) return;
+    setAvailableRooms(roomsResult);
+    setLocationAddOns(addOnsResult);
+  }, []);
+
+  const loadCategories = useCallback(async () => {
+    setCategoriesStatus('loading');
+    try {
+      const response = await categoryService.getCategories();
+      const list: Category[] = Array.isArray(response?.data) ? response.data : [];
+      const names = list
+        .map((category) => (typeof category?.name === 'string' ? category.name : ''))
+        .filter((name) => name.trim() !== '');
+      setCategoryNames(Array.from(new Set(names)));
+      setCategoriesStatus('ready');
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategoriesStatus('error');
+    }
   }, []);
 
   useEffect(() => {
@@ -210,6 +339,25 @@ const EditBooking: React.FC = () => {
           return;
         }
 
+        if (isCustomBooking(bookingData)) {
+          try {
+            const fresh = await bookingService.getBookingById(Number(bookingData.id));
+            if (fresh.success && fresh.data) {
+              bookingData = fresh.data;
+              await bookingCacheService.updateBookingInCache(fresh.data);
+            }
+          } catch (error) {
+            console.error('Error loading custom package details:', error);
+          }
+        }
+
+        const customBooking = isCustomBooking(bookingData);
+        if (customBooking) {
+          const terms = customTermsOf(bookingData);
+          setCustomInput(terms ? withCustomRowKeys(customTermsInputFrom(terms)) : null);
+          setCustomTermsUnavailable(!terms);
+        }
+
         setOriginalBooking(bookingData);
         setOriginalAmountPaid(Number(bookingData.amount_paid || 0));
 
@@ -249,7 +397,7 @@ const EditBooking: React.FC = () => {
         const packageId = bookingData.package_id;
 
         await Promise.all([
-          loadPackagesAndRoomsForLocation(locationId),
+          customBooking ? loadCustomLocationData(locationId) : loadPackagesAndRoomsForLocation(locationId),
 
           (async () => {
             if (!packageId) return;
@@ -278,7 +426,40 @@ const EditBooking: React.FC = () => {
     loadBookingAndPackage();
   }, [id, referenceNumber]);
 
+  useEffect(() => {
+    if (isCustom) loadCategories();
+  }, [isCustom, loadCategories]);
+
+  const handleCustomLocationChange = async (locationId: number) => {
+    if (!locationId || !originalBooking) return;
+    const returningHome = locationId === Number(originalBooking.location_id);
+    const droppedNames = returningHome
+      ? []
+      : Object.entries(selectedAddOns)
+          .filter(([, quantity]) => quantity > 0)
+          .map(([addOnId]) => customAddOnName(Number(addOnId)));
+    const locationName = locations.find((loc) => loc.id === locationId)?.name || 'this location';
+
+    setFormData(prev => ({ ...prev, locationId, roomId: null }));
+    setSelectedAddOns(returningHome ? { ...originalAddOnSelection } : {});
+    setCustomAddOnsNotice(
+      droppedNames.length > 0 ? `Removed add-ons not offered at ${locationName}: ${droppedNames.join(', ')}.` : null
+    );
+    setAvailableRooms([]);
+    setLocationAddOns([]);
+
+    try {
+      await loadCustomLocationData(locationId);
+    } catch (error) {
+      console.error('Error loading location data:', error);
+    }
+  };
+
   const handleLocationChange = async (locationId: number) => {
+    if (isCustom) {
+      await handleCustomLocationChange(locationId);
+      return;
+    }
     setFormData(prev => ({ ...prev, locationId, packageId: null, roomId: null, date: '', time: '' }));
     setPackageDetails(null);
     setAvailablePackages([]);
@@ -475,7 +656,52 @@ const EditBooking: React.FC = () => {
     return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, packageDetails.id));
   }, [dayOffsWithTime, packageDetails]);
 
+  const originalAddOnSelection = useMemo(() => {
+    const selection: { [id: number]: number } = {};
+    (originalBooking?.add_ons || []).forEach((a) => {
+      const addonId = a.pivot?.add_on_id ?? a.id;
+      const qty = Number(a.pivot?.quantity ?? 0);
+      if (addonId && qty > 0) selection[addonId] = qty;
+    });
+    return selection;
+  }, [originalBooking]);
+
+  const customAddOns = useMemo(() => {
+    if (!isCustom || !originalBooking) return NO_CUSTOM_ADD_ONS;
+    const locationId = Number(formData.locationId);
+    const atOriginalLocation = locationId === Number(originalBooking.location_id);
+    const keptIds = new Set(atOriginalLocation ? Object.keys(originalAddOnSelection).map(Number) : []);
+    const list: CustomCatalogAddOn[] = locationAddOns
+      .filter((addOn) => Number(addOn.location_id) === locationId)
+      .filter((addOn) => keptIds.has(addOn.id) || (addOn.is_active !== false && addOn.price !== null && addOn.price !== undefined))
+      .map((addOn) => ({
+        id: addOn.id,
+        name: addOn.name,
+        price: addOn.price,
+        image: addOn.image,
+        min_quantity: addOn.min_quantity ?? null,
+        max_quantity: addOn.max_quantity ?? null,
+      }));
+    if (atOriginalLocation) {
+      (originalBooking.add_ons || []).forEach((a) => {
+        const addonId = Number(a.pivot?.add_on_id ?? a.id);
+        if (!addonId || list.some((addOn) => addOn.id === addonId)) return;
+        const stored = a as { image?: string; min_quantity?: number | null; max_quantity?: number | null };
+        list.push({
+          id: addonId,
+          name: a.name,
+          price: a.pivot?.price_at_booking ?? a.price ?? 0,
+          image: stored.image,
+          min_quantity: stored.min_quantity ?? null,
+          max_quantity: stored.max_quantity ?? null,
+        });
+      });
+    }
+    return list;
+  }, [isCustom, originalBooking, formData.locationId, locationAddOns, originalAddOnSelection]);
+
   const availableAddOns = useMemo(() => {
+    if (isCustom) return customAddOns as any[];
     const list: any[] = Array.isArray((packageDetails as any)?.add_ons)
       ? [...(packageDetails as any).add_ons]
       : [];
@@ -493,7 +719,12 @@ const EditBooking: React.FC = () => {
       }
     });
     return list;
-  }, [packageDetails, originalBooking]);
+  }, [isCustom, customAddOns, packageDetails, originalBooking]);
+
+  const customAddOnName = (addOnId: number): string =>
+    availableAddOns.find((a: any) => a.id === addOnId)?.name
+      || (originalBooking?.add_ons || []).find((a) => (a.pivot?.add_on_id ?? a.id) === addOnId)?.name
+      || `Add-on #${addOnId}`;
 
   const frozenAddOnPrices = useMemo(() => {
     const map: { [id: number]: number } = {};
@@ -561,6 +792,113 @@ const EditBooking: React.FC = () => {
         .join(',');
     return norm(originalMap) !== norm(selectedAddOns);
   }, [originalBooking, selectedAddOns]);
+
+  const customCatalogLines = useMemo(() => {
+    if (!isCustom) return [];
+    return Object.entries(selectedAddOns)
+      .map(([addOnId, quantity]) => {
+        const id = Number(addOnId);
+        const addOn = availableAddOns.find((a: any) => a.id === id);
+        if (!addOn || quantity <= 0) return null;
+        const range = catalogQuantityRange(addOn);
+        return {
+          id,
+          name: String(addOn.name ?? ''),
+          quantity,
+          minQuantity: addOn.min_quantity ?? null,
+          maxQuantity: addOn.max_quantity ?? null,
+          unitPrice: getAddOnUnitPrice(id, addOn),
+          valid: quantity >= range.min && quantity <= range.max,
+        };
+      })
+      .filter((line): line is NonNullable<typeof line> => line !== null);
+  }, [isCustom, selectedAddOns, availableAddOns, getAddOnUnitPrice]);
+
+  const customQuote = useMemo(() => {
+    if (!isCustom || !customInput) return null;
+    return customQuoteFromInput(
+      customInput,
+      formData.participants,
+      customCatalogLines.filter((line) => line.valid).map(({ unitPrice, quantity }) => ({ unitPrice, quantity })),
+    );
+  }, [isCustom, customInput, formData.participants, customCatalogLines]);
+
+  const customErrors = useMemo((): Record<string, string> => {
+    if (!isCustom || !customInput) return {};
+    return validateCustomTerms(customInput, {
+      participants: formData.participants,
+      locationId: formData.locationId,
+      roomId: formData.roomId,
+      catalog: customCatalogLines.map(({ id, name, quantity, minQuantity, maxQuantity }) => ({ id, name, quantity, minQuantity, maxQuantity })),
+      amountPaid: originalAmountPaid,
+      totalCents: customQuote ? customQuote.totalCents : null,
+    });
+  }, [isCustom, customInput, formData.participants, formData.locationId, formData.roomId, customCatalogLines, originalAmountPaid, customQuote]);
+
+  useEffect(() => {
+    if (customSubmitAttempted && Object.keys(customErrors).length === 0) setCustomSubmitAttempted(false);
+  }, [customSubmitAttempted, customErrors]);
+
+  const updateCustomInput = (patch: Partial<Omit<CustomEditorInput, 'fees' | 'oneTimeAddOns'>>) => {
+    setCustomInput((prev) => (prev ? { ...prev, ...patch } : prev));
+  };
+
+  const touchCustomField = (key: string) => {
+    setCustomTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  };
+
+  const focusCustomField = (elementId: string) => {
+    window.requestAnimationFrame(() => document.getElementById(elementId)?.focus());
+  };
+
+  const addCustomFee = () => {
+    if (!customInput || customInput.fees.length >= CUSTOM_PACKAGE_LIMITS.feesMax) return;
+    const rowKey = nextCustomRowKey();
+    setCustomInput((prev) => (prev ? { ...prev, fees: [...prev.fees, { ...emptyCustomFeeInput(), rowKey }] } : prev));
+    focusCustomField(`custom-fee-name-${rowKey}`);
+  };
+
+  const updateCustomFee = (rowKey: number, patch: Partial<CustomFeeInput>) => {
+    setCustomInput((prev) => (prev
+      ? { ...prev, fees: prev.fees.map((fee) => (fee.rowKey === rowKey ? { ...fee, ...patch } : fee)) }
+      : prev));
+  };
+
+  const removeCustomFee = (rowKey: number) => {
+    setCustomInput((prev) => (prev ? { ...prev, fees: prev.fees.filter((fee) => fee.rowKey !== rowKey) } : prev));
+  };
+
+  const addOneTimeAddOn = () => {
+    if (!customInput || customInput.oneTimeAddOns.length >= CUSTOM_PACKAGE_LIMITS.oneTimeAddOnsMax) return;
+    const rowKey = nextCustomRowKey();
+    setCustomInput((prev) => (prev
+      ? { ...prev, oneTimeAddOns: [...prev.oneTimeAddOns, { ...emptyOneTimeAddOnInput(), rowKey }] }
+      : prev));
+    focusCustomField(`custom-addon-name-${rowKey}`);
+  };
+
+  const updateOneTimeAddOn = (rowKey: number, patch: Partial<OneTimeAddOnInput>) => {
+    setCustomInput((prev) => (prev
+      ? { ...prev, oneTimeAddOns: prev.oneTimeAddOns.map((line) => (line.rowKey === rowKey ? { ...line, ...patch } : line)) }
+      : prev));
+  };
+
+  const removeOneTimeAddOn = (rowKey: number) => {
+    setCustomInput((prev) => (prev
+      ? { ...prev, oneTimeAddOns: prev.oneTimeAddOns.filter((line) => line.rowKey !== rowKey) }
+      : prev));
+  };
+
+  const setCustomAddOnQuantity = (addOnId: number, typed: number, maxQty: number) => {
+    const quantity = Math.max(0, Math.min(maxQty, Number.isFinite(typed) ? Math.floor(typed) : 0));
+    setSelectedAddOns((prev) => {
+      if (quantity <= 0) {
+        const { [addOnId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [addOnId]: quantity };
+    });
+  };
 
   useEffect(() => {
     if (!originalBooking?.id || !formData.packageId) return;
@@ -760,6 +1098,17 @@ const EditBooking: React.FC = () => {
       return;
     }
 
+    if (isCustom) {
+      if (!customInput || !customQuote) return;
+      if (Object.keys(customErrors).length > 0) {
+        setCustomSubmitAttempted(true);
+        window.requestAnimationFrame(() => {
+          document.querySelector('[data-custom-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        return;
+      }
+    }
+
     setShowReasonPrompt(true);
   };
 
@@ -772,11 +1121,24 @@ const EditBooking: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const isPackageChanged = formData.packageId !== originalBooking.package_id;
+      const isPackageChanged = !isCustom && formData.packageId !== originalBooking.package_id;
       const additionalAddons = buildAdditionalAddons();
       const statusChanged = formData.status !== originalBooking.status;
       const closingVisit = statusChanged && (formData.status === 'completed' || formData.status === 'cancelled');
       const sendUpdateEmail = formData.sendNotification && !(statusChanged && formData.status === 'completed');
+      const customPricing = isCustom && customInput && customQuote
+        ? {
+            custom_package: customPackagePayload(customInput),
+            total_amount: centsToDollars(customQuote.totalCents),
+            applied_fees: customQuote.fees.length > 0 ? toAppliedFees(customQuote) : null,
+          }
+        : null;
+
+      if (isCustom && !customPricing) {
+        setSubmitting(false);
+        setShowReasonPrompt(false);
+        return;
+      }
 
       const response = await bookingService.updateBooking(Number(originalBooking.id), {
         change_reason: changeReason,
@@ -788,21 +1150,22 @@ const EditBooking: React.FC = () => {
         participants: formData.participants,
         ...(statusChanged && { status: formData.status }),
         location_id: formData.locationId || undefined,
-        package_id: formData.packageId || undefined,
+        package_id: isCustom ? undefined : formData.packageId || undefined,
         room_id: formData.roomId || null,
         notes: formData.notes,
         send_notification: sendUpdateEmail,
         ...(addOnsChanged && { additional_addons: additionalAddons }),
         ...(isPackageChanged && { additional_attractions: [] }),
+        ...(customPricing ?? {}),
         ...(quote && {
           total_amount: quote.total_amount,
           discount_amount: quote.discount_amount,
           applied_fees: quote.persist_fees.length > 0 ? quote.persist_fees : null,
           ...(quote.applied_discounts && { applied_discounts: quote.applied_discounts.length > 0 ? quote.applied_discounts : null }),
         }),
-        guest_of_honor_name: packageDetails?.has_guest_of_honor ? (formData.guestOfHonorName.trim() || null) : undefined,
-        guest_of_honor_age: packageDetails?.has_guest_of_honor ? (formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : null) : undefined,
-        guest_of_honor_gender: packageDetails?.has_guest_of_honor ? ((formData.guestOfHonorGender as 'male' | 'female' | 'other') || null) : undefined,
+        guest_of_honor_name: showGuestOfHonor ? (formData.guestOfHonorName.trim() || null) : undefined,
+        guest_of_honor_age: showGuestOfHonor ? (formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : null) : undefined,
+        guest_of_honor_gender: showGuestOfHonor ? ((formData.guestOfHonorGender as 'male' | 'female' | 'other') || null) : undefined,
         overlap_override_token: overrideTokenRef.current || undefined,
       });
 
@@ -861,10 +1224,24 @@ const EditBooking: React.FC = () => {
         return;
       }
 
+      if (isCustom && (failure?.data as { code?: string } | undefined)?.code === 'CUSTOM_PRICE_MISMATCH' && formData.locationId) {
+        void refreshCustomAddOns(formData.locationId);
+      }
+
       const message = failure?.data?.errors?.change_reason?.[0] ?? failure?.data?.message;
       alert(message ?? 'Error updating booking. Please try again.');
       setSubmitting(false);
       setShowReasonPrompt(false);
+    }
+  };
+
+  const refreshCustomAddOns = async (locationId: number) => {
+    const request = customLocationRequestRef.current;
+    try {
+      const fresh = await addOnService.getAllAddOns({ location_id: locationId, is_active: true });
+      if (request === customLocationRequestRef.current) setLocationAddOns(fresh);
+    } catch (error) {
+      console.error('Error refreshing add-ons:', error);
     }
   };
 
@@ -902,6 +1279,489 @@ const EditBooking: React.FC = () => {
     );
   }
 
+  const customFieldError = (key: string, touchKey?: string) => {
+    const message = customErrors[key];
+    if (!message || (touchKey && !customSubmitAttempted && !customTouched[touchKey])) return null;
+    return <p className="text-xs text-red-600 mt-1" data-custom-error>{message}</p>;
+  };
+
+  const customLabelClass = 'block text-xs font-medium text-gray-600 mb-1';
+  const customFieldClass = customInputClass(themeColor);
+  const customRemoveButtonClass = 'inline-flex items-center justify-center shrink-0 h-9 w-9 rounded-lg border border-gray-300 bg-white text-base leading-none text-gray-700 hover:bg-gray-100 transition-colors';
+  const originalCustomCategory = originalBooking?.custom_package_category ?? '';
+  const customCategoryOptions = [
+    ...categoryNames,
+    ...[originalCustomCategory, customInput?.category ?? '']
+      .filter((name, index, names) => name.trim() !== '' && !categoryNames.includes(name) && names.indexOf(name) === index),
+  ];
+  const customEndText = isCustom && customInput ? endTimeText(formData.date, formData.time, customInput.durationMinutes) : '';
+
+  const customPackageSection = (
+    <div>
+      <h3 className="text-xl font-bold mb-4 text-neutral-900 flex flex-wrap items-center gap-2">
+        <Package className={`w-5 h-5 text-${themeColor}-600`} /> {CUSTOM_PACKAGE_LABEL}
+        <CustomPackageBadge size="sm" />
+      </h3>
+      {!customInput || customTermsUnavailable ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" data-custom-error>
+          This booking's custom package details could not be loaded. Refresh the page to try again.
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-6 gap-3">
+            <div className="col-span-6 sm:col-span-3 min-w-0">
+              <label htmlFor="custom-package-name" className={customLabelClass}>Booking Name *</label>
+              <input
+                id="custom-package-name"
+                type="text"
+                maxLength={CUSTOM_PACKAGE_LIMITS.nameMaxLength}
+                placeholder="e.g. Team Outing"
+                value={customInput.name}
+                onChange={(e) => updateCustomInput({ name: e.target.value })}
+                aria-invalid={!!customErrors.name}
+                className={customFieldClass}
+              />
+              {customFieldError('name')}
+            </div>
+            <div className="col-span-6 sm:col-span-3 min-w-0">
+              <label htmlFor="custom-package-category" className={customLabelClass}>Category *</label>
+              <select
+                id="custom-package-category"
+                value={customInput.category}
+                onChange={(e) => updateCustomInput({ category: e.target.value })}
+                aria-invalid={!!customErrors.category}
+                className={customFieldClass}
+              >
+                <option value="" disabled>Select a category</option>
+                {customCategoryOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              {categoriesStatus === 'error' && (
+                <p className="text-xs text-red-600 mt-1">
+                  {CUSTOM_PACKAGE_MESSAGES.categoriesFailed}{' '}
+                  <button type="button" onClick={() => void loadCategories()} className={`font-medium underline text-${themeColor}-600`}>
+                    Retry
+                  </button>
+                </p>
+              )}
+              {categoriesStatus === 'ready' && categoryNames.length === 0 && (
+                <p className="text-xs text-gray-500 mt-1">{CUSTOM_PACKAGE_MESSAGES.noCategories}</p>
+              )}
+              {customFieldError('category')}
+            </div>
+            <div className="col-span-2 min-w-0">
+              <label htmlFor="custom-package-duration" className={customLabelClass}>Duration (min) *</label>
+              <input
+                id="custom-package-duration"
+                type="number"
+                min={1}
+                max={CUSTOM_PACKAGE_LIMITS.durationMaxMinutes}
+                step={1}
+                placeholder="e.g. 90"
+                value={customInput.durationMinutes}
+                onChange={(e) => updateCustomInput({ durationMinutes: e.target.value })}
+                onWheel={(e) => e.currentTarget.blur()}
+                aria-invalid={!!customErrors.durationMinutes}
+                className={customFieldClass}
+              />
+              {customFieldError('durationMinutes')}
+            </div>
+            <div className="col-span-2 min-w-0">
+              <label htmlFor="custom-package-min-guests" className={customLabelClass}>Min. Guests</label>
+              <input
+                id="custom-package-min-guests"
+                type="number"
+                min={1}
+                max={CUSTOM_PACKAGE_LIMITS.guestsMax}
+                step={1}
+                placeholder="Optional"
+                value={customInput.minGuests}
+                onChange={(e) => updateCustomInput({ minGuests: e.target.value })}
+                onWheel={(e) => e.currentTarget.blur()}
+                aria-invalid={!!customErrors.minGuests}
+                className={customFieldClass}
+              />
+              {customFieldError('minGuests')}
+            </div>
+            <div className="col-span-2 min-w-0">
+              <label htmlFor="custom-package-max-guests" className={customLabelClass}>Max. Guests *</label>
+              <input
+                id="custom-package-max-guests"
+                type="number"
+                min={1}
+                max={CUSTOM_PACKAGE_LIMITS.guestsMax}
+                step={1}
+                placeholder="e.g. 30"
+                value={customInput.maxGuests}
+                onChange={(e) => updateCustomInput({ maxGuests: e.target.value })}
+                onWheel={(e) => e.currentTarget.blur()}
+                aria-invalid={!!customErrors.maxGuests}
+                className={customFieldClass}
+              />
+              {customFieldError('maxGuests')}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="min-w-0">
+              <label htmlFor="custom-package-pricing" className={customLabelClass}>Pricing</label>
+              <select
+                id="custom-package-pricing"
+                value={customInput.pricingType}
+                onChange={(e) => updateCustomInput({ pricingType: e.target.value === 'per_guest' ? 'per_guest' : 'per_booking' })}
+                className={customFieldClass}
+              >
+                <option value="per_booking">{pricingTypeLabel('per_booking')}</option>
+                <option value="per_guest">{pricingTypeLabel('per_guest')}</option>
+              </select>
+            </div>
+            <div className="min-w-0">
+              <label htmlFor="custom-package-price" className={customLabelClass}>{priceFieldLabel(customInput.pricingType)} *</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-gray-500" aria-hidden="true">$</span>
+                <input
+                  id="custom-package-price"
+                  type="number"
+                  min={0}
+                  max={CUSTOM_PACKAGE_LIMITS.priceMax}
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={customInput.price}
+                  onChange={(e) => updateCustomInput({ price: e.target.value })}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  aria-invalid={!!customErrors.price}
+                  className={customFieldClass}
+                />
+              </div>
+              {customInput.pricingType === 'per_guest' && (
+                <p className="text-xs text-gray-500 mt-1">Uses the participant count.</p>
+              )}
+              {customFieldError('price')}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium text-gray-700">Fees</span>
+              <StandardButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addCustomFee}
+                disabled={customInput.fees.length >= CUSTOM_PACKAGE_LIMITS.feesMax}
+              >
+                + Add Fee
+              </StandardButton>
+            </div>
+            {customInput.fees.map((fee, index) => {
+              const isPercent = fee.type === 'percent';
+              return (
+                <div key={fee.rowKey} className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-2">
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <label htmlFor={`custom-fee-name-${fee.rowKey}`} className={customLabelClass}>Fee Name</label>
+                      <input
+                        id={`custom-fee-name-${fee.rowKey}`}
+                        type="text"
+                        maxLength={CUSTOM_PACKAGE_LIMITS.lineNameMaxLength}
+                        placeholder="e.g. Venue Fee"
+                        value={fee.name}
+                        onChange={(e) => updateCustomFee(fee.rowKey, { name: e.target.value })}
+                        onBlur={() => touchCustomField(`fee.${fee.rowKey}.name`)}
+                        className={customFieldClass}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomFee(fee.rowKey)}
+                      title="Remove fee"
+                      aria-label="Remove fee"
+                      className={customRemoveButtonClass}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {customFieldError(feeErrorKey(index, 'name'), `fee.${fee.rowKey}.name`)}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="min-w-0">
+                      <label htmlFor={`custom-fee-type-${fee.rowKey}`} className={customLabelClass}>Fee Type</label>
+                      <select
+                        id={`custom-fee-type-${fee.rowKey}`}
+                        value={fee.type}
+                        onChange={(e) => updateCustomFee(fee.rowKey, { type: e.target.value === 'percent' ? 'percent' : 'flat' })}
+                        className={customFieldClass}
+                      >
+                        <option value="flat">Flat fee</option>
+                        <option value="percent">Percent</option>
+                      </select>
+                    </div>
+                    <div className="min-w-0">
+                      <label htmlFor={`custom-fee-amount-${fee.rowKey}`} className={customLabelClass}>{isPercent ? 'Rate (%)' : 'Amount'}</label>
+                      <div className="flex items-center gap-1.5">
+                        {!isPercent && <span className="text-sm text-gray-500" aria-hidden="true">$</span>}
+                        <input
+                          id={`custom-fee-amount-${fee.rowKey}`}
+                          type="number"
+                          min={0}
+                          max={isPercent ? CUSTOM_PACKAGE_LIMITS.percentMax : CUSTOM_PACKAGE_LIMITS.priceMax}
+                          step="0.01"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={fee.amount}
+                          onChange={(e) => updateCustomFee(fee.rowKey, { amount: e.target.value })}
+                          onBlur={() => touchCustomField(`fee.${fee.rowKey}.amount`)}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className={customFieldClass}
+                        />
+                        {isPercent && <span className="text-sm text-gray-500" aria-hidden="true">%</span>}
+                      </div>
+                      {customFieldError(feeErrorKey(index, 'amount'), `fee.${fee.rowKey}.amount`)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {customInput.fees.length > 0 && (
+              <p className="text-xs text-gray-500">Percentage fees use the package and add-ons subtotal.</p>
+            )}
+            {customFieldError('fees')}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const customOneTimeAddOnsPanel = customInput ? (
+    <div className="mb-4 space-y-3">
+      <StandardButton
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={addOneTimeAddOn}
+        disabled={customInput.oneTimeAddOns.length >= CUSTOM_PACKAGE_LIMITS.oneTimeAddOnsMax}
+      >
+        + Add One-Time Add-on
+      </StandardButton>
+      {customInput.oneTimeAddOns.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <p className="text-xs font-medium text-gray-700">{ONE_TIME_ADD_ONS_LABEL}</p>
+          <p className="text-xs text-gray-500 mb-2">These add-ons apply only to this booking.</p>
+          <div className="space-y-3">
+            {customInput.oneTimeAddOns.map((line, index) => (
+              <div key={line.rowKey}>
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:grid-cols-[minmax(0,1.45fr)_minmax(0,0.55fr)_minmax(0,0.85fr)_auto] items-end gap-2">
+                  <div className="col-span-3 sm:col-span-1 min-w-0">
+                    <label htmlFor={`custom-addon-name-${line.rowKey}`} className={customLabelClass}>Add-on Name</label>
+                    <input
+                      id={`custom-addon-name-${line.rowKey}`}
+                      type="text"
+                      maxLength={CUSTOM_PACKAGE_LIMITS.lineNameMaxLength}
+                      placeholder="e.g. Glow Bracelets"
+                      value={line.name}
+                      onChange={(e) => updateOneTimeAddOn(line.rowKey, { name: e.target.value })}
+                      onBlur={() => touchCustomField(`addon.${line.rowKey}.name`)}
+                      className={customFieldClass}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor={`custom-addon-quantity-${line.rowKey}`} className={customLabelClass}>Qty.</label>
+                    <input
+                      id={`custom-addon-quantity-${line.rowKey}`}
+                      type="number"
+                      min={1}
+                      max={CUSTOM_PACKAGE_LIMITS.oneTimeQuantityMax}
+                      step={1}
+                      value={line.quantity}
+                      onChange={(e) => updateOneTimeAddOn(line.rowKey, { quantity: e.target.value })}
+                      onBlur={() => touchCustomField(`addon.${line.rowKey}.quantity`)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className={customFieldClass}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label htmlFor={`custom-addon-price-${line.rowKey}`} className={customLabelClass}>Unit Price</label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm text-gray-500" aria-hidden="true">$</span>
+                      <input
+                        id={`custom-addon-price-${line.rowKey}`}
+                        type="number"
+                        min={0}
+                        max={CUSTOM_PACKAGE_LIMITS.priceMax}
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={line.unitPrice}
+                        onChange={(e) => updateOneTimeAddOn(line.rowKey, { unitPrice: e.target.value })}
+                        onBlur={() => touchCustomField(`addon.${line.rowKey}.unitPrice`)}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        className={customFieldClass}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeOneTimeAddOn(line.rowKey)}
+                    title="Remove add-on"
+                    aria-label="Remove add-on"
+                    className={customRemoveButtonClass}
+                  >
+                    ×
+                  </button>
+                </div>
+                {customFieldError(oneTimeAddOnErrorKey(index, 'name'), `addon.${line.rowKey}.name`)}
+                {customFieldError(oneTimeAddOnErrorKey(index, 'quantity'), `addon.${line.rowKey}.quantity`)}
+                {customFieldError(oneTimeAddOnErrorKey(index, 'unitPrice'), `addon.${line.rowKey}.unitPrice`)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {customFieldError('oneTimeAddOns')}
+    </div>
+  ) : null;
+
+  const customSummaryBlock = customInput ? (
+    <div className="pb-4 border-b border-gray-100">
+      <div className="flex items-center gap-2 mb-1">
+        <p className="text-sm text-gray-500">{CUSTOM_PACKAGE_LABEL}</p>
+        <CustomPackageBadge />
+      </div>
+      <p className="font-semibold text-gray-900 break-words">{customInput.name.trim() || CUSTOM_PACKAGE_LABEL}</p>
+      <dl className="mt-2 space-y-1 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt className="text-gray-500">Category</dt>
+          <dd className="text-gray-900 text-right break-words">{customInput.category || 'Choose a category'}</dd>
+        </div>
+        {durationText(customInput.durationMinutes) && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">Duration</dt>
+            <dd className="text-gray-900 text-right">{durationText(customInput.durationMinutes)}</dd>
+          </div>
+        )}
+        {capacityText(customInput.minGuests, customInput.maxGuests) && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">Guests</dt>
+            <dd className="text-gray-900 text-right">{capacityText(customInput.minGuests, customInput.maxGuests)}</dd>
+          </div>
+        )}
+        <div className="flex justify-between gap-3">
+          <dt className="text-gray-500">Pricing</dt>
+          <dd className="text-gray-900 text-right">{pricingTypeLabel(customInput.pricingType)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-gray-500">{priceFieldLabel(customInput.pricingType)}</dt>
+          <dd className="text-gray-900 text-right">
+            {customInput.price.trim() === '' ? '—' : formatMoney(toCents(customInput.price))}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  ) : null;
+
+  const customPaymentSummary = (() => {
+    if (!customInput || !customQuote) return null;
+    const totalCents = customQuote.totalCents;
+    const totalChanged = totalCents !== toCents(originalBooking?.total_amount ?? 0);
+    const paymentState = resolvePaymentState({
+      payment_status: originalBooking?.payment_status,
+      amount_paid: originalAmountPaid,
+      total_amount: centsToDollars(totalCents),
+    });
+    const catalogRows = customCatalogLines.filter((line) => line.valid);
+    const oneTimeRows = customInput.oneTimeAddOns
+      .map((line) => {
+        const quantity = Math.floor(Number(line.quantity));
+        return {
+          rowKey: line.rowKey,
+          name: line.name.trim() || 'One-time add-on',
+          quantity,
+          cents: Math.max(0, toCents(line.unitPrice)) * quantity,
+          listed: Number.isFinite(quantity) && quantity > 0 && line.unitPrice.trim() !== '',
+        };
+      })
+      .filter((row) => row.listed);
+
+    return (
+      <div>
+        <p className="text-sm text-gray-500 mb-3">Payment Breakdown</p>
+        <div className="space-y-2">
+          <div className="flex justify-between gap-3">
+            <span className="text-sm text-gray-600">{packageLineLabel(customInput.pricingType, formData.participants, customInput.price)}</span>
+            <span className="font-medium text-gray-900">{formatMoney(customQuote.packageCents)}</span>
+          </div>
+
+          {catalogRows.length > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-xs text-gray-500 mb-2">Add-ons</p>
+              {catalogRows.map((line) => (
+                <div key={line.id} className="flex justify-between gap-3 text-sm">
+                  <span className="text-gray-600 break-words">
+                    {line.name} {line.quantity > 1 && `×${line.quantity}`}
+                  </span>
+                  <span className="text-gray-900">{formatMoney(Math.max(0, toCents(line.unitPrice)) * line.quantity)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {oneTimeRows.length > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-xs text-gray-500 mb-2">{ONE_TIME_ADD_ONS_LABEL}</p>
+              {oneTimeRows.map((row) => (
+                <div key={row.rowKey} className="flex justify-between gap-3 text-sm">
+                  <span className="text-gray-600 break-words">
+                    {row.name} {row.quantity > 1 && `×${row.quantity}`}
+                  </span>
+                  <span className="text-gray-900">{formatMoney(row.cents)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-between pt-2 border-t border-gray-100">
+            <span className="text-sm text-gray-600">Subtotal</span>
+            <span className="font-medium text-gray-900">{formatMoney(customQuote.subtotalCents)}</span>
+          </div>
+
+          {customQuote.fees.map((fee, index) => (
+            <div key={`${fee.name}-${index}`} className="flex justify-between gap-3">
+              <span className="text-sm text-gray-600 break-words">{feeLineLabel(fee) || 'Fee'}</span>
+              <span className="font-medium text-gray-900">+{formatMoney(fee.cents)}</span>
+            </div>
+          ))}
+
+          <div className="flex justify-between pt-3 border-t border-gray-200">
+            <span className="text-sm font-semibold text-gray-900">Total Amount</span>
+            <span className="font-bold text-gray-900">
+              {formatMoney(totalCents)}
+              {totalChanged && <span className="ml-1 text-xs text-orange-600">(Updated)</span>}
+            </span>
+          </div>
+          {customFieldError('total')}
+
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-600">Amount Paid</span>
+            <span className="font-semibold text-green-600">${originalAmountPaid.toFixed(2)}</span>
+          </div>
+          {customFieldError('amountPaid')}
+
+          <div className="flex justify-between pt-2 border-t border-gray-100">
+            <span className={`text-sm font-medium ${paymentState.isSettled ? 'text-green-700' : 'text-red-700'}`}>
+              {paymentState.balanceLabel}
+            </span>
+            <span className={`font-bold ${paymentState.amountClass}`}>
+              {paymentState.isSettled && paymentState.balance >= -0.005
+                ? paymentState.label
+                : `$${Math.abs(paymentState.balance).toFixed(2)}`}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  })();
+
   return (
     <>
     <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
@@ -938,14 +1798,22 @@ const EditBooking: React.FC = () => {
                     onChange={(e) => handleLocationChange(Number(e.target.value))}
                     className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                   >
-                    <option value="">Select a location</option>
+                    <option value="" disabled={isCustom}>Select a location</option>
                     {locations.map((loc) => (
                       <option key={loc.id} value={loc.id}>{loc?.name}</option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-500">
-                    Changing the location resets the selected package, space, date, and time.
+                    {isCustom
+                      ? "Changing the location resets the space and removes add-ons that aren't offered there."
+                      : 'Changing the location resets the selected package, space, date, and time.'}
                   </p>
+                  {isCustom && customFieldError('location')}
+                  {isCustom && customAddOnsNotice && (
+                    <div className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                      {customAddOnsNotice}
+                    </div>
+                  )}
 
                   {formData.locationId && formData.date && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -1036,6 +1904,7 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
+            {isCustom ? customPackageSection : (
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Package className={`w-5 h-5 text-${themeColor}-600`} /> Package / Party
@@ -1051,7 +1920,7 @@ const EditBooking: React.FC = () => {
                   <option value="">Select a package</option>
                   {availablePackages.map((pkg) => (
                     <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} - ${Number(pkg.price).toFixed(2)}{pkg.available_online === false ? ' · Backend only' : ''}
+                      {pkg.name} - ${Number(pkg.price).toFixed(2)}{pkg.available_online === false ? ' · Hidden from booking site' : ''}
                     </option>
                   ))}
                 </select>
@@ -1061,7 +1930,7 @@ const EditBooking: React.FC = () => {
                       <span className="font-medium">Selected:</span> {packageDetails.name} • ${Number(packageDetails.price).toFixed(2)}
                       {packageDetails.available_online === false && (
                         <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium amber-tone bg-amber-100 text-amber-800">
-                          Backend only
+                          Hidden from booking site
                         </span>
                       )}
                     </p>
@@ -1069,10 +1938,11 @@ const EditBooking: React.FC = () => {
                 )}
               </div>
             </div>
+            )}
 
             <div>
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                <Home className={`w-5 h-5 text-${themeColor}-600`} /> Space Assignment
+                <Home className={`w-5 h-5 text-${themeColor}-600`} /> Space Assignment{isCustom ? ' *' : ''}
               </h3>
               {availableRooms.length > 0 ? (
                 <select
@@ -1093,6 +1963,7 @@ const EditBooking: React.FC = () => {
                   </p>
                 </div>
               )}
+              {isCustom && customFieldError('room')}
             </div>
 
             <div>
@@ -1185,7 +2056,16 @@ const EditBooking: React.FC = () => {
 
                 <div>
                   <label className="block font-semibold mb-2 text-base text-neutral-800">Time</label>
-                  {!formData.date ? (
+                  {isCustom ? (
+                    <input
+                      type="time"
+                      name="time"
+                      required
+                      value={formData.time ? formData.time.slice(0, 5) : ''}
+                      onChange={handleInputChange}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                    />
+                  ) : !formData.date ? (
                     <p className="text-sm text-gray-400 py-2">Select a date first to see available times.</p>
                   ) : loadingTimeSlots ? (
                     <div className="flex items-center justify-center p-4">
@@ -1235,7 +2115,9 @@ const EditBooking: React.FC = () => {
                   ) : (
                     <p className="text-sm text-gray-400 py-2">No available times for the selected date.</p>
                   )}
-                  {formData.time && (
+                  {isCustom ? (
+                    customEndText && <p className="text-xs text-gray-500 mt-2">{customEndText}</p>
+                  ) : formData.time && (
                     <p className="text-xs text-gray-500 mt-2">
                       Selected: <span className="font-medium text-gray-700">{formatTimeTo12Hour(formData.time)}</span>
                     </p>
@@ -1260,12 +2142,17 @@ const EditBooking: React.FC = () => {
                       required
                       value={formData.participants}
                       onChange={handleInputChange}
-                      onBlur={() => setFormData(prev => ({
+                      onBlur={isCustom ? undefined : () => setFormData(prev => ({
                         ...prev,
                         participants: Math.min(packageDetails?.max_participants || Number.MAX_SAFE_INTEGER, Math.max(dateMinParticipants, prev.participants)),
                       }))}
+                      aria-invalid={isCustom ? !!customErrors.participants : undefined}
                       className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                     />
+                    {isCustom && customInput && (
+                      <p className="text-xs text-gray-500 mt-1">{participantsHint(customInput.minGuests, customInput.maxGuests)}</p>
+                    )}
+                    {isCustom && customFieldError('participants')}
                   </div>
                   <div>
                     <label className="block font-semibold mb-2 text-base text-neutral-800">Status</label>
@@ -1295,12 +2182,13 @@ const EditBooking: React.FC = () => {
               </div>
             </div>
 
-            {availableAddOns.length > 0 && (
+            {(isCustom || availableAddOns.length > 0) && (
               <div>
                 <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                   <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
                 </h3>
                 <p className="text-sm text-gray-500 mb-4">Add or adjust extras for this booking. Changing add-ons updates the total.</p>
+                {isCustom && customOneTimeAddOnsPanel}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {availableAddOns.map((addOn: any) => {
                     const quantity = selectedAddOns[addOn.id] || 0;
@@ -1350,6 +2238,10 @@ const EditBooking: React.FC = () => {
                               max={maxQty}
                               value={quantity}
                               onChange={(e) => {
+                                if (isCustom) {
+                                  setCustomAddOnQuantity(addOn.id, parseInt(e.target.value) || 0, maxQty);
+                                  return;
+                                }
                                 const newQty = clampAddOnQuantity(addOn, formData.packageId, quantity, parseInt(e.target.value) || 0);
                                 if (newQty <= 0) {
                                   setSelectedAddOns(prev => {
@@ -1374,6 +2266,7 @@ const EditBooking: React.FC = () => {
                               {''}
                             </StandardButton>
                           </div>
+                          {isCustom && customFieldError(catalogErrorKey(addOn.id))}
                         </div>
                       </div>
                     );
@@ -1382,7 +2275,7 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
-            {packageDetails?.has_guest_of_honor && (
+            {showGuestOfHonor && (
               <div>
                 <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                   <User className={`w-5 h-5 text-${themeColor}-600`} /> Guest of Honor
@@ -1498,7 +2391,7 @@ const EditBooking: React.FC = () => {
                 size="lg"
                 icon={Save}
                 type="submit"
-                disabled={submitting || quoteLoading || quoteError !== null}
+                disabled={submitting || quoteLoading || quoteError !== null || (isCustom && (!customInput || customTermsUnavailable))}
                 loading={submitting}
               >
                 {submitting ? 'Saving...' : quoteLoading ? 'Pricing...' : 'Save Changes'}
@@ -1530,6 +2423,8 @@ const EditBooking: React.FC = () => {
                 <p className="text-sm text-gray-600 mt-1">${Number(packageDetails.price).toFixed(2)}</p>
               </div>
             )}
+
+            {isCustom && customSummaryBlock}
 
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Space</p>
@@ -1564,6 +2459,7 @@ const EditBooking: React.FC = () => {
                   hour12: true 
                 }) : 'Not set'}
               </p>
+              {isCustom && customEndText && <p className="text-sm text-gray-600">{customEndText}</p>}
             </div>
 
             <div className="pb-4 border-b border-gray-100">
@@ -1585,6 +2481,7 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
+            {isCustom ? customPaymentSummary : (
             <div>
               <p className="text-sm text-gray-500 mb-3">Applied Fees</p>
               <div className="space-y-2 mb-4">
@@ -1769,6 +2666,7 @@ const EditBooking: React.FC = () => {
                 })()}
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>

@@ -35,6 +35,26 @@ import CustomFieldAnswers from '../../../components/admin/CustomFieldAnswers';
 import { normalizeCategory } from '../../../utils/venueCategories';
 import { resolvePaymentState } from '../../../types/Bookings.types';
 import { cardFromPayments, formatCardLabel, formatMoney } from '../../../utils/cardLabel';
+import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
+import {
+  CUSTOM_PACKAGE_LABEL,
+  ONE_TIME_ADD_ONS_LABEL,
+  bookingCategoryOf,
+  bookingDisplayName,
+  customGuestRange,
+  customQuoteFromTerms,
+  customTermsMissing,
+  customTermsOf,
+  durationText,
+  feeLineLabel,
+  formatMoney as formatCents,
+  isCustomBooking,
+  oneTimeAddOnsOf,
+  packageLineLabel,
+  priceFieldLabel,
+  pricingTypeLabel,
+  toCents,
+} from '../../../utils/customBooking';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -120,8 +140,9 @@ const ViewBooking: React.FC = () => {
             (bookingData as { custom_field_responses?: unknown }).custom_field_responses === undefined;
           const missingPayments =
             (bookingData as { payments?: unknown }).payments === undefined;
+          const missingCustomTerms = customTermsMissing(bookingData);
 
-          if (!cameFromShowEndpoint && (missingAnswers || missingPayments) && id) {
+          if (!cameFromShowEndpoint && (missingAnswers || missingPayments || missingCustomTerms) && id) {
             bookingService
               .getBookingById(Number(id))
               .then(fresh => { if (fresh.success && fresh.data) setBooking(fresh.data); })
@@ -185,6 +206,24 @@ const ViewBooking: React.FC = () => {
     completed: 'bg-green-100 text-green-800',
     'checked-in': `bg-${themeColor}-100 text-${fullColor}`
   };
+
+  const isCustom = isCustomBooking(booking);
+  const customTerms = isCustom ? customTermsOf(booking) : null;
+  const oneTimeLines = isCustom ? oneTimeAddOnsOf(booking) : [];
+  const customHasCatalogAddOns = (booking.add_ons?.length ?? 0) > 0;
+  const customBreakdown = customTerms
+    ? customQuoteFromTerms(customTerms, booking.participants, (booking.add_ons || []).map((addOn) => ({
+        unitPrice: Number(addOn.pivot?.price_at_booking ?? addOn.price ?? 0) || 0,
+        quantity: Number(addOn.pivot?.quantity ?? 1) || 1,
+      })))
+    : null;
+  const customPricingType = customTerms?.pricingType ?? (booking.package_pricing_type_at_booking === 'per_person' ? 'per_guest' : 'per_booking');
+  const customPrice = customTerms ? customTerms.price : Number(booking.package_price_at_booking ?? 0) || 0;
+  const customGuestCount = Number(booking.participants) || 0;
+  const customRange = customTerms ? customGuestRange(customTerms.minGuests, customTerms.maxGuests) : null;
+  const customGuestsText = `${customGuestCount} ${customGuestCount === 1 ? 'guest' : 'guests'}${
+    customRange ? ` (allowed ${customRange.min}–${customRange.max})` : ''
+  }`;
 
   const handleDownloadQRCode = () => {
     if (!qrCodeData || !booking) return;
@@ -295,7 +334,47 @@ const ViewBooking: React.FC = () => {
                 </div>
               )}
 
-              {booking.package ? (
+              {isCustom ? (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
+                    <Package className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-gray-500">{CUSTOM_PACKAGE_LABEL}</p>
+                    <dl className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                      <div className="min-w-0 sm:col-span-2">
+                        <dt className="text-xs text-gray-500">Booking Name</dt>
+                        <dd className="font-medium text-gray-900 flex flex-wrap items-center gap-2 break-words">
+                          <span className="min-w-0 break-words">{bookingDisplayName(booking, CUSTOM_PACKAGE_LABEL)}</span>
+                          <CustomPackageBadge />
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-gray-500">Category</dt>
+                        <dd className="font-medium text-gray-900 break-words">{bookingCategoryOf(booking) || '—'}</dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-gray-500">Duration</dt>
+                        <dd className="font-medium text-gray-900">
+                          {(customTerms && durationText(customTerms.durationMinutes)) || formatDurationDisplay(booking.duration, booking.duration_unit)}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-gray-500">Guests</dt>
+                        <dd className="font-medium text-gray-900">{customGuestsText}</dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-gray-500">Pricing</dt>
+                        <dd className="font-medium text-gray-900">{pricingTypeLabel(customPricingType)}</dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-gray-500">{priceFieldLabel(customPricingType)}</dt>
+                        <dd className="font-medium text-gray-900">{formatCents(toCents(customPrice))}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              ) : booking.package ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                     <Package className={`h-5 w-5 text-${fullColor}`} />
@@ -326,6 +405,7 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
+              {!isCustom && (
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <Clock className={`h-5 w-5 text-${fullColor}`} />
@@ -335,7 +415,9 @@ const ViewBooking: React.FC = () => {
                   <p className="font-medium text-gray-900">{formatDurationDisplay(booking.duration, booking.duration_unit)}</p>
                 </div>
               </div>
+              )}
 
+              {!isCustom && (
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${themeColor}-100 rounded-lg flex-shrink-0`}>
                   <Users className={`h-5 w-5 text-${fullColor}`} />
@@ -345,6 +427,7 @@ const ViewBooking: React.FC = () => {
                   <p className="font-medium text-gray-900">{booking.participants} people</p>
                 </div>
               </div>
+              )}
 
               {(booking.location && typeof booking.location === 'object') ? (
                 <div className="flex items-start gap-3">
@@ -510,7 +593,48 @@ const ViewBooking: React.FC = () => {
                 </div>
               )}
 
-              {booking.applied_fees && booking.applied_fees.length > 0 && (
+              {customTerms && customBreakdown ? (
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <p className="text-sm font-medium text-gray-900 mb-3">Price Breakdown</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-gray-600 min-w-0 break-words">{packageLineLabel(customTerms.pricingType, booking.participants, customTerms.price)}</span>
+                      <span className="font-medium text-gray-900 shrink-0">{formatCents(customBreakdown.packageCents)}</span>
+                    </div>
+                    {customHasCatalogAddOns && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">Add-ons</span>
+                        <span className="font-medium text-gray-900 shrink-0">{formatCents(customBreakdown.catalogCents)}</span>
+                      </div>
+                    )}
+                    {oneTimeLines.length > 0 && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-600">{ONE_TIME_ADD_ONS_LABEL}</span>
+                        <span className="font-medium text-gray-900 shrink-0">{formatCents(customBreakdown.oneTimeCents)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between gap-3 pt-2 border-t border-gray-100">
+                      <span className="text-gray-600">Subtotal</span>
+                      <span className="font-medium text-gray-900 shrink-0">{formatCents(customBreakdown.subtotalCents)}</span>
+                    </div>
+                    {customBreakdown.fees.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500">Fees</p>
+                        {customBreakdown.fees.map((fee, index) => (
+                          <div key={`${fee.name}-${index}`} className="flex justify-between gap-3">
+                            <span className="text-gray-600 min-w-0 break-words">{feeLineLabel(fee) || 'Fee'}</span>
+                            <span className="font-medium text-gray-900 shrink-0">+{formatCents(fee.cents)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex justify-between gap-3 pt-2 border-t border-gray-200">
+                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-bold text-gray-900 shrink-0">{formatCents(customBreakdown.totalCents)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : booking.applied_fees && booking.applied_fees.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedFeesDisplay appliedFees={booking.applied_fees} />
                 </div>
@@ -634,7 +758,7 @@ const ViewBooking: React.FC = () => {
             )}
           </div>
 
-          {((booking.attractions && booking.attractions.length > 0) || ((booking as any).add_ons && (booking as any).add_ons.length > 0)) && (
+          {((booking.attractions && booking.attractions.length > 0) || ((booking as any).add_ons && (booking as any).add_ons.length > 0) || oneTimeLines.length > 0) && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Services</h2>
               <div className="flex flex-col gap-6">
@@ -717,6 +841,32 @@ const ViewBooking: React.FC = () => {
                           </li>
                         );
                       })}
+                    </ul>
+                  </div>
+                )}
+
+                {oneTimeLines.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-2">{ONE_TIME_ADD_ONS_LABEL} ({oneTimeLines.length})</h3>
+                    <ul className="space-y-2">
+                      {oneTimeLines.map((line, index) => (
+                        <li key={index} className="flex items-start justify-between gap-3 text-gray-700">
+                          <div className="flex items-start min-w-0">
+                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2 shrink-0"></span>
+                            <div className="min-w-0">
+                              <p className="font-medium break-words">{line.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {line.quantity > 1 ? (
+                                  <>{line.quantity} × {formatCents(toCents(line.unitPrice))}</>
+                                ) : (
+                                  <>Quantity: {line.quantity}</>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="font-medium shrink-0">{formatCents(toCents(line.total))}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}
