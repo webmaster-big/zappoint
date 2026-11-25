@@ -32,6 +32,7 @@ export interface Room {
   break_time?: BreakTime[];
   area_group?: string;
   booking_interval?: number;
+  area_allows_simultaneous_starts?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -130,9 +131,14 @@ class RoomService {
     return response.data;
   }
 
-  async updateBookingIntervalByAreaGroup(areaGroup: string, bookingInterval: number, locationId?: number | null): Promise<ApiResponse<{ updated_count: number }>> {
+  async updateBookingIntervalByAreaGroup(
+    areaGroup: string,
+    changes: { bookingInterval?: number; allowsSimultaneousStarts?: boolean },
+    locationId?: number | null,
+  ): Promise<ApiResponse<{ updated_count: number }>> {
     const response = await api.patch(`/rooms/area-group/${encodeURIComponent(areaGroup)}/update-booking-interval`, {
-      booking_interval: bookingInterval,
+      ...(changes.bookingInterval !== undefined ? { booking_interval: changes.bookingInterval } : {}),
+      ...(changes.allowsSimultaneousStarts !== undefined ? { area_allows_simultaneous_starts: changes.allowsSimultaneousStarts } : {}),
       ...(locationId ? { location_id: locationId } : {})
     });
     return response.data;

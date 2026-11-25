@@ -178,7 +178,8 @@ const CreatePackage: React.FC = () => {
                     name: room.name,
                     area_group: room.area_group || undefined,
                     booking_interval: room.booking_interval ?? undefined,
-                    is_available: room.is_available ?? true
+                    is_available: room.is_available ?? true,
+                    area_allows_simultaneous_starts: room.area_allows_simultaneous_starts === true
                 }));
 
                 setAttractions(attractionsData);
@@ -380,6 +381,16 @@ const CreatePackage: React.FC = () => {
         () => form.rooms.flatMap(name => {
             const room = rooms.find(candidate => candidate.name === name);
             return room && room.is_available !== false ? [room.booking_interval ?? 0] : [];
+        }),
+        [form.rooms, rooms],
+    );
+
+    const selectedSpacesHoldStartsApart = useMemo(
+        () => form.rooms.some(name => {
+            const room = rooms.find(candidate => candidate.name === name);
+            if (!room || room.is_available === false || !room.area_group) return false;
+            const area = rooms.filter(candidate => candidate.area_group === room.area_group);
+            return area.length > 1 && !area.every(candidate => candidate.area_allows_simultaneous_starts === true);
         }),
         [form.rooms, rooms],
     );
@@ -1375,6 +1386,7 @@ const CreatePackage: React.FC = () => {
                                                                 durationMinutes={durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes)}
                                                                 interval={schedule.time_slot_interval}
                                                                 spaceIntervals={selectedSpaceIntervals}
+                                                                spacesHoldStartsApart={selectedSpacesHoldStartsApart}
                                                                 cleanupMinutes={slotCleanupMinutes}
                                                                 onUseDuration={() => updateSchedule(index, { time_slot_interval: durationToMinutes(form.durationUnit, form.duration, form.durationHours, form.durationMinutes) })}
                                                             />

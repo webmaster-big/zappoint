@@ -21,6 +21,7 @@ export interface CreatePackageRoom {
   area_group?: string;
   booking_interval?: number;
   is_available?: boolean;
+  area_allows_simultaneous_starts?: boolean;
 }
 
 export interface CreatePackageForm {

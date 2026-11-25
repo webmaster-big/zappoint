@@ -28,8 +28,8 @@ export const startCadenceLabel = (args: StartTimeArgs): string => {
   return `a start every ${args.interval} min`;
 };
 
-export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () => void }> = props => {
-  const { durationMinutes, interval, spaceIntervals, onUseDuration } = props;
+export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () => void; spacesHoldStartsApart?: boolean }> = props => {
+  const { durationMinutes, interval, spaceIntervals, onUseDuration, spacesHoldStartsApart } = props;
 
   if (!durationMinutes || !interval) return null;
 
@@ -45,7 +45,7 @@ export const ScheduleIntervalNote: React.FC<StartTimeArgs & { onUseDuration: () 
       {' '}Once a booking is taken, that space stays closed for its turnaround
       {sameEverywhere ? ` of ${longest} min` : ` — up to ${longest} min across the spaces you picked`} before it can
       take another.
-      {spaces.length > 1 ? ' Spaces sharing an area also hold their start times that far apart.' : ''}
+      {spacesHoldStartsApart ? ' Spaces sharing an area also hold their start times apart by the largest turnaround in that area.' : ''}
     </>
   );
 

@@ -101,7 +101,34 @@ const Rooms: React.FC = () => {
 
     const [showAreaGroupModal, setShowAreaGroupModal] = useState(false);
     const [selectedAreaGroup, setSelectedAreaGroup] = useState<string>('');
-    const [areaGroupInterval, setAreaGroupInterval] = useState<string>('15');
+    const [areaGroupInterval, setAreaGroupInterval] = useState<string>('');
+    const [areaGroupIntervalTouched, setAreaGroupIntervalTouched] = useState(false);
+    const [areaGroupStartsTogether, setAreaGroupStartsTogether] = useState(false);
+    const [areaGroupStartsTogetherTouched, setAreaGroupStartsTogetherTouched] = useState(false);
+    const areaGroupStartsTogetherRef = React.useRef<HTMLInputElement>(null);
+
+    const areaGroupSummary = React.useMemo(() => {
+        const inGroup = rooms.filter(r => r.area_group === selectedAreaGroup);
+        const turnarounds = [...new Set(inGroup.map(r => r.booking_interval).filter((minutes): minutes is number => minutes != null))].sort((a, b) => a - b);
+        const together = inGroup.map(r => r.area_allows_simultaneous_starts === true);
+        return {
+            turnaround: turnarounds.length === 1 ? String(turnarounds[0]) : '',
+            turnaroundRange: turnarounds.length > 1 ? `${turnarounds[0]}–${turnarounds[turnarounds.length - 1]} min` : null,
+            largestTurnaround: turnarounds.length > 0 ? turnarounds[turnarounds.length - 1] : null,
+            startsTogether: together.length > 0 && together.every(Boolean),
+            startsTogetherMixed: together.some(Boolean) && !together.every(Boolean),
+        };
+    }, [rooms, selectedAreaGroup]);
+
+    const shownAreaGroupInterval = areaGroupIntervalTouched ? areaGroupInterval : areaGroupSummary.turnaround;
+    const shownAreaGroupStartsTogether = areaGroupStartsTogetherTouched ? areaGroupStartsTogether : areaGroupSummary.startsTogether;
+    const areaGroupStartsTogetherMixed = !areaGroupStartsTogetherTouched && areaGroupSummary.startsTogetherMixed;
+
+    useEffect(() => {
+        if (areaGroupStartsTogetherRef.current) {
+            areaGroupStartsTogetherRef.current.indeterminate = areaGroupStartsTogetherMixed;
+        }
+    }, [areaGroupStartsTogetherMixed, selectedAreaGroup, showAreaGroupModal]);
 
     const generateRoomPreview = (): string[] => {
         const { baseName, suffixType, count, startNumber, startLetter } = bulkFormData;
@@ -475,29 +502,63 @@ const Rooms: React.FC = () => {
         return [...new Set(groups)].sort();
     };
 
+    const resetAreaGroupForm = () => {
+        setAreaGroupInterval('');
+        setAreaGroupIntervalTouched(false);
+        setAreaGroupStartsTogether(false);
+        setAreaGroupStartsTogetherTouched(false);
+    };
+
+    const closeAreaGroupModal = () => {
+        setShowAreaGroupModal(false);
+        setSelectedAreaGroup('');
+        resetAreaGroupForm();
+    };
+
     const handleAreaGroupIntervalUpdate = async () => {
         if (!selectedAreaGroup) {
             showToast('Please select an area group', 'error');
             return;
         }
-        
+
+        const sendInterval = areaGroupIntervalTouched && areaGroupInterval.trim() !== '';
+        const sendStartsTogether = areaGroupStartsTogetherTouched;
+
+        if (!sendInterval && !sendStartsTogether) {
+            showToast('Nothing changed for this area group', 'info');
+            closeAreaGroupModal();
+            return;
+        }
+
         const interval = parseInt(areaGroupInterval);
-        if (isNaN(interval) || interval < 0) {
+        if (sendInterval && (isNaN(interval) || interval < 0)) {
             showToast('Please enter a valid interval', 'error');
             return;
         }
 
         try {
             const areaGroupLocationId = isCompanyAdmin ? selectedLocationId : (currentUser?.location_id ?? null);
-            const response = await roomService.updateBookingIntervalByAreaGroup(selectedAreaGroup, interval, areaGroupLocationId);
+            const response = await roomService.updateBookingIntervalByAreaGroup(
+                selectedAreaGroup,
+                {
+                    bookingInterval: sendInterval ? interval : undefined,
+                    allowsSimultaneousStarts: sendStartsTogether ? areaGroupStartsTogether : undefined,
+                },
+                areaGroupLocationId,
+            );
+            const savedRooms = rooms.filter(r => r.area_group === selectedAreaGroup);
+            const savedValues = {
+                ...(sendInterval ? { booking_interval: interval } : {}),
+                ...(sendStartsTogether ? { area_allows_simultaneous_starts: areaGroupStartsTogether } : {}),
+            };
             showToast(response.message || `Booking interval updated for area group "${selectedAreaGroup}"`, 'success');
-            setShowAreaGroupModal(false);
-            setSelectedAreaGroup('');
-            setAreaGroupInterval('15');
+            closeAreaGroupModal();
+            await Promise.all(savedRooms.map(room => roomCacheService.updateRoomInCache({ ...room, ...savedValues })));
             fetchRooms();
         } catch (error) {
             console.error('Error updating area group interval:', error);
-            showToast('Error updating turnaround', 'error');
+            const serverMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            showToast(serverMessage || 'Could not save the area group settings', 'error');
         }
     };
 
@@ -804,6 +865,10 @@ const Rooms: React.FC = () => {
                                                 </div>
                                             )}
 
+                                            {room.area_group && room.area_allows_simultaneous_starts && (
+                                                <div className="text-xs text-gray-500">Group can start together</div>
+                                            )}
+
                                             <div className="text-xs text-gray-500">
                                                 {new Date(room.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                             </div>
@@ -972,7 +1037,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="e.g., Zone A"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Spaces in the same area are checked together, using the largest turnaround set on any of them.</p>
+                                                    <p className="text-xs text-gray-500 mt-1">Spaces in the same area start apart by the largest turnaround set on any of them, unless Area Group Settings lets them start at the same time.</p>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1226,7 +1291,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="e.g., Zone A"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">Spaces in the same area are checked together, using the largest turnaround set on any of them.</p>
+                                                    <p className="text-xs text-gray-500 mt-1">Spaces in the same area start apart by the largest turnaround set on any of them, unless Area Group Settings lets them start at the same time.</p>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1241,7 +1306,7 @@ const Rooms: React.FC = () => {
                                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                                         placeholder="15"
                                                     />
-                                                    <p className="text-xs text-gray-500 mt-1">How long each space stays closed after a booking ends. If these spaces share an area, it also means bookings across the area must start at least this far apart.</p>
+                                                    <p className="text-xs text-gray-500 mt-1">How long each space stays closed after a booking ends. If these spaces share an area, it also means bookings across the area must start at least this far apart, unless Area Group Settings lets them start at the same time.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1487,8 +1552,8 @@ const Rooms: React.FC = () => {
                                                 placeholder="e.g., Zone A"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">
-                                                Spaces in the same area are checked together. Clear this box to ungroup
-                                                this space, so its times stop being staggered against the others.
+                                                Spaces in the same area keep their start times apart, unless Area Group Settings
+                                                lets them start at the same time. Clear this box to ungroup this space.
                                             </p>
                                         </div>
                                         <div>
@@ -1661,7 +1726,7 @@ const Rooms: React.FC = () => {
             )}
 
             {showAreaGroupModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAreaGroupModal(false)}>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeAreaGroupModal}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6">
                             <div className="flex items-center gap-3 mb-4">
@@ -1670,7 +1735,7 @@ const Rooms: React.FC = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-semibold text-gray-900">Area Group Settings</h2>
-                                    <p className="text-sm text-gray-500">Set one turnaround for every space in an area group</p>
+                                    <p className="text-sm text-gray-500">Set the turnaround, and whether spaces can start at the same time, for every space in an area group</p>
                                 </div>
                             </div>
 
@@ -1692,12 +1757,7 @@ const Rooms: React.FC = () => {
                                         value={selectedAreaGroup}
                                         onChange={(e) => {
                                             setSelectedAreaGroup(e.target.value);
-                                            const roomInGroup = rooms.find(r => r.area_group === e.target.value);
-                                            setAreaGroupInterval(
-                                                roomInGroup && roomInGroup.booking_interval != null
-                                                    ? String(roomInGroup.booking_interval)
-                                                    : '15'
-                                            );
+                                            resetAreaGroupForm();
                                         }}
                                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                     >
@@ -1739,16 +1799,55 @@ const Rooms: React.FC = () => {
                                             </label>
                                             <input
                                                 type="number"
-                                                value={areaGroupInterval}
-                                                onChange={(e) => setAreaGroupInterval(e.target.value)}
+                                                value={shownAreaGroupInterval}
+                                                onChange={(e) => {
+                                                    setAreaGroupInterval(e.target.value);
+                                                    setAreaGroupIntervalTouched(true);
+                                                }}
                                                 min="0"
                                                 max="120"
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                                                placeholder="15"
+                                                placeholder={
+                                                    areaGroupSummary.turnaroundRange
+                                                        ? `Mixed: ${areaGroupSummary.turnaroundRange}`
+                                                        : areaGroupSummary.turnaround
+                                                        ? `Keep ${areaGroupSummary.turnaround} min`
+                                                        : '15'
+                                                }
                                             />
                                             <p className="text-xs text-gray-500 mt-1">
-                                                Written to every space in this area. It sets how long each space stays closed after a booking, and how far apart bookings across the area must start. Set to 0 to let two spaces in the area start at the same time — two bookings in the SAME space can still never overlap.
+                                                {shownAreaGroupInterval.trim() === ''
+                                                    ? areaGroupSummary.turnaroundRange
+                                                        ? `These spaces have different turnarounds (${areaGroupSummary.turnaroundRange}). Leave this blank to keep each space's own, or type a number to set them all.`
+                                                        : "Leave this blank to keep each space's turnaround as it is, or type a number to set them all."
+                                                    : 'Written to every space in this area. It sets how long each space stays closed after one of its own bookings. Two bookings in the SAME space can never overlap.'}
                                             </p>
+                                        </div>
+
+                                        <div className="flex items-start">
+                                            <input
+                                                ref={areaGroupStartsTogetherRef}
+                                                id="area-group-starts-together"
+                                                type="checkbox"
+                                                checked={shownAreaGroupStartsTogether}
+                                                onChange={(e) => {
+                                                    setAreaGroupStartsTogether(e.target.checked);
+                                                    setAreaGroupStartsTogetherTouched(true);
+                                                }}
+                                                className={`mt-0.5 w-4 h-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
+                                            />
+                                            <label htmlFor="area-group-starts-together" className="ml-2 block">
+                                                <span className="block text-sm text-gray-900">Spaces in this group can start at the same time</span>
+                                                <span className="block text-xs text-gray-500 mt-1">
+                                                    {areaGroupStartsTogetherMixed
+                                                        ? 'Not every space here has this ticked. A group only starts together when all its spaces do, so tick or untick to set them all the same.'
+                                                        : shownAreaGroupStartsTogether
+                                                        ? 'A booking in one space no longer holds back start times in the other spaces. Each space only waits out its own turnaround.'
+                                                        : areaGroupSummary.largestTurnaround === 0
+                                                        ? 'Every turnaround in this group is 0, so start times are not held apart.'
+                                                        : 'Spaces in this group keep their start times apart by the largest turnaround in the group, so a booking in one space removes nearby start times from the others.'}
+                                                </span>
+                                            </label>
                                         </div>
                                     </>
                                 )}
@@ -1764,11 +1863,7 @@ const Rooms: React.FC = () => {
                                         Update All Rooms
                                     </StandardButton>
                                     <StandardButton
-                                        onClick={() => {
-                                            setShowAreaGroupModal(false);
-                                            setSelectedAreaGroup('');
-                                            setAreaGroupInterval('15');
-                                        }}
+                                        onClick={closeAreaGroupModal}
                                         variant="secondary"
                                         size="md"
                                         className="flex-1"
