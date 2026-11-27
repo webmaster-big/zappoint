@@ -158,6 +158,7 @@ export interface CreateBookingData {
   custom_package?: CustomPackagePayload;
   location_id: number;
   room_id?: number;
+  room_ids?: number[];
   created_by?: number;
   gift_card_id?: number;
   promo_id?: number;
@@ -282,6 +283,7 @@ export interface UpdateBookingData {
   custom_package?: CustomPackagePayload;
   location_id?: number;
   room_id?: number | null;
+  room_ids?: number[];
   booking_date?: string;
   booking_time?: string;
   participants?: number;
@@ -411,6 +413,8 @@ export interface Booking {
   package_id?: number;
   location_id: number;
   room_id?: number;
+  room_ids?: number[];
+  time_slots?: Array<{ id: number; room_id: number | null; status?: string; room?: { id: number; name: string } | null }>;
   created_by?: number;
   gift_card_id?: number;
   promo_id?: number;
@@ -586,6 +590,12 @@ const bookingService = {
       });
       return { items: response.data?.bookings || [], lastPage: response.data?.pagination?.last_page ?? 1 };
     });
+  },
+
+  async getCustomPackageCategories(): Promise<string[]> {
+    const response = await api.get('/bookings/custom-package/categories');
+    const list = response.data?.data;
+    return Array.isArray(list) ? list.filter((name: unknown): name is string => typeof name === 'string' && name.trim() !== '') : [];
   },
 
   async getBookingById(bookingId: number): Promise<BookingResponse> {
@@ -855,6 +865,7 @@ const bookingService = {
     data: {
       restored_count: number;
       space_warnings?: { id: number; reference_number: string; message: string }[];
+      blocked?: { id: number; reference_number: string; message: string }[];
     };
   }> {
     const response = await api.post('/bookings/bulk-restore', { ids });

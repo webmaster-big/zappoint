@@ -8,6 +8,7 @@ import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import { clearStaffSession } from '../../utils/auth';
+import { safeReturnPath } from '../../utils/safeReturnPath';
 
 const carouselSlides = [
   {
@@ -44,7 +45,7 @@ const CustomerLogin = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get('next') || searchParams.get('redirect') || '/';
-  const safeNextPath = nextPath.startsWith('/') ? nextPath : '/';
+  const safeNextPath = safeReturnPath(nextPath, '/');
   const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

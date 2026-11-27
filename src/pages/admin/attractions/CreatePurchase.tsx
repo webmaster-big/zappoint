@@ -83,6 +83,7 @@ const CreatePurchase = () => {
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -1012,6 +1013,7 @@ const CreatePurchase = () => {
               status: 'completed',
               location_id: order.location_id,
               notes: `Collected at creation for order ${order.reference_number}`,
+              external_reference: paymentReceipt.trim() || undefined,
             });
           } catch {
             void attractionPurchaseCacheService.clearCache();
@@ -1199,6 +1201,7 @@ const CreatePurchase = () => {
             status: 'completed' as const,
             location_id: Number(selectedAttraction.locationId),
             notes: `Payment for attraction purchase: ${selectedAttraction.name}`,
+            external_reference: paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
           };
           
           await createPayment(paymentData);
@@ -1248,6 +1251,7 @@ const CreatePurchase = () => {
       setCardYear('');
       setCardCVV('');
       setPaymentError('');
+      setPaymentReceipt('');
       setSendEmail(true);
       setScheduledDate('');
       setScheduledTime('');
@@ -1582,6 +1586,20 @@ const CreatePurchase = () => {
                     />
                   </div>
 
+                  {!bulkMode && paymentMethod === 'in-store' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                      <input
+                        type="text"
+                        value={paymentReceipt}
+                        maxLength={100}
+                        onChange={(e) => setPaymentReceipt(e.target.value)}
+                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                        placeholder="From the card terminal or register receipt"
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
                     <textarea
@@ -1833,6 +1851,20 @@ const CreatePurchase = () => {
                     <span className="text-sm">Pay Later</span>
                   </button>
                 </div>
+
+                {bulkMode && paymentMethod === 'in-store' && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                    <input
+                      type="text"
+                      value={paymentReceipt}
+                      maxLength={100}
+                      onChange={(e) => setPaymentReceipt(e.target.value)}
+                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                      placeholder="From the card terminal or register receipt"
+                    />
+                  </div>
+                )}
 
                 {paymentMethod === 'paylater' && (
                   <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">

@@ -79,6 +79,11 @@ export const chargePayment = async (
   }
 };
 
+export const paymentErrorMessage = (error: unknown, fallback: string): string => {
+  const data = (error as { response?: { data?: { message?: string; error_code?: string } } })?.response?.data;
+  return data?.error_code === 'DUPLICATE_RECEIPT' && data.message ? data.message : fallback;
+};
+
 export const createPayment = async (
   data: CreatePaymentRequest
 ): Promise<PaymentApiResponse<Payment>> => {

@@ -152,6 +152,7 @@ export interface Payment {
   status: PaymentStatus;
   transaction_id: string;
   payment_id?: string;
+  external_reference?: string | null;
   notes?: string;
   paid_at?: string;
   refunded_at?: string;
@@ -185,6 +186,7 @@ export interface Payment {
 }
 
 export interface CreatePaymentRequest {
+  external_reference?: string;
   payable_id?: number;
   payable_type?: PaymentPayableType;
   booking_id?: number;

@@ -27,7 +27,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { fetchAllPages } from '../../../utils/fetchAllPages';
 import { bookingCacheService } from '../../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../../services/PaymentService';
 import attractionPurchaseService, { type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import eventPurchaseService from '../../../services/EventPurchaseService';
 import { AttractionScheduleCard, EventScheduleCard } from '../../../components/admin/calendar/ScheduledActivity';
@@ -55,6 +55,7 @@ import { dayOffService, type AvailabilityBlock } from '../../../services/DayOffS
 import { CUSTOM_PACKAGE_LABEL, bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
 import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
 import { CustomPackageSection, OneTimeAddOnsSection } from '../../../components/admin/bookings/CustomPackageDetails';
+import { bookingSpaceNames, bookingSpaces } from '../../../utils/bookingSpaces';
 
 const CUSTOM_PACKAGE_FILTER = '__custom_package__';
 
@@ -117,6 +118,7 @@ const CalendarView: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const loadBookings = useCallback(async (silent = false) => {
@@ -971,6 +973,7 @@ const CalendarView: React.FC = () => {
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
   };
 
@@ -979,6 +982,7 @@ const CalendarView: React.FC = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   const handleSubmitPayment = async () => {
@@ -1004,6 +1008,7 @@ const CalendarView: React.FC = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
+        external_reference: paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
       });
 
@@ -1028,6 +1033,8 @@ const CalendarView: React.FC = () => {
       handleClosePaymentModal();
     } catch (error) {
       console.error('Error processing payment:', error);
+      const duplicateReceipt = paymentErrorMessage(error, '');
+      if (duplicateReceipt) alert(duplicateReceipt);
     } finally {
       setProcessingPayment(false);
     }
@@ -1733,8 +1740,8 @@ const CalendarView: React.FC = () => {
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">{String((selectedBooking.room as { name?: string }).name || 'N/A')}</span>
-                        {(selectedBooking.room as { capacity?: number }).capacity && (
+                        <span className="font-medium text-gray-900">{bookingSpaceNames(selectedBooking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}</span>
+                        {bookingSpaces(selectedBooking as Parameters<typeof bookingSpaceNames>[0]).length <= 1 && (selectedBooking.room as { capacity?: number }).capacity && (
                           <span className="text-sm text-gray-600">Capacity: {(selectedBooking.room as { capacity?: number }).capacity}</span>
                         )}
                       </div>
@@ -2027,6 +2034,19 @@ const CalendarView: React.FC = () => {
                     In-Store
                   </div>
                 </div>
+                {paymentMethod === 'in-store' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                    <input
+                      type="text"
+                      value={paymentReceipt}
+                      maxLength={100}
+                      onChange={(e) => setPaymentReceipt(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="From the card terminal or register receipt"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
                   <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}

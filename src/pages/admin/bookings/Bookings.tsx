@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { bookingSpaceNames, bookingSpaces } from '../../../utils/bookingSpaces';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
@@ -50,7 +51,7 @@ import { fetchAllPages } from '../../../utils/fetchAllPages';
 import { requestChangeReason } from '../../../utils/changeReasonPrompt';
 import locationChangeRequestService from '../../../services/LocationChangeRequestService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
 import { useLocationScope } from '../../../contexts/LocationContext';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
@@ -135,8 +136,10 @@ const Bookings: React.FC = () => {
       type: 'package',
       packageName: bookingDisplayName(booking, 'N/A'),
       packageId: booking.package_id,
-      room: booking.room?.name || 'N/A',
+      room: bookingSpaceNames(booking) || 'N/A',
       roomId: booking.room_id,
+      roomIds: bookingSpaces(booking).map(space => space.id).filter((id): id is number => id !== null),
+      roomNames: bookingSpaces(booking).filter(space => space.id !== null).map(space => space.name),
       customerName: booking.customer
         ? `${booking.customer.first_name} ${booking.customer.last_name}`
         : booking.guest_name || 'Guest',
@@ -230,6 +233,7 @@ const Bookings: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store' | 'authorize.net'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
@@ -742,7 +746,13 @@ const Bookings: React.FC = () => {
         uniquePackages.set(b.packageId, b.packageName);
       }
       if (b.roomId && b.room !== 'N/A') {
-        uniqueRooms.set(b.roomId, b.room);
+        if (b.roomIds?.length && b.roomNames?.length === b.roomIds.length) {
+          b.roomIds.forEach((id, index) => {
+            if (!uniqueRooms.has(id)) uniqueRooms.set(id, b.roomNames![index]);
+          });
+        } else {
+          uniqueRooms.set(b.roomId, b.room);
+        }
       }
       if (b.customerId && b.customerName !== 'Guest') {
         uniqueCustomers.set(b.customerId, b.customerName);
@@ -784,8 +794,10 @@ const Bookings: React.FC = () => {
               type: 'package' as const,
               packageName: bookingDisplayName(booking, 'N/A'),
               packageId: booking.package_id,
-              room: booking.room?.name || 'N/A',
+              room: bookingSpaceNames(booking) || 'N/A',
               roomId: booking.room_id,
+              roomIds: bookingSpaces(booking).map(space => space.id).filter((id): id is number => id !== null),
+              roomNames: bookingSpaces(booking).filter(space => space.id !== null).map(space => space.name),
               customerName: booking.customer 
                 ? `${booking.customer.first_name} ${booking.customer.last_name}`
                 : booking.guest_name || 'Guest',
@@ -839,7 +851,7 @@ const Bookings: React.FC = () => {
             result = result.filter(matchesPackageFilter);
           }
           if (filters.roomId !== 'all') {
-            result = result.filter(booking => booking.roomId?.toString() === filters.roomId);
+            result = result.filter(booking => (booking.roomIds?.length ? booking.roomIds : [booking.roomId]).some(id => id?.toString() === filters.roomId));
           }
           if (filters.customerId !== 'all') {
             result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
@@ -899,7 +911,7 @@ const Bookings: React.FC = () => {
     }
     
     if (filters.roomId !== 'all') {
-      result = result.filter(booking => booking.roomId?.toString() === filters.roomId);
+      result = result.filter(booking => (booking.roomIds?.length ? booking.roomIds : [booking.roomId]).some(id => id?.toString() === filters.roomId));
     }
     
     if (filters.customerId !== 'all') {
@@ -1787,6 +1799,8 @@ const Bookings: React.FC = () => {
                 locationId: destId,
                 room: destRoom ? destRoom.name : '',
                 roomId: destRoom ? destRoom.id : undefined,
+                roomIds: destRoom ? [destRoom.id] : [],
+                roomNames: destRoom ? [destRoom.name] : [],
               }
             : b
         )
@@ -2601,9 +2615,11 @@ const Bookings: React.FC = () => {
       const response = await bookingService.bulkRestore(ids);
       if (response.success) {
         const spaceWarnings = response.data.space_warnings ?? [];
+        const notRestored = response.data.blocked ?? [];
         alert([
           `${response.data.restored_count} booking(s) restored successfully`,
           ...spaceWarnings.map(warning => `${warning.reference_number}: ${warning.message}`),
+          ...notRestored.map(item => `Not restored, ${item.reference_number}: ${item.message}`),
         ].join('\n\n'));
         setSelectedTrashed([]);
         loadTrashedBookings(trashedCurrentPage);
@@ -2724,6 +2740,7 @@ const Bookings: React.FC = () => {
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
   };
 
@@ -2733,6 +2750,7 @@ const Bookings: React.FC = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   // the log fetches its own notes, so there is nothing to prefetch and nothing to go stale
@@ -2959,7 +2977,7 @@ const Bookings: React.FC = () => {
       booking.guest_zip || '',
       booking.guest_country || '',
       bookingDisplayName(booking, ''),
-      booking.room?.name || '',
+      bookingSpaceNames(booking),
       booking.location?.name || '',
       formatDateCell(booking.booking_date),
       booking.booking_time ? formatTime12Hour(booking.booking_time) : '',
@@ -3045,6 +3063,7 @@ const Bookings: React.FC = () => {
         currency: 'USD',
         method: paymentMethod,
         status: 'completed',
+        external_reference: paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || (paymentMethod === 'in-store' 
           ? `In-store payment for booking ${selectedBookingForPayment.referenceNumber}`
           : `Authorize.net payment for booking ${selectedBookingForPayment.referenceNumber}`),
@@ -3087,7 +3106,7 @@ const Bookings: React.FC = () => {
       handleClosePaymentModal();
     } catch (error) {
       console.error('Error processing payment:', error);
-      alert('Failed to process payment. Please try again.');
+      alert(paymentErrorMessage(error, 'Failed to process payment. Please try again.'));
     } finally {
       setProcessingPayment(false);
     }
@@ -4203,6 +4222,19 @@ const Bookings: React.FC = () => {
                   </div>
                 </div>
 
+                {paymentMethod === 'in-store' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                    <input
+                      type="text"
+                      value={paymentReceipt}
+                      maxLength={100}
+                      onChange={(e) => setPaymentReceipt(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="From the card terminal or register receipt"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Notes (Optional)
@@ -4518,7 +4550,7 @@ const Bookings: React.FC = () => {
                   ) : (
                     <div className="space-y-1 max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2">
                       {destinationBookings.map((b) => {
-                        const bRoom = (b.room as { name?: string } | undefined)?.name;
+                        const bRoom = bookingSpaceNames(b as Parameters<typeof bookingSpaceNames>[0]);
                         return (
                           <div key={b.id} className="text-xs text-gray-700 flex items-center justify-between gap-2 border-b border-gray-50 last:border-0 pb-1 last:pb-0">
                             <span className="flex items-center gap-1 flex-shrink-0">

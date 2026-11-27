@@ -57,6 +57,7 @@ export interface Package {
   customer_notes?: string;
   invitation_download_link?: string | null;
   invitation_file?: string | null;
+  party_invites_enabled?: boolean;
   booking_window_days?: number | null;
   min_booking_notice_hours?: number | null;
   availability_schedules?: AvailabilitySchedule[];
@@ -149,6 +150,7 @@ export interface CreatePackageData {
   customer_notes?: string;
   invitation_download_link?: string | null;
   invitation_file?: string | null;
+  party_invites_enabled?: boolean;
   booking_window_days?: number | null;
   min_booking_notice_hours?: number | null;
   attraction_ids?: (number | undefined)[];

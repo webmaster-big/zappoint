@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import {
   Download,
   RefreshCcw,
@@ -15,18 +15,26 @@ import {
   Landmark,
   CircleDollarSign,
   CreditCard,
+  Globe,
+  Store,
+  HelpCircle,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import InfoTooltip from '../../../components/ui/InfoTooltip';
 import { accountingAnalyticsService } from '../../../services/AccountingAnalyticsService';
 import { useLocationScope } from '../../../contexts/LocationContext';
+import { michiganTodayKey } from '../../../utils/dashboardTimeframe';
 import type {
   AccountingReportResponse,
   CategoryData,
   CategoryItem,
+  DailyReceipts,
+  ReceiptsGroupBy,
+  ReceiptsTotals,
 } from '../../../types/AccountingAnalytics.types';
 
 const formatCurrency = (value: number): string => {
@@ -39,8 +47,8 @@ const formatCurrency = (value: number): string => {
 
 const calculateChange = (primary: number, compare: number): { value: number; display: string; direction: 'up' | 'down' | 'neutral' } => {
   if (compare === 0 && primary === 0) return { value: 0, display: '0%', direction: 'neutral' };
-  if (compare === 0) return { value: 100, display: '+100%', direction: 'up' };
-  const change = ((primary - compare) / compare) * 100;
+  if (compare === 0) return primary > 0 ? { value: 100, display: '+100%', direction: 'up' } : { value: -100, display: '-100%', direction: 'down' };
+  const change = ((primary - compare) / Math.abs(compare)) * 100;
   const sign = change >= 0 ? '+' : '';
   const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
   return { value: change, display: `${sign}${change.toFixed(1)}%`, direction };
@@ -84,6 +92,32 @@ const groupItemsByLabel = (items: CategoryItem[]) => {
     .map(([name, groupItems]) => ({ name, items: groupItems, totals: sumItems(groupItems) }));
 };
 
+const RECEIPT_COLUMNS: Array<{ key: keyof Omit<ReceiptsTotals, 'total'>; label: string; tooltip: string; icon: typeof Globe }> = [
+  {
+    key: 'online',
+    label: 'Online Revenue',
+    tooltip: 'Online payments posted for the selected business day, less online refunds posted that day. Includes tax and customer fees in those payments.',
+    icon: Globe,
+  },
+  {
+    key: 'in_store',
+    label: 'In-Store Collected',
+    tooltip: 'Cash and venue-terminal payments recorded in ZapZone for the selected business day, less in-store refunds posted that day.',
+    icon: Store,
+  },
+  {
+    key: 'unclassified',
+    label: 'Unclassified Receipts',
+    tooltip: 'Posted payments and refunds whose collection channel still needs verification.',
+    icon: HelpCircle,
+  },
+];
+
+const formatReceiptDay = (date: string): string =>
+  new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+const formatSignedCurrency = (value: number): string => (value < 0 ? `-${formatCurrency(Math.abs(value))}` : formatCurrency(value));
+
 const formatDateRange = (start: string, end: string): string => {
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
@@ -103,16 +137,15 @@ const AccountingAnalytics: React.FC = () => {
   const [showCompare, setShowCompare] = useState(false);
 
   
-  const [startDate, setStartDate] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const [startDate, setStartDate] = useState<string>(() => michiganTodayKey());
   const [endDate, setEndDate] = useState<string>('');
   const [compareStartDate, setCompareStartDate] = useState<string>('');
   const [compareEndDate, setCompareEndDate] = useState<string>('');
   
   const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_on');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [receiptsGroupBy, setReceiptsGroupBy] = useState<ReceiptsGroupBy>('location');
+  const receiptsGroupByLoaded = useRef(receiptsGroupBy);
 
   const reportLocationId = effectiveLocationId;
   const locationCacheKey = reportLocationId === null ? 'all' : String(reportLocationId);
@@ -125,10 +158,14 @@ const AccountingAnalytics: React.FC = () => {
 
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
+  const reportRequest = useRef(0);
+
   const fetchReport = async (showRefreshing = false) => {
     if (!startDate) return;
 
-    const cacheKey = `zapzone_acct_report_${locationCacheKey}_${startDate}_${endDate || ''}_${viewMode}_${categoryFilter || 'all'}`;
+    const request = ++reportRequest.current;
+
+    const cacheKey = `zapzone_acct_report_${locationCacheKey}_${startDate}_${endDate || ''}_${viewMode}_${categoryFilter || 'all'}_${receiptsGroupBy}`;
 
     if (!showRefreshing && !reportData) {
       try {
@@ -159,7 +196,10 @@ const AccountingAnalytics: React.FC = () => {
         compare_end_date: compareEndDate || undefined,
         view_mode: viewMode,
         category_filter: categoryFilter || undefined,
+        receipts_group_by: receiptsGroupBy,
       });
+
+      if (request !== reportRequest.current) return;
 
       if (response.success) {
         setReportData(response.data);
@@ -179,7 +219,13 @@ const AccountingAnalytics: React.FC = () => {
         } catch { /* sessionStorage full — ignore */ }
       }
     } catch (error) {
+      if (request !== reportRequest.current) return;
       console.error('Failed to fetch report:', error);
+      const shownGroupBy = reportData?.primary?.receipts?.group_by;
+      if (shownGroupBy && shownGroupBy !== receiptsGroupBy) {
+        receiptsGroupByLoaded.current = shownGroupBy;
+        setReceiptsGroupBy(shownGroupBy);
+      }
       const axiosError = error as { response?: { status?: number } };
       if (axiosError.response?.status === 404) {
         setToast({ message: 'No data found for selected date', type: 'error' });
@@ -188,8 +234,10 @@ const AccountingAnalytics: React.FC = () => {
       }
       if (!reportData) setReportData(null);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (request === reportRequest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -201,6 +249,12 @@ const AccountingAnalytics: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationCacheKey]);
+
+  useEffect(() => {
+    if (receiptsGroupByLoaded.current === receiptsGroupBy) return;
+    receiptsGroupByLoaded.current = receiptsGroupBy;
+    fetchReport(true);
+  }, [receiptsGroupBy]);
 
 
 
@@ -216,7 +270,7 @@ const AccountingAnalytics: React.FC = () => {
   const handleExport = async () => {
     if (!startDate) return;
     try {
-      accountingAnalyticsService.downloadCSV(reportLocationId, startDate, endDate || undefined, viewMode, categoryFilter || undefined);
+      accountingAnalyticsService.downloadCSV(reportLocationId, startDate, endDate || undefined, viewMode, categoryFilter || undefined, receiptsGroupBy);
       setToast({ message: 'Downloading CSV...', type: 'success' });
     } catch {
       setToast({ message: 'Export failed', type: 'error' });
@@ -251,7 +305,7 @@ const AccountingAnalytics: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Accounting & Analytics</h1>
           <p className="text-gray-600 mt-1">
-            {viewMode === 'booked_for' ? 'Events scheduled for selected dates' : 'Purchases made on selected dates'}
+            Daily receipts count each payment and refund on the business day it posts. Sales cover {viewMode === 'booked_for' ? 'visits scheduled for' : 'purchases made on'} the selected dates.
           </p>
         </div>
       </div>
@@ -338,6 +392,16 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       )}
 
+      {reportData?.primary?.receipts && (
+        <DailyReceiptsSection
+          receipts={reportData.primary.receipts}
+          comparison={reportData.comparison?.receipts ?? null}
+          groupBy={receiptsGroupBy}
+          onGroupByChange={setReceiptsGroupBy}
+          themeColor={themeColor}
+        />
+      )}
+
       {reportData?.primary?.summary && (() => {
         const summary = reportData.primary.summary;
         const comparison = reportData.comparison?.summary;
@@ -345,11 +409,10 @@ const AccountingAnalytics: React.FC = () => {
           { label: 'Qty Sold', value: summary.quantity_sold, compareValue: comparison?.quantity_sold, icon: Hash, isCurrency: false, tooltip: 'Total number of items sold', change: comparison ? calculateChange(summary.quantity_sold, comparison.quantity_sold) : null },
           { label: 'Gross Sales', value: summary.gross_sales, compareValue: comparison?.gross_sales, icon: DollarSign, isCurrency: true, tooltip: 'Total revenue before discounts', change: comparison ? calculateChange(summary.gross_sales, comparison.gross_sales) : null },
           { label: 'Discounts', value: summary.discount_amount, compareValue: comparison?.discount_amount, icon: Tag, isCurrency: true, isNegative: true, tooltip: 'Total discounts applied', change: comparison ? calculateChange(summary.discount_amount, comparison.discount_amount) : null },
-          { label: 'Net Sales', value: summary.net_sales, compareValue: comparison?.net_sales, icon: Receipt, isCurrency: true, tooltip: 'Gross sales minus discounts', change: comparison ? calculateChange(summary.net_sales, comparison.net_sales) : null },
-          { label: 'Fees', value: summary.fee_amount, compareValue: comparison?.fee_amount, icon: BadgePercent, isCurrency: true, tooltip: 'Service and processing fees', change: comparison ? calculateChange(summary.fee_amount, comparison.fee_amount) : null },
-          { label: 'Tax', value: summary.tax_amount, compareValue: comparison?.tax_amount, icon: Landmark, isCurrency: true, tooltip: 'Tax amount collected', change: comparison ? calculateChange(summary.tax_amount, comparison.tax_amount) : null },
-          { label: 'Total Billed', value: summary.total_billed, compareValue: comparison?.total_billed, icon: CircleDollarSign, isCurrency: true, tooltip: 'Total amount invoiced (after discounts, with fees)', change: comparison ? calculateChange(summary.total_billed, comparison.total_billed) : null },
-          { label: 'Collected', value: summary.grand_total, compareValue: comparison?.grand_total, icon: DollarSign, isCurrency: true, tooltip: 'Total collected from Authorize.Net and in-store payments', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
+          { label: 'Customer Fees', value: summary.fee_amount, compareValue: comparison?.fee_amount, icon: BadgePercent, isCurrency: true, tooltip: 'Billed non-tax charges', change: comparison ? calculateChange(summary.fee_amount, comparison.fee_amount) : null },
+          { label: 'Tax Charged', value: summary.tax_amount, compareValue: comparison?.tax_amount, icon: Landmark, isCurrency: true, tooltip: 'Billed tax', change: comparison ? calculateChange(summary.tax_amount, comparison.tax_amount) : null },
+          { label: 'Total Billed', value: summary.total_billed, compareValue: comparison?.total_billed, icon: CircleDollarSign, isCurrency: true, tooltip: 'The bill after discounts', change: comparison ? calculateChange(summary.total_billed, comparison.total_billed) : null },
+          { label: 'Collected', value: summary.grand_total, compareValue: comparison?.grand_total, icon: Receipt, isCurrency: true, tooltip: 'Paid so far on these bookings and orders, whenever the payment posted. Daily receipts by posting day are above.', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
           { label: 'Authorize Payment', value: summary.collected_via_gateway, compareValue: comparison?.collected_via_gateway, icon: CreditCard, isCurrency: true, tooltip: 'Total collected via Authorize.Net. In-store payments are not included.', change: comparison ? calculateChange(summary.collected_via_gateway, comparison.collected_via_gateway) : null },
           { label: 'Gateway Net', value: summary.collected_via_gateway_net, compareValue: comparison?.collected_via_gateway_net, icon: CreditCard, isCurrency: true, tooltip: 'Gateway collected minus fees and taxes. In-store payments are not included.', change: comparison ? calculateChange(summary.collected_via_gateway_net, comparison.collected_via_gateway_net) : null },
         ];
@@ -425,7 +488,7 @@ const AccountingAnalytics: React.FC = () => {
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Sales by Category</h2>
-              <p className="text-sm text-gray-500">Breakdown by Parties, Attractions, Events, and Add-ons</p>
+              <p className="text-sm text-gray-500">Bookings and purchases {viewMode === 'booked_for' ? 'scheduled for' : 'made on'} the selected dates, by Parties, Attractions, Events, and Add-ons</p>
             </div>
             <div className="flex gap-2 text-sm">
               <button
@@ -463,6 +526,130 @@ const AccountingAnalytics: React.FC = () => {
           <p className="text-gray-500">No data available for the selected date range.</p>
         </div>
       )}
+    </div>
+  );
+};
+
+interface DailyReceiptsSectionProps {
+  receipts: DailyReceipts;
+  comparison: DailyReceipts | null;
+  groupBy: ReceiptsGroupBy;
+  onGroupByChange: (groupBy: ReceiptsGroupBy) => void;
+  themeColor: string;
+}
+
+const DailyReceiptsSection: React.FC<DailyReceiptsSectionProps> = ({ receipts, comparison, groupBy, onGroupByChange, themeColor }) => {
+  const columns = RECEIPT_COLUMNS.filter(column => column.key !== 'unclassified' || receipts.has_unclassified || comparison?.has_unclassified);
+  const firstColumn = receipts.group_by === 'item' ? 'Item' : 'Location';
+  const colSpan = columns.length + 2;
+
+  return (
+    <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Daily Receipts</h2>
+          <p className="text-sm text-gray-500">Each payment and refund counts on the business day it posts, whatever the visit date.</p>
+        </div>
+        <div className="inline-flex rounded-lg border border-gray-200 p-0.5 text-sm" role="group" aria-label="Group daily receipts">
+          {(['location', 'item'] as ReceiptsGroupBy[]).map(option => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onGroupByChange(option)}
+              aria-pressed={groupBy === option}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${groupBy === option ? `bg-${themeColor}-600 text-white` : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              {option === 'location' ? 'By location' : 'By item'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-6 pb-2">
+        {columns.map(column => {
+          const Icon = column.icon;
+          const value = receipts.totals[column.key];
+          const compareValue = comparison?.totals[column.key];
+          const change = compareValue !== undefined ? calculateChange(value, compareValue) : null;
+          return (
+            <div key={column.key} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                  {column.label}
+                  <InfoTooltip content={column.tooltip} size={12} widthClass="w-64" />
+                </p>
+                <Icon className={`w-4 h-4 text-${themeColor}-600`} />
+              </div>
+              <p className={`mt-1 text-lg font-bold ${value < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatSignedCurrency(value)}</p>
+              {change && compareValue !== undefined && (
+                <p className="text-[11px] text-gray-400">vs {formatSignedCurrency(compareValue)} ({change.display})</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="px-6 pb-6 overflow-x-auto">
+        {receipts.days.length === 0 ? (
+          <p className="py-6 text-center text-sm text-gray-500">No payments or refunds posted on these dates.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-2 font-medium text-gray-600">{firstColumn}</th>
+                {columns.map(column => (
+                  <th key={column.key} className="text-right py-3 px-2 font-medium text-gray-600">
+                    <span className="inline-flex items-center gap-1">
+                      {column.label}
+                      <InfoTooltip content={column.tooltip} size={12} widthClass="w-64" />
+                    </span>
+                  </th>
+                ))}
+                <th className="text-right py-3 px-2 font-medium text-gray-600">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {receipts.days.map(day => (
+                <Fragment key={day.date}>
+                  {receipts.days.length > 1 && (
+                    <tr className="bg-gray-100/70">
+                      <td colSpan={colSpan} className="py-2 px-2 text-xs font-bold uppercase tracking-wider text-gray-500">{formatReceiptDay(day.date)}</td>
+                    </tr>
+                  )}
+                  {day.rows.map(row => (
+                    <tr key={`${day.date}-${row.key}`} className="hover:bg-gray-50">
+                      <td className="py-3 px-2 font-medium text-gray-900">
+                        {row.label}
+                        {row.type && <span className="ml-2 text-xs font-normal text-gray-500">{row.type}</span>}
+                      </td>
+                      {columns.map(column => (
+                        <td key={column.key} className={`py-3 px-2 text-right ${row[column.key] < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatSignedCurrency(row[column.key])}</td>
+                      ))}
+                      <td className="py-3 px-2 text-right font-semibold text-gray-900">{formatSignedCurrency(row.total)}</td>
+                    </tr>
+                  ))}
+                  {receipts.days.length > 1 && (
+                    <tr className="bg-gray-50 font-medium text-gray-700">
+                      <td className="py-2.5 px-2">Day total</td>
+                      {columns.map(column => (
+                        <td key={column.key} className="py-2.5 px-2 text-right">{formatSignedCurrency(day.totals[column.key])}</td>
+                      ))}
+                      <td className="py-2.5 px-2 text-right font-semibold">{formatSignedCurrency(day.totals.total)}</td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+              <tr className={`bg-${themeColor}-50 font-semibold`}>
+                <td className="py-3 px-2 text-gray-900">TOTAL</td>
+                {columns.map(column => (
+                  <td key={column.key} className="py-3 px-2 text-right text-gray-900">{formatSignedCurrency(receipts.totals[column.key])}</td>
+                ))}
+                <td className={`py-3 px-2 text-right text-${themeColor}-700`}>{formatSignedCurrency(receipts.totals.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 };
@@ -526,12 +713,11 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Qty</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Gross</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Discount</th>
-                    <th className="text-right py-3 px-2 font-medium text-gray-600">Net</th>
-                    <th className="text-right py-3 px-2 font-medium text-gray-600">Fees</th>
-                    <th className="text-right py-3 px-2 font-medium text-gray-600">Tax</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-600">Customer Fees</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-600">Tax Charged</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Total Billed</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Collected</th>
-                    <th className="text-right py-3 px-2 font-medium text-gray-600">Balance Due</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-600">Open Balance</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Authorize Payment</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Gateway Net</th>
                   </tr>
@@ -541,7 +727,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <Fragment key={group.name}>
                     {showLabelGroups && (
                       <tr className="bg-gray-100/70">
-                        <td colSpan={13} className="py-2 px-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                        <td colSpan={12} className="py-2 px-2 text-xs font-bold uppercase tracking-wider text-gray-500">
                           {group.name}
                         </td>
                       </tr>
@@ -556,7 +742,6 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                           <td className="py-3 px-2 text-right text-gray-900">{item.quantity_sold}</td>
                           <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.gross_sales)}</td>
                           <td className="py-3 px-2 text-right text-red-600">-{formatCurrency(item.discount_amount)}</td>
-                          <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.net_sales)}</td>
                           <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.fee_amount)}</td>
                           <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.tax_amount)}</td>
                           <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.total_billed)}</td>
@@ -585,7 +770,6 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         <td className="py-2.5 px-2 text-right">{group.totals.quantity_sold}</td>
                         <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.gross_sales)}</td>
                         <td className="py-2.5 px-2 text-right text-red-600">-{formatCurrency(group.totals.discount_amount)}</td>
-                        <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.net_sales)}</td>
                         <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.fee_amount)}</td>
                         <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.tax_amount)}</td>
                         <td className="py-2.5 px-2 text-right">{formatCurrency(group.totals.total_billed)}</td>
@@ -602,7 +786,6 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <td className="py-3 px-2 text-right text-gray-900">{category.summary.quantity_sold}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.gross_sales)}</td>
                     <td className="py-3 px-2 text-right text-red-600">-{formatCurrency(category.summary.discount_amount)}</td>
-                    <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.net_sales)}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.fee_amount)}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.tax_amount)}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.total_billed)}</td>

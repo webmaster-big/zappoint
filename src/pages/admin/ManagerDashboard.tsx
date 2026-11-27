@@ -33,7 +33,7 @@ import { getStoredUser } from '../../utils/storage';
 import { useQuickActions } from '../../hooks/useQuickActions';
 import bookingService, { type Booking } from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../services/PaymentService';
 import { locationService } from '../../services/LocationService';
 import {
   useScheduledExtras,
@@ -74,12 +74,13 @@ import WaiverConnectionPanel from '../../components/waiver/WaiverConnectionPanel
 import { isCheckInEligible, outstandingBalanceOf } from '../../utils/bookingCheckIn';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
 import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
-import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
+import { buildBreakdown, buildMoneyBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
 import LocationConcernsPanel from '../../components/admin/dashboard/LocationConcernsPanel';
 import { countLabel, participantsCoveredLabel } from '../../utils/waiverCoverage';
 import { CUSTOM_PACKAGE_LABEL, bookingDisplayName, isCustomBooking } from '../../utils/customBooking';
 import CustomPackageBadge from '../../components/admin/CustomPackageBadge';
 import { CustomPackageSection, OneTimeAddOnsSection } from '../../components/admin/bookings/CustomPackageDetails';
+import { bookingSpaceNames, bookingSpaces } from '../../utils/bookingSpaces';
 
 const LocationManagerDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -119,6 +120,7 @@ const LocationManagerDashboard: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -704,13 +706,13 @@ const LocationManagerDashboard: React.FC = () => {
     newBookingPackageCounts.set(packageLabel, (newBookingPackageCounts.get(packageLabel) ?? 0) + 1);
   });
 
-  const revenueBreakdown = buildBreakdown([
-    { label: 'Package bookings', count: Number(metrics.bookingRevenue || 0) },
-    { label: 'Attraction tickets', count: Number(metrics.purchaseRevenue || 0) },
-    { label: 'Event tickets', count: Number(metrics.eventPurchaseRevenue || 0) },
+  const receiptsBreakdown = buildMoneyBreakdown([
+    { label: 'Online revenue', count: Number(metrics.onlineRevenue ?? 0) },
+    { label: 'In-store collected', count: Number(metrics.inStoreCollected ?? 0) },
+    { label: 'Unclassified receipts', count: Number(metrics.unclassifiedReceipts ?? 0) },
   ]);
 
-  const asMoney = (value: number) => `$${value.toFixed(2)}`;
+  const asSignedMoney = (value: number) => `${value < 0 ? '-' : ''}$${Math.abs(value).toFixed(2)}`;
 
   const metricsCards: MetricCardDef[] = [
     {
@@ -741,14 +743,14 @@ const LocationManagerDashboard: React.FC = () => {
     },
     {
       key: 'totalRevenue',
-      title: 'Total Revenue',
-      value: `$${metrics.totalRevenue.toFixed(2)}`,
-      change: `Bkgs: $${Math.round(metrics.bookingRevenue)} • Tix: $${Math.round(metrics.purchaseRevenue)}${metrics.eventPurchaseRevenue > 0 ? ` • Events: $${Math.round(metrics.eventPurchaseRevenue)}` : ''}`,
+      title: 'Online Revenue',
+      value: asSignedMoney(Number(metrics.onlineRevenue ?? 0)),
+      change: `In-store: ${asSignedMoney(Number(metrics.inStoreCollected ?? 0))}${Number(metrics.unclassifiedReceipts ?? 0) !== 0 ? ` • Unclassified: ${asSignedMoney(Number(metrics.unclassifiedReceipts ?? 0))}` : ''}`,
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
-      explanation: 'Money actually collected (amount paid) on package bookings, attraction orders, and event orders placed in the period. Cancelled/refunded orders are excluded. Outstanding balances are not included.',
+      explanation: 'Online payments posted in the period, less online refunds posted in it. Includes tax and customer fees in those payments. Cash and venue-terminal payments recorded in ZapZone are shown separately as in-store.',
       sections: [
-        { title: 'Where it came from', items: revenueBreakdown, formatValue: asMoney, totalLabel: 'Collected' },
+        { title: 'Receipts by channel', items: receiptsBreakdown, formatValue: asSignedMoney, showTotal: false },
         { title: 'Attraction tickets sold', items: dashboardBreakdowns?.attractionBreakdown ?? [], totalLabel: 'Tickets' },
         { title: 'Event tickets sold', items: dashboardBreakdowns?.eventBreakdown ?? [], totalLabel: 'Tickets' },
       ],
@@ -849,6 +851,7 @@ const LocationManagerDashboard: React.FC = () => {
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
   };
 
@@ -857,6 +860,7 @@ const LocationManagerDashboard: React.FC = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   const handleSubmitPayment = async () => {
@@ -882,6 +886,7 @@ const LocationManagerDashboard: React.FC = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
+        external_reference: paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
       });
 
@@ -906,6 +911,8 @@ const LocationManagerDashboard: React.FC = () => {
       handleClosePaymentModal();
     } catch (error) {
       console.error('Error processing payment:', error);
+      const duplicateReceipt = paymentErrorMessage(error, '');
+      if (duplicateReceipt) alert(duplicateReceipt);
     } finally {
       setProcessingPayment(false);
     }
@@ -1753,7 +1760,7 @@ const LocationManagerDashboard: React.FC = () => {
                         <div className="flex gap-4 mt-2 text-sm text-gray-500">
                           <span className="flex items-center gap-1">
                             <House size={14} />
-                            {booking.room ? booking.room.name : 'N/A'}
+                            {bookingSpaceNames(booking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}
                           </span>
       
                           <span className="flex items-center gap-1">
@@ -2102,8 +2109,8 @@ const LocationManagerDashboard: React.FC = () => {
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900">{selectedBooking.room.name || 'N/A'}</span>
-                      {selectedBooking.room.capacity && (
+                      <span className="font-medium text-gray-900">{bookingSpaceNames(selectedBooking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}</span>
+                      {bookingSpaces(selectedBooking as Parameters<typeof bookingSpaceNames>[0]).length <= 1 && selectedBooking.room.capacity && (
                         <span className="text-sm text-gray-600">Capacity: {selectedBooking.room.capacity}</span>
                       )}
                     </div>
@@ -2360,6 +2367,19 @@ const LocationManagerDashboard: React.FC = () => {
                   In-Store
                 </div>
               </div>
+              {paymentMethod === 'in-store' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={paymentReceipt}
+                    maxLength={100}
+                    onChange={(e) => setPaymentReceipt(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="From the card terminal or register receipt"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
                 <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}

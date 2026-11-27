@@ -31,7 +31,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
@@ -73,6 +73,7 @@ import {
   pricingTypeLabel,
   toCents,
 } from '../../../utils/customBooking';
+import { bookingSpaceNames } from '../../../utils/bookingSpaces';
 
 const LIST_TAB_KEY = 'zapzone_checkin_list_tab';
 const WAIVER_PAGE_SIZE = 200;
@@ -250,6 +251,7 @@ const CheckIn: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const { effectiveLocationId, locations, isCompanyAdmin } = useLocationScope();
   const [hasEscapeRooms, setHasEscapeRooms] = useState(false);
@@ -1206,6 +1208,7 @@ const CheckIn: React.FC = () => {
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
     setShowVerificationModal(false); // Close verification modal
   };
@@ -1216,6 +1219,7 @@ const CheckIn: React.FC = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   const handleSubmitPayment = async () => {
@@ -1260,6 +1264,7 @@ const CheckIn: React.FC = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
+        external_reference: (paymentMethod === 'in-store' || paymentMethod === 'card') && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || (paymentMethod === 'in-store' 
           ? `In-store payment for booking ${selectedBookingForPayment.reference_number}`
           : `Payment for booking ${selectedBookingForPayment.reference_number}`),
@@ -1302,7 +1307,7 @@ const CheckIn: React.FC = () => {
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      setToast({ message: 'Failed to process payment. Please try again.', type: 'error' });
+      setToast({ message: paymentErrorMessage(error, 'Failed to process payment. Please try again.'), type: 'error' });
     } finally {
       setProcessingPayment(false);
     }
@@ -2415,7 +2420,7 @@ const CheckIn: React.FC = () => {
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Space</p>
-                          <p className="font-medium text-gray-800">{(verifiedBooking.room as { name: string })?.name || 'N/A'}</p>
+                          <p className="font-medium text-gray-800">{bookingSpaceNames(verifiedBooking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}</p>
                         </div>
                       </div>
                     ) : null}
@@ -2892,7 +2897,7 @@ const CheckIn: React.FC = () => {
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Space</p>
-                          <p className="font-medium text-gray-800">{(selectedBooking.room as { name: string })?.name || 'N/A'}</p>
+                          <p className="font-medium text-gray-800">{bookingSpaceNames(selectedBooking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}</p>
                         </div>
                       </div>
                     ) : null}
@@ -3112,6 +3117,19 @@ const CheckIn: React.FC = () => {
                   </select>
                 </div>
 
+                {(paymentMethod === 'in-store' || paymentMethod === 'card') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                    <input
+                      type="text"
+                      value={paymentReceipt}
+                      maxLength={100}
+                      onChange={(e) => setPaymentReceipt(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="From the card terminal or register receipt"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Notes (Optional)

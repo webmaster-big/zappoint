@@ -6,6 +6,7 @@ import type {
   AccountingReportParams,
   SummaryTrendParams,
   ExportParams,
+  ReceiptsGroupBy,
 } from '../types/AccountingAnalytics.types';
 
 const api = axios.create({
@@ -56,6 +57,9 @@ export const accountingAnalyticsService = {
     }
     if (params.category_filter) {
       queryParams.append('category_filter', params.category_filter);
+    }
+    if (params.receipts_group_by) {
+      queryParams.append('receipts_group_by', params.receipts_group_by);
     }
     
     const response = await api.get<AccountingReportResponse>(
@@ -109,12 +113,13 @@ export const accountingAnalyticsService = {
     return response.data;
   },
 
-  downloadCSV(locationId: number | null, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for', categoryFilter?: string): void {
+  downloadCSV(locationId: number | null, startDate: string, endDate: string | undefined, viewMode: 'booked_on' | 'booked_for' = 'booked_for', categoryFilter?: string, receiptsGroupBy: ReceiptsGroupBy = 'location'): void {
     const queryParams = new URLSearchParams({
       location_id: locationId === null ? 'all' : locationId.toString(),
       start_date: startDate,
       view_mode: viewMode,
       format: 'csv',
+      receipts_group_by: receiptsGroupBy,
     });
     if (endDate) {
       queryParams.append('end_date', endDate);

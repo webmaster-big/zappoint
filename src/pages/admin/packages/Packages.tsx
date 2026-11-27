@@ -570,6 +570,7 @@ const Packages: React.FC = () => {
         has_guest_of_honor: original.has_guest_of_honor,
         customer_notes: original.customer_notes,
         invitation_download_link: original.invitation_download_link,
+        party_invites_enabled: original.party_invites_enabled ?? false,
         booking_window_days: original.booking_window_days,
         min_booking_notice_hours: original.min_booking_notice_hours,
         attraction_ids: sameLocation ? original.attractions?.map(a => a.id) : [],

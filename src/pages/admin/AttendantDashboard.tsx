@@ -33,7 +33,7 @@ import { getStoredUser } from '../../utils/storage';
 import { useQuickActions } from '../../hooks/useQuickActions';
 import bookingService, { type Booking } from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../services/PaymentService';
 import {
   useScheduledExtras,
   formatDateKey,
@@ -74,10 +74,11 @@ import WaiverConnectionPanel from '../../components/waiver/WaiverConnectionPanel
 import { isCheckInEligible, outstandingBalanceOf } from '../../utils/bookingCheckIn';
 import MetricCardGrid, { type MetricCardDef } from '../../components/admin/dashboard/MetricCardGrid';
 import CategoryActivityPanel from '../../components/admin/dashboard/CategoryActivityPanel';
-import { buildBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
+import { buildBreakdown, buildMoneyBreakdown, rescaleBreakdown } from '../../components/admin/dashboard/breakdowns';
 import { CUSTOM_PACKAGE_LABEL, bookingDisplayName, isCustomBooking } from '../../utils/customBooking';
 import CustomPackageBadge from '../../components/admin/CustomPackageBadge';
 import { CustomPackageSection, OneTimeAddOnsSection } from '../../components/admin/bookings/CustomPackageDetails';
+import { bookingSpaceNames } from '../../utils/bookingSpaces';
 
 const AttendantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -133,6 +134,7 @@ const AttendantDashboard: React.FC = () => {
    const [paymentAmount, setPaymentAmount] = useState('');
    const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
    const [paymentNotes, setPaymentNotes] = useState('');
+   const [paymentReceipt, setPaymentReceipt] = useState('');
    const [processingPayment, setProcessingPayment] = useState(false);
    const [metrics, setMetrics] = useState({
      totalBookings: 0,
@@ -591,13 +593,13 @@ const AttendantDashboard: React.FC = () => {
      newBookingPackageCounts.set(packageLabel, (newBookingPackageCounts.get(packageLabel) ?? 0) + 1);
    });
 
-   const revenueBreakdown = buildBreakdown([
-     { label: 'Package bookings', count: Number(metrics.bookingRevenue || 0) },
-     { label: 'Attraction tickets', count: Number(metrics.purchaseRevenue || 0) },
-     { label: 'Event tickets', count: Number(metrics.eventPurchaseRevenue || 0) },
+   const receiptsBreakdown = buildMoneyBreakdown([
+     { label: 'Online revenue', count: Number(metrics.onlineRevenue ?? 0) },
+     { label: 'In-store collected', count: Number(metrics.inStoreCollected ?? 0) },
+     { label: 'Unclassified receipts', count: Number(metrics.unclassifiedReceipts ?? 0) },
    ]);
 
-   const asMoney = (value: number) => `$${value.toFixed(2)}`;
+   const asSignedMoney = (value: number) => `${value < 0 ? '-' : ''}$${Math.abs(value).toFixed(2)}`;
 
    const metricsCards: MetricCardDef[] = [
      {
@@ -649,14 +651,14 @@ const AttendantDashboard: React.FC = () => {
      },
      {
        key: 'totalRevenue',
-       title: 'Total Revenue',
-       value: `$${metrics.totalRevenue.toFixed(2)}`,
-       change: `Bkgs: $${Math.round(metrics.bookingRevenue)} • Tix: $${Math.round(metrics.purchaseRevenue)}${metrics.eventPurchaseRevenue > 0 ? ` • Events: $${Math.round(metrics.eventPurchaseRevenue)}` : ''}`,
+       title: 'Online Revenue',
+       value: asSignedMoney(Number(metrics.onlineRevenue ?? 0)),
+       change: `In-store: ${asSignedMoney(Number(metrics.inStoreCollected ?? 0))}${Number(metrics.unclassifiedReceipts ?? 0) !== 0 ? ` • Unclassified: ${asSignedMoney(Number(metrics.unclassifiedReceipts ?? 0))}` : ''}`,
        icon: DollarSign,
        accent: 'bg-green-100 text-green-600',
-       explanation: 'Money actually collected (amount paid) on package bookings, attraction orders, and event orders placed in the period. Cancelled/refunded orders are excluded. Outstanding balances are not included.',
+       explanation: 'Online payments posted in the period, less online refunds posted in it. Includes tax and customer fees in those payments. Cash and venue-terminal payments recorded in ZapZone are shown separately as in-store.',
        sections: [
-         { title: 'Where it came from', items: revenueBreakdown, formatValue: asMoney, totalLabel: 'Collected' },
+         { title: 'Receipts by channel', items: receiptsBreakdown, formatValue: asSignedMoney, showTotal: false },
        ],
      },
      {
@@ -809,6 +811,7 @@ const AttendantDashboard: React.FC = () => {
      setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
      setPaymentMethod('in-store');
      setPaymentNotes('');
+     setPaymentReceipt('');
      setShowPaymentModal(true);
    };
 
@@ -817,6 +820,7 @@ const AttendantDashboard: React.FC = () => {
      setPaymentAmount('');
      setPaymentMethod('in-store');
      setPaymentNotes('');
+     setPaymentReceipt('');
    };
 
    const handleSubmitPayment = async () => {
@@ -842,6 +846,7 @@ const AttendantDashboard: React.FC = () => {
          currency: 'USD',
          method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
          status: 'completed',
+         external_reference: (paymentMethod === 'in-store' || paymentMethod === 'card') && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
          notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
        });
 
@@ -866,6 +871,8 @@ const AttendantDashboard: React.FC = () => {
        handleClosePaymentModal();
      } catch (error) {
        console.error('Error processing payment:', error);
+       const duplicateReceipt = paymentErrorMessage(error, '');
+       if (duplicateReceipt) alert(duplicateReceipt);
      } finally {
        setProcessingPayment(false);
      }
@@ -1647,7 +1654,7 @@ const AttendantDashboard: React.FC = () => {
                      <div className="bg-gray-50 rounded-lg p-4">
                        <div className="flex items-center">
                          <House className="h-4 w-4 text-gray-400 mr-3" />
-                         <span className="font-medium text-gray-900">{selectedBooking.room.name || 'N/A'}</span>
+                         <span className="font-medium text-gray-900">{bookingSpaceNames(selectedBooking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}</span>
                        </div>
                      </div>
                    </div>
@@ -1848,6 +1855,19 @@ const AttendantDashboard: React.FC = () => {
                      <option value="card">Card</option>
                    </select>
                  </div>
+                 {(paymentMethod === 'in-store' || paymentMethod === 'card') && (
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                     <input
+                       type="text"
+                       value={paymentReceipt}
+                       maxLength={100}
+                       onChange={(e) => setPaymentReceipt(e.target.value)}
+                       className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                       placeholder="From the card terminal or register receipt"
+                     />
+                   </div>
+                 )}
                  <div>
                    <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
                    <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}

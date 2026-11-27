@@ -24,7 +24,6 @@ import roomService, { type Room } from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import addOnService, { type AddOn } from '../../../services/AddOnService';
 import { addOnCacheService } from '../../../services/AddOnCacheService';
-import { categoryService, type Category } from '../../../services/CategoryService';
 import { loadAcceptJS, processCardPayment, validateCardNumber, getCardType, formatCardNumber, createPayment, PaymentOutcomeUnknownError } from '../../../services/PaymentService';
 import { newCheckoutKey } from '../../../utils/checkoutKey';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
@@ -177,6 +176,7 @@ const ManualBooking: React.FC = () => {
   const checkoutKeyRef = useRef(newCheckoutKey());
   const checkoutAttemptRef = useRef<string | null>(null);
   const [overrideGate, setOverrideGate] = useState<{ conflicts: string[]; onlineSlotsLost: string[] } | null>(null);
+  const [paymentReceipt, setPaymentReceipt] = useState('');
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
@@ -261,7 +261,8 @@ const ManualBooking: React.FC = () => {
   const [customAddOns, setCustomAddOns] = useState<AddOn[]>([]);
   const [customAddOnsStatus, setCustomAddOnsStatus] = useState<CustomLoadStatus>('idle');
   const [customAddOnsAttempt, setCustomAddOnsAttempt] = useState(0);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [customRoomIds, setCustomRoomIds] = useState<string[]>([]);
   const [categoriesStatus, setCategoriesStatus] = useState<CustomLoadStatus>('idle');
   const [categoriesAttempt, setCategoriesAttempt] = useState(0);
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -356,19 +357,19 @@ const ManualBooking: React.FC = () => {
       const endTotal = (h * 60 + (m || 0) + minutes) % (24 * 60);
       end = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`;
     }
-    const roomId = form.roomId ? Number(form.roomId) : null;
+    const selectedRoomIds = customRoomIds.map(Number).filter(Number.isFinite);
     const closures = dayOffsWithTime.filter(dayOff => {
       if (!isSelectedDay(dayOff.date)) return false;
       const targetsPackages = !!dayOff.package_ids?.length;
       const targetsRooms = !!dayOff.room_ids?.length;
       if (!targetsPackages && !targetsRooms) return true;
-      return targetsRooms && roomId != null && Number.isFinite(roomId) && dayOff.room_ids!.includes(roomId);
+      return targetsRooms && selectedRoomIds.some(selected => dayOff.room_ids!.includes(selected));
     });
     const blocked = dayOffs.some(isSelectedDay)
       || (closures.length > 0 && isSlotBlockedByClosure(form.bookingTime, end, closures));
     if (!blocked) return null;
     return 'This time is inside a blocked period. Guests cannot book it online; you will be asked to confirm when you save.';
-  }, [isCustom, form.bookingDate, form.bookingTime, form.roomId, customTerms.durationMinutes, dayOffs, dayOffsWithTime]);
+  }, [isCustom, form.bookingDate, form.bookingTime, customRoomIds, customTerms.durationMinutes, dayOffs, dayOffsWithTime]);
 
   const filteredDayOffsWithTime = pkg
     ? dayOffsWithTime.filter(d => (d.package_ids && d.package_ids.length > 0) ? d.package_ids.includes(pkg.id) : !(d.room_ids && d.room_ids.length > 0))
@@ -517,10 +518,10 @@ const ManualBooking: React.FC = () => {
     if (!isCustom) return;
     let cancelled = false;
     setCategoriesStatus('loading');
-    categoryService.getCategories()
-      .then((response: { data?: Category[] }) => {
+    bookingService.getCustomPackageCategories()
+      .then((labels: string[]) => {
         if (cancelled) return;
-        setCategories(Array.isArray(response?.data) ? response.data : []);
+        setCategories(labels);
         setCategoriesStatus('ready');
       })
       .catch((error: unknown) => {
@@ -1209,8 +1210,23 @@ const ManualBooking: React.FC = () => {
   };
 
   const toggleCustomRoom = (roomId: number) => {
-    setForm(prev => ({ ...prev, roomId: prev.roomId === roomId.toString() ? '' : roomId.toString() }));
+    const key = roomId.toString();
+    const next = customRoomIds.includes(key) ? customRoomIds.filter(id => id !== key) : [...customRoomIds, key];
+    setCustomRoomIds(next);
+    setForm(prev => ({ ...prev, roomId: next[0] ?? '' }));
   };
+
+  useEffect(() => {
+    if (!isCustom) {
+      setCustomRoomIds(prev => (prev.length > 0 ? [] : prev));
+      return;
+    }
+    if (!form.roomId) {
+      setCustomRoomIds(prev => (prev.length > 0 ? [] : prev));
+      return;
+    }
+    setCustomRoomIds(prev => (prev.includes(form.roomId) ? prev : [...prev, form.roomId]));
+  }, [isCustom, form.roomId]);
 
   const startCustomPackage = () => {
     packageRequestRef.current += 1;
@@ -1413,7 +1429,7 @@ const ManualBooking: React.FC = () => {
       const customPackage = customPackagePayload(customTerms);
       const customAppliedFees = toAppliedFees(customQuote);
       const attempt = isCustom
-        ? JSON.stringify(['custom', locationId, form.bookingDate, form.bookingTime, form.roomId, customParticipants, customPackage, additionalAddons])
+        ? JSON.stringify(['custom', locationId, form.bookingDate, form.bookingTime, customRoomIds.join(','), customParticipants, customPackage, additionalAddons])
         : JSON.stringify([form.packageId, form.bookingDate, form.bookingTime, form.roomId, form.participants]);
       if (checkoutAttemptRef.current !== null && checkoutAttemptRef.current !== attempt) {
         checkoutKeyRef.current = newCheckoutKey();
@@ -1429,6 +1445,7 @@ const ManualBooking: React.FC = () => {
         package_id: null,
         custom_package: customPackage,
         room_id: form.roomId ? parseInt(form.roomId) : undefined,
+        room_ids: customRoomIds.map(id => parseInt(id)).filter(Number.isFinite),
         type: 'package' as const,
         booking_date: form.bookingDate,
         booking_time: form.bookingTime,
@@ -1682,6 +1699,7 @@ const ManualBooking: React.FC = () => {
               status: 'completed',
               location_id: locationId,
               notes: `In-store payment for booking ${referenceNumber}`,
+              external_reference: paymentReceipt.trim() || undefined,
             });
             console.log('✅ In-store payment record created for booking:', bookingId);
           } catch (paymentError) {
@@ -1936,7 +1954,7 @@ const ManualBooking: React.FC = () => {
                   >
                     <option value="" disabled>Select a category</option>
                     {categories.map(category => (
-                      <option key={category.id} value={category.name}>{category.name}</option>
+                      <option key={category} value={category}>{category}</option>
                     ))}
                   </select>
                   {categoriesStatus === 'error' && (
@@ -2528,6 +2546,7 @@ const ManualBooking: React.FC = () => {
                           <h3 className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
                             Space Selection *
                           </h3>
+                          <p className="text-xs text-gray-500 mb-2">Pick one or more spaces. Each one is held for the same start time and length.</p>
                           {!bookingLocationId ? (
                             <p className="text-xs text-amber-700">{CUSTOM_PACKAGE_MESSAGES.locationRequired}</p>
                           ) : customRoomsStatus === 'error' ? (
@@ -2550,8 +2569,9 @@ const ManualBooking: React.FC = () => {
                                   <StandardButton
                                     type="button"
                                     key={room.id}
-                                    variant={form.roomId === room.id.toString() ? 'primary' : 'secondary'}
+                                    variant={customRoomIds.includes(room.id.toString()) ? 'primary' : 'secondary'}
                                     size="sm"
+                                    aria-pressed={customRoomIds.includes(room.id.toString())}
                                     onClick={() => toggleCustomRoom(room.id)}
                                   >
                                     {room.name}
@@ -3499,6 +3519,20 @@ const ManualBooking: React.FC = () => {
                         )}
                       </div>
                     </div>
+
+                    {form.paymentMethod === 'in-store' && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Receipt Number (Optional)</label>
+                        <input
+                          type="text"
+                          value={paymentReceipt}
+                          maxLength={100}
+                          onChange={(e) => setPaymentReceipt(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                          placeholder="From the card terminal or register receipt"
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <div>

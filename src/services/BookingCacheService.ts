@@ -840,16 +840,12 @@ class BookingCacheService {
         return false;
       }
 
-      if (filters.date_from) {
-        const bookingDate = new Date(booking.booking_date);
-        const fromDate = new Date(filters.date_from);
-        if (bookingDate < fromDate) return false;
+      if (filters.date_from && String(booking.booking_date ?? '').split('T')[0] < filters.date_from) {
+        return false;
       }
 
-      if (filters.date_to) {
-        const bookingDate = new Date(booking.booking_date);
-        const toDate = new Date(filters.date_to);
-        if (bookingDate > toDate) return false;
+      if (filters.date_to && String(booking.booking_date ?? '').split('T')[0] > filters.date_to) {
+        return false;
       }
 
       if (filters.booking_date) {

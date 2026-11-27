@@ -113,6 +113,7 @@ const EditPackage: React.FC = () => {
         invitation_download_link: "", // Link to downloadable invitation template
         invitation_file: "", // Base64 encoded invitation file
         invitationType: "link" as "link" | "file", // Tab selection for invitation
+        partyInvitesEnabled: false,
         bookingWindowDays: "", // Max days in advance for booking (1-365)
         minBookingNoticeHours: "", // Min hours in advance for booking (0-8760)
         isActive: false, // Preserve active/inactive status on edit
@@ -322,6 +323,7 @@ const EditPackage: React.FC = () => {
                     invitation_download_link: pkg.invitation_download_link || "",
                     invitation_file: pkg.invitation_file || "",
                     invitationType: pkg.invitation_file ? "file" : "link",
+                    partyInvitesEnabled: pkg.party_invites_enabled ?? false,
                     bookingWindowDays: String(pkg.booking_window_days || ""),
                     minBookingNoticeHours: String(pkg.min_booking_notice_hours || ""),
                     isActive: pkg.is_active ?? false,
@@ -794,6 +796,7 @@ const EditPackage: React.FC = () => {
                 customer_notes: form.customerNotes.trim(),
                 invitation_download_link: form.invitationType === 'link' ? form.invitation_download_link.trim() : null,
                 invitation_file: form.invitationType === 'file' ? (form.invitation_file || null) : null,
+                party_invites_enabled: form.partyInvitesEnabled,
                 booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null,
                 min_booking_notice_hours: form.minBookingNoticeHours ? parseInt(form.minBookingNoticeHours) : null,
                 image: form.image || undefined,
@@ -2116,6 +2119,19 @@ const EditPackage: React.FC = () => {
                                 </div>
                             )}
                             <p className="text-xs text-gray-500 mt-3">Optional: Customers can access this invitation template after booking.</p>
+                        </div>
+
+                        <div>
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.partyInvitesEnabled}
+                                    onChange={(e) => setForm(prev => ({ ...prev, partyInvitesEnabled: e.target.checked }))}
+                                    className={`w-5 h-5 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                                />
+                                <span className="text-base text-neutral-800">Send party invitations and waivers</span>
+                            </label>
+                            <p className="text-xs text-gray-500 mt-2">When on, the booking confirmation email includes a link where the customer signs in to invite their party guests, send waiver links and see who has signed.</p>
                         </div>
 
                         <div className="bg-white rounded-xl border border-gray-200 p-5">

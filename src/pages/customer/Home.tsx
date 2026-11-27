@@ -902,6 +902,9 @@ const EntertainmentLandingPage = () => {
     return item.image ?? null;
   };
 
+  const packageImageFor = (pkg: { image?: string | null; imageByLocation?: Record<number, string | null> }) =>
+    viewedLocationId !== null ? pkg.imageByLocation?.[viewedLocationId] ?? null : pkg.image ?? null;
+
   const openCallToBookFor = (
     type: 'package' | 'attraction' | 'event',
     item: Attraction | PackageType | DisplayEvent,
@@ -1103,9 +1106,9 @@ const EntertainmentLandingPage = () => {
       className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group flex flex-col h-full"
     >
       <div className="aspect-video bg-gray-50 relative overflow-hidden flex-shrink-0">
-        {imageFor(pkg) ? (
+        {packageImageFor(pkg) ? (
           <img 
-            src={getImageUrl(imageFor(pkg))} 
+            src={getImageUrl(packageImageFor(pkg))} 
             alt={pkg.name}
             className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
           />
@@ -1729,9 +1732,9 @@ const EntertainmentLandingPage = () => {
                   >
                     <div className="flex flex-col md:flex-row">
                       <div className="aspect-video md:aspect-auto md:h-auto md:w-2/5 bg-gray-50 relative overflow-hidden rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none">
-                        {imageFor(pkg) ? (
+                        {packageImageFor(pkg) ? (
                           <img 
-                            src={getImageUrl(imageFor(pkg))} 
+                            src={getImageUrl(packageImageFor(pkg))} 
                             alt={pkg.name}
                             className="absolute inset-0 w-full h-full object-contain"
                           />

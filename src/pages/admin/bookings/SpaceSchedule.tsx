@@ -7,7 +7,7 @@ import CustomerSearch from '../../../components/admin/calendar/CustomerSearch';
 import { customerEmailOf, customerNameOf, customerPhoneOf, matchesBookingSearch } from '../../../utils/bookingSearch';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../../services/PaymentService';
 import { roomService } from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
@@ -302,6 +302,7 @@ const SpaceSchedule = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
   useEffect(() => {
@@ -660,6 +661,14 @@ const SpaceSchedule = () => {
     [knownRoomIds]
   );
 
+  const columnKeysFor = useCallback(
+    (b: Booking): string[] => {
+      const assigned = (b.room_ids && b.room_ids.length > 0 ? b.room_ids : b.room_id ? [b.room_id] : []).filter(id => knownRoomIds.has(id));
+      return assigned.length > 0 ? assigned.map(id => `room-${id}`) : [columnKeyFor(b)];
+    },
+    [knownRoomIds, columnKeyFor]
+  );
+
   const { dayWindow } = useScheduleDayWindow(selectedDate, effectiveLocationId);
 
   const roomWindows = useMemo(() => {
@@ -694,7 +703,11 @@ const SpaceSchedule = () => {
   const columns = useMemo<ScheduleColumn[]>(() => {
     const roomBookingCount = new Map<number, number>();
     for (const b of filteredBookings) {
-      if (b.room_id && knownRoomIds.has(b.room_id)) roomBookingCount.set(b.room_id, (roomBookingCount.get(b.room_id) || 0) + 1);
+      for (const key of columnKeysFor(b)) {
+        if (!key.startsWith('room-')) continue;
+        const roomId = Number(key.slice(5));
+        roomBookingCount.set(roomId, (roomBookingCount.get(roomId) || 0) + 1);
+      }
     }
     const roomColumns: ScheduleColumn[] = displaySpaces
       .filter(space => !hideEmptySpaces || (roomBookingCount.get(space.id) || 0) > 0)
@@ -827,7 +840,7 @@ const SpaceSchedule = () => {
     const map = new Map<string, PositionedBooking[]>();
     for (const column of columns) map.set(column.key, []);
     for (const b of filteredBookings) {
-      const key = columnKeyFor(b);
+      for (const key of columnKeysFor(b)) {
       const list = map.get(key);
       if (!list) continue;
       const startMin = timeToMinutes(b.booking_time);
@@ -845,6 +858,7 @@ const SpaceSchedule = () => {
         endMinRaw: rawEnd,
         conflicts: [],
       });
+      }
     }
     for (const column of columns) {
       const list = map.get(column.key);
@@ -858,7 +872,7 @@ const SpaceSchedule = () => {
       // measured against every live booking in this space, not only the ones passing the current
       // filters — a clash staff cannot see is exactly the one that hurts
       const neighbours = activeBookings
-        .filter(b => columnKeyFor(b) === column.key)
+        .filter(b => columnKeysFor(b).includes(column.key))
         .map(b => {
           const startMinutes = timeToMinutes(b.booking_time);
           return {
@@ -940,7 +954,7 @@ const SpaceSchedule = () => {
       const turnaround = column.roomId === undefined ? 0 : space?.interval_minutes ?? 0;
 
       const inColumn = activeBookings
-        .filter(b => columnKeyFor(b) === column.key)
+        .filter(b => columnKeysFor(b).includes(column.key))
         .map(b => {
           const startMinutes = timeToMinutes(b.booking_time);
           return {
@@ -1017,7 +1031,7 @@ const SpaceSchedule = () => {
       const columnTurnaround = column.roomId === undefined ? 0 : space?.interval_minutes ?? 0;
       const blocked = [
         ...activeBookings
-          .filter(b => columnKeyFor(b) === column.key)
+          .filter(b => columnKeysFor(b).includes(column.key))
           .map(b => {
             const startMinutes = timeToMinutes(b.booking_time);
             return {
@@ -1183,6 +1197,7 @@ const SpaceSchedule = () => {
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
   };
 
@@ -1191,6 +1206,7 @@ const SpaceSchedule = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   const handleSubmitPayment = async () => {
@@ -1216,6 +1232,7 @@ const SpaceSchedule = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
+        external_reference: (paymentMethod === 'in-store' || paymentMethod === 'card') && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
       });
 
@@ -1240,13 +1257,24 @@ const SpaceSchedule = () => {
       handleClosePaymentModal();
     } catch (error) {
       console.error('Error processing payment:', error);
+      const duplicateReceipt = paymentErrorMessage(error, '');
+      if (duplicateReceipt) alert(duplicateReceipt);
     } finally {
       setProcessingPayment(false);
     }
   };
 
-  const spaceCapacityFor = (item: PositionedBooking): number | null =>
-    item.booking.room_id ? capacityByRoom.get(item.booking.room_id) ?? null : null;
+  const spaceCapacityFor = (item: PositionedBooking): number | null => {
+    const spaceIds = item.booking.room_ids && item.booking.room_ids.length > 1 ? item.booking.room_ids : null;
+    if (!spaceIds) return item.booking.room_id ? capacityByRoom.get(item.booking.room_id) ?? null : null;
+    let combined = 0;
+    for (const id of spaceIds) {
+      const capacity = capacityByRoom.get(id);
+      if (capacity == null) return null;
+      combined += capacity;
+    }
+    return combined;
+  };
 
   const renderBookingBlock = (item: PositionedBooking) => {
     const { booking } = item;
@@ -1399,7 +1427,7 @@ const SpaceSchedule = () => {
                   className={`shrink-0 tabular-nums ${overCapacity ? 'font-bold text-rose-700' : `${color.text} opacity-70`}`}
                   title={
                     overCapacity
-                      ? `${booking.participants} guests in a space for ${capacity}`
+                      ? `${booking.participants} guests in ${booking.room_ids && booking.room_ids.length > 1 ? 'spaces' : 'a space'} for ${capacity}`
                       : `${booking.participants} guests`
                   }
                 >
@@ -1462,7 +1490,7 @@ const SpaceSchedule = () => {
     const turnaround = turnaroundFor(column);
 
     return activeBookings
-      .filter(b => columnKeyFor(b) === column.key)
+      .filter(b => columnKeysFor(b).includes(column.key))
       .map(b => {
         const startMinutes = timeToMinutes(b.booking_time);
         return {
@@ -1576,8 +1604,7 @@ const SpaceSchedule = () => {
     return (
       activeBookings.find(
         booking =>
-          booking.room_id != null &&
-          peers.has(booking.room_id) &&
+          (booking.room_ids && booking.room_ids.length > 0 ? booking.room_ids : booking.room_id != null ? [booking.room_id] : []).some(id => peers.has(id)) &&
           Math.abs(timeToMinutes(booking.booking_time) - minute) < gap
       ) ?? null
     );
@@ -1642,7 +1669,7 @@ const SpaceSchedule = () => {
     const shortestPackage = fit.packageName;
 
     const clash = activeBookings
-      .filter(b => columnKeyFor(b) === column.key)
+      .filter(b => columnKeysFor(b).includes(column.key))
       .map(b => ({ booking: b, start: timeToMinutes(b.booking_time) }))
       .filter(({ start }) => start >= walkInMinute && start < endMinute)
       .sort((a, b) => a.start - b.start)[0]?.booking ?? null;
@@ -3056,6 +3083,19 @@ const SpaceSchedule = () => {
                   <option value="card">Card</option>
                 </select>
               </div>
+              {(paymentMethod === 'in-store' || paymentMethod === 'card') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={paymentReceipt}
+                    maxLength={100}
+                    onChange={(e) => setPaymentReceipt(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="From the card terminal or register receipt"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
                 <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}

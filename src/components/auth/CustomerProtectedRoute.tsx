@@ -4,11 +4,13 @@ import type { ReactNode } from 'react';
 interface CustomerProtectedRouteProps {
   children: ReactNode;
   requireAuth?: boolean;
+  returnAfterSignIn?: boolean;
 }
 
 const CustomerProtectedRoute: React.FC<CustomerProtectedRouteProps> = ({ 
   children, 
-  requireAuth = true 
+  requireAuth = true,
+  returnAfterSignIn = false,
 }) => {
   const location = useLocation();
   
@@ -29,7 +31,10 @@ const CustomerProtectedRoute: React.FC<CustomerProtectedRouteProps> = ({
   const isAuthenticated = customer && customer.token;
 
   if (requireAuth && !isAuthenticated) {
-    return <Navigate to="/customer/login" state={{ from: location }} replace />;
+    const signInPath = returnAfterSignIn
+      ? `/customer/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`
+      : '/customer/login';
+    return <Navigate to={signInPath} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

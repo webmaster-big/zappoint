@@ -226,6 +226,7 @@ const CreatePackage: React.FC = () => {
         invitation_download_link: "", // Link to downloadable invitation template
         invitation_file: "", // Base64 encoded invitation file
         invitationType: "link" as "link" | "file", // Tab selection for invitation
+        partyInvitesEnabled: false,
         bookingWindowDays: "", // Max days in advance for booking (1-365)
         minBookingNoticeHours: "" as string, // Min hours in advance for booking (0-8760)
         
@@ -647,6 +648,7 @@ const CreatePackage: React.FC = () => {
                 customer_notes: form.customerNotes.trim() || undefined,
                 invitation_download_link: form.invitationType === 'link' ? (form.invitation_download_link.trim() || undefined) : undefined,
                 invitation_file: form.invitationType === 'file' ? (form.invitation_file || undefined) : undefined,
+                party_invites_enabled: form.partyInvitesEnabled,
                 booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null,
                 min_booking_notice_hours: form.minBookingNoticeHours ? parseInt(form.minBookingNoticeHours) : null,
                 
@@ -726,6 +728,7 @@ const CreatePackage: React.FC = () => {
                 invitation_download_link: "",
                 invitation_file: "",
                 invitationType: "link",
+                partyInvitesEnabled: false,
                 bookingWindowDays: "",
                 minBookingNoticeHours: "",
                 availability_schedules: [],
@@ -1989,6 +1992,19 @@ const CreatePackage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-3">Optional: Customers can access this invitation template after booking.</p>
                             </div>
 
+                            <div>
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.partyInvitesEnabled}
+                                        onChange={(e) => setForm(prev => ({ ...prev, partyInvitesEnabled: e.target.checked }))}
+                                        className={`w-5 h-5 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                                    />
+                                    <span className="text-base text-neutral-800">Send party invitations and waivers</span>
+                                </label>
+                                <p className="text-xs text-gray-500 mt-2">When on, the booking confirmation email includes a link where the customer signs in to invite their party guests, send waiver links and see who has signed.</p>
+                            </div>
+
                             <OnlineAvailabilityField
                                 checked={form.availableOnline}
                                 canChange={canChangeOnlineAvailability}
@@ -2043,6 +2059,7 @@ const CreatePackage: React.FC = () => {
                                         invitation_download_link: "",
                                         invitation_file: "",
                                         invitationType: "link",
+                                        partyInvitesEnabled: false,
                                         bookingWindowDays: "",
                                         minBookingNoticeHours: "",
                                         availability_schedules: [],

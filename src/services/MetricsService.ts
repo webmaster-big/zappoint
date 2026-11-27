@@ -3,6 +3,10 @@ import { API_BASE_URL, getStoredUser } from '../utils/storage';
 export interface DashboardMetrics {
   totalBookings: number;
   totalRevenue: number;
+  onlineRevenue?: number;
+  inStoreCollected?: number;
+  unclassifiedReceipts?: number;
+  receiptsTotal?: number;
   totalCustomers: number;
   confirmedBookings: number;
   pendingBookings: number;

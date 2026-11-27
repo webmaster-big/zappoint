@@ -23,7 +23,7 @@ import type { AttractionPurchasesPurchase } from '../../../types/AttractionPurch
 import { cardFromPayments } from '../../../utils/cardLabel';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { attractionPurchaseCacheService } from '../../../services/AttractionPurchaseCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { useLocationScope } from '../../../contexts/LocationContext';
@@ -53,6 +53,7 @@ const ManagePurchases = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const [showTrashed, setShowTrashed] = useState(false);
@@ -588,6 +589,7 @@ const ManagePurchases = () => {
     setPaymentAmount(purchase.totalAmount.toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
   };
 
@@ -597,6 +599,7 @@ const ManagePurchases = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   const handleSubmitPayment = async () => {
@@ -640,6 +643,7 @@ const ManagePurchases = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
+        external_reference: paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || (paymentMethod === 'in-store'
           ? `In-store payment for attraction purchase #${selectedPurchaseForPayment.id}`
           : `Payment for attraction purchase #${selectedPurchaseForPayment.id}`),
@@ -659,7 +663,7 @@ const ManagePurchases = () => {
       loadPurchases(true);
     } catch (error) {
       console.error('Error processing payment:', error);
-      setToast({ message: 'Failed to process payment. Please try again.', type: 'error' });
+      setToast({ message: paymentErrorMessage(error, 'Failed to process payment. Please try again.'), type: 'error' });
     } finally {
       setProcessingPayment(false);
     }
@@ -1126,6 +1130,19 @@ const ManagePurchases = () => {
                 </div>
               </div>
 
+              {paymentMethod === 'in-store' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={paymentReceipt}
+                    maxLength={100}
+                    onChange={(e) => setPaymentReceipt(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="From the card terminal or register receipt"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Notes (Optional)

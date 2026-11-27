@@ -216,6 +216,31 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     [knownRoomIds]
   );
 
+  const columnKeysFor = React.useCallback(
+    (booking: Booking): string[] => {
+      const assigned = (booking.room_ids && booking.room_ids.length > 0 ? booking.room_ids : booking.room_id ? [booking.room_id] : []).filter(id => knownRoomIds.has(id));
+      return assigned.length > 0 ? assigned.map(id => `room-${id}`) : [columnKeyFor(booking)];
+    },
+    [knownRoomIds, columnKeyFor]
+  );
+
+  const roomCapacityById = useMemo(() => new Map(rooms.map(room => [room.id, room.capacity ?? null])), [rooms]);
+
+  const capacityFor = React.useCallback(
+    (booking: Booking, columnCapacity: number | null | undefined): number | null => {
+      const spaceIds = booking.room_ids && booking.room_ids.length > 1 ? booking.room_ids : null;
+      if (!spaceIds) return columnCapacity ?? null;
+      let combined = 0;
+      for (const id of spaceIds) {
+        const capacity = roomCapacityById.get(id);
+        if (capacity == null) return null;
+        combined += capacity;
+      }
+      return combined;
+    },
+    [roomCapacityById]
+  );
+
   const packageWindows = useMemo(() => {
     const map = new Map<number, { open: number; close: number; closedRanges: ScheduleColumn['closedRanges'] }>();
     for (const entry of windowData.packages ?? []) {
@@ -235,8 +260,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
   const columns = useMemo<ScheduleColumn[]>(() => {
     const counts = new Map<string, number>();
     for (const booking of bookings) {
-      const key = columnKeyFor(booking);
-      counts.set(key, (counts.get(key) || 0) + 1);
+      for (const key of columnKeysFor(booking)) {
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
     }
 
     const roomColumns = rooms
@@ -327,17 +353,19 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     const source = allDayBookings ?? bookings;
     const map = new Map<string, TimeRange[]>();
     for (const booking of source) {
-      const key = columnKeyFor(booking);
+      for (const key of columnKeysFor(booking)) {
       const startMinutes = startMinutesOf(booking);
       // a space stays shut for its turnaround after a booking ends; without it the band looks
       // free and the booking page then refuses that minute
-      const turnaround = booking.room_id
-        ? roomWindows.get(booking.room_id)?.interval_minutes ?? 0
+      const keyRoomId = key.startsWith('room-') ? Number(key.slice(5)) : booking.room_id;
+      const turnaround = keyRoomId
+        ? roomWindows.get(keyRoomId)?.interval_minutes ?? 0
         : 0;
       const bucket = map.get(key);
       const range = { startMinutes, endMinutes: startMinutes + durationMinutesOf(booking) + turnaround };
       if (bucket) bucket.push(range);
       else map.set(key, [range]);
+      }
     }
     return map;
   }, [allDayBookings, bookings, columnKeyFor, roomWindows]);
@@ -347,7 +375,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
     for (const column of columns) map.set(column.key, []);
 
     for (const booking of bookings) {
-      const key = columnKeyFor(booking);
+      for (const key of columnKeysFor(booking)) {
       const bucket = map.get(key);
       if (!bucket) continue;
       const startMinutes = startMinutesOf(booking);
@@ -359,6 +387,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         laneCount: 1,
         conflicts: [],
       });
+      }
     }
 
     // a space stays shut for its turnaround, so a booking starting inside it clashes too
@@ -371,7 +400,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       assignLanes(bucket);
       // measured against every booking in this space, not only the ones this grid draws
       const neighbours = (allDayBookings ?? bookings)
-        .filter(b => columnKeyFor(b) === column.key)
+        .filter(b => columnKeysFor(b).includes(column.key))
         .map(b => {
           const startMinutes = startMinutesOf(b);
           return { booking: b, startMinutes, endMinutes: startMinutes + durationMinutesOf(b) };
@@ -381,8 +410,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         item.conflicts = neighbours
           .filter(other =>
             other.booking.id !== item.booking.id &&
-            item.startMinutes < other.endMinutes + turnaroundOf(other.booking.room_id) &&
-            item.endMinutes + turnaroundOf(item.booking.room_id) > other.startMinutes)
+            item.startMinutes < other.endMinutes + turnaroundOf(column.roomId ?? other.booking.room_id) &&
+            item.endMinutes + turnaroundOf(column.roomId ?? item.booking.room_id) > other.startMinutes)
           .map(other => ({
             booking: other.booking,
             overlapMinutes: Math.max(
@@ -408,7 +437,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         roomId ? roomWindows.get(roomId)?.interval_minutes ?? 0 : 0;
 
       const inColumn = source
-        .filter(b => columnKeyFor(b) === column.key)
+        .filter(b => columnKeysFor(b).includes(column.key))
         .map(b => {
           const startMinutes = startMinutesOf(b);
           return { booking: b, startMinutes, endMinutes: startMinutes + durationMinutesOf(b) };
@@ -419,8 +448,8 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
         for (let j = i + 1; j < inColumn.length; j++) {
           const a = inColumn[i];
           const b = inColumn[j];
-          const ta = turnaroundOf(a.booking.room_id);
-          const tb = turnaroundOf(b.booking.room_id);
+          const ta = turnaroundOf(column.roomId ?? a.booking.room_id);
+          const tb = turnaroundOf(column.roomId ?? b.booking.room_id);
           if (!(a.startMinutes < b.endMinutes + tb && a.endMinutes + ta > b.startMinutes)) continue;
 
           rows.push({
@@ -726,8 +755,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
       return (
         (allDayBookings ?? bookings).find(
           booking =>
-            booking.room_id != null &&
-            peers.has(booking.room_id) &&
+            (booking.room_ids && booking.room_ids.length > 0 ? booking.room_ids : booking.room_id != null ? [booking.room_id] : []).some(id => peers.has(id)) &&
             Math.abs(startMinutesOf(booking) - minute) < gap
         ) ?? null
       );
@@ -866,7 +894,7 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
 
       const endMinute = walkInMinute + (fit.shortest ?? 0);
       const clash = (allDayBookings ?? bookings)
-        .filter(b => columnKeyFor(b) === column.key)
+        .filter(b => columnKeysFor(b).includes(column.key))
         .map(b => ({ booking: b, start: startMinutesOf(b) }))
         .filter(({ start }) => start >= walkInMinute && start < endMinute)
         .sort((a, b) => a.start - b.start)[0]?.booking ?? null;
@@ -1242,8 +1270,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                     )}
 
                     {items.map(item => {
-                      const turnaround = item.booking.room_id
-                        ? roomWindows.get(item.booking.room_id)?.interval_minutes ?? 0
+                      const bandRoomId = column.roomId ?? item.booking.room_id;
+                      const turnaround = bandRoomId
+                        ? roomWindows.get(bandRoomId)?.interval_minutes ?? 0
                         : 0;
                       if (turnaround <= 0) return null;
                       const strip = availableBand(item.endMinutes, item.endMinutes + turnaround, timeline);
@@ -1285,8 +1314,9 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                       const guestNote = guestNoteOf(item.booking);
                       const staffNote = staffNoteOf(item.booking);
                       const honoree = (item.booking.guest_of_honor_name ?? '').trim();
+                      const bookingCapacity = capacityFor(item.booking, column.capacity);
                       const overCapacity =
-                        column.capacity != null && Number(item.booking.participants) > column.capacity;
+                        bookingCapacity != null && Number(item.booking.participants) > bookingCapacity;
                       const arrived = item.booking.status === 'checked-in' || item.booking.status === 'completed';
                       const settled = item.booking.status === 'cancelled' || arrived;
                       const running = isViewingToday && nowMinutes >= item.startMinutes && nowMinutes < item.endMinutes;
@@ -1420,12 +1450,12 @@ const DayScheduleGrid: React.FC<DayScheduleGridProps> = ({
                                     className={`shrink-0 tabular-nums ${overCapacity ? 'font-bold text-rose-700' : 'text-gray-600'}`}
                                     title={
                                       overCapacity
-                                        ? `${item.booking.participants} guests in a space for ${column.capacity}`
+                                        ? `${item.booking.participants} guests in ${item.booking.room_ids && item.booking.room_ids.length > 1 ? 'spaces' : 'a space'} for ${bookingCapacity}`
                                         : `${item.booking.participants} guests`
                                     }
                                   >
                                     {item.booking.participants}
-                                    {column.capacity ? `/${column.capacity}` : ''} pax
+                                    {bookingCapacity ? `/${bookingCapacity}` : ''} pax
                                   </span>
                                   <span
                                     className={`truncate font-semibold ${

@@ -27,6 +27,7 @@ import { getStoredUser } from '../../../utils/storage';
 import type { Booking } from '../../../services/bookingService';
 import { bookingDisplayName, isCustomBooking } from '../../../utils/customBooking';
 import CustomPackageBadge from '../CustomPackageBadge';
+import { bookingSpaceNames } from '../../../utils/bookingSpaces';
 
 interface BucketStyle {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
@@ -94,10 +95,7 @@ const guestNameOf = (booking: Booking): string => {
   return 'Guest';
 };
 
-const roomNameOf = (booking: Booking): string => {
-  const room = booking.room as { name?: string } | undefined;
-  return room?.name ?? '';
-};
+const roomNameOf = (booking: Booking): string => bookingSpaceNames(booking as Parameters<typeof bookingSpaceNames>[0]);
 
 const STEP_DEBOUNCE_MS = 200;
 const PURCHASE_PAGE_SIZE = 100;

@@ -83,6 +83,7 @@ const OnsitePurchaseEvent = () => {
   const [customFieldsUnavailable, setCustomFieldsUnavailable] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('authorize.net');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [notes, setNotes] = useState('');
   const [sendEmail, setSendEmail] = useState(false);
 
@@ -686,6 +687,7 @@ const OnsitePurchaseEvent = () => {
             status: 'completed' as const,
             location_id: Number(event!.location_id),
             notes: `Payment for event purchase: ${event!.name}`,
+            external_reference: paymentReceipt.trim() || undefined,
           });
         } catch {
         }
@@ -1212,6 +1214,20 @@ const OnsitePurchaseEvent = () => {
                   <span className="text-sm">Pay Later</span>
                 </button>
               </div>
+
+              {paymentMethod === 'in-store' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={paymentReceipt}
+                    maxLength={100}
+                    onChange={(e) => setPaymentReceipt(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="From the card terminal or register receipt"
+                  />
+                </div>
+              )}
 
               {paymentMethod === 'paylater' && (
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">

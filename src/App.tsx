@@ -76,6 +76,7 @@ import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLog
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 import ManageAddOns from "./pages/admin/packages/AddOns";
 import CustomerReservations from "./pages/customer/CustomerReservation";
+import PartyOrganizer from "./pages/customer/PartyOrganizer";
 import CustomerNotifications from "./pages/customer/CustomerNotifications";
 import CustomerLayout from "./layouts/CustomerLayout";
 import Settings from "./pages/admin/Settings";
@@ -227,6 +228,7 @@ function App() {
           <Route path="/checkout" element={<><PageViewBeacon pageType="checkout" /><CheckoutGate /></>} />
           <Route path="/browse" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_reservations" /><CustomerReservations /></></CustomerProtectedRoute>} />
+          <Route path="/customer/party/:bookingId" element={<CustomerProtectedRoute returnAfterSignIn><><PageViewBeacon pageType="party_organizer" /><PartyOrganizer /></></CustomerProtectedRoute>} />
           <Route path="/customer/attractions" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_attractions" /><MyAttractions /></></CustomerProtectedRoute>} />
           <Route path="/customer/events" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_events" /><MyEvents /></></CustomerProtectedRoute>} />
           <Route path="/customer/notifications" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_notifications" /><CustomerNotifications /></></CustomerProtectedRoute>} />

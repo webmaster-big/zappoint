@@ -13,6 +13,7 @@ export interface PaymentsPagePayment {
   status: 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
   transaction_id: string;
   payment_id?: string;
+  externalReference?: string | null;
   notes?: string;
   paid_at?: string;
   refunded_at?: string;

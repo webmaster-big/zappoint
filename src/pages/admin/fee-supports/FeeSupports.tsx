@@ -73,6 +73,7 @@ const FeeSupports: React.FC = () => {
     company_id: currentUser?.company_id || 1,
     location_id: null,
     fee_name: '',
+    charge_type: 'fee',
     fee_amount: 0,
     fee_calculation_type: 'fixed',
     fee_application_type: 'additive',
@@ -255,6 +256,19 @@ const FeeSupports: React.FC = () => {
       render: fs => (
         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${fs.fee_application_type === 'additive' ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-600'}`}>
           {fs.fee_application_type === 'additive' ? 'Additive' : 'Inclusive'}
+        </span>
+      ),
+    },
+    {
+      key: 'charge_type',
+      label: 'Charge Type',
+      group: 'Fee Details',
+      sortable: true,
+      sortValue: fs => fs.charge_type ?? 'fee',
+      exportValue: fs => (fs.charge_type === 'tax' ? 'Tax' : 'Customer fee'),
+      render: fs => (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          {fs.charge_type === 'tax' ? 'Tax' : 'Customer fee'}
         </span>
       ),
     },
@@ -474,6 +488,7 @@ const FeeSupports: React.FC = () => {
       company_id: currentUser?.company_id || 1,
       location_id: isCompanyAdmin ? null : userLocationId,
       fee_name: '',
+      charge_type: 'fee',
       fee_amount: 0,
       fee_calculation_type: 'fixed',
       fee_application_type: 'additive',
@@ -491,6 +506,7 @@ const FeeSupports: React.FC = () => {
       company_id: fs.company_id,
       location_id: fs.location_id,
       fee_name: fs.fee_name,
+      charge_type: fs.charge_type === 'tax' ? 'tax' : 'fee',
       fee_amount: parseFloat(fs.fee_amount),
       fee_calculation_type: fs.fee_calculation_type,
       fee_application_type: fs.fee_application_type,
@@ -785,6 +801,19 @@ const FeeSupports: React.FC = () => {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Charge Type</label>
+                    <select
+                      value={form.charge_type}
+                      onChange={(e) => handleFormChange('charge_type', e.target.value)}
+                      className={`w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+                    >
+                      <option value="fee">Customer fee</option>
+                      <option value="tax">Tax</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Reports count taxes as Tax Charged and every other charge as Customer Fees.</p>
                   </div>
 
                   <div className="mt-4">

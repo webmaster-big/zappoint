@@ -43,10 +43,42 @@ export interface CategoryData {
   summary: AccountingSummary;
 }
 
+export type ReceiptsGroupBy = 'location' | 'item';
+
+export interface ReceiptsTotals {
+  online: number;
+  in_store: number;
+  unclassified: number;
+  total: number;
+}
+
+export interface ReceiptsRow extends ReceiptsTotals {
+  key: string;
+  label: string;
+  type?: string | null;
+}
+
+export interface ReceiptsDay {
+  date: string;
+  rows: ReceiptsRow[];
+  totals: ReceiptsTotals;
+}
+
+export interface DailyReceipts {
+  group_by: ReceiptsGroupBy;
+  start_date: string;
+  end_date: string;
+  staff_card_column: 'online' | 'in_store' | 'unclassified';
+  has_unclassified: boolean;
+  days: ReceiptsDay[];
+  totals: ReceiptsTotals;
+}
+
 export interface ReportData {
   summary: AccountingSummary;
   categories: CategoryData[];
   note?: string; // Explains Add-ons visibility
+  receipts?: DailyReceipts;
 }
 
 export interface FiltersApplied {
@@ -112,6 +144,7 @@ export interface AccountingReportParams {
   payment_status?: 'paid' | 'partial' | 'pending' | 'all';
   include_addons_breakdown?: boolean;
   category_filter?: string;
+  receipts_group_by?: ReceiptsGroupBy;
 }
 
 export interface SummaryTrendParams {

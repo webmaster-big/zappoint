@@ -390,6 +390,18 @@ const ViewPayment: React.FC = () => {
                 </div>
               </div>
 
+              {payment.external_reference && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                    <FileText className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Receipt Number</p>
+                    <p className="font-medium text-gray-900 font-mono text-sm">{payment.external_reference}</p>
+                  </div>
+                </div>
+              )}
+
               {payment.payment_id && payment.payment_id !== payment.transaction_id && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>

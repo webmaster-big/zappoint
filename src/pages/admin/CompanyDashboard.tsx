@@ -40,7 +40,7 @@ import CounterAnimation from '../../components/ui/CounterAnimation';
 import InfoTooltip from '../../components/ui/InfoTooltip';
 import bookingService, { type Booking } from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
-import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE, paymentErrorMessage } from '../../services/PaymentService';
 import { metricsService, type TimeframeType, type DashboardMetrics } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import {
@@ -86,6 +86,9 @@ import { countLabel, participantsCoveredLabel } from '../../utils/waiverCoverage
 import { CUSTOM_PACKAGE_LABEL, bookingDisplayName, isCustomBooking } from '../../utils/customBooking';
 import CustomPackageBadge from '../../components/admin/CustomPackageBadge';
 import { CustomPackageSection, OneTimeAddOnsSection } from '../../components/admin/bookings/CustomPackageDetails';
+import { bookingSpaceNames, bookingSpaces } from '../../utils/bookingSpaces';
+
+const signedMoney = (value: number, digits = 2): string => `${value < 0 ? '-' : ''}$${Math.abs(value).toFixed(digits)}`;
 
 const CUSTOM_PACKAGE_FILTER = '__custom_package__';
 
@@ -147,6 +150,7 @@ const CompanyDashboard: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings (optionally filtered by location)
@@ -937,7 +941,7 @@ const CompanyDashboard: React.FC = () => {
 
   const getTopLocations = () => {
     return Object.entries(locationStats)
-      .sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue)
+      .sort(([, a], [, b]) => Number((b as { onlineRevenue?: number }).onlineRevenue ?? 0) - Number((a as { onlineRevenue?: number }).onlineRevenue ?? 0))
       .slice(0, 3);
   };
   const topLocations = getTopLocations();
@@ -956,7 +960,7 @@ const CompanyDashboard: React.FC = () => {
     const key = user?.id ? `dashboard_card_visibility_${user.id}` : 'dashboard_card_visibility';
     localStorage.setItem(key, JSON.stringify(updated));
   };
-  const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue);
+  const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => Number((b as { onlineRevenue?: number }).onlineRevenue ?? 0) - Number((a as { onlineRevenue?: number }).onlineRevenue ?? 0));
   const displayedLocations = showAllLocations ? sortedLocations : sortedLocations.slice(0, 4);
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
@@ -967,6 +971,7 @@ const CompanyDashboard: React.FC = () => {
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
     setShowPaymentModal(true);
   };
 
@@ -975,6 +980,7 @@ const CompanyDashboard: React.FC = () => {
     setPaymentAmount('');
     setPaymentMethod('in-store');
     setPaymentNotes('');
+    setPaymentReceipt('');
   };
 
   const handleSubmitPayment = async () => {
@@ -1000,6 +1006,7 @@ const CompanyDashboard: React.FC = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
+        external_reference: paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
         notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
       });
 
@@ -1024,6 +1031,8 @@ const CompanyDashboard: React.FC = () => {
       handleClosePaymentModal();
     } catch (error) {
       console.error('Error processing payment:', error);
+      const duplicateReceipt = paymentErrorMessage(error, '');
+      if (duplicateReceipt) alert(duplicateReceipt);
     } finally {
       setProcessingPayment(false);
     }
@@ -1296,7 +1305,7 @@ const CompanyDashboard: React.FC = () => {
             ) : topLocations.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {topLocations.map(([locationId, stats], index) => {
-                  const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; waivers?: number; waiversSigned?: number };
+                  const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; onlineRevenue?: number; inStoreCollected?: number; unclassifiedReceipts?: number; waivers?: number; waiversSigned?: number };
                   return (
                   <div key={locationId} className={`p-3 rounded-lg border bg-${themeColor}-50/60 border-${themeColor}-200`}>
                     <div className="flex items-center gap-2.5">
@@ -1310,7 +1319,8 @@ const CompanyDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className={`font-bold text-sm text-${fullColor} tabular-nums`}>${typedStats.revenue.toFixed(2)}</div>
+                        <div className={`font-bold text-sm text-${fullColor} tabular-nums`} title="Online revenue">{signedMoney(Number(typedStats.onlineRevenue ?? 0))}</div>
+                        <div className="text-[10px] text-gray-500 tabular-nums">In-store {signedMoney(Number(typedStats.inStoreCollected ?? 0))}</div>
                         <div className="flex items-center gap-1.5 justify-end mt-1">
                           <div className={`w-14 h-1.5 rounded-full overflow-hidden bg-${themeColor}-200`}>
                             <div className={`h-1.5 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
@@ -1343,12 +1353,12 @@ const CompanyDashboard: React.FC = () => {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {displayedLocations.map(([locationId, stats]) => {
-                    const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; waivers?: number; waiversSigned?: number };
+                    const typedStats = stats as { name: string; bookings: number; purchases: number; attractionTickets?: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number; onlineRevenue?: number; inStoreCollected?: number; unclassifiedReceipts?: number; waivers?: number; waiversSigned?: number };
                     return (
                     <div key={locationId} className="border border-gray-200 rounded-lg p-3 bg-gray-50/70 hover:shadow-sm transition-shadow">
                       <div className="flex items-baseline justify-between gap-2 mb-2.5">
                         <span className="font-semibold text-gray-900 text-sm truncate">{typedStats.name}</span>
-                        <span className={`text-sm font-bold shrink-0 text-${fullColor} tabular-nums`}>${typedStats.revenue.toFixed(2)}</span>
+                        <span className={`text-sm font-bold shrink-0 text-${fullColor} tabular-nums`} title="Online revenue">{signedMoney(Number(typedStats.onlineRevenue ?? 0))}</span>
                       </div>
                       <div className="grid grid-cols-4 gap-2 mb-2.5">
                         <div className="min-w-0">
@@ -1376,9 +1386,9 @@ const CompanyDashboard: React.FC = () => {
                         <span className="text-[10px] font-semibold text-gray-500 tabular-nums shrink-0">{typedStats.utilization}% used</span>
                       </div>
                       <div className="mt-2.5 pt-2 border-t border-gray-200 flex items-center justify-between gap-1 text-[10px] text-gray-500 tabular-nums">
-                        <span className="truncate">Bkgs ${Number(typedStats.bookingRevenue ?? 0).toFixed(0)}</span>
-                        <span className="truncate">Tix ${Number(typedStats.purchaseRevenue ?? 0).toFixed(0)}</span>
-                        <span className="truncate">Events ${Number(typedStats.eventPurchaseRevenue ?? 0).toFixed(0)}</span>
+                        <span className="truncate">Online {signedMoney(Number(typedStats.onlineRevenue ?? 0), 0)}</span>
+                        <span className="truncate">In-store {signedMoney(Number(typedStats.inStoreCollected ?? 0), 0)}</span>
+                        {Number(typedStats.unclassifiedReceipts ?? 0) !== 0 && <span className="truncate">Unclassified {signedMoney(Number(typedStats.unclassifiedReceipts ?? 0), 0)}</span>}
                       </div>
                     </div>
                     );
@@ -2494,9 +2504,9 @@ const CompanyDashboard: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <House className="h-4 w-4 text-gray-400 mr-3" />
-                        <span className="font-medium text-gray-900">{selectedBooking.room.name || 'N/A'}</span>
+                        <span className="font-medium text-gray-900">{bookingSpaceNames(selectedBooking as Parameters<typeof bookingSpaceNames>[0]) || 'N/A'}</span>
                       </div>
-                      {selectedBooking.room.capacity && (
+                      {bookingSpaces(selectedBooking as Parameters<typeof bookingSpaceNames>[0]).length <= 1 && selectedBooking.room.capacity && (
                         <span className="text-sm text-gray-600">Capacity: {selectedBooking.room.capacity}</span>
                       )}
                     </div>
@@ -2818,6 +2828,19 @@ const CompanyDashboard: React.FC = () => {
                   In-Store
                 </div>
               </div>
+              {paymentMethod === 'in-store' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={paymentReceipt}
+                    maxLength={100}
+                    onChange={(e) => setPaymentReceipt(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="From the card terminal or register receipt"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
                 <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}

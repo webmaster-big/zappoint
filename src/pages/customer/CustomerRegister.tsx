@@ -8,6 +8,7 @@ import { useCompanyBrand } from '../../hooks/useCompanyBrand';
 import { getImageUrl } from '../../utils/storage';
 import { DEFAULT_LOGO_SRC } from '../../utils/logo';
 import { clearStaffSession } from '../../utils/auth';
+import { safeReturnPath } from '../../utils/safeReturnPath';
 
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' }, { code: 'CA', name: 'Canada' }, { code: 'GB', name: 'United Kingdom' },
@@ -84,7 +85,7 @@ const CustomerRegister = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get('next') || searchParams.get('redirect') || '';
-  const safeNextPath = nextPath.startsWith('/') ? nextPath : '';
+  const safeNextPath = safeReturnPath(nextPath, '');
   const [formData, setFormData] = useState<RegisterFormData>({
     firstName: '', lastName: '', email: '', phone: '',
     password: '', confirmPassword: '',
@@ -160,13 +161,36 @@ const CustomerRegister = () => {
       });
       if (response.success && response.data) {
         clearStaffSession();
-        localStorage.setItem('zapzone_customer', JSON.stringify({
-          id: response.data.id, firstName: formData.firstName, lastName: formData.lastName,
-          name: `${formData.firstName} ${formData.lastName}`, email: formData.email, phone: formData.phone,
-          address: formData.address, address2: formData.address2, city: formData.city,
-          state: formData.state, zip: formData.zip, country: formData.country,
-          createdAt: new Date().toISOString(),
-        }));
+        let signedIn = false;
+        if (safeNextPath) {
+          try {
+            const session = await customerService.login(formData.email, formData.password);
+            if (session.token && session.user) {
+              localStorage.setItem('zapzone_customer', JSON.stringify({
+                id: session.user.id,
+                firstName: session.user.first_name || formData.firstName, lastName: session.user.last_name || formData.lastName,
+                name: session.user.name || `${formData.firstName} ${formData.lastName}`,
+                email: session.user.email, phone: session.user.phone,
+                address: session.user.address || '', address2: session.user.address2 || '',
+                city: session.user.city || '', state: session.user.state || '',
+                zip: session.user.zip || '', country: session.user.country || 'US',
+                token: session.token, role: session.role,
+              }));
+              signedIn = true;
+            }
+          } catch {
+            signedIn = false;
+          }
+        }
+        if (!signedIn) {
+          localStorage.setItem('zapzone_customer', JSON.stringify({
+            id: response.data.id, firstName: formData.firstName, lastName: formData.lastName,
+            name: `${formData.firstName} ${formData.lastName}`, email: formData.email, phone: formData.phone,
+            address: formData.address, address2: formData.address2, city: formData.city,
+            state: formData.state, zip: formData.zip, country: formData.country,
+            createdAt: new Date().toISOString(),
+          }));
+        }
         if (safeNextPath) {
           navigate(safeNextPath);
         } else {

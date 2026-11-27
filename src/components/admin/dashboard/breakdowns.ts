@@ -10,6 +10,13 @@ export const buildBreakdown = (rows: Array<{ label: string; count: number }>): B
     .map(row => ({ label: row.label, count: row.count, percentage: percentageOf(row.count, total) }));
 };
 
+export const buildMoneyBreakdown = (rows: Array<{ label: string; count: number }>): BreakdownItem[] => {
+  const moved = rows.reduce((sum, row) => sum + Math.abs(row.count), 0);
+  return rows
+    .filter(row => row.count !== 0)
+    .map(row => ({ label: row.label, count: row.count, percentage: percentageOf(Math.abs(row.count), moved) }));
+};
+
 export const rescaleBreakdown = (items: BreakdownItem[] | undefined, keys: string[]): BreakdownItem[] => {
   const wanted = keys.map(k => k.toLowerCase());
   const picked = (items ?? []).filter(item => wanted.includes(String(item.status ?? item.label).toLowerCase()));

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { bookingSpaceNames } from '../../../utils/bookingSpaces';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import WaiverConnectionPanel from '../../../components/waiver/WaiverConnectionPanel';
 import EscapeRoomBookingCard from '../../../components/admin/bookings/EscapeRoomBookingCard';
@@ -453,7 +454,7 @@ const ViewBooking: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Space</p>
-                    <p className="font-medium text-gray-900">{(booking.room as any)?.name}</p>
+                    <p className="font-medium text-gray-900">{bookingSpaceNames(booking as Parameters<typeof bookingSpaceNames>[0])}</p>
                   </div>
                 </div>
               ) : null}

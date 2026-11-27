@@ -8,6 +8,8 @@ export interface BookingsPageBooking {
   packageId?: number;
   room: string;
   roomId?: number;
+  roomIds?: number[];
+  roomNames?: string[];
   customerName: string;
   customerId?: number;
   email: string;

@@ -31,7 +31,6 @@ import { clampAddOnQuantity, getAddOnMinQuantity, isForceAddOn, seedForcedAddOns
 import { describeFollowUp } from '../../../utils/visitFollowUpNotice';
 import { scheduleMatchesDate } from '../../../utils/packageSchedule';
 import CustomPackageBadge from '../../../components/admin/CustomPackageBadge';
-import { categoryService, type Category } from '../../../services/CategoryService';
 import addOnService, { type AddOn } from '../../../services/AddOnService';
 import { addOnCacheService } from '../../../services/AddOnCacheService';
 import {
@@ -161,6 +160,8 @@ const EditBooking: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const spacesFromServer = useRef(false);
+  const loadedRoomIds = useRef<number[]>([]);
   const [originalBooking, setOriginalBooking] = useState<Booking | null>(null);
   const [packageDetails, setPackageDetails] = useState<PackageType | null>(null);
   const [originalAmountPaid, setOriginalAmountPaid] = useState<number>(0);
@@ -185,6 +186,7 @@ const EditBooking: React.FC = () => {
     locationId: null as number | null,
     packageId: null as number | null,
     roomId: null as number | null,
+    roomIds: [] as number[],
     notes: '',
     sendNotification: true,
     guestOfHonorName: '',
@@ -262,11 +264,7 @@ const EditBooking: React.FC = () => {
   const loadCategories = useCallback(async () => {
     setCategoriesStatus('loading');
     try {
-      const response = await categoryService.getCategories();
-      const list: Category[] = Array.isArray(response?.data) ? response.data : [];
-      const names = list
-        .map((category) => (typeof category?.name === 'string' ? category.name : ''))
-        .filter((name) => name.trim() !== '');
+      const names = await bookingService.getCustomPackageCategories();
       setCategoryNames(Array.from(new Set(names)));
       setCategoriesStatus('ready');
     } catch (error) {
@@ -344,6 +342,7 @@ const EditBooking: React.FC = () => {
             const fresh = await bookingService.getBookingById(Number(bookingData.id));
             if (fresh.success && fresh.data) {
               bookingData = fresh.data;
+              spacesFromServer.current = true;
               await bookingCacheService.updateBookingInCache(fresh.data);
             }
           } catch (error) {
@@ -352,6 +351,9 @@ const EditBooking: React.FC = () => {
         }
 
         const customBooking = isCustomBooking(bookingData);
+        loadedRoomIds.current = Array.isArray(bookingData.room_ids) && bookingData.room_ids.length > 0
+          ? bookingData.room_ids
+          : (bookingData.room_id ? [bookingData.room_id] : []);
         if (customBooking) {
           const terms = customTermsOf(bookingData);
           setCustomInput(terms ? withCustomRowKeys(customTermsInputFrom(terms)) : null);
@@ -380,6 +382,9 @@ const EditBooking: React.FC = () => {
           locationId: bookingData.location_id ?? null,
           packageId: bookingData.package_id || null,
           roomId: bookingData.room_id || null,
+          roomIds: Array.isArray(bookingData.room_ids) && bookingData.room_ids.length > 0
+            ? bookingData.room_ids
+            : (bookingData.room_id ? [bookingData.room_id] : []),
           notes: bookingData.notes || '',
           sendNotification: true,
           guestOfHonorName: bookingData.guest_of_honor_name || '',
@@ -440,7 +445,7 @@ const EditBooking: React.FC = () => {
           .map(([addOnId]) => customAddOnName(Number(addOnId)));
     const locationName = locations.find((loc) => loc.id === locationId)?.name || 'this location';
 
-    setFormData(prev => ({ ...prev, locationId, roomId: null }));
+    setFormData(prev => ({ ...prev, locationId, roomId: null, roomIds: [] }));
     setSelectedAddOns(returningHome ? { ...originalAddOnSelection } : {});
     setCustomAddOnsNotice(
       droppedNames.length > 0 ? `Removed add-ons not offered at ${locationName}: ${droppedNames.join(', ')}.` : null
@@ -460,7 +465,7 @@ const EditBooking: React.FC = () => {
       await handleCustomLocationChange(locationId);
       return;
     }
-    setFormData(prev => ({ ...prev, locationId, packageId: null, roomId: null, date: '', time: '' }));
+    setFormData(prev => ({ ...prev, locationId, packageId: null, roomId: null, roomIds: [], date: '', time: '' }));
     setPackageDetails(null);
     setAvailablePackages([]);
     setAvailableRooms([]);
@@ -1152,6 +1157,7 @@ const EditBooking: React.FC = () => {
         location_id: formData.locationId || undefined,
         package_id: isCustom ? undefined : formData.packageId || undefined,
         room_id: formData.roomId || null,
+        ...(isCustom && (spacesFromServer.current || formData.roomIds.join(',') !== loadedRoomIds.current.join(',')) && { room_ids: formData.roomIds }),
         notes: formData.notes,
         send_notification: sendUpdateEmail,
         ...(addOnsChanged && { additional_addons: additionalAddons }),
@@ -1944,7 +1950,30 @@ const EditBooking: React.FC = () => {
               <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                 <Home className={`w-5 h-5 text-${themeColor}-600`} /> Space Assignment{isCustom ? ' *' : ''}
               </h3>
-              {availableRooms.length > 0 ? (
+              {isCustom && availableRooms.length > 0 ? (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">Pick one or more spaces. Each one is held for the same start time and length.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableRooms.map((room) => {
+                      const selected = formData.roomIds.includes(room.id);
+                      return (
+                        <button
+                          key={room.id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setFormData(prev => {
+                            const next = prev.roomIds.includes(room.id) ? prev.roomIds.filter(roomId => roomId !== room.id) : [...prev.roomIds, room.id];
+                            return { ...prev, roomIds: next, roomId: next[0] ?? null };
+                          })}
+                          className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${selected ? `bg-${themeColor}-600 border-${themeColor}-600 text-white` : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {room.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : availableRooms.length > 0 ? (
                 <select
                   name="roomId"
                   value={formData.roomId || ''}
@@ -2429,9 +2458,11 @@ const EditBooking: React.FC = () => {
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Space</p>
               <p className="font-medium text-gray-900">
-                {formData.roomId 
-                  ? availableRooms.find(r => r.id === formData.roomId)?.name || 'Selected' 
-                  : 'Not assigned'}
+                {isCustom && formData.roomIds.length > 0
+                  ? formData.roomIds.map(roomId => availableRooms.find(r => r.id === roomId)?.name || 'Selected').join(', ')
+                  : formData.roomId
+                    ? availableRooms.find(r => r.id === formData.roomId)?.name || 'Selected'
+                    : 'Not assigned'}
               </p>
             </div>
 

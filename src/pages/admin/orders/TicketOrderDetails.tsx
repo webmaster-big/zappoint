@@ -17,7 +17,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import ticketOrderService, { type TicketOrder, type OrderLine } from '../../../services/TicketOrderService';
-import { getPayments, createPayment } from '../../../services/PaymentService';
+import { getPayments, createPayment, paymentErrorMessage } from '../../../services/PaymentService';
 import { cardFromPayments, formatCardLabel, formatMoney } from '../../../utils/cardLabel';
 import { PAYMENT_TYPE, type Payment } from '../../../types/Payment.types';
 import LoadingSpinner from '../../../components/ui/LoadingSpinner';
@@ -51,6 +51,7 @@ const TicketOrderDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [checkingIn, setCheckingIn] = useState<number | 'all' | null>(null);
   const [acting, setActing] = useState<'pay' | 'cancel' | null>(null);
+  const [venueReceipt, setVenueReceipt] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -118,11 +119,13 @@ const TicketOrderDetails = () => {
         status: 'completed',
         location_id: order.location_id,
         notes: `Venue payment for order ${order.reference_number}`,
+        external_reference: venueReceipt.trim() || undefined,
       });
+      setVenueReceipt('');
       setToast({ message: 'Payment recorded — every ticket on the order is settled.', type: 'success' });
       await load();
     } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : 'Payment failed', type: 'error' });
+      setToast({ message: paymentErrorMessage(e, e instanceof Error ? e.message : 'Payment failed'), type: 'error' });
     } finally {
       setActing(null);
     }
@@ -190,6 +193,17 @@ const TicketOrderDetails = () => {
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {order.remaining_balance > 0 && !['cancelled', 'refunded'].includes(order.status) && (
+              <input
+                type="text"
+                value={venueReceipt}
+                maxLength={100}
+                onChange={(e) => setVenueReceipt(e.target.value)}
+                aria-label="Receipt number (optional)"
+                placeholder="Receipt number (optional)"
+                className="w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            )}
             {order.remaining_balance > 0 && !['cancelled', 'refunded'].includes(order.status) && (
               <StandardButton
                 variant="secondary"

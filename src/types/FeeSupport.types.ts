@@ -4,6 +4,7 @@ export interface FeeSupport {
   company_id: number;
   location_id: number | null;
   fee_name: string;
+  charge_type?: 'fee' | 'tax';
   fee_amount: string; // Decimal string from API
   fee_calculation_type: 'fixed' | 'percentage';
   fee_application_type: 'additive' | 'inclusive';
@@ -21,6 +22,7 @@ export interface FeeSupportFormData {
   company_id: number;
   location_id?: number | null;
   fee_name: string;
+  charge_type: 'fee' | 'tax';
   fee_amount: number;
   fee_calculation_type: 'fixed' | 'percentage';
   fee_application_type: 'additive' | 'inclusive';

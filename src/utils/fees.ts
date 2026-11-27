@@ -7,6 +7,7 @@ export interface AppliedFee {
   fee_application_type: 'additive' | 'inclusive';
   fee_label?: string | null;
   fee_calculation_type?: 'fixed' | 'percentage' | null;
+  fee_support_id?: number | null;
 }
 
 export function buildAppliedFees(feeBreakdown: FeeBreakdown | null): AppliedFee[] {
@@ -18,6 +19,7 @@ export function buildAppliedFees(feeBreakdown: FeeBreakdown | null): AppliedFee[
     fee_name: fee.fee_name,
     fee_amount: fee.fee_amount,
     fee_application_type: fee.fee_application_type,
+    fee_support_id: fee.fee_support_id ?? null,
   }));
 }
 

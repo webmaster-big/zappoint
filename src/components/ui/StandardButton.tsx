@@ -18,6 +18,7 @@ interface StandardButtonProps {
   type?: 'button' | 'submit' | 'reset';
   fullWidth?: boolean;
   title?: string;
+  'aria-pressed'?: boolean;
 }
 
 const StandardButton: React.FC<StandardButtonProps> = ({
@@ -33,6 +34,7 @@ const StandardButton: React.FC<StandardButtonProps> = ({
   type = 'button',
   fullWidth = false,
   title,
+  'aria-pressed': ariaPressed,
 }) => {
   const { themeColor } = useThemeColor();
 
@@ -80,6 +82,7 @@ const StandardButton: React.FC<StandardButtonProps> = ({
       onClick={onClick}
       disabled={disabled || loading}
       title={title}
+      aria-pressed={ariaPressed}
     >
       {loading ? (
         <>

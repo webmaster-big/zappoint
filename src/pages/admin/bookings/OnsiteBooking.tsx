@@ -155,6 +155,7 @@ const OnsiteBooking: React.FC = () => {
     ? (slotPrefill.locationId ?? effectiveLocationId)
     : effectiveLocationId;
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
+  const [paymentReceipt, setPaymentReceipt] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
   const gatewayLocationId = selectedPackage?.location_id
     ?? selectedPackage?.location?.id
@@ -1573,6 +1574,7 @@ const OnsiteBooking: React.FC = () => {
     sideEffectsAcceptedRef.current = false;
     setOverrideGate(null);
     setSelectedPackage(null);
+    setPaymentReceipt('');
     setCustomFieldAnswers({});
     setPromoDiscount(0);
     setAppliedPromoCode(null);
@@ -2082,6 +2084,7 @@ const OnsiteBooking: React.FC = () => {
               notes: bookingData.paymentMethod === 'in-store' 
                 ? `In-store payment for booking ${referenceNumber}` 
                 : `Payment for booking ${referenceNumber}`,
+              external_reference: bookingData.paymentMethod === 'in-store' && paymentReceipt.trim() ? paymentReceipt.trim() : undefined,
             };
             
             await createPayment(paymentData);
@@ -3625,6 +3628,17 @@ const OnsiteBooking: React.FC = () => {
               />
             </div>
             <p className="text-xs text-gray-500 mt-2">Total: ${payableTotal().toFixed(2)} | Remaining: ${(payableTotal() - (bookingData.inStoreAmountPaid || 0)).toFixed(2)}</p>
+          </div>
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (Optional)</label>
+            <input
+              type="text"
+              value={paymentReceipt}
+              maxLength={100}
+              onChange={(e) => setPaymentReceipt(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="From the card terminal or register receipt"
+            />
           </div>
         </div>
       )}

@@ -153,6 +153,7 @@ const transformPayment = (payment: Payment): PaymentsPagePayment => {
     status: payment.status,
     transaction_id: payment.transaction_id,
     payment_id: payment.payment_id,
+    externalReference: payment.external_reference ?? null,
     notes: payment.notes,
     paid_at: payment.paid_at,
     refunded_at: payment.refunded_at,
@@ -717,6 +718,17 @@ const Payments = () => {
           </div>
         );
       },
+    },
+    {
+      key: 'receipt',
+      label: 'Receipt #',
+      group: 'Identifiers',
+      sortable: true,
+      sortValue: p => p.externalReference || '',
+      exportValue: p => p.externalReference || '',
+      render: p => p.externalReference
+        ? <span className="text-sm font-mono text-gray-700">{p.externalReference}</span>
+        : <span className="text-sm text-gray-400">—</span>,
     },
     {
       key: 'type',

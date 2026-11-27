@@ -86,6 +86,24 @@ const flushDuration = (): void => {
   }
 };
 
+const PRIVATE_QUERY_KEYS = ['k'];
+
+const withoutPrivateKeys = (raw: string): string => {
+  try {
+    const url = new URL(raw, window.location.origin);
+    PRIVATE_QUERY_KEYS.forEach(key => url.searchParams.delete(key));
+    const next = url.searchParams.get('next');
+    if (next) {
+      const inner = new URL(next, window.location.origin);
+      PRIVATE_QUERY_KEYS.forEach(key => inner.searchParams.delete(key));
+      url.searchParams.set('next', `${inner.pathname}${inner.search}${inner.hash}`);
+    }
+    return /^https?:/i.test(raw) ? url.toString() : `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return raw;
+  }
+};
+
 export async function trackPageView(p: TrackPayload = {}): Promise<void> {
   if (isAnalyticsDnt() || isTrackingSilencedHost() || typeof window === 'undefined') return;
   flushDuration();
@@ -94,10 +112,10 @@ export async function trackPageView(p: TrackPayload = {}): Promise<void> {
   const body = {
     event_type: 'page_view' as AnalyticsEventType,
     event_name: 'page_view',
-    page_url: window.location.href,
+    page_url: withoutPrivateKeys(window.location.href),
     page_path: window.location.pathname,
     page_title: document.title,
-    referrer: document.referrer || null,
+    referrer: document.referrer ? withoutPrivateKeys(document.referrer) : null,
     ...utm,
     ...p,
   };
@@ -194,12 +212,12 @@ const recordClick = (event: MouseEvent): void => {
       tag: target.tagName.toLowerCase(),
     };
     const href = target instanceof HTMLAnchorElement ? target.getAttribute('href') : null;
-    if (href) metadata.href = href.slice(0, 200);
+    if (href) metadata.href = (/k=|k%3d/i.test(href) ? withoutPrivateKeys(href) : href).slice(0, 200);
 
     pendingClicks.push({
       event_type: 'engagement',
       event_name: 'click',
-      page_url: window.location.href,
+      page_url: withoutPrivateKeys(window.location.href),
       page_path: window.location.pathname,
       page_title: document.title,
       visitor_id: getVisitorId(),
