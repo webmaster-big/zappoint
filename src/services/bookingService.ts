@@ -820,7 +820,7 @@ const bookingService = {
     return response.data;
   },
 
-  async restoreBooking(id: number): Promise<BookingResponse> {
+  async restoreBooking(id: number): Promise<BookingResponse & { space_warning?: string | null }> {
     const response = await api.post(`/bookings/${id}/restore`);
     return response.data;
   },
@@ -852,7 +852,10 @@ const bookingService = {
   async bulkRestore(ids: number[]): Promise<{
     success: boolean;
     message: string;
-    data: { restored_count: number };
+    data: {
+      restored_count: number;
+      space_warnings?: { id: number; reference_number: string; message: string }[];
+    };
   }> {
     const response = await api.post('/bookings/bulk-restore', { ids });
     return response.data;

@@ -253,6 +253,10 @@ export interface VoidResponse {
   payable: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
 }
 
+export interface RefundVoidedInsteadResponse extends VoidResponse {
+  was_void_fallback: true;
+}
+
 export interface RefundErrorData {
   original_amount: number;
   total_already_refunded: number;

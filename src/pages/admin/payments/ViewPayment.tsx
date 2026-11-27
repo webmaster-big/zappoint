@@ -689,6 +689,10 @@ const ViewPayment: React.FC = () => {
         open={showRefundModal}
         onClose={() => setShowRefundModal(false)}
         onRefundComplete={handleRefundComplete}
+        onVoidedInstead={() => {
+          setShowRefundModal(false);
+          reloadPayment();
+        }}
         onToast={(message, type) => setToast({ message, type })}
       />
 

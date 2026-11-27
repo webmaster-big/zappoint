@@ -3,7 +3,7 @@ import { X, RotateCcw, DollarSign, AlertTriangle, Eye, EyeOff } from 'lucide-rea
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../ui/StandardButton';
 import { refundPayment } from '../../../services/PaymentService';
-import type { RefundResponse, RefundErrorData } from '../../../types/Payment.types';
+import type { RefundResponse, RefundVoidedInsteadResponse, RefundErrorData } from '../../../types/Payment.types';
 import type { PaymentsPagePayment } from '../../../types/Payments.types';
 
 interface RefundModalProps {
@@ -11,6 +11,7 @@ interface RefundModalProps {
   open: boolean;
   onClose: () => void;
   onRefundComplete: (response: RefundResponse) => void;
+  onVoidedInstead: (response: RefundVoidedInsteadResponse) => void;
   onToast: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -19,6 +20,7 @@ const RefundModal: React.FC<RefundModalProps> = ({
   open,
   onClose,
   onRefundComplete,
+  onVoidedInstead,
   onToast,
 }) => {
   const { themeColor, fullColor } = useThemeColor();
@@ -82,6 +84,18 @@ const RefundModal: React.FC<RefundModalProps> = ({
         notes: notes || undefined,
         cancel: cancelBooking,
       });
+
+      if ('was_void_fallback' in response) {
+        const voidedAmount = Number(response.void_amount ?? payment.amount);
+        const cancelledLabel = payment.payable_type === 'booking' ? 'booking' : 'purchase';
+        onToast(
+          `This payment had not settled yet, so it was voided instead of refunded. The full $${voidedAmount.toFixed(2)} goes back to the card${response.payable_cancelled ? ` and the ${cancelledLabel} was cancelled` : ''}.`,
+          'success'
+        );
+        onVoidedInstead(response);
+        onClose();
+        return;
+      }
 
       onToast(
         `Refund of $${refundAmount.toFixed(2)} processed successfully. Refund Payment #${response.data.refund_payment.id}`,

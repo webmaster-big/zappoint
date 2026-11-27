@@ -2238,7 +2238,9 @@ const BookPackage: React.FC = () => {
                     <span className="text-xs text-gray-500 w-full sm:w-auto mt-1 sm:mt-0">
                       {pkg.pricing_type === 'per_person'
                         ? `$${Number(pkg.price).toFixed(2)} per ${(pkg.participant_label || 'participant').toLowerCase()} (${pkg.min_participants || 1}–${pkg.max_participants})`
-                        : `${pkg.min_participants} included, +$${pkg.price_per_additional} per additional (Max: ${pkg.max_participants})`}
+                        : Number(pkg.price_per_additional) > 0
+                          ? `${pkg.min_participants} included, +$${pkg.price_per_additional} per additional (Max: ${pkg.max_participants})`
+                          : `${pkg.min_participants} included (Max: ${pkg.max_participants})`}
                     </span>
                     {selectedSlotRemaining != null && !selectedSlotExclusive && (
                       <span className={`text-xs font-semibold w-full sm:w-auto ${selectedSlotRemaining <= 3 ? 'text-amber-700' : 'text-emerald-700'}`}>

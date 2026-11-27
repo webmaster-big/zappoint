@@ -1924,6 +1924,7 @@ const Payments = () => {
           setSelectedPaymentForAction(null);
         }}
         onRefundComplete={handleRefundComplete}
+        onVoidedInstead={handleVoidComplete}
         onToast={(message, type) => setToast({ message, type })}
       />
 

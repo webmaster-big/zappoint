@@ -14,6 +14,7 @@ import type {
   PaginatedPaymentsResponse,
   RefundRequest,
   RefundResponse,
+  RefundVoidedInsteadResponse,
   VoidResponse,
   ManualRefundRequest,
   ManualRefundResponse,
@@ -171,8 +172,8 @@ export const getAllTrashedPayments = async (filters?: PaymentFilters): Promise<P
 export const refundPayment = async (
   paymentId: number,
   data: RefundRequest = {}
-): Promise<RefundResponse> => {
-  const response = await api.patch<RefundResponse>(`/payments/${paymentId}/refund`, data);
+): Promise<RefundResponse | RefundVoidedInsteadResponse> => {
+  const response = await api.patch<RefundResponse | RefundVoidedInsteadResponse>(`/payments/${paymentId}/refund`, data);
   return response.data;
 };
 

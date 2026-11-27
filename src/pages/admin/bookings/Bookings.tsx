@@ -2581,7 +2581,7 @@ const Bookings: React.FC = () => {
     try {
       const response = await bookingService.restoreBooking(Number(id));
       if (response.success) {
-        alert('Booking restored successfully');
+        alert(response.space_warning || 'Booking restored successfully');
         loadTrashedBookings(trashedCurrentPage);
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
@@ -2600,7 +2600,11 @@ const Bookings: React.FC = () => {
       const ids = selectedTrashed.map(id => Number(id));
       const response = await bookingService.bulkRestore(ids);
       if (response.success) {
-        alert(`${response.data.restored_count} booking(s) restored successfully`);
+        const spaceWarnings = response.data.space_warnings ?? [];
+        alert([
+          `${response.data.restored_count} booking(s) restored successfully`,
+          ...spaceWarnings.map(warning => `${warning.reference_number}: ${warning.message}`),
+        ].join('\n\n'));
         setSelectedTrashed([]);
         loadTrashedBookings(trashedCurrentPage);
       }
